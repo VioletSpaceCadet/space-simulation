@@ -81,6 +81,16 @@ All in `content/`. Loaded at runtime by `sim_cli`; never compiled in.
 | `solar_system.json` | Nodes and edges (static graph) |
 | `asteroid_templates.json` | Composition ranges and anomaly tags per template |
 
+## After Every Change
+
+Tests run automatically via a PostToolUse hook (`.claude/hooks/after-edit.sh`) whenever a `.rs` file is edited — `cargo fmt` then `cargo test`. Fix any failures before moving on.
+
+Additionally, use judgment on the following:
+
+- **If you changed a type, added/removed a crate, or changed tick ordering:** update the relevant section in CLAUDE.md and `memory/MEMORY.md`.
+- **If you added a new mechanic or system:** add it to the Key Types table and Architecture section in CLAUDE.md.
+- **Before claiming work is complete:** confirm tests pass and no `TODO` stubs were introduced without being noted.
+
 ## MVP Scope
 
 - **MVP-0 (done):** `sim_core` tick + tests, `sim_control` autopilot, `sim_cli` run loop.

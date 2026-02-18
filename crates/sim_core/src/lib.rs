@@ -179,7 +179,10 @@ pub struct CommandEnvelope {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Command {
-    AssignShipTask { ship_id: ShipId, task_kind: TaskKind },
+    AssignShipTask {
+        ship_id: ShipId,
+        task_kind: TaskKind,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +422,9 @@ fn apply_commands(
         }
         match &envelope.command {
             Command::AssignShipTask { ship_id, task_kind } => {
-                let Some(ship) = state.ships.get(ship_id) else { continue };
+                let Some(ship) = state.ships.get(ship_id) else {
+                    continue;
+                };
                 if ship.owner != envelope.issued_by {
                     continue;
                 }
@@ -449,7 +454,11 @@ fn apply_commands(
         events.push(emit(
             &mut state.counters,
             current_tick,
-            Event::TaskStarted { ship_id, task_kind: label, target },
+            Event::TaskStarted {
+                ship_id,
+                task_kind: label,
+                target,
+            },
         ));
     }
 }
@@ -515,7 +524,10 @@ fn resolve_survey(
     };
     let site = state.scan_sites.remove(site_pos);
 
-    let Some(template) = content.asteroid_templates.iter().find(|t| t.id == site.template_id)
+    let Some(template) = content
+        .asteroid_templates
+        .iter()
+        .find(|t| t.id == site.template_id)
     else {
         return; // Unknown template — content error.
     };
@@ -539,14 +551,19 @@ fn resolve_survey(
             location_node: site.node.clone(),
             true_composition: composition,
             anomaly_tags: anomaly_tags.clone(),
-            knowledge: AsteroidKnowledge { tag_beliefs: vec![], composition: None },
+            knowledge: AsteroidKnowledge {
+                tag_beliefs: vec![],
+                composition: None,
+            },
         },
     );
 
     events.push(emit(
         &mut state.counters,
         current_tick,
-        Event::AsteroidDiscovered { asteroid_id: asteroid_id.clone() },
+        Event::AsteroidDiscovered {
+            asteroid_id: asteroid_id.clone(),
+        },
     ));
 
     // Detect anomaly tags probabilistically.
@@ -564,17 +581,28 @@ fn resolve_survey(
     events.push(emit(
         &mut state.counters,
         current_tick,
-        Event::ScanResult { asteroid_id: asteroid_id.clone(), tags: detected_tags },
+        Event::ScanResult {
+            asteroid_id: asteroid_id.clone(),
+            tags: detected_tags,
+        },
     ));
 
     let amount = content.constants.survey_scan_data_amount;
     let quality = content.constants.survey_scan_data_quality;
-    *state.research.data_pool.entry(DataKind::ScanData).or_insert(0.0) += amount * quality;
+    *state
+        .research
+        .data_pool
+        .entry(DataKind::ScanData)
+        .or_insert(0.0) += amount * quality;
 
     events.push(emit(
         &mut state.counters,
         current_tick,
-        Event::DataGenerated { kind: DataKind::ScanData, amount, quality },
+        Event::DataGenerated {
+            kind: DataKind::ScanData,
+            amount,
+            quality,
+        },
     ));
 
     set_ship_idle(state, ship_id, current_tick);
@@ -602,7 +630,10 @@ fn resolve_deep_scan(
 
     let sigma = composition_noise_sigma(&state.research, content);
 
-    let Some(true_composition) = state.asteroids.get(asteroid_id).map(|a| a.true_composition.clone())
+    let Some(true_composition) = state
+        .asteroids
+        .get(asteroid_id)
+        .map(|a| a.true_composition.clone())
     else {
         return; // Asteroid not found — shouldn't happen with valid state.
     };
@@ -611,7 +642,11 @@ fn resolve_deep_scan(
     let mut mapped: CompositionVec = true_composition
         .iter()
         .map(|(element, &true_value)| {
-            let noise = if sigma > 0.0 { rng.gen_range(-sigma..=sigma) } else { 0.0 };
+            let noise = if sigma > 0.0 {
+                rng.gen_range(-sigma..=sigma)
+            } else {
+                0.0
+            };
             (element.clone(), (true_value + noise).clamp(0.0, 1.0))
         })
         .collect();
@@ -624,17 +659,28 @@ fn resolve_deep_scan(
     events.push(emit(
         &mut state.counters,
         current_tick,
-        Event::CompositionMapped { asteroid_id: asteroid_id.clone(), composition: mapped },
+        Event::CompositionMapped {
+            asteroid_id: asteroid_id.clone(),
+            composition: mapped,
+        },
     ));
 
     let amount = content.constants.deep_scan_data_amount;
     let quality = content.constants.deep_scan_data_quality;
-    *state.research.data_pool.entry(DataKind::ScanData).or_insert(0.0) += amount * quality;
+    *state
+        .research
+        .data_pool
+        .entry(DataKind::ScanData)
+        .or_insert(0.0) += amount * quality;
 
     events.push(emit(
         &mut state.counters,
         current_tick,
-        Event::DataGenerated { kind: DataKind::ScanData, amount, quality },
+        Event::DataGenerated {
+            kind: DataKind::ScanData,
+            amount,
+            quality,
+        },
     ));
 
     set_ship_idle(state, ship_id, current_tick);
@@ -678,7 +724,11 @@ fn advance_research(
     for station_id in station_ids {
         let (compute_total, power_per_unit, efficiency) = {
             let facilities = &state.stations[&station_id].facilities;
-            (facilities.compute_units_total, facilities.power_per_compute_unit_per_tick, facilities.efficiency)
+            (
+                facilities.compute_units_total,
+                facilities.power_per_compute_unit_per_tick,
+                facilities.efficiency,
+            )
         };
 
         // Collect eligible techs: prereqs met, not yet unlocked. Sort for determinism.
@@ -687,7 +737,10 @@ fn advance_research(
             .iter()
             .filter(|tech| {
                 !state.research.unlocked.contains(&tech.id)
-                    && tech.prereqs.iter().all(|prereq| state.research.unlocked.contains(prereq))
+                    && tech
+                        .prereqs
+                        .iter()
+                        .all(|prereq| state.research.unlocked.contains(prereq))
             })
             .map(|tech| (tech.id.clone(), tech.difficulty))
             .collect();
@@ -703,12 +756,19 @@ fn advance_research(
         events.push(emit(
             &mut state.counters,
             current_tick,
-            Event::PowerConsumed { station_id: station_id.clone(), amount: total_power },
+            Event::PowerConsumed {
+                station_id: station_id.clone(),
+                amount: total_power,
+            },
         ));
 
         for (tech_id, difficulty) in eligible {
             let current_evidence = {
-                let evidence = state.research.evidence.entry(tech_id.clone()).or_insert(0.0);
+                let evidence = state
+                    .research
+                    .evidence
+                    .entry(tech_id.clone())
+                    .or_insert(0.0);
                 *evidence += per_tech_compute * efficiency;
                 *evidence
             };
@@ -848,7 +908,11 @@ mod tests {
                 data_pool: HashMap::new(),
                 evidence: HashMap::new(),
             },
-            counters: Counters { next_event_id: 0, next_command_id: 0, next_asteroid_id: 0 },
+            counters: Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+            },
         }
     }
 
@@ -866,7 +930,9 @@ mod tests {
             execute_at_tick: state.meta.tick,
             command: Command::AssignShipTask {
                 ship_id,
-                task_kind: TaskKind::Survey { site: SiteId("site_0001".to_string()) },
+                task_kind: TaskKind::Survey {
+                    site: SiteId("site_0001".to_string()),
+                },
             },
         }
     }
@@ -899,7 +965,9 @@ mod tests {
         let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
 
         assert!(
-            events.iter().any(|e| matches!(e.event, Event::TaskStarted { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e.event, Event::TaskStarted { .. })),
             "TaskStarted event should be emitted"
         );
     }
@@ -918,14 +986,25 @@ mod tests {
             execute_at_tick: 0,
             command: Command::AssignShipTask {
                 ship_id: ship_id.clone(),
-                task_kind: TaskKind::Survey { site: SiteId("site_0001".to_string()) },
+                task_kind: TaskKind::Survey {
+                    site: SiteId("site_0001".to_string()),
+                },
             },
         };
 
-        tick(&mut state, &[bad_command], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[bad_command],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+        );
 
         let ship = &state.ships[&ship_id];
-        assert!(ship.task.is_none(), "command from wrong owner should be silently dropped");
+        assert!(
+            ship.task.is_none(),
+            "command from wrong owner should be silently dropped"
+        );
     }
 
     #[test]
@@ -942,14 +1021,25 @@ mod tests {
             execute_at_tick: 5, // scheduled for tick 5, not now
             command: Command::AssignShipTask {
                 ship_id: ship_id.clone(),
-                task_kind: TaskKind::Survey { site: SiteId("site_0001".to_string()) },
+                task_kind: TaskKind::Survey {
+                    site: SiteId("site_0001".to_string()),
+                },
             },
         };
 
-        tick(&mut state, &[future_command], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[future_command],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+        );
 
         let ship = &state.ships[&ship_id];
-        assert!(ship.task.is_none(), "command scheduled for a future tick should not apply yet");
+        assert!(
+            ship.task.is_none(),
+            "command scheduled for a future tick should not apply yet"
+        );
     }
 
     // --- Survey scan --------------------------------------------------------
@@ -963,11 +1053,18 @@ mod tests {
         // Tick 0: assign task (eta_tick = 0 + 1 = 1).
         let cmd = survey_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
-        assert!(state.asteroids.is_empty(), "asteroid should not exist before task completes");
+        assert!(
+            state.asteroids.is_empty(),
+            "asteroid should not exist before task completes"
+        );
 
         // Tick 1: task resolves.
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-        assert_eq!(state.asteroids.len(), 1, "asteroid should be created on survey completion");
+        assert_eq!(
+            state.asteroids.len(),
+            1,
+            "asteroid should be created on survey completion"
+        );
         assert!(state.scan_sites.is_empty(), "scan site should be consumed");
     }
 
@@ -979,8 +1076,7 @@ mod tests {
 
         let cmd = survey_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
-        let completion_events =
-            tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let completion_events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         let event_kinds: Vec<&str> = completion_events
             .iter()
@@ -1034,8 +1130,16 @@ mod tests {
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
-        let scan_data = state.research.data_pool.get(&DataKind::ScanData).copied().unwrap_or(0.0);
-        assert!(scan_data > 0.0, "ScanData should accumulate in the data pool after a survey");
+        let scan_data = state
+            .research
+            .data_pool
+            .get(&DataKind::ScanData)
+            .copied()
+            .unwrap_or(0.0);
+        assert!(
+            scan_data > 0.0,
+            "ScanData should accumulate in the data pool after a survey"
+        );
     }
 
     #[test]
@@ -1081,11 +1185,19 @@ mod tests {
             execute_at_tick: state.meta.tick,
             command: Command::AssignShipTask {
                 ship_id: ship_id.clone(),
-                task_kind: TaskKind::DeepScan { asteroid: asteroid_id },
+                task_kind: TaskKind::DeepScan {
+                    asteroid: asteroid_id,
+                },
             },
         };
 
-        tick(&mut state, &[deep_cmd], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[deep_cmd],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+        );
 
         let ship = &state.ships[&ship_id];
         assert!(
@@ -1101,7 +1213,10 @@ mod tests {
         let mut rng = make_rng();
 
         // Unlock the tech directly.
-        state.research.unlocked.insert(TechId("tech_deep_scan_v1".to_string()));
+        state
+            .research
+            .unlocked
+            .insert(TechId("tech_deep_scan_v1".to_string()));
 
         // Survey to create an asteroid.
         let cmd = survey_command(&state);
@@ -1110,7 +1225,10 @@ mod tests {
 
         let asteroid_id = state.asteroids.keys().next().unwrap().clone();
         assert!(
-            state.asteroids[&asteroid_id].knowledge.composition.is_none(),
+            state.asteroids[&asteroid_id]
+                .knowledge
+                .composition
+                .is_none(),
             "composition should be unknown before deep scan"
         );
 
@@ -1123,15 +1241,26 @@ mod tests {
             execute_at_tick: state.meta.tick,
             command: Command::AssignShipTask {
                 ship_id,
-                task_kind: TaskKind::DeepScan { asteroid: asteroid_id.clone() },
+                task_kind: TaskKind::DeepScan {
+                    asteroid: asteroid_id.clone(),
+                },
             },
         };
 
-        tick(&mut state, &[deep_cmd], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[deep_cmd],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+        );
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         let composition = state.asteroids[&asteroid_id].knowledge.composition.as_ref();
-        assert!(composition.is_some(), "composition should be mapped after deep scan");
+        assert!(
+            composition.is_some(),
+            "composition should be mapped after deep scan"
+        );
     }
 
     #[test]
@@ -1141,7 +1270,10 @@ mod tests {
         let mut state = test_state(&content);
         let mut rng = make_rng();
 
-        state.research.unlocked.insert(TechId("tech_deep_scan_v1".to_string()));
+        state
+            .research
+            .unlocked
+            .insert(TechId("tech_deep_scan_v1".to_string()));
 
         let cmd = survey_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
@@ -1157,10 +1289,18 @@ mod tests {
             execute_at_tick: state.meta.tick,
             command: Command::AssignShipTask {
                 ship_id,
-                task_kind: TaskKind::DeepScan { asteroid: asteroid_id.clone() },
+                task_kind: TaskKind::DeepScan {
+                    asteroid: asteroid_id.clone(),
+                },
             },
         };
-        tick(&mut state, &[deep_cmd], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[deep_cmd],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+        );
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         let asteroid = &state.asteroids[&asteroid_id];
@@ -1190,16 +1330,32 @@ mod tests {
         let mut high_difficulty_content = content.clone();
         high_difficulty_content.techs[0].difficulty = 1_000_000.0;
 
-        tick(&mut state, &[], &high_difficulty_content, &mut rng, EventLevel::Normal);
-        let evidence_t1 =
-            *state.research.evidence.get(&tech_id).unwrap_or(&0.0);
+        tick(
+            &mut state,
+            &[],
+            &high_difficulty_content,
+            &mut rng,
+            EventLevel::Normal,
+        );
+        let evidence_t1 = *state.research.evidence.get(&tech_id).unwrap_or(&0.0);
 
-        tick(&mut state, &[], &high_difficulty_content, &mut rng, EventLevel::Normal);
-        let evidence_t2 =
-            *state.research.evidence.get(&tech_id).unwrap_or(&0.0);
+        tick(
+            &mut state,
+            &[],
+            &high_difficulty_content,
+            &mut rng,
+            EventLevel::Normal,
+        );
+        let evidence_t2 = *state.research.evidence.get(&tech_id).unwrap_or(&0.0);
 
-        assert!(evidence_t1 > 0.0, "evidence should be positive after first tick");
-        assert!(evidence_t2 > evidence_t1, "evidence should increase each tick");
+        assert!(
+            evidence_t1 > 0.0,
+            "evidence should be positive after first tick"
+        );
+        assert!(
+            evidence_t2 > evidence_t1,
+            "evidence should increase each tick"
+        );
     }
 
     #[test]
@@ -1211,7 +1367,9 @@ mod tests {
         let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         assert!(
-            events.iter().any(|e| matches!(e.event, Event::PowerConsumed { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e.event, Event::PowerConsumed { .. })),
             "PowerConsumed should be emitted each tick that research runs"
         );
     }
@@ -1250,8 +1408,16 @@ mod tests {
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         let tech_id = TechId("tech_deep_scan_v1".to_string());
-        let evidence = state.research.evidence.get(&tech_id).copied().unwrap_or(0.0);
-        assert_eq!(evidence, 0.0, "evidence should not accumulate when prerequisites are unmet");
+        let evidence = state
+            .research
+            .evidence
+            .get(&tech_id)
+            .copied()
+            .unwrap_or(0.0);
+        assert_eq!(
+            evidence, 0.0,
+            "evidence should not accumulate when prerequisites are unmet"
+        );
     }
 
     #[test]
@@ -1259,13 +1425,18 @@ mod tests {
         let content = test_content();
         let mut state = test_state(&content);
         // Pre-unlock the only tech so nothing is eligible.
-        state.research.unlocked.insert(TechId("tech_deep_scan_v1".to_string()));
+        state
+            .research
+            .unlocked
+            .insert(TechId("tech_deep_scan_v1".to_string()));
         let mut rng = make_rng();
 
         let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         assert!(
-            !events.iter().any(|e| matches!(e.event, Event::PowerConsumed { .. })),
+            !events
+                .iter()
+                .any(|e| matches!(e.event, Event::PowerConsumed { .. })),
             "no PowerConsumed when all techs are already unlocked"
         );
     }
@@ -1323,7 +1494,9 @@ mod tests {
         let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
 
         assert!(
-            events.iter().any(|e| matches!(e.event, Event::ResearchRoll { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e.event, Event::ResearchRoll { .. })),
             "ResearchRoll events should be emitted at EventLevel::Debug"
         );
     }
@@ -1337,7 +1510,9 @@ mod tests {
         let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         assert!(
-            !events.iter().any(|e| matches!(e.event, Event::ResearchRoll { .. })),
+            !events
+                .iter()
+                .any(|e| matches!(e.event, Event::ResearchRoll { .. })),
             "ResearchRoll events should not be emitted at EventLevel::Normal"
         );
     }
@@ -1355,9 +1530,12 @@ mod tests {
 
             let cmd = survey_command(&state);
             for i in 0..20u64 {
-                let commands = if i == 0 { std::slice::from_ref(&cmd) } else { &[] };
-                let events =
-                    tick(&mut state, commands, &content, &mut rng, EventLevel::Debug);
+                let commands = if i == 0 {
+                    std::slice::from_ref(&cmd)
+                } else {
+                    &[]
+                };
+                let events = tick(&mut state, commands, &content, &mut rng, EventLevel::Debug);
                 for event in events {
                     log.push((event.id.0.clone(), event.tick));
                 }
@@ -1365,7 +1543,11 @@ mod tests {
             log
         };
 
-        assert_eq!(run(42), run(42), "identical seeds must produce identical event logs");
+        assert_eq!(
+            run(42),
+            run(42),
+            "identical seeds must produce identical event logs"
+        );
     }
 
     #[test]
@@ -1389,6 +1571,9 @@ mod tests {
         // If they happen to collide the test is a false failure — acceptable in practice.
         let tick_42 = unlock_tick(42);
         let tick_1234 = unlock_tick(1234);
-        assert_ne!(tick_42, tick_1234, "different seeds should generally produce different results");
+        assert_ne!(
+            tick_42, tick_1234,
+            "different seeds should generally produce different results"
+        );
     }
 }

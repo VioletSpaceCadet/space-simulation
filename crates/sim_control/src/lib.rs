@@ -36,14 +36,19 @@ impl CommandSource for AutopilotController {
             .values()
             .filter(|ship| {
                 ship.owner == owner
-                    && ship.task.as_ref().map_or(true, |t| matches!(t.kind, TaskKind::Idle))
+                    && ship
+                        .task
+                        .as_ref()
+                        .map_or(true, |t| matches!(t.kind, TaskKind::Idle))
             })
             .map(|ship| ship.id.clone())
             .collect();
         idle_ships.sort_by(|a, b| a.0.cmp(&b.0));
 
-        let deep_scan_unlocked =
-            state.research.unlocked.contains(&TechId("tech_deep_scan_v1".to_string()));
+        let deep_scan_unlocked = state
+            .research
+            .unlocked
+            .contains(&TechId("tech_deep_scan_v1".to_string()));
 
         // Deep scan candidates: IronRich confidence above threshold, composition unknown.
         let mut deep_scan_candidates: Vec<AsteroidId> = state
@@ -66,10 +71,14 @@ impl CommandSource for AutopilotController {
         for ship_id in idle_ships {
             let ship = &state.ships[&ship_id];
             let task_kind = if let Some(site) = next_site.next() {
-                TaskKind::Survey { site: SiteId(site.id.0.clone()) }
+                TaskKind::Survey {
+                    site: SiteId(site.id.0.clone()),
+                }
             } else if deep_scan_unlocked {
                 match next_deep_scan.next() {
-                    Some(asteroid_id) => TaskKind::DeepScan { asteroid: asteroid_id.clone() },
+                    Some(asteroid_id) => TaskKind::DeepScan {
+                        asteroid: asteroid_id.clone(),
+                    },
                     None => continue, // nothing to do
                 }
             } else {
