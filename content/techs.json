@@ -1,0 +1,16 @@
+{
+  "content_version": "0.0.1",
+  "techs": [
+    {
+      "id": "tech_deep_scan_v1",
+      "name": "Deep Scan v1",
+      "prereqs": [],
+      "accepted_data": ["ScanData"],
+      "difficulty": 200.0,
+      "effects": [
+        { "type": "EnableDeepScan" },
+        { "type": "DeepScanCompositionNoise", "sigma": 0.02 }
+      ]
+    }
+  ]
+}

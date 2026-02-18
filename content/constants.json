@@ -1,0 +1,14 @@
+{
+  "survey_scan_ticks": 10,
+  "deep_scan_ticks": 30,
+  "survey_scan_data_amount": 5.0,
+  "survey_scan_data_quality": 1.0,
+  "deep_scan_data_amount": 15.0,
+  "deep_scan_data_quality": 1.2,
+  "survey_tag_detection_probability": 0.85,
+  "asteroid_count_per_template": 10,
+  "station_compute_units_total": 10,
+  "station_power_per_compute_unit_per_tick": 1.0,
+  "station_efficiency": 1.0,
+  "station_power_available_per_tick": 100.0
+}

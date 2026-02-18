@@ -1,0 +1,22 @@
+{
+  "templates": [
+    {
+      "id": "tmpl_iron_rich",
+      "anomaly_tags": ["IronRich"],
+      "composition_ranges": {
+        "Fe": [0.55, 0.80],
+        "Si": [0.10, 0.30],
+        "He": [0.00, 0.15]
+      }
+    },
+    {
+      "id": "tmpl_silicate",
+      "anomaly_tags": [],
+      "composition_ranges": {
+        "Fe": [0.10, 0.25],
+        "Si": [0.55, 0.80],
+        "He": [0.00, 0.10]
+      }
+    }
+  ]
+}

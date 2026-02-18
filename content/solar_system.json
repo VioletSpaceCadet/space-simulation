@@ -1,0 +1,13 @@
+{
+  "nodes": [
+    { "id": "node_earth_orbit", "name": "Earth Orbit" },
+    { "id": "node_belt_inner",  "name": "Inner Belt" },
+    { "id": "node_belt_mid",    "name": "Mid Belt" },
+    { "id": "node_belt_outer",  "name": "Outer Belt" }
+  ],
+  "edges": [
+    ["node_earth_orbit", "node_belt_inner"],
+    ["node_belt_inner",  "node_belt_mid"],
+    ["node_belt_mid",    "node_belt_outer"]
+  ]
+}
