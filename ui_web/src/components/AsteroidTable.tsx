@@ -27,7 +27,7 @@ export function AsteroidTable({ asteroids }: Props) {
   if (rows.length === 0) {
     return (
       <div className="asteroid-table">
-        <div className="table-empty">no asteroids discovered</div>
+        <div className="table-empty">no bodies discovered</div>
       </div>
     )
   }

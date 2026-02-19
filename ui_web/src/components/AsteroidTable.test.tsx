@@ -33,6 +33,6 @@ describe('AsteroidTable', () => {
 
   it('shows empty state when no asteroids', () => {
     render(<AsteroidTable asteroids={{}} />)
-    expect(screen.getByText(/no asteroids/i)).toBeInTheDocument()
+    expect(screen.getByText(/no bodies discovered/i)).toBeInTheDocument()
   })
 })

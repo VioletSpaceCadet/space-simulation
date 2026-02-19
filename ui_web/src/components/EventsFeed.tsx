@@ -22,7 +22,7 @@ export function EventsFeed({ events }: Props) {
   if (events.length === 0) {
     return (
       <div className="events-feed">
-        <div className="events-empty">no events yet</div>
+        <div className="events-empty">waiting for stream data</div>
       </div>
     )
   }

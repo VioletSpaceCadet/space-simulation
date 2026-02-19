@@ -21,6 +21,6 @@ describe('EventsFeed', () => {
 
   it('shows empty state with no events', () => {
     render(<EventsFeed events={[]} />)
-    expect(screen.getByText(/no events/i)).toBeInTheDocument()
+    expect(screen.getByText(/waiting for stream data/i)).toBeInTheDocument()
   })
 })

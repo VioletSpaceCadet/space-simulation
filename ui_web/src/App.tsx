@@ -1,35 +1,30 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
+import { AsteroidTable } from './components/AsteroidTable'
+import { EventsFeed } from './components/EventsFeed'
+import { ResearchPanel } from './components/ResearchPanel'
+import { StatusBar } from './components/StatusBar'
+import { useSimStream } from './hooks/useSimStream'
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const { snapshot, events, connected, currentTick } = useSimStream()
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="app">
+      <StatusBar tick={currentTick} connected={connected} />
+      <div className="panels">
+        <section className="panel panel-events">
+          <h2>Events</h2>
+          <EventsFeed events={events} />
+        </section>
+        <section className="panel panel-asteroids">
+          <h2>Asteroids</h2>
+          <AsteroidTable asteroids={snapshot?.asteroids ?? {}} />
+        </section>
+        <section className="panel panel-research">
+          <h2>Research</h2>
+          {snapshot && <ResearchPanel research={snapshot.research} />}
+        </section>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    </div>
   )
 }
-
-export default App
