@@ -378,6 +378,7 @@ mod tests {
             constants: Constants {
                 survey_scan_ticks: 1,
                 deep_scan_ticks: 1,
+                travel_ticks_per_hop: 1,
                 survey_scan_data_amount: 1.0,
                 survey_scan_data_quality: 1.0,
                 deep_scan_data_amount: 1.0,

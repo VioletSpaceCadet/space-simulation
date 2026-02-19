@@ -160,6 +160,13 @@ pub struct TaskState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TaskKind {
     Idle,
+    /// Ship is in transit. On arrival it will immediately start `then`.
+    Transit {
+        destination: NodeId,
+        /// Pre-computed total travel ticks (hop_count × travel_ticks_per_hop).
+        total_ticks: u64,
+        then: Box<TaskKind>,
+    },
     Survey { site: SiteId },
     DeepScan { asteroid: AsteroidId },
 }
@@ -232,6 +239,10 @@ pub enum Event {
     TechUnlocked {
         tech_id: TechId,
     },
+    ShipArrived {
+        ship_id: ShipId,
+        node: NodeId,
+    },
     /// Only emitted at EventLevel::Debug.
     ResearchRoll {
         tech_id: TechId,
@@ -294,6 +305,8 @@ pub struct AsteroidTemplateDef {
 pub struct Constants {
     pub survey_scan_ticks: u64,
     pub deep_scan_ticks: u64,
+    /// Ticks to travel one hop on the solar system graph.
+    pub travel_ticks_per_hop: u64,
     pub survey_scan_data_amount: f32,
     pub survey_scan_data_quality: f32,
     pub deep_scan_data_amount: f32,
@@ -348,6 +361,7 @@ fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnvelope {
 
 fn task_duration(kind: &TaskKind, constants: &Constants) -> u64 {
     match kind {
+        TaskKind::Transit { total_ticks, .. } => *total_ticks,
         TaskKind::Survey { .. } => constants.survey_scan_ticks,
         TaskKind::DeepScan { .. } => constants.deep_scan_ticks,
         TaskKind::Idle => 0,
@@ -357,6 +371,7 @@ fn task_duration(kind: &TaskKind, constants: &Constants) -> u64 {
 fn task_kind_label(kind: &TaskKind) -> &'static str {
     match kind {
         TaskKind::Idle => "Idle",
+        TaskKind::Transit { .. } => "Transit",
         TaskKind::Survey { .. } => "Survey",
         TaskKind::DeepScan { .. } => "DeepScan",
     }
@@ -365,9 +380,43 @@ fn task_kind_label(kind: &TaskKind) -> &'static str {
 fn task_target(kind: &TaskKind) -> Option<String> {
     match kind {
         TaskKind::Idle => None,
+        TaskKind::Transit { destination, .. } => Some(destination.0.clone()),
         TaskKind::Survey { site } => Some(site.0.clone()),
         TaskKind::DeepScan { asteroid } => Some(asteroid.0.clone()),
     }
+}
+
+/// Returns the number of hops on the shortest undirected path between two nodes,
+/// or `None` if no path exists. Returns `Some(0)` when `from == to`.
+pub fn shortest_hop_count(from: &NodeId, to: &NodeId, solar_system: &SolarSystemDef) -> Option<u64> {
+    if from == to {
+        return Some(0);
+    }
+    use std::collections::{HashSet, VecDeque};
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back((from.clone(), 0u64));
+    visited.insert(from.clone());
+    while let Some((node, dist)) = queue.pop_front() {
+        for (a, b) in &solar_system.edges {
+            let neighbor = if a == &node {
+                Some(b)
+            } else if b == &node {
+                Some(a)
+            } else {
+                None
+            };
+            if let Some(neighbor) = neighbor {
+                if neighbor == to {
+                    return Some(dist + 1);
+                }
+                if visited.insert(neighbor.clone()) {
+                    queue.push_back((neighbor.clone(), dist + 1));
+                }
+            }
+        }
+    }
+    None
 }
 
 /// True if any unlocked tech grants the EnableDeepScan effect.
@@ -499,6 +548,9 @@ fn resolve_ship_tasks(
         };
 
         match task_kind {
+            TaskKind::Transit { ref destination, ref then, .. } => {
+                resolve_transit(state, &ship_id, destination, then, content, events);
+            }
             TaskKind::Survey { ref site } => {
                 resolve_survey(state, &ship_id, site, content, rng, events);
             }
@@ -508,6 +560,53 @@ fn resolve_ship_tasks(
             TaskKind::Idle => {}
         }
     }
+}
+
+fn resolve_transit(
+    state: &mut GameState,
+    ship_id: &ShipId,
+    destination: &NodeId,
+    then: &TaskKind,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    if let Some(ship) = state.ships.get_mut(ship_id) {
+        ship.location_node = destination.clone();
+    }
+
+    events.push(emit(
+        &mut state.counters,
+        current_tick,
+        Event::ShipArrived {
+            ship_id: ship_id.clone(),
+            node: destination.clone(),
+        },
+    ));
+
+    // Start the follow-on task immediately.
+    let duration = task_duration(then, &content.constants);
+    let label = task_kind_label(then).to_string();
+    let target = task_target(then);
+
+    if let Some(ship) = state.ships.get_mut(ship_id) {
+        ship.task = Some(TaskState {
+            kind: then.clone(),
+            started_tick: current_tick,
+            eta_tick: current_tick + duration,
+        });
+    }
+
+    events.push(emit(
+        &mut state.counters,
+        current_tick,
+        Event::TaskStarted {
+            ship_id: ship_id.clone(),
+            task_kind: label,
+            target,
+        },
+    ));
 }
 
 fn resolve_survey(
@@ -849,6 +948,7 @@ mod tests {
             constants: Constants {
                 survey_scan_ticks: 1,
                 deep_scan_ticks: 1,
+                travel_ticks_per_hop: 1,
                 survey_scan_data_amount: 5.0,
                 survey_scan_data_quality: 1.0,
                 deep_scan_data_amount: 15.0,
@@ -1576,6 +1676,186 @@ mod tests {
         assert_ne!(
             tick_42, tick_1234,
             "different seeds should generally produce different results"
+        );
+    }
+
+    // --- Transit ------------------------------------------------------------
+
+    #[test]
+    fn test_shortest_hop_count_same_node() {
+        let content = test_content();
+        let node = NodeId("node_test".to_string());
+        assert_eq!(
+            shortest_hop_count(&node, &node, &content.solar_system),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn test_shortest_hop_count_adjacent() {
+        let solar_system = SolarSystemDef {
+            nodes: vec![
+                NodeDef { id: NodeId("a".to_string()), name: "A".to_string() },
+                NodeDef { id: NodeId("b".to_string()), name: "B".to_string() },
+            ],
+            edges: vec![(NodeId("a".to_string()), NodeId("b".to_string()))],
+        };
+        assert_eq!(
+            shortest_hop_count(
+                &NodeId("a".to_string()),
+                &NodeId("b".to_string()),
+                &solar_system
+            ),
+            Some(1)
+        );
+        // Undirected: reverse also works.
+        assert_eq!(
+            shortest_hop_count(
+                &NodeId("b".to_string()),
+                &NodeId("a".to_string()),
+                &solar_system
+            ),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn test_shortest_hop_count_two_hops() {
+        let solar_system = SolarSystemDef {
+            nodes: vec![
+                NodeDef { id: NodeId("a".to_string()), name: "A".to_string() },
+                NodeDef { id: NodeId("b".to_string()), name: "B".to_string() },
+                NodeDef { id: NodeId("c".to_string()), name: "C".to_string() },
+            ],
+            edges: vec![
+                (NodeId("a".to_string()), NodeId("b".to_string())),
+                (NodeId("b".to_string()), NodeId("c".to_string())),
+            ],
+        };
+        assert_eq!(
+            shortest_hop_count(
+                &NodeId("a".to_string()),
+                &NodeId("c".to_string()),
+                &solar_system
+            ),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn test_shortest_hop_count_no_path() {
+        let solar_system = SolarSystemDef {
+            nodes: vec![
+                NodeDef { id: NodeId("a".to_string()), name: "A".to_string() },
+                NodeDef { id: NodeId("b".to_string()), name: "B".to_string() },
+            ],
+            edges: vec![],
+        };
+        assert_eq!(
+            shortest_hop_count(
+                &NodeId("a".to_string()),
+                &NodeId("b".to_string()),
+                &solar_system
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn transit_moves_ship_and_starts_next_task() {
+        // Two-node solar system; ship starts at node_a, site is at node_b.
+        let mut content = test_content();
+        let node_a = NodeId("node_a".to_string());
+        let node_b = NodeId("node_b".to_string());
+        content.solar_system = SolarSystemDef {
+            nodes: vec![
+                NodeDef { id: node_a.clone(), name: "A".to_string() },
+                NodeDef { id: node_b.clone(), name: "B".to_string() },
+            ],
+            edges: vec![(node_a.clone(), node_b.clone())],
+        };
+        content.constants.travel_ticks_per_hop = 5;
+        content.constants.survey_scan_ticks = 1;
+
+        let ship_id = ShipId("ship_0001".to_string());
+        let site_id = SiteId("site_0001".to_string());
+        let owner = PrincipalId("principal_autopilot".to_string());
+        let station_id = StationId("station_test".to_string());
+
+        let mut state = GameState {
+            meta: MetaState { tick: 0, seed: 0, schema_version: 1, content_version: "test".to_string() },
+            scan_sites: vec![ScanSite { id: site_id.clone(), node: node_b.clone(), template_id: "tmpl_iron_rich".to_string() }],
+            asteroids: HashMap::new(),
+            ships: HashMap::from([(
+                ship_id.clone(),
+                ShipState { id: ship_id.clone(), location_node: node_a.clone(), owner: owner.clone(), task: None },
+            )]),
+            stations: HashMap::from([(
+                station_id.clone(),
+                StationState {
+                    id: station_id,
+                    location_node: node_a.clone(),
+                    power_available_per_tick: 100.0,
+                    facilities: FacilitiesState {
+                        compute_units_total: 10,
+                        power_per_compute_unit_per_tick: 1.0,
+                        efficiency: 1.0,
+                    },
+                },
+            )]),
+            research: ResearchState {
+                unlocked: std::collections::HashSet::new(),
+                data_pool: HashMap::new(),
+                evidence: HashMap::new(),
+            },
+            counters: Counters { next_event_id: 0, next_command_id: 0, next_asteroid_id: 0 },
+        };
+
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+
+        // Assign a Transit task: 5 ticks to node_b, then Survey.
+        let transit_cmd = CommandEnvelope {
+            id: CommandId("cmd_000000".to_string()),
+            issued_by: owner,
+            issued_tick: 0,
+            execute_at_tick: 0,
+            command: Command::AssignShipTask {
+                ship_id: ship_id.clone(),
+                task_kind: TaskKind::Transit {
+                    destination: node_b.clone(),
+                    total_ticks: 5,
+                    then: Box::new(TaskKind::Survey { site: site_id.clone() }),
+                },
+            },
+        };
+
+        // Tick 0: assign transit.
+        tick(&mut state, &[transit_cmd], &content, &mut rng, EventLevel::Normal);
+        assert_eq!(state.ships[&ship_id].location_node, node_a, "ship still at origin during transit");
+
+        // Ticks 1–4: transit in progress, ship still at node_a.
+        for _ in 1..5 {
+            tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        }
+        assert_eq!(state.ships[&ship_id].location_node, node_a, "ship still in transit");
+
+        // Tick 5: transit resolves → ship moves to node_b, survey starts.
+        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        assert_eq!(state.ships[&ship_id].location_node, node_b, "ship arrived at destination");
+        assert!(
+            events.iter().any(|e| matches!(&e.event, Event::ShipArrived { node, .. } if node == &node_b)),
+            "ShipArrived event should be emitted"
+        );
+        let survey_started = events.iter().any(|e| matches!(&e.event,
+            Event::TaskStarted { task_kind, .. } if task_kind == "Survey"
+        ));
+        assert!(survey_started, "Survey task should start immediately after arrival");
+
+        // Tick 6: survey resolves → asteroid discovered.
+        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        assert!(
+            events.iter().any(|e| matches!(e.event, Event::AsteroidDiscovered { .. })),
+            "AsteroidDiscovered after survey completes"
         );
     }
 }

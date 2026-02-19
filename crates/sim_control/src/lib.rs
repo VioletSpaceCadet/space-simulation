@@ -1,6 +1,6 @@
 use sim_core::{
-    AnomalyTag, AsteroidId, Command, CommandEnvelope, CommandId, GameContent, GameState,
-    PrincipalId, SiteId, TaskKind, TechId,
+    shortest_hop_count, AnomalyTag, AsteroidId, Command, CommandEnvelope, CommandId, GameContent,
+    GameState, PrincipalId, SiteId, TaskKind, TechId,
 };
 
 pub trait CommandSource {
@@ -25,7 +25,7 @@ impl CommandSource for AutopilotController {
     fn generate_commands(
         &mut self,
         state: &GameState,
-        _content: &GameContent,
+        content: &GameContent,
         next_command_id: &mut u64,
     ) -> Vec<CommandEnvelope> {
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
@@ -70,19 +70,35 @@ impl CommandSource for AutopilotController {
 
         for ship_id in idle_ships {
             let ship = &state.ships[&ship_id];
-            let task_kind = if let Some(site) = next_site.next() {
-                TaskKind::Survey {
-                    site: SiteId(site.id.0.clone()),
-                }
+            let (task_kind, target_node) = if let Some(site) = next_site.next() {
+                (
+                    TaskKind::Survey { site: SiteId(site.id.0.clone()) },
+                    site.node.clone(),
+                )
             } else if deep_scan_unlocked {
                 match next_deep_scan.next() {
-                    Some(asteroid_id) => TaskKind::DeepScan {
-                        asteroid: asteroid_id.clone(),
-                    },
+                    Some(asteroid_id) => {
+                        let node = state.asteroids[asteroid_id].location_node.clone();
+                        (TaskKind::DeepScan { asteroid: asteroid_id.clone() }, node)
+                    }
                     None => continue, // nothing to do
                 }
             } else {
                 continue; // no sites left and tech not unlocked yet — wait
+            };
+
+            // Wrap in Transit if the ship is not already at the target node.
+            let final_task = match shortest_hop_count(
+                &ship.location_node,
+                &target_node,
+                &content.solar_system,
+            ) {
+                Some(0) | None => task_kind,
+                Some(hops) => TaskKind::Transit {
+                    destination: target_node,
+                    total_ticks: hops * content.constants.travel_ticks_per_hop,
+                    then: Box::new(task_kind),
+                },
             };
 
             let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
@@ -93,7 +109,7 @@ impl CommandSource for AutopilotController {
                 issued_by: ship.owner.clone(),
                 issued_tick: state.meta.tick,
                 execute_at_tick: state.meta.tick,
-                command: Command::AssignShipTask { ship_id, task_kind },
+                command: Command::AssignShipTask { ship_id, task_kind: final_task },
             });
         }
 

@@ -1,6 +1,7 @@
 {
-  "survey_scan_ticks": 10,
-  "deep_scan_ticks": 30,
+  "survey_scan_ticks": 120,
+  "deep_scan_ticks": 480,
+  "travel_ticks_per_hop": 2880,
   "survey_scan_data_amount": 5.0,
   "survey_scan_data_quality": 1.0,
   "deep_scan_data_amount": 15.0,
