@@ -38,6 +38,25 @@ describe('useSimStream', () => {
     expect(result.current.events).toEqual([])
   })
 
+  it('resets state when watchdog fires after no data', async () => {
+    vi.useFakeTimers()
+    const mockEs = new MockEventSource()
+    vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
+    const { result } = renderHook(() => useSimStream())
+    await act(async () => { await Promise.resolve() })
+
+    // Simulate connection opening (starts watchdog)
+    act(() => { mockEs.onopen!(new Event('open')) })
+    expect(result.current.connected).toBe(true)
+
+    // Advance past watchdog timeout with no messages
+    await act(async () => { vi.advanceTimersByTime(11_000) })
+
+    expect(result.current.connected).toBe(false)
+    expect(result.current.snapshot).toBeNull()
+    vi.useRealTimers()
+  })
+
   it('resets state and retries on EventSource error', async () => {
     const mockEs = new MockEventSource()
     vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
