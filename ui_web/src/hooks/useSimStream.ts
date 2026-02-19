@@ -27,14 +27,16 @@ function applyEvents(
   for (const evt of events) {
     const e = evt.event
 
-    if (e['CompositionMapped']) {
-      const { asteroid_id, composition } = e['CompositionMapped'] as { asteroid_id: string; composition: Record<string, number> }
-      if (updatedAsteroids[asteroid_id]) {
+    if (e['AsteroidDiscovered']) {
+      const { asteroid_id, location_node } = e['AsteroidDiscovered'] as { asteroid_id: string; location_node: string }
+      if (!updatedAsteroids[asteroid_id]) {
         updatedAsteroids = {
           ...updatedAsteroids,
           [asteroid_id]: {
-            ...updatedAsteroids[asteroid_id],
-            knowledge: { ...updatedAsteroids[asteroid_id].knowledge, composition },
+            id: asteroid_id,
+            location_node,
+            anomaly_tags: [],
+            knowledge: { tag_beliefs: [], composition: null },
           },
         }
       }
@@ -48,6 +50,19 @@ function applyEvents(
           [asteroid_id]: {
             ...updatedAsteroids[asteroid_id],
             knowledge: { ...updatedAsteroids[asteroid_id].knowledge, tag_beliefs: tags },
+          },
+        }
+      }
+    }
+
+    if (e['CompositionMapped']) {
+      const { asteroid_id, composition } = e['CompositionMapped'] as { asteroid_id: string; composition: Record<string, number> }
+      if (updatedAsteroids[asteroid_id]) {
+        updatedAsteroids = {
+          ...updatedAsteroids,
+          [asteroid_id]: {
+            ...updatedAsteroids[asteroid_id],
+            knowledge: { ...updatedAsteroids[asteroid_id].knowledge, composition },
           },
         }
       }

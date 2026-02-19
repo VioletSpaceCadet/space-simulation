@@ -210,6 +210,7 @@ pub enum Event {
     },
     AsteroidDiscovered {
         asteroid_id: AsteroidId,
+        location_node: NodeId,
     },
     ScanResult {
         asteroid_id: AsteroidId,
@@ -563,6 +564,7 @@ fn resolve_survey(
         current_tick,
         Event::AsteroidDiscovered {
             asteroid_id: asteroid_id.clone(),
+            location_node: site.node.clone(),
         },
     ));
 

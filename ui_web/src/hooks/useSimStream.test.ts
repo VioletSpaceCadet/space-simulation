@@ -46,6 +46,25 @@ describe('useSimStream', () => {
     expect(mockEs.close).toHaveBeenCalledOnce()
   })
 
+  it('adds asteroid to table when AsteroidDiscovered event is received', async () => {
+    const mockEs = new MockEventSource()
+    vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
+    const { result } = renderHook(() => useSimStream())
+    await act(async () => { await Promise.resolve() })
+
+    const events = [
+      { id: 'evt_000010', tick: 20, event: { AsteroidDiscovered: { asteroid_id: 'asteroid_0005', location_node: 'node_belt_inner' } } },
+      { id: 'evt_000011', tick: 20, event: { ScanResult: { asteroid_id: 'asteroid_0005', tags: [['IronRich', 0.9]] } } },
+    ]
+    act(() => {
+      mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }))
+    })
+
+    expect(result.current.snapshot?.asteroids['asteroid_0005']).toBeDefined()
+    expect(result.current.snapshot?.asteroids['asteroid_0005'].location_node).toBe('node_belt_inner')
+    expect(result.current.snapshot?.asteroids['asteroid_0005'].knowledge.tag_beliefs).toEqual([['IronRich', 0.9]])
+  })
+
   it('updates currentTick when events are received', async () => {
     const mockEs = new MockEventSource()
     vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
