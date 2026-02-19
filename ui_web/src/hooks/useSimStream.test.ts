@@ -38,6 +38,22 @@ describe('useSimStream', () => {
     expect(result.current.events).toEqual([])
   })
 
+  it('resets state and retries on EventSource error', async () => {
+    const mockEs = new MockEventSource()
+    vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
+    const { result } = renderHook(() => useSimStream())
+    await act(async () => { await Promise.resolve() })
+    expect(result.current.currentTick).toBe(5)
+
+    act(() => {
+      mockEs.onerror!(new Event('error'))
+    })
+
+    expect(result.current.currentTick).toBe(0)
+    expect(result.current.snapshot).toBeNull()
+    expect(result.current.events).toEqual([])
+  })
+
   it('closes EventSource on unmount', () => {
     const mockEs = new MockEventSource()
     vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)

@@ -18,8 +18,8 @@ describe('StatusBar', () => {
     expect(screen.getByText(/connected/i)).toBeInTheDocument()
   })
 
-  it('shows disconnected when not connected', () => {
+  it('shows reconnecting when not connected', () => {
     render(<StatusBar tick={0} connected={false} />)
-    expect(screen.getByText(/disconnected/i)).toBeInTheDocument()
+    expect(screen.getByText(/reconnecting/i)).toBeInTheDocument()
   })
 })

@@ -194,17 +194,23 @@ async fn stream_handler(
     let stream = async_stream::stream! {
         let mut heartbeat = tokio::time::interval(Duration::from_secs(5));
         heartbeat.tick().await; // discard the immediate first tick
+        let mut flush = tokio::time::interval(Duration::from_secs(1));
+        flush.tick().await; // discard the immediate first tick
+        let mut pending: Vec<EventEnvelope> = Vec::new();
         loop {
             tokio::select! {
                 result = rx.recv() => {
                     match result {
-                        Ok(events) if !events.is_empty() => {
-                            let data = serde_json::to_string(&events).unwrap_or_default();
-                            yield Ok(Event::default().data(data));
-                        }
-                        Ok(_) => {}
+                        Ok(events) => pending.extend(events),
                         Err(broadcast::error::RecvError::Lagged(_)) => {}
                         Err(broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+                _ = flush.tick() => {
+                    if !pending.is_empty() {
+                        let data = serde_json::to_string(&pending).unwrap_or_default();
+                        pending.clear();
+                        yield Ok(Event::default().data(data));
                     }
                 }
                 _ = heartbeat.tick() => {

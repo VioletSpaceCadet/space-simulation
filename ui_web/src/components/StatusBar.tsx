@@ -15,7 +15,7 @@ export function StatusBar({ tick, connected }: Props) {
         day {day} | {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
       </span>
       <span className={`status-connection ${connected ? 'connected' : 'disconnected'}`}>
-        {connected ? '● connected' : '○ disconnected'}
+        {connected ? '● connected' : '○ reconnecting...'}
       </span>
     </div>
   )
