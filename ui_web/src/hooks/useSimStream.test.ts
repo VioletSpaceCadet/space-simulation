@@ -45,4 +45,33 @@ describe('useSimStream', () => {
     unmount()
     expect(mockEs.close).toHaveBeenCalledOnce()
   })
+
+  it('updates currentTick when events are received', async () => {
+    const mockEs = new MockEventSource()
+    vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
+    const { result } = renderHook(() => useSimStream())
+    await act(async () => { await Promise.resolve() })
+
+    const events = [
+      { id: 'evt_000001', tick: 42, event: { TaskStarted: { ship_id: 'ship_0001' } } },
+    ]
+    act(() => {
+      mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }))
+    })
+
+    expect(result.current.currentTick).toBe(42)
+  })
+
+  it('updates currentTick from heartbeat', async () => {
+    const mockEs = new MockEventSource()
+    vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
+    const { result } = renderHook(() => useSimStream())
+    await act(async () => { await Promise.resolve() })
+
+    act(() => {
+      mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify({ heartbeat: true, tick: 99 }) }))
+    })
+
+    expect(result.current.currentTick).toBe(99)
+  })
 })
