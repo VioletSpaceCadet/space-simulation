@@ -192,6 +192,8 @@ async fn stream_handler(
     let sim = app_state.sim.clone();
 
     let stream = async_stream::stream! {
+        let mut heartbeat = tokio::time::interval(Duration::from_secs(5));
+        heartbeat.tick().await; // discard the immediate first tick
         loop {
             tokio::select! {
                 result = rx.recv() => {
@@ -205,10 +207,10 @@ async fn stream_handler(
                         Err(broadcast::error::RecvError::Closed) => break,
                     }
                 }
-                _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                _ = heartbeat.tick() => {
                     let tick = sim.lock().unwrap().game_state.meta.tick;
-                    let heartbeat = serde_json::json!({"heartbeat": true, "tick": tick});
-                    yield Ok(Event::default().data(heartbeat.to_string()));
+                    let hb = serde_json::json!({"heartbeat": true, "tick": tick});
+                    yield Ok(Event::default().data(hb.to_string()));
                 }
             }
         }

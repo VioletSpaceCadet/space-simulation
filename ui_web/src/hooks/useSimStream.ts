@@ -72,7 +72,8 @@ function reducer(state: State, action: Action): State {
 
     case 'EVENTS_RECEIVED': {
       const newEvents = [...action.events, ...state.events].slice(0, 500)
-      if (!state.snapshot) return { ...state, events: newEvents }
+      const latestTick = action.events.reduce((max, e) => Math.max(max, e.tick), state.currentTick)
+      if (!state.snapshot) return { ...state, events: newEvents, currentTick: latestTick }
       const { asteroids, research } = applyEvents(
         state.snapshot.asteroids,
         state.snapshot.research,
@@ -81,6 +82,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         events: newEvents,
+        currentTick: latestTick,
         snapshot: { ...state.snapshot, asteroids, research },
       }
     }
