@@ -118,7 +118,7 @@ export function useSimStream() {
     es.onmessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data as string) as unknown
       if (data && typeof data === 'object' && 'heartbeat' in data) {
-        dispatch({ type: 'HEARTBEAT', tick: (data as { tick: number }).tick })
+        dispatch({ type: 'HEARTBEAT', tick: (data as unknown as { tick: number }).tick })
       } else if (Array.isArray(data)) {
         dispatch({ type: 'EVENTS_RECEIVED', events: data as SimEvent[] })
       }
