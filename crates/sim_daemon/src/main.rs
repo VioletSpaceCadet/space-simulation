@@ -1,11 +1,16 @@
+use std::convert::Infallible;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use axum::{
     extract::State,
     http::{header, StatusCode},
-    response::Json,
+    response::{
+        sse::{Event, Sse},
+        Json,
+    },
     routing::get,
     Router,
 };
@@ -168,8 +173,40 @@ async fn snapshot_handler(
     )
 }
 
-async fn stream_handler() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED // filled in Task 4
+async fn stream_handler(
+    State(app_state): State<AppState>,
+) -> Sse<impl futures_core::Stream<Item = Result<Event, Infallible>>> {
+    let mut rx = app_state.event_tx.subscribe();
+    let sim = app_state.sim.clone();
+
+    let stream = async_stream::stream! {
+        loop {
+            tokio::select! {
+                result = rx.recv() => {
+                    match result {
+                        Ok(events) if !events.is_empty() => {
+                            let data = serde_json::to_string(&events).unwrap_or_default();
+                            yield Ok(Event::default().data(data));
+                        }
+                        Ok(_) => {}
+                        Err(broadcast::error::RecvError::Lagged(_)) => {}
+                        Err(broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+                _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                    let tick = sim.lock().unwrap().game_state.meta.tick;
+                    let heartbeat = serde_json::json!({"heartbeat": true, "tick": tick});
+                    yield Ok(Event::default().data(heartbeat.to_string()));
+                }
+            }
+        }
+    };
+
+    Sse::new(stream).keep_alive(
+        axum::response::sse::KeepAlive::new()
+            .interval(Duration::from_secs(30))
+            .text("ping"),
+    )
 }
 
 fn main() {
