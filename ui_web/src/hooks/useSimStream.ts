@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer } from 'react'
 import { createEventSource, fetchSnapshot } from '../api'
 import type { AsteroidState, ResearchState, SimEvent, SimSnapshot } from '../types'
 
@@ -131,45 +131,61 @@ const RECONNECT_DELAY_MS = 2000
 
 export function useSimStream() {
   const [state, dispatch] = useReducer(reducer, initialState)
-  const [connectionKey, setConnectionKey] = useState(0)
 
   useEffect(() => {
-    let cancelled = false
+    let stopped = false
+    let currentEs: EventSource | null = null
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-    const retry = () => {
-      if (!cancelled) setTimeout(() => setConnectionKey((k) => k + 1), RECONNECT_DELAY_MS)
+    function scheduleRetry() {
+      // Guard: don't double-schedule, don't schedule after cleanup
+      if (stopped || retryTimer !== null) return
+      retryTimer = setTimeout(() => {
+        retryTimer = null
+        if (!stopped) connect()
+      }, RECONNECT_DELAY_MS)
     }
 
-    fetchSnapshot()
-      .then((snapshot) => { if (!cancelled) dispatch({ type: 'SNAPSHOT_LOADED', snapshot }) })
-      .catch(retry)
+    function connect() {
+      fetchSnapshot()
+        .then((snapshot) => { if (!stopped) dispatch({ type: 'SNAPSHOT_LOADED', snapshot }) })
+        .catch(scheduleRetry)
 
-    const es = createEventSource()
+      const es = createEventSource()
+      currentEs = es
 
-    es.onopen = () => { if (!cancelled) dispatch({ type: 'CONNECTED' }) }
+      es.onopen = () => { if (!stopped) dispatch({ type: 'CONNECTED' }) }
 
-    es.onerror = () => {
-      if (cancelled) return
-      dispatch({ type: 'RESET' })
-      es.close()
-      retry()
-    }
+      es.onerror = () => {
+        if (stopped) return
+        dispatch({ type: 'RESET' })
+        es.close()
+        if (currentEs === es) currentEs = null
+        scheduleRetry()
+      }
 
-    es.onmessage = (event: MessageEvent) => {
-      if (cancelled) return
-      const data = JSON.parse(event.data as string) as unknown
-      if (data && typeof data === 'object' && 'heartbeat' in data) {
-        dispatch({ type: 'HEARTBEAT', tick: (data as { tick: number }).tick })
-      } else if (Array.isArray(data)) {
-        dispatch({ type: 'EVENTS_RECEIVED', events: data as SimEvent[] })
+      es.onmessage = (event: MessageEvent) => {
+        if (stopped) return
+        const data = JSON.parse(event.data as string) as unknown
+        if (data && typeof data === 'object' && 'heartbeat' in data) {
+          dispatch({ type: 'HEARTBEAT', tick: (data as { tick: number }).tick })
+        } else if (Array.isArray(data)) {
+          dispatch({ type: 'EVENTS_RECEIVED', events: data as SimEvent[] })
+        }
       }
     }
 
+    connect()
+
     return () => {
-      cancelled = true
-      es.close()
+      stopped = true
+      currentEs?.close()
+      if (retryTimer !== null) {
+        clearTimeout(retryTimer)
+        retryTimer = null
+      }
     }
-  }, [connectionKey])
+  }, [])
 
   return { snapshot: state.snapshot, events: state.events, connected: state.connected, currentTick: state.currentTick }
 }
