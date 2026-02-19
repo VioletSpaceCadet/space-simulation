@@ -6,7 +6,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use axum::{
     extract::State,
-    http::{header, StatusCode},
+    http::{header, Method, StatusCode},
     response::{
         sse::{Event, Sse},
         Json,
@@ -14,17 +14,19 @@ use axum::{
     routing::get,
     Router,
 };
+use clap::{Parser, Subcommand};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde::Deserialize;
-use sim_control::AutopilotController;
+use sim_control::{AutopilotController, CommandSource};
 use sim_core::{
-    AsteroidTemplateDef, Constants, Counters, EventEnvelope, FacilitiesState, GameContent,
-    GameState, MetaState, NodeDef, NodeId, PrincipalId, ResearchState, ScanSite, ShipId,
-    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef,
+    AsteroidTemplateDef, Constants, Counters, EventEnvelope, EventLevel, FacilitiesState,
+    GameContent, GameState, MetaState, NodeId, PrincipalId, ResearchState, ScanSite,
+    ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef,
 };
 use tokio::sync::broadcast;
+use tower_http::cors::{Any, CorsLayer};
 
 #[derive(Deserialize)]
 struct TechsFile {
@@ -144,10 +146,20 @@ struct AppState {
 }
 
 fn make_router(state: AppState) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(
+            "http://localhost:5173"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+        )
+        .allow_methods([Method::GET])
+        .allow_headers(Any);
+
     Router::new()
         .route("/api/v1/meta", get(meta_handler))
         .route("/api/v1/snapshot", get(snapshot_handler))
         .route("/api/v1/stream", get(stream_handler))
+        .layer(cors)
         .with_state(state)
 }
 
@@ -209,8 +221,130 @@ async fn stream_handler(
     )
 }
 
-fn main() {
-    println!("sim_daemon stub");
+async fn run_tick_loop(
+    sim: SharedSim,
+    event_tx: EventTx,
+    ticks_per_sec: f64,
+    max_ticks: Option<u64>,
+) {
+    let sleep_duration = if ticks_per_sec > 0.0 {
+        Some(Duration::from_secs_f64(1.0 / ticks_per_sec))
+    } else {
+        None
+    };
+
+    loop {
+        let start = std::time::Instant::now();
+
+        let (events, done) = {
+            let mut guard = sim.lock().unwrap();
+            // Split borrow: autopilot needs &mut self, plus we need &game_state, &content, &mut next_command_id.
+            // Extract the fields we need as separate borrows to satisfy the borrow checker.
+            let SimState {
+                ref game_state,
+                ref content,
+                rng: _,
+                ref mut autopilot,
+                ref mut next_command_id,
+                ..
+            } = *guard;
+            let commands = autopilot.generate_commands(game_state, content, next_command_id);
+            let SimState {
+                ref mut game_state,
+                ref content,
+                ref mut rng,
+                ..
+            } = *guard;
+            let events = sim_core::tick(game_state, &commands, content, rng, EventLevel::Normal);
+            let done = max_ticks.map_or(false, |max| guard.game_state.meta.tick >= max);
+            (events, done)
+        };
+
+        let _ = event_tx.send(events);
+
+        if done {
+            break;
+        }
+
+        if let Some(duration) = sleep_duration {
+            let elapsed = start.elapsed();
+            if elapsed < duration {
+                tokio::time::sleep(duration - elapsed).await;
+            }
+        } else {
+            tokio::task::yield_now().await;
+        }
+    }
+}
+
+#[derive(Parser)]
+#[command(name = "sim_daemon", about = "Space Industry Sim Daemon")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Run {
+        #[arg(long)]
+        seed: u64,
+        #[arg(long, default_value = "./content")]
+        content_dir: String,
+        #[arg(long, default_value_t = 3001)]
+        port: u16,
+        /// Ticks per second. 0 = as fast as possible.
+        #[arg(long, default_value_t = 10.0)]
+        ticks_per_sec: f64,
+        #[arg(long)]
+        max_ticks: Option<u64>,
+    },
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::Run {
+            seed,
+            content_dir,
+            port,
+            ticks_per_sec,
+            max_ticks,
+        } => {
+            let content = load_content(&content_dir)?;
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let game_state = build_initial_state(&content, seed, &mut rng);
+            let (event_tx, _) = broadcast::channel::<Vec<EventEnvelope>>(256);
+            let app_state = AppState {
+                sim: Arc::new(Mutex::new(SimState {
+                    game_state,
+                    content,
+                    rng,
+                    autopilot: AutopilotController,
+                    next_command_id: 0,
+                })),
+                event_tx: event_tx.clone(),
+            };
+            let router = make_router(app_state.clone());
+            let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
+            let speed = if ticks_per_sec == 0.0 {
+                "max".to_string()
+            } else {
+                format!("{} ticks/sec", ticks_per_sec)
+            };
+            println!("sim_daemon listening on http://localhost:{port}  speed={speed}");
+            tokio::spawn(run_tick_loop(
+                app_state.sim,
+                event_tx,
+                ticks_per_sec,
+                max_ticks,
+            ));
+            let listener = tokio::net::TcpListener::bind(addr).await?;
+            axum::serve(listener, router).await?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -218,6 +352,7 @@ mod tests {
     use super::*;
     use axum::{body::Body, http::Request, http::StatusCode};
     use http_body_util::BodyExt;
+    use sim_core::NodeDef;
     use tower::ServiceExt;
 
     fn make_test_state() -> AppState {
