@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Space industry simulation game. Deterministic Rust sim core, CLI runner, future React UI.
+Space industry simulation game. Deterministic Rust sim core, HTTP daemon with SSE event streaming, React mission control UI.
 See `base-project.md` for the original design doc and `mvp0-contract.md` for the authoritative MVP-0 type/mechanic spec.
 
 ## Common Commands
@@ -18,14 +18,24 @@ cargo clippy                                              # Lint
 cargo fmt                                                 # Format
 cargo mutants                                             # Mutation testing (requires cargo-mutants)
 
-# Run the simulation
+# CLI runner
 cargo run -p sim_cli -- run --ticks 1000 --seed 42
 cargo run -p sim_cli -- run --ticks 500 --seed 42 --print-every 50 --event-level debug
+
+# HTTP daemon (runs at http://localhost:3001)
+cargo run -p sim_daemon -- run --seed 42
+cargo run -p sim_daemon -- run --seed 42 --ticks-per-sec 0   # as fast as possible
+cargo run -p sim_daemon -- run --seed 42 --port 3001 --ticks-per-sec 10 --max-ticks 500
+
+# React UI (in ui_web/)
+cd ui_web && npm run dev          # dev server at http://localhost:5173 (proxies /api to :3001)
+cd ui_web && npm test             # run vitest tests
+cd ui_web && npm run build        # production build
 ```
 
 ## Architecture
 
-Cargo workspace with three crates. Dependency order: `sim_core` ← `sim_control` ← `sim_cli`.
+Cargo workspace with four crates + a React app. Dependency order: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`.
 
 ### `crates/sim_core` (lib)
 Pure deterministic simulation. No IO, no network.
@@ -57,6 +67,23 @@ Loads content, builds initial world state, runs the tick loop with autopilot.
 - World gen creates 1 station + 1 ship + N scan sites (from templates × `asteroid_count_per_template`).
 - Prints a status line every `--print-every` ticks; always prints on tech unlock.
 
+### `crates/sim_daemon` (bin)
+axum 0.7 HTTP server that runs the tick loop in a tokio task and streams events to the React UI.
+
+- Shared state: `Arc<Mutex<SimState>>` (game state + RNG + autopilot).
+- Events broadcast via `tokio::sync::broadcast::Sender<Vec<EventEnvelope>>`.
+- Tick rate configurable (`--ticks-per-sec`; 0 = as fast as possible).
+- **Endpoints:** `GET /api/v1/meta`, `GET /api/v1/snapshot`, `GET /api/v1/stream` (SSE).
+- CORS configured for `http://localhost:5173` (Vite dev server).
+
+### `ui_web/` (React app — not a Rust crate)
+Vite 5 + React 18 + TypeScript 5 mission control dashboard. Tests via Vitest + React Testing Library.
+
+- **Data flow:** on mount fetches `/api/v1/snapshot` to hydrate, then subscribes to `/api/v1/stream` (SSE) for live updates.
+- **State:** single `useReducer` in `useSimStream` hook; no external state library.
+- **Layout:** StatusBar (tick/time/connection) + three panels: EventsFeed | AsteroidTable | ResearchPanel.
+- **Proxy:** `/api` proxied to `http://localhost:3001` in dev (`vite.config.ts`).
+
 ## Key Types (sim_core)
 
 | Type | Purpose |
@@ -72,7 +99,7 @@ Loads content, builds initial world state, runs the tick loop with autopilot.
 
 ## Content Files
 
-All in `content/`. Loaded at runtime by `sim_cli`; never compiled in.
+All in `content/`. Loaded at runtime by `sim_cli` and `sim_daemon`; never compiled in.
 
 | File | Key fields |
 |---|---|
@@ -94,7 +121,7 @@ Additionally, use judgment on the following:
 ## MVP Scope
 
 - **MVP-0 (done):** `sim_core` tick + tests, `sim_control` autopilot, `sim_cli` run loop.
-- **MVP-1 (next):** `sim_daemon` HTTP server (axum + tokio), SSE event stream, React UI.
+- **MVP-1 (done):** `sim_daemon` HTTP server (axum + tokio), SSE event stream, React mission control UI.
 
 ## Notes
 
