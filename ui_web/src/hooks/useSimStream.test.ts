@@ -1,0 +1,48 @@
+import { act, renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as api from '../api'
+import type { SimSnapshot } from '../types'
+import { useSimStream } from './useSimStream'
+
+const baseSnapshot: SimSnapshot = {
+  meta: { tick: 5, seed: 42, content_version: '0.0.1' },
+  scan_sites: [],
+  asteroids: {},
+  ships: {},
+  stations: {},
+  research: { unlocked: [], data_pool: {}, evidence: {} },
+}
+
+class MockEventSource {
+  onopen: ((e: Event) => void) | null = null
+  onerror: ((e: Event) => void) | null = null
+  onmessage: ((e: MessageEvent) => void) | null = null
+  close = vi.fn()
+}
+
+describe('useSimStream', () => {
+  beforeEach(() => {
+    vi.spyOn(api, 'fetchSnapshot').mockResolvedValue(baseSnapshot)
+    vi.spyOn(api, 'createEventSource').mockReturnValue(new MockEventSource() as unknown as EventSource)
+  })
+
+  it('fetches snapshot on mount and sets tick', async () => {
+    const { result } = renderHook(() => useSimStream())
+    await act(async () => { await Promise.resolve() })
+    expect(api.fetchSnapshot).toHaveBeenCalledOnce()
+    expect(result.current.currentTick).toBe(5)
+  })
+
+  it('starts with empty events list', () => {
+    const { result } = renderHook(() => useSimStream())
+    expect(result.current.events).toEqual([])
+  })
+
+  it('closes EventSource on unmount', () => {
+    const mockEs = new MockEventSource()
+    vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
+    const { unmount } = renderHook(() => useSimStream())
+    unmount()
+    expect(mockEs.close).toHaveBeenCalledOnce()
+  })
+})
