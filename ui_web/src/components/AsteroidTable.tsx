@@ -26,15 +26,15 @@ export function AsteroidTable({ asteroids }: Props) {
 
   if (rows.length === 0) {
     return (
-      <div className="overflow-y-auto flex-1">
+      <div className="overflow-auto flex-1">
         <div className="text-faint italic">no bodies discovered</div>
       </div>
     )
   }
 
   return (
-    <div className="overflow-y-auto flex-1">
-      <table className="w-full border-collapse text-[11px]">
+    <div className="overflow-auto flex-1">
+      <table className="min-w-max w-full border-collapse text-[11px]">
         <thead>
           <tr>
             <th className="text-left text-label px-2 py-1 border-b border-edge font-normal">ID</th>

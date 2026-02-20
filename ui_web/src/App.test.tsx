@@ -40,4 +40,11 @@ describe('App', () => {
     expect(screen.getByText(/asteroids/i)).toBeInTheDocument()
     expect(screen.getByText(/research/i)).toBeInTheDocument()
   })
+
+  it('renders resize handles between panels', () => {
+    render(<App />)
+    // react-resizable-panels renders [data-panel-resize-handle-id] attributes
+    const handles = document.querySelectorAll('[data-panel-resize-handle-id]')
+    expect(handles.length).toBeGreaterThan(0)
+  })
 })
