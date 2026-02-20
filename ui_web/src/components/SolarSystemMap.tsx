@@ -50,10 +50,8 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props
   function entityMouseHandlers(type: string, id: string) {
     return {
       onMouseEnter: (e: React.MouseEvent) => {
-        setHovered({ type, id, screenX: e.clientX, screenY: e.clientY })
-      },
-      onMouseMove: (e: React.MouseEvent) => {
-        setHovered((prev) => prev ? { ...prev, screenX: e.clientX, screenY: e.clientY } : null)
+        const rect = (e.currentTarget as Element).getBoundingClientRect()
+        setHovered({ type, id, screenX: rect.left + rect.width / 2, screenY: rect.top })
       },
       onMouseLeave: () => setHovered(null),
     }
@@ -118,18 +116,19 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props
                 cy={0}
                 r={ring.radius}
                 fill="none"
-                stroke="var(--color-edge)"
-                strokeWidth={ring.isBelt ? 0.5 : 0.8}
-                strokeDasharray={ring.isBelt ? '4 4' : undefined}
+                stroke="var(--color-dim)"
+                strokeWidth={ring.isBelt ? 0.8 : 1.2}
+                strokeDasharray={ring.isBelt ? '6 4' : undefined}
                 opacity={0.6}
               />
               <text
                 x={0}
-                y={-ring.radius - 8}
+                y={-ring.radius - 10}
                 textAnchor="middle"
-                fill="var(--color-label)"
-                fontSize={10}
+                fill="var(--color-fg)"
+                fontSize={12}
                 fontFamily="monospace"
+                opacity={0.7}
               >
                 {ring.label}
               </text>
@@ -146,10 +145,10 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props
                 key={station.id}
                 data-entity-type="station"
                 data-entity-id={station.id}
-                x={x - 6}
-                y={y - 6}
-                width={12}
-                height={12}
+                x={x - 8}
+                y={y - 8}
+                width={16}
+                height={16}
                 fill="var(--color-accent)"
                 transform={`rotate(45 ${x} ${y})`}
                 stroke={selected?.id === station.id ? 'var(--color-bright)' : undefined}
@@ -195,7 +194,7 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props
                 key={ship.id}
                 data-entity-type="ship"
                 data-entity-id={ship.id}
-                points={`${x},${y - 6} ${x - 4},${y + 4} ${x + 4},${y + 4}`}
+                points={`${x},${y - 8} ${x - 6},${y + 5} ${x + 6},${y + 5}`}
                 fill={shipColor(ship.task)}
                 stroke={selected?.id === ship.id ? 'var(--color-bright)' : undefined}
                 strokeWidth={selected?.id === ship.id ? 2 : undefined}
@@ -212,7 +211,7 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props
             const angle = angleFromId(asteroid.id)
             const { x, y } = polarToCartesian(radius, angle)
             const massKg = asteroid.mass_kg ?? 1000
-            const size = Math.max(2, Math.min(8, Math.log10(massKg) - 1))
+            const size = Math.max(4, Math.min(12, Math.log10(massKg) + 1))
             const isIronRich = asteroid.anomaly_tags.includes('IronRich')
 
             return (
@@ -223,8 +222,8 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props
                 cx={x}
                 cy={y}
                 r={size}
-                fill={isIronRich ? '#a0522d' : 'var(--color-muted)'}
-                opacity={0.8}
+                fill={isIronRich ? '#c47038' : '#8a8e98'}
+                opacity={0.9}
                 stroke={selected?.id === asteroid.id ? 'var(--color-bright)' : undefined}
                 strokeWidth={selected?.id === asteroid.id ? 2 : undefined}
                 className="cursor-pointer"
@@ -239,27 +238,39 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props
             const radius = ringRadiusForNode(site.node)
             const angle = angleFromId(site.id)
             const { x, y } = polarToCartesian(radius, angle)
+            const isSelected = selected?.id === site.id
 
             return (
-              <text
+              <g
                 key={site.id}
                 data-entity-type="scan-site"
                 data-entity-id={site.id}
-                x={x}
-                y={y}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill={selected?.id === site.id ? 'var(--color-bright)' : 'var(--color-faint)'}
-                fontSize={8}
-                fontFamily="monospace"
-                stroke={selected?.id === site.id ? 'var(--color-bright)' : undefined}
-                strokeWidth={selected?.id === site.id ? 0.5 : undefined}
                 className="cursor-pointer"
                 {...entityMouseHandlers('scan-site', site.id)}
                 onClick={() => setSelected({ type: 'scan-site', id: site.id })}
               >
-                ?
-              </text>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={8}
+                  fill="var(--color-edge)"
+                  stroke={isSelected ? 'var(--color-bright)' : 'var(--color-muted)'}
+                  strokeWidth={isSelected ? 1.5 : 0.8}
+                  opacity={0.8}
+                />
+                <text
+                  x={x}
+                  y={y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill={isSelected ? 'var(--color-bright)' : 'var(--color-fg)'}
+                  fontSize={11}
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  ?
+                </text>
+              </g>
             )
           })}
         </g>

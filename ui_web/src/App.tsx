@@ -8,16 +8,17 @@ import { SolarSystemMap } from './components/SolarSystemMap'
 import { StatusBar } from './components/StatusBar'
 import { useSimStream } from './hooks/useSimStream'
 
-type PanelId = 'events' | 'asteroids' | 'fleet' | 'research'
+type PanelId = 'map' | 'events' | 'asteroids' | 'fleet' | 'research'
 
 const PANEL_LABELS: Record<PanelId, string> = {
+  map: 'Map',
   events: 'Events',
   asteroids: 'Asteroids',
   fleet: 'Fleet',
   research: 'Research',
 }
 
-const ALL_PANELS: PanelId[] = ['events', 'asteroids', 'fleet', 'research']
+const ALL_PANELS: PanelId[] = ['map', 'events', 'asteroids', 'fleet', 'research']
 
 function readVisiblePanels(): Set<PanelId> {
   try {
@@ -61,14 +62,16 @@ function useVisiblePanels() {
 
 export default function App() {
   const { snapshot, events, connected, currentTick, oreCompositions } = useSimStream()
-  const [view, setView] = useState<'dashboard' | 'map'>('dashboard')
-  const toggleView = () => setView((v) => (v === 'dashboard' ? 'map' : 'dashboard'))
   const { visible, toggle } = useVisiblePanels()
 
   const visiblePanels = ALL_PANELS.filter((id) => visible.has(id))
 
   function renderPanel(id: PanelId) {
     switch (id) {
+      case 'map':
+        return (
+          <SolarSystemMap snapshot={snapshot} currentTick={currentTick} oreCompositions={oreCompositions} />
+        )
       case 'events':
         return <EventsFeed events={events} />
       case 'asteroids':
@@ -88,48 +91,44 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <StatusBar tick={currentTick} connected={connected} view={view} onToggleView={toggleView} />
-      {view === 'dashboard' ? (
-        <div className="flex flex-1 overflow-hidden">
-          <nav className="flex flex-col shrink-0 bg-surface border-r border-edge py-2 px-1 gap-0.5">
-            {ALL_PANELS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => toggle(id)}
-                className={`text-[10px] uppercase tracking-widest px-2 py-1.5 rounded-sm transition-colors cursor-pointer text-left ${
-                  visible.has(id)
-                    ? 'text-active bg-edge/40'
-                    : 'text-muted hover:text-dim hover:bg-edge/15'
-                }`}
-              >
-                {PANEL_LABELS[id]}
-              </button>
+      <StatusBar tick={currentTick} connected={connected} />
+      <div className="flex flex-1 overflow-hidden">
+        <nav className="flex flex-col shrink-0 bg-surface border-r border-edge py-2 px-1 gap-0.5">
+          {ALL_PANELS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => toggle(id)}
+              className={`text-[10px] uppercase tracking-widest px-2 py-1.5 rounded-sm transition-colors cursor-pointer text-left ${
+                visible.has(id)
+                  ? 'text-active bg-edge/40'
+                  : 'text-muted hover:text-dim hover:bg-edge/15'
+              }`}
+            >
+              {PANEL_LABELS[id]}
+            </button>
+          ))}
+        </nav>
+        {visiblePanels.length > 0 && (
+          <PanelGroup direction="horizontal" className="flex-1 overflow-hidden">
+            {visiblePanels.map((id, index) => (
+              <div key={id} className="contents">
+                {index > 0 && (
+                  <PanelResizeHandle className="w-px bg-edge hover:bg-dim cursor-col-resize transition-colors" />
+                )}
+                <Panel defaultSize={100 / visiblePanels.length} minSize={10}>
+                  <section className="flex flex-col h-full overflow-hidden bg-void p-3">
+                    <h2 className="text-[11px] uppercase tracking-widest text-label mb-2 pb-1.5 border-b border-edge shrink-0">
+                      {PANEL_LABELS[id]}
+                    </h2>
+                    {renderPanel(id)}
+                  </section>
+                </Panel>
+              </div>
             ))}
-          </nav>
-          {visiblePanels.length > 0 && (
-            <PanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-              {visiblePanels.map((id, index) => (
-                <div key={id} className="contents">
-                  {index > 0 && (
-                    <PanelResizeHandle className="w-px bg-edge hover:bg-dim cursor-col-resize transition-colors" />
-                  )}
-                  <Panel defaultSize={100 / visiblePanels.length} minSize={10}>
-                    <section className="flex flex-col h-full overflow-hidden bg-void p-3">
-                      <h2 className="text-[11px] uppercase tracking-widest text-label mb-2 pb-1.5 border-b border-edge shrink-0">
-                        {PANEL_LABELS[id]}
-                      </h2>
-                      {renderPanel(id)}
-                    </section>
-                  </Panel>
-                </div>
-              ))}
-            </PanelGroup>
-          )}
-        </div>
-      ) : (
-        <SolarSystemMap snapshot={snapshot} currentTick={currentTick} oreCompositions={oreCompositions} />
-      )}
+          </PanelGroup>
+        )}
+      </div>
     </div>
   )
 }

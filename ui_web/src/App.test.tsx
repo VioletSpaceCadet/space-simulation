@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import * as api from './api'
@@ -36,18 +35,19 @@ describe('App', () => {
     expect(screen.getByText(/tick/i)).toBeInTheDocument()
   })
 
-  it('renders nav with all four panel names', () => {
+  it('renders nav with Map and all four panel names', () => {
     render(<App />)
     const nav = screen.getByRole('navigation')
     expect(nav).toBeInTheDocument()
     const buttons = Array.from(nav.querySelectorAll('button'))
     const labels = buttons.map((b) => b.textContent)
-    expect(labels).toEqual(['Events', 'Asteroids', 'Fleet', 'Research'])
+    expect(labels).toEqual(['Map', 'Events', 'Asteroids', 'Fleet', 'Research'])
   })
 
-  it('renders all four panel headings by default', () => {
+  it('renders all five panel headings by default', () => {
     render(<App />)
-    expect(screen.getAllByText('Events')).toHaveLength(2) // nav + panel heading
+    expect(screen.getAllByText('Map')).toHaveLength(2) // nav + panel heading
+    expect(screen.getAllByText('Events')).toHaveLength(2)
     expect(screen.getAllByText('Asteroids')).toHaveLength(2)
     expect(screen.getAllByText('Fleet')).toHaveLength(2)
     expect(screen.getAllByText('Research')).toHaveLength(2)
@@ -70,25 +70,24 @@ describe('App', () => {
     expect(handles.length).toBeGreaterThan(0)
   })
 
-  it('toggles between dashboard and map views', async () => {
-    render(<App />)
-    // Start in dashboard — nav sidebar is visible
-    expect(screen.getByRole('navigation')).toBeInTheDocument()
-
-    // Switch to map
-    await userEvent.click(screen.getByText(/System Map/))
-    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+  it('renders solar system map panel with SVG', () => {
+    const { container } = render(<App />)
+    expect(container.querySelector('svg')).toBeInTheDocument()
     expect(screen.getByText('Earth Orbit')).toBeInTheDocument()
-
-    // Switch back
-    await userEvent.click(screen.getByText(/Dashboard/))
-    expect(screen.getByRole('navigation')).toBeInTheDocument()
   })
 
-  it('shows solar system map when toggled to map view', async () => {
+  it('can toggle map panel off and on', () => {
     const { container } = render(<App />)
-    await userEvent.click(screen.getByText(/System Map/))
     expect(container.querySelector('svg')).toBeInTheDocument()
-    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+
+    const nav = screen.getByRole('navigation')
+    const mapButton = Array.from(nav.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Map',
+    )!
+    fireEvent.click(mapButton)
+    expect(container.querySelector('svg')).not.toBeInTheDocument()
+
+    fireEvent.click(mapButton)
+    expect(container.querySelector('svg')).toBeInTheDocument()
   })
 })
