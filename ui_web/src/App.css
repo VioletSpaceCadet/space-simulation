@@ -6,8 +6,8 @@
   }
 
   body {
-    background-color: #0a0e1a;
-    color: #c8d8f0;
+    background-color: var(--color-void);
+    color: var(--color-fg);
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
   }

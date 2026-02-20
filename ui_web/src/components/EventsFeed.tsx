@@ -22,7 +22,7 @@ export function EventsFeed({ events }: Props) {
   if (events.length === 0) {
     return (
       <div className="overflow-y-auto flex-1">
-        <div className="text-[#3a5070] italic">waiting for stream data</div>
+        <div className="text-faint italic">waiting for stream data</div>
       </div>
     )
   }
@@ -30,11 +30,11 @@ export function EventsFeed({ events }: Props) {
   return (
     <div className="overflow-y-auto flex-1">
       {events.map((evt) => (
-        <div key={evt.id} className="flex gap-1.5 py-0.5 border-b border-[#0d1226] text-[11px] overflow-hidden">
-          <span className="text-[#3a6090] min-w-[90px] shrink-0">{evt.id}</span>
-          <span className="text-[#2a4060] min-w-[44px] shrink-0">t={evt.tick}</span>
-          <span className="text-[#70a0d0] min-w-[120px] shrink-0">{eventType(evt.event)}</span>
-          <span className="text-[#607090] overflow-hidden text-ellipsis whitespace-nowrap">{eventDetail(evt.event)}</span>
+        <div key={evt.id} className="flex gap-1.5 py-0.5 border-b border-surface text-[11px] overflow-hidden">
+          <span className="text-faint min-w-[90px] shrink-0">{evt.id}</span>
+          <span className="text-faint min-w-[44px] shrink-0">t={evt.tick}</span>
+          <span className="text-accent min-w-[120px] shrink-0">{eventType(evt.event)}</span>
+          <span className="text-muted overflow-hidden text-ellipsis whitespace-nowrap">{eventDetail(evt.event)}</span>
         </div>
       ))}
     </div>

@@ -9,12 +9,12 @@ export function StatusBar({ tick, connected }: Props) {
   const minute = tick % 60
 
   return (
-    <div className="flex gap-6 items-center px-4 py-1.5 bg-[#0d1226] border-b border-[#1e2d50] text-xs shrink-0">
-      <span className="text-[#a8c4e8] font-bold">tick {tick}</span>
-      <span className="text-[#7a9cc8]">
+    <div className="flex gap-6 items-center px-4 py-1.5 bg-surface border-b border-edge text-xs shrink-0">
+      <span className="text-bright font-bold">tick {tick}</span>
+      <span className="text-dim">
         day {day} | {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
       </span>
-      <span className={connected ? 'text-[#4caf7d]' : 'text-[#e05555]'}>
+      <span className={connected ? 'text-online' : 'text-offline'}>
         {connected ? '● connected' : '○ reconnecting...'}
       </span>
     </div>
