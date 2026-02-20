@@ -15,5 +15,6 @@
   "station_compute_units_total": 10,
   "station_power_per_compute_unit_per_tick": 1.0,
   "station_efficiency": 1.0,
-  "station_power_available_per_tick": 100.0
+  "station_power_available_per_tick": 100.0,
+  "mining_rate_kg_per_tick": 50.0
 }

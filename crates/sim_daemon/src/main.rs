@@ -109,8 +109,16 @@ mod tests {
             },
             asteroid_templates: vec![],
             elements: vec![
-                ElementDef { id: "Fe".to_string(), density_kg_per_m3: 7874.0, display_name: "Iron".to_string() },
-                ElementDef { id: "Si".to_string(), density_kg_per_m3: 2329.0, display_name: "Silicon".to_string() },
+                ElementDef {
+                    id: "Fe".to_string(),
+                    density_kg_per_m3: 7874.0,
+                    display_name: "Iron".to_string(),
+                },
+                ElementDef {
+                    id: "Si".to_string(),
+                    density_kg_per_m3: 2329.0,
+                    display_name: "Silicon".to_string(),
+                },
             ],
             constants: Constants {
                 survey_scan_ticks: 1,
@@ -130,6 +138,7 @@ mod tests {
                 station_power_per_compute_unit_per_tick: 1.0,
                 station_efficiency: 1.0,
                 station_power_available_per_tick: 100.0,
+                mining_rate_kg_per_tick: 50.0,
             },
         };
         let mut rng = ChaCha8Rng::seed_from_u64(0);

@@ -10,6 +10,7 @@ mod types;
 
 pub use engine::tick;
 pub use graph::shortest_hop_count;
+pub use tasks::{cargo_volume_used, mine_duration};
 pub use types::*;
 
 pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnvelope {
@@ -63,8 +64,16 @@ mod tests {
                 ]),
             }],
             elements: vec![
-                ElementDef { id: "Fe".to_string(), density_kg_per_m3: 7874.0, display_name: "Iron".to_string() },
-                ElementDef { id: "Si".to_string(), density_kg_per_m3: 2329.0, display_name: "Silicon".to_string() },
+                ElementDef {
+                    id: "Fe".to_string(),
+                    density_kg_per_m3: 7874.0,
+                    display_name: "Iron".to_string(),
+                },
+                ElementDef {
+                    id: "Si".to_string(),
+                    density_kg_per_m3: 2329.0,
+                    display_name: "Silicon".to_string(),
+                },
             ],
             constants: Constants {
                 survey_scan_ticks: 1,
@@ -77,7 +86,7 @@ mod tests {
                 // Always detect tags so tests are predictable.
                 survey_tag_detection_probability: 1.0,
                 asteroid_count_per_template: 1,
-                asteroid_mass_min_kg: 500.0,   // fixed range so tests are deterministic
+                asteroid_mass_min_kg: 500.0, // fixed range so tests are deterministic
                 asteroid_mass_max_kg: 500.0,
                 ship_cargo_capacity_m3: 20.0,
                 station_cargo_capacity_m3: 10_000.0,
@@ -85,6 +94,7 @@ mod tests {
                 station_power_per_compute_unit_per_tick: 1.0,
                 station_efficiency: 1.0,
                 station_power_available_per_tick: 100.0,
+                mining_rate_kg_per_tick: 50.0,
             },
         }
     }
@@ -753,9 +763,15 @@ mod tests {
     #[test]
     fn test_content_has_element_densities() {
         let content = test_content();
-        let fe = content.elements.iter().find(|e| e.id == "Fe")
+        let fe = content
+            .elements
+            .iter()
+            .find(|e| e.id == "Fe")
             .expect("Fe element must be defined in content");
-        assert!((fe.density_kg_per_m3 - 7874.0).abs() < 1.0, "Fe density should be ~7874 kg/m³");
+        assert!(
+            (fe.density_kg_per_m3 - 7874.0).abs() < 1.0,
+            "Fe density should be ~7874 kg/m³"
+        );
     }
 
     // --- Asteroid mass ------------------------------------------------------
@@ -771,7 +787,10 @@ mod tests {
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         let asteroid = state.asteroids.values().next().unwrap();
-        assert!(asteroid.mass_kg > 0.0, "asteroid must have positive mass after survey");
+        assert!(
+            asteroid.mass_kg > 0.0,
+            "asteroid must have positive mass after survey"
+        );
     }
 
     #[test]
@@ -852,6 +871,138 @@ mod tests {
         );
     }
 
+    // --- Mine ---------------------------------------------------------------
+
+    // Helper: build a state with an already-surveyed asteroid (mass 500, 70% Fe / 30% Si).
+    fn state_with_asteroid(content: &GameContent) -> (GameState, AsteroidId) {
+        let mut state = test_state(content);
+        let mut rng = make_rng();
+        let cmd = survey_command(&state);
+        tick(&mut state, &[cmd], content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], content, &mut rng, EventLevel::Normal);
+        let asteroid_id = state.asteroids.keys().next().unwrap().clone();
+        (state, asteroid_id)
+    }
+
+    fn mine_command(
+        state: &GameState,
+        asteroid_id: &AsteroidId,
+        _content: &GameContent,
+    ) -> CommandEnvelope {
+        let ship_id = ShipId("ship_0001".to_string());
+        let ship = &state.ships[&ship_id];
+        // Use a simple fixed duration for tests
+        let duration_ticks = 10;
+        CommandEnvelope {
+            id: CommandId("cmd_mine_001".to_string()),
+            issued_by: ship.owner.clone(),
+            issued_tick: state.meta.tick,
+            execute_at_tick: state.meta.tick,
+            command: Command::AssignShipTask {
+                ship_id,
+                task_kind: TaskKind::Mine {
+                    asteroid: asteroid_id.clone(),
+                    duration_ticks,
+                },
+            },
+        }
+    }
+
+    #[test]
+    fn test_mine_emits_ore_mined_event() {
+        let content = test_content();
+        let (mut state, asteroid_id) = state_with_asteroid(&content);
+        let mut rng = make_rng();
+
+        let cmd = mine_command(&state, &asteroid_id, &content);
+        tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+        // Fast forward to completion (duration_ticks=10)
+        let completion_tick = state.meta.tick + 10;
+        while state.meta.tick < completion_tick {
+            tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        }
+        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e.event, Event::OreMined { .. })),
+            "OreMined event should be emitted when mining completes"
+        );
+    }
+
+    #[test]
+    fn test_mine_adds_ore_to_ship_cargo() {
+        let content = test_content();
+        let (mut state, asteroid_id) = state_with_asteroid(&content);
+        let mut rng = make_rng();
+
+        let ship_id = ShipId("ship_0001".to_string());
+        assert!(state.ships[&ship_id].cargo.is_empty());
+
+        let cmd = mine_command(&state, &asteroid_id, &content);
+        tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+        let completion_tick = state.meta.tick + 10;
+        while state.meta.tick <= completion_tick {
+            tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        }
+
+        let cargo = &state.ships[&ship_id].cargo;
+        assert!(
+            !cargo.is_empty(),
+            "ship cargo should not be empty after mining"
+        );
+        assert!(
+            cargo.values().any(|&kg| kg > 0.0),
+            "extracted mass must be positive"
+        );
+    }
+
+    #[test]
+    fn test_mine_reduces_asteroid_mass() {
+        let content = test_content();
+        let (mut state, asteroid_id) = state_with_asteroid(&content);
+        let mut rng = make_rng();
+
+        let original_mass = state.asteroids[&asteroid_id].mass_kg;
+        let cmd = mine_command(&state, &asteroid_id, &content);
+        tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+        let completion_tick = state.meta.tick + 10;
+        while state.meta.tick <= completion_tick {
+            tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        }
+
+        let remaining = state
+            .asteroids
+            .get(&asteroid_id)
+            .map(|a| a.mass_kg)
+            .unwrap_or(0.0);
+        assert!(
+            remaining < original_mass,
+            "asteroid mass must decrease after mining"
+        );
+    }
+
+    #[test]
+    fn test_mine_removes_depleted_asteroid() {
+        let mut content = test_content();
+        content.constants.mining_rate_kg_per_tick = 1_000_000.0; // deplete in 1 tick
+        let (mut state, asteroid_id) = state_with_asteroid(&content);
+        let mut rng = make_rng();
+
+        let cmd = mine_command(&state, &asteroid_id, &content);
+        tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+        // Run to completion
+        for _ in 0..11 {
+            tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        }
+
+        assert!(
+            !state.asteroids.contains_key(&asteroid_id),
+            "fully mined asteroid should be removed from state"
+        );
+    }
+
     // --- Cargo holds --------------------------------------------------------
 
     #[test]
@@ -860,7 +1011,10 @@ mod tests {
         let state = test_state(&content);
         let ship = state.ships.values().next().unwrap();
         assert!(ship.cargo.is_empty(), "ship cargo should be empty at start");
-        assert!((ship.cargo_capacity_m3 - 20.0).abs() < 1e-5, "ship capacity should be 20 m³");
+        assert!(
+            (ship.cargo_capacity_m3 - 20.0).abs() < 1e-5,
+            "ship capacity should be 20 m³"
+        );
     }
 
     #[test]
@@ -868,8 +1022,14 @@ mod tests {
         let content = test_content();
         let state = test_state(&content);
         let station = state.stations.values().next().unwrap();
-        assert!(station.cargo.is_empty(), "station cargo should be empty at start");
-        assert!((station.cargo_capacity_m3 - 10_000.0).abs() < 1e-5, "station capacity should be 10,000 m³");
+        assert!(
+            station.cargo.is_empty(),
+            "station cargo should be empty at start"
+        );
+        assert!(
+            (station.cargo_capacity_m3 - 10_000.0).abs() < 1e-5,
+            "station capacity should be 10,000 m³"
+        );
     }
 
     // --- Transit ------------------------------------------------------------

@@ -1,15 +1,17 @@
 use crate::{
     AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, CompositionVec, Constants, DataKind,
-    Event, EventEnvelope, GameContent, GameState, NodeId, ResearchState, ShipId, SiteId, TaskKind,
-    TaskState, TechEffect,
+    ElementId, Event, EventEnvelope, GameContent, GameState, NodeId, ResearchState, ShipId,
+    ShipState, SiteId, TaskKind, TaskState, TechEffect,
 };
 use rand::Rng;
+use std::collections::HashMap;
 
 pub(crate) fn task_duration(kind: &TaskKind, constants: &Constants) -> u64 {
     match kind {
         TaskKind::Transit { total_ticks, .. } => *total_ticks,
         TaskKind::Survey { .. } => constants.survey_scan_ticks,
         TaskKind::DeepScan { .. } => constants.deep_scan_ticks,
+        TaskKind::Mine { duration_ticks, .. } => duration_ticks + 1,
         TaskKind::Idle => 0,
     }
 }
@@ -20,6 +22,7 @@ pub(crate) fn task_kind_label(kind: &TaskKind) -> &'static str {
         TaskKind::Transit { .. } => "Transit",
         TaskKind::Survey { .. } => "Survey",
         TaskKind::DeepScan { .. } => "DeepScan",
+        TaskKind::Mine { .. } => "Mine",
     }
 }
 
@@ -29,6 +32,7 @@ pub(crate) fn task_target(kind: &TaskKind) -> Option<String> {
         TaskKind::Transit { destination, .. } => Some(destination.0.clone()),
         TaskKind::Survey { site } => Some(site.0.clone()),
         TaskKind::DeepScan { asteroid } => Some(asteroid.0.clone()),
+        TaskKind::Mine { asteroid, .. } => Some(asteroid.0.clone()),
     }
 }
 
@@ -54,6 +58,56 @@ fn composition_noise_sigma(research: &ResearchState, content: &GameContent) -> f
             TechEffect::EnableDeepScan => None,
         })
         .unwrap_or(0.0)
+}
+
+/// Volume (m³) currently occupied by the ship's cargo.
+/// Unknown elements default to 1.0 kg/m³ (safe fallback).
+pub fn cargo_volume_used(cargo: &HashMap<ElementId, f32>, content: &GameContent) -> f32 {
+    cargo
+        .iter()
+        .map(|(element_id, &mass_kg)| {
+            let density = content
+                .elements
+                .iter()
+                .find(|e| &e.id == element_id)
+                .map(|e| e.density_kg_per_m3)
+                .unwrap_or(1.0);
+            mass_kg / density
+        })
+        .sum()
+}
+
+/// Pre-compute how many ticks a mining run will take.
+///
+/// Stops when the cargo hold fills OR the asteroid is depleted, whichever comes first.
+pub fn mine_duration(asteroid: &AsteroidState, ship: &ShipState, content: &GameContent) -> u64 {
+    // m³ consumed per kg of bulk ore (weighted by composition fractions).
+    let effective_m3_per_kg: f32 = asteroid
+        .true_composition
+        .iter()
+        .map(|(element_id, &fraction)| {
+            let density = content
+                .elements
+                .iter()
+                .find(|e| &e.id == element_id)
+                .map(|e| e.density_kg_per_m3)
+                .unwrap_or(1.0);
+            fraction / density
+        })
+        .sum();
+
+    let volume_used = cargo_volume_used(&ship.cargo, content);
+    let free_volume = (ship.cargo_capacity_m3 - volume_used).max(0.0);
+    let rate = content.constants.mining_rate_kg_per_tick;
+
+    let ticks_to_fill = if effective_m3_per_kg > 0.0 {
+        (free_volume / (rate * effective_m3_per_kg)).ceil() as u64
+    } else {
+        u64::MAX
+    };
+    let ticks_to_deplete = (asteroid.mass_kg / rate).ceil() as u64;
+
+    ticks_to_fill.min(ticks_to_deplete).max(1)
 }
 
 /// Normalise a composition map so values sum to 1.0. No-op if sum is zero.
@@ -154,9 +208,8 @@ pub(crate) fn resolve_survey(
         .collect();
     normalise(&mut composition);
 
-    let mass_kg = rng.gen_range(
-        content.constants.asteroid_mass_min_kg..=content.constants.asteroid_mass_max_kg,
-    );
+    let mass_kg = rng
+        .gen_range(content.constants.asteroid_mass_min_kg..=content.constants.asteroid_mass_max_kg);
 
     let asteroid_id = AsteroidId(format!("asteroid_{:04}", state.counters.next_asteroid_id));
     state.counters.next_asteroid_id += 1;
@@ -234,6 +287,97 @@ pub(crate) fn resolve_survey(
             ship_id: ship_id.clone(),
             task_kind: "Survey".to_string(),
             target: Some(site_id.0.clone()),
+        },
+    ));
+}
+
+pub(crate) fn resolve_mine(
+    state: &mut GameState,
+    ship_id: &ShipId,
+    asteroid_id: &AsteroidId,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    let Some(asteroid) = state.asteroids.get(asteroid_id) else {
+        set_ship_idle(state, ship_id, current_tick);
+        return; // Asteroid already gone — nothing to do.
+    };
+
+    let ship = match state.ships.get(ship_id) {
+        Some(s) => s,
+        None => return,
+    };
+
+    // How much volume is free in the hold?
+    let volume_used = cargo_volume_used(&ship.cargo, content);
+    let free_volume = (ship.cargo_capacity_m3 - volume_used).max(0.0);
+
+    // Effective m³/kg for this asteroid's mixed composition.
+    let effective_m3_per_kg: f32 = asteroid
+        .true_composition
+        .iter()
+        .map(|(element_id, &fraction)| {
+            let density = content
+                .elements
+                .iter()
+                .find(|e| &e.id == element_id)
+                .map(|e| e.density_kg_per_m3)
+                .unwrap_or(1.0);
+            fraction / density
+        })
+        .sum();
+
+    // Total kg we can extract: limited by asteroid mass and cargo space.
+    let max_kg_by_volume = if effective_m3_per_kg > 0.0 {
+        free_volume / effective_m3_per_kg
+    } else {
+        f32::MAX
+    };
+    let extracted_total_kg = asteroid.mass_kg.min(max_kg_by_volume);
+
+    // Distribute extracted mass by composition fractions.
+    let true_composition = asteroid.true_composition.clone();
+    let extracted: HashMap<ElementId, f32> = true_composition
+        .iter()
+        .map(|(element_id, &fraction)| (element_id.clone(), extracted_total_kg * fraction))
+        .collect();
+
+    // Update asteroid mass; remove if depleted.
+    let asteroid_remaining_kg = asteroid.mass_kg - extracted_total_kg;
+    if asteroid_remaining_kg <= 0.0 {
+        state.asteroids.remove(asteroid_id);
+    } else if let Some(asteroid) = state.asteroids.get_mut(asteroid_id) {
+        asteroid.mass_kg = asteroid_remaining_kg;
+    }
+
+    // Add extracted ore to ship cargo.
+    if let Some(ship) = state.ships.get_mut(ship_id) {
+        for (element_id, kg) in &extracted {
+            *ship.cargo.entry(element_id.clone()).or_insert(0.0) += kg;
+        }
+    }
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::OreMined {
+            asteroid_id: asteroid_id.clone(),
+            extracted: extracted.clone(),
+            asteroid_remaining_kg: asteroid_remaining_kg.max(0.0),
+        },
+    ));
+
+    set_ship_idle(state, ship_id, current_tick);
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::TaskCompleted {
+            ship_id: ship_id.clone(),
+            task_kind: "Mine".to_string(),
+            target: Some(asteroid_id.0.clone()),
         },
     ));
 }
