@@ -1,5 +1,6 @@
 import { useSortableData } from '../hooks/useSortableData'
 import type { AsteroidState } from '../types'
+import { SortIndicator } from './SortIndicator'
 
 interface Props {
   asteroids: Record<string, AsteroidState>
@@ -34,20 +35,6 @@ interface SortableAsteroid {
   mass_kg: number
   primary_fraction: number
   asteroid: AsteroidState
-}
-
-function SortIndicator({ column, sortConfig }: {
-  column: string
-  sortConfig: { key: string; direction: string } | null
-}) {
-  if (!sortConfig || sortConfig.key !== column) {
-    return <span className="text-faint/40 ml-1">⇅</span>
-  }
-  return (
-    <span className="text-accent ml-1">
-      {sortConfig.direction === 'asc' ? '▲' : '▼'}
-    </span>
-  )
 }
 
 export function AsteroidTable({ asteroids }: Props) {
