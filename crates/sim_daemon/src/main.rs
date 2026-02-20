@@ -118,6 +118,8 @@ mod tests {
                 deep_scan_data_quality: 1.0,
                 survey_tag_detection_probability: 0.5,
                 asteroid_count_per_template: 0,
+                asteroid_mass_min_kg: 500.0,
+                asteroid_mass_max_kg: 500.0,
                 station_compute_units_total: 10,
                 station_power_per_compute_unit_per_tick: 1.0,
                 station_efficiency: 1.0,

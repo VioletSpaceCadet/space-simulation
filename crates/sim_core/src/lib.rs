@@ -73,6 +73,8 @@ mod tests {
                 // Always detect tags so tests are predictable.
                 survey_tag_detection_probability: 1.0,
                 asteroid_count_per_template: 1,
+                asteroid_mass_min_kg: 500.0,   // fixed range so tests are deterministic
+                asteroid_mass_max_kg: 500.0,
                 station_compute_units_total: 10,
                 station_power_per_compute_unit_per_tick: 1.0,
                 station_efficiency: 1.0,
@@ -733,6 +735,40 @@ mod tests {
                 .iter()
                 .any(|e| matches!(e.event, Event::ResearchRoll { .. })),
             "ResearchRoll events should not be emitted at EventLevel::Normal"
+        );
+    }
+
+    // --- Asteroid mass ------------------------------------------------------
+
+    #[test]
+    fn test_asteroid_has_mass_after_survey() {
+        let content = test_content();
+        let mut state = test_state(&content);
+        let mut rng = make_rng();
+
+        let cmd = survey_command(&state);
+        tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let asteroid = state.asteroids.values().next().unwrap();
+        assert!(asteroid.mass_kg > 0.0, "asteroid must have positive mass after survey");
+    }
+
+    #[test]
+    fn test_asteroid_mass_within_range() {
+        let content = test_content();
+        let mut state = test_state(&content);
+        let mut rng = make_rng();
+
+        let cmd = survey_command(&state);
+        tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let asteroid = state.asteroids.values().next().unwrap();
+        // test_content sets min=max=500.0 for determinism
+        assert!(
+            (asteroid.mass_kg - 500.0).abs() < 1e-3,
+            "mass should be 500.0 in test content (fixed range)"
         );
     }
 

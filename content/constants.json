@@ -8,6 +8,8 @@
   "deep_scan_data_quality": 1.2,
   "survey_tag_detection_probability": 0.85,
   "asteroid_count_per_template": 10,
+  "asteroid_mass_min_kg": 100.0,
+  "asteroid_mass_max_kg": 100000.0,
   "station_compute_units_total": 10,
   "station_power_per_compute_unit_per_tick": 1.0,
   "station_efficiency": 1.0,

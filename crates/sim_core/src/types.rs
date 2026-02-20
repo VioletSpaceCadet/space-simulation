@@ -107,6 +107,7 @@ pub struct AsteroidState {
     /// Ground truth — never exposed to the UI.
     pub true_composition: CompositionVec,
     pub anomaly_tags: Vec<AnomalyTag>,
+    pub mass_kg: f32,
     pub knowledge: AsteroidKnowledge,
 }
 
@@ -316,6 +317,8 @@ pub struct Constants {
     pub deep_scan_data_quality: f32,
     pub survey_tag_detection_probability: f32,
     pub asteroid_count_per_template: u32,
+    pub asteroid_mass_min_kg: f32,
+    pub asteroid_mass_max_kg: f32,
     pub station_compute_units_total: u32,
     pub station_power_per_compute_unit_per_tick: f32,
     pub station_efficiency: f32,

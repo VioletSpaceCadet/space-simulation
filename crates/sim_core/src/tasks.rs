@@ -154,6 +154,10 @@ pub(crate) fn resolve_survey(
         .collect();
     normalise(&mut composition);
 
+    let mass_kg = rng.gen_range(
+        content.constants.asteroid_mass_min_kg..=content.constants.asteroid_mass_max_kg,
+    );
+
     let asteroid_id = AsteroidId(format!("asteroid_{:04}", state.counters.next_asteroid_id));
     state.counters.next_asteroid_id += 1;
 
@@ -165,6 +169,7 @@ pub(crate) fn resolve_survey(
             location_node: site.node.clone(),
             true_composition: composition,
             anomaly_tags: anomaly_tags.clone(),
+            mass_kg,
             knowledge: AsteroidKnowledge {
                 tag_beliefs: vec![],
                 composition: None,
