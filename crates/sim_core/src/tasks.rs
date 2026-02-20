@@ -84,30 +84,21 @@ pub fn cargo_volume_used(cargo: &HashMap<ElementId, f32>, content: &GameContent)
 ///
 /// Stops when the cargo hold fills OR the asteroid is depleted, whichever comes first.
 pub fn mine_duration(asteroid: &AsteroidState, ship: &ShipState, content: &GameContent) -> u64 {
-    // m³ consumed per kg of bulk ore (weighted by composition fractions).
-    let effective_m3_per_kg: f32 = asteroid
-        .true_composition
+    // Mining extracts raw ore (unrefined bulk rock). Use the ore element's density
+    // for volume calculations; fall back to 3000 kg/m³ if ore is not in the element list.
+    let ore_density = content
+        .elements
         .iter()
-        .map(|(element_id, &fraction)| {
-            let density = content
-                .elements
-                .iter()
-                .find(|e| &e.id == element_id)
-                .map(|e| e.density_kg_per_m3)
-                .unwrap_or(1.0);
-            fraction / density
-        })
-        .sum();
+        .find(|e| e.id == "ore")
+        .map(|e| e.density_kg_per_m3)
+        .unwrap_or(3000.0);
+    let effective_m3_per_kg = 1.0 / ore_density;
 
     let volume_used = cargo_volume_used(&ship.cargo, content);
     let free_volume = (ship.cargo_capacity_m3 - volume_used).max(0.0);
     let rate = content.constants.mining_rate_kg_per_tick;
 
-    let ticks_to_fill = if effective_m3_per_kg > 0.0 {
-        (free_volume / (rate * effective_m3_per_kg)).ceil() as u64
-    } else {
-        u64::MAX
-    };
+    let ticks_to_fill = (free_volume / (rate * effective_m3_per_kg)).ceil() as u64;
     let ticks_to_deplete = (asteroid.mass_kg / rate).ceil() as u64;
 
     ticks_to_fill.min(ticks_to_deplete).max(1)
@@ -317,35 +308,23 @@ pub(crate) fn resolve_mine(
     let volume_used = cargo_volume_used(&ship.cargo, content);
     let free_volume = (ship.cargo_capacity_m3 - volume_used).max(0.0);
 
-    // Effective m³/kg for this asteroid's mixed composition.
-    let effective_m3_per_kg: f32 = asteroid
-        .true_composition
+    // Mining extracts raw ore. Use ore density for volume calculation.
+    let ore_density = content
+        .elements
         .iter()
-        .map(|(element_id, &fraction)| {
-            let density = content
-                .elements
-                .iter()
-                .find(|e| &e.id == element_id)
-                .map(|e| e.density_kg_per_m3)
-                .unwrap_or(1.0);
-            fraction / density
-        })
-        .sum();
+        .find(|e| e.id == "ore")
+        .map(|e| e.density_kg_per_m3)
+        .unwrap_or(3000.0);
+    let effective_m3_per_kg = 1.0 / ore_density;
 
     // Total kg we can extract: limited by asteroid mass and cargo space.
-    let max_kg_by_volume = if effective_m3_per_kg > 0.0 {
-        free_volume / effective_m3_per_kg
-    } else {
-        f32::MAX
-    };
+    let max_kg_by_volume = free_volume / effective_m3_per_kg;
     let extracted_total_kg = asteroid.mass_kg.min(max_kg_by_volume);
 
-    // Distribute extracted mass by composition fractions.
-    let true_composition = asteroid.true_composition.clone();
-    let extracted: HashMap<ElementId, f32> = true_composition
-        .iter()
-        .map(|(element_id, &fraction)| (element_id.clone(), extracted_total_kg * fraction))
-        .collect();
+    // Extract as raw ore — composition is preserved in the asteroid record
+    // and will be used later by the refinery to split ore into elements.
+    let extracted: HashMap<ElementId, f32> =
+        HashMap::from([("ore".to_string(), extracted_total_kg)]);
 
     // Update asteroid mass; remove if depleted.
     let asteroid_remaining_kg = asteroid.mass_kg - extracted_total_kg;

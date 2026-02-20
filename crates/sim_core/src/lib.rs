@@ -65,6 +65,11 @@ mod tests {
             }],
             elements: vec![
                 ElementDef {
+                    id: "ore".to_string(),
+                    density_kg_per_m3: 3000.0,
+                    display_name: "Raw Ore".to_string(),
+                },
+                ElementDef {
                     id: "Fe".to_string(),
                     density_kg_per_m3: 7874.0,
                     display_name: "Iron".to_string(),
