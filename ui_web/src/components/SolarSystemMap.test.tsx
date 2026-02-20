@@ -20,6 +20,48 @@ describe('SolarSystemMap', () => {
     expect(container.querySelector('svg')).toBeInTheDocument()
   })
 
+  it('renders station markers', () => {
+    const snapshotWithEntities: SimSnapshot = {
+      ...emptySnapshot,
+      stations: {
+        station_001: {
+          id: 'station_001',
+          location_node: 'node_earth_orbit',
+          power_available_per_tick: 100,
+          cargo: {},
+          cargo_capacity_m3: 10000,
+          facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1 },
+        },
+      },
+    }
+    const { container } = render(
+      <SolarSystemMap snapshot={snapshotWithEntities} currentTick={100} oreCompositions={{}} />
+    )
+    const stationMarkers = container.querySelectorAll('[data-entity-type="station"]')
+    expect(stationMarkers.length).toBe(1)
+  })
+
+  it('renders ship markers', () => {
+    const snapshotWithShip: SimSnapshot = {
+      ...emptySnapshot,
+      ships: {
+        ship_001: {
+          id: 'ship_001',
+          location_node: 'node_earth_orbit',
+          owner: 'player',
+          cargo: {},
+          cargo_capacity_m3: 20,
+          task: null,
+        },
+      },
+    }
+    const { container } = render(
+      <SolarSystemMap snapshot={snapshotWithShip} currentTick={100} oreCompositions={{}} />
+    )
+    const shipMarkers = container.querySelectorAll('[data-entity-type="ship"]')
+    expect(shipMarkers.length).toBe(1)
+  })
+
   it('renders orbital ring labels', () => {
     render(
       <SolarSystemMap snapshot={emptySnapshot} currentTick={100} oreCompositions={{}} />,
