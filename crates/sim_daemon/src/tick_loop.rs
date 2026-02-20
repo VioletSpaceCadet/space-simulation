@@ -36,6 +36,13 @@ pub async fn run_tick_loop(
                 ..
             } = *guard;
             let events = sim_core::tick(game_state, &commands, content, rng, EventLevel::Normal);
+
+            let metrics_every = guard.metrics_every;
+            if metrics_every > 0 && guard.game_state.meta.tick % metrics_every == 0 {
+                let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
+                guard.push_metrics(snapshot);
+            }
+
             let done = max_ticks.is_some_and(|max| guard.game_state.meta.tick >= max);
             (events, done)
         };

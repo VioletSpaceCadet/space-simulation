@@ -30,7 +30,9 @@ fn tick_station_modules(
 
     for module_idx in 0..module_count {
         let (def_id, interval, power_needed) = {
-            let Some(station) = state.stations.get(station_id) else { return };
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
             let module = &station.modules[module_idx];
             if !module.enabled {
                 continue;
@@ -42,12 +44,18 @@ fn tick_station_modules(
                 ModuleBehaviorDef::Processor(p) => p.processing_interval_ticks,
                 ModuleBehaviorDef::Storage { .. } => continue,
             };
-            (module.def_id.clone(), interval, def.power_consumption_per_run)
+            (
+                module.def_id.clone(),
+                interval,
+                def.power_consumption_per_run,
+            )
         };
 
         // Tick timer; skip if interval not reached yet.
         {
-            let Some(station) = state.stations.get_mut(station_id) else { return };
+            let Some(station) = state.stations.get_mut(station_id) else {
+                return;
+            };
             if let ModuleKindState::Processor(ps) = &mut station.modules[module_idx].kind_state {
                 ps.ticks_since_last_run += 1;
                 if ps.ticks_since_last_run < interval {
@@ -58,7 +66,9 @@ fn tick_station_modules(
 
         // Check power budget.
         {
-            let Some(station) = state.stations.get(station_id) else { return };
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
             if station.power_available_per_tick < power_needed {
                 continue;
             }
@@ -66,7 +76,9 @@ fn tick_station_modules(
 
         // Check ore threshold.
         let threshold_kg = {
-            let Some(station) = state.stations.get(station_id) else { return };
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
             match &station.modules[module_idx].kind_state {
                 ModuleKindState::Processor(ps) => ps.threshold_kg,
                 ModuleKindState::Storage => continue,
@@ -76,7 +88,13 @@ fn tick_station_modules(
         let total_ore_kg: f32 = state.stations.get(station_id).map_or(0.0, |s| {
             s.inventory
                 .iter()
-                .filter_map(|i| if let InventoryItem::Ore { kg, .. } = i { Some(*kg) } else { None })
+                .filter_map(|i| {
+                    if let InventoryItem::Ore { kg, .. } = i {
+                        Some(*kg)
+                    } else {
+                        None
+                    }
+                })
                 .sum()
         });
 
@@ -131,8 +149,12 @@ fn resolve_processor_run(
     let matches_input = move |item: &InventoryItem| -> bool {
         match &input_filter {
             Some(InputFilter::ItemKind(ItemKind::Ore)) => matches!(item, InventoryItem::Ore { .. }),
-            Some(InputFilter::ItemKind(ItemKind::Material)) => matches!(item, InventoryItem::Material { .. }),
-            Some(InputFilter::ItemKind(ItemKind::Slag)) => matches!(item, InventoryItem::Slag { .. }),
+            Some(InputFilter::ItemKind(ItemKind::Material)) => {
+                matches!(item, InventoryItem::Material { .. })
+            }
+            Some(InputFilter::ItemKind(ItemKind::Slag)) => {
+                matches!(item, InventoryItem::Slag { .. })
+            }
             Some(InputFilter::Element(el)) => {
                 matches!(item, InventoryItem::Material { element, .. } if element == el)
             }
@@ -142,7 +164,9 @@ fn resolve_processor_run(
 
     // FIFO-consume ore and compute weighted average composition.
     let (consumed_kg, lots) = {
-        let Some(station) = state.stations.get_mut(station_id) else { return };
+        let Some(station) = state.stations.get_mut(station_id) else {
+            return;
+        };
         consume_ore_fifo_with_lots(&mut station.inventory, rate_kg, matches_input)
     };
 
@@ -155,7 +179,11 @@ fn resolve_processor_run(
     let avg_composition = weighted_composition(&lot_refs);
 
     let extracted_element: Option<String> = recipe.outputs.iter().find_map(|o| {
-        if let OutputSpec::Material { element, .. } = o { Some(element.clone()) } else { None }
+        if let OutputSpec::Material { element, .. } = o {
+            Some(element.clone())
+        } else {
+            None
+        }
     });
 
     let mut material_kg = 0.0_f32;
@@ -164,7 +192,11 @@ fn resolve_processor_run(
 
     for output in &recipe.outputs {
         match output {
-            OutputSpec::Material { element, yield_formula, quality_formula } => {
+            OutputSpec::Material {
+                element,
+                yield_formula,
+                quality_formula,
+            } => {
                 let yield_frac = match yield_formula {
                     YieldFormula::ElementFraction { element: el } => {
                         avg_composition.get(el).copied().unwrap_or(0.0)
@@ -173,14 +205,21 @@ fn resolve_processor_run(
                 };
                 material_kg = consumed_kg * yield_frac;
                 material_quality = match quality_formula {
-                    QualityFormula::ElementFractionTimesMultiplier { element: el, multiplier } => {
-                        (avg_composition.get(el).copied().unwrap_or(0.0) * multiplier).clamp(0.0, 1.0)
-                    }
+                    QualityFormula::ElementFractionTimesMultiplier {
+                        element: el,
+                        multiplier,
+                    } => (avg_composition.get(el).copied().unwrap_or(0.0) * multiplier)
+                        .clamp(0.0, 1.0),
                     QualityFormula::Fixed(q) => *q,
                 };
                 if material_kg > 1e-3 {
                     if let Some(station) = state.stations.get_mut(station_id) {
-                        merge_material_lot(&mut station.inventory, element.clone(), material_kg, material_quality);
+                        merge_material_lot(
+                            &mut station.inventory,
+                            element.clone(),
+                            material_kg,
+                            material_quality,
+                        );
                     }
                 }
             }
@@ -194,7 +233,8 @@ fn resolve_processor_run(
                 slag_kg = (consumed_kg - material_kg) * yield_frac;
 
                 // Slag composition: non-extracted elements, re-normalized.
-                let slag_composition = slag_composition_from_avg(&avg_composition, extracted_element.as_deref());
+                let slag_composition =
+                    slag_composition_from_avg(&avg_composition, extracted_element.as_deref());
 
                 if slag_kg > 1e-3 {
                     if let Some(station) = state.stations.get_mut(station_id) {
@@ -202,8 +242,17 @@ fn resolve_processor_run(
                             .inventory
                             .iter_mut()
                             .find(|i| matches!(i, InventoryItem::Slag { .. }));
-                        if let Some(InventoryItem::Slag { kg: existing_kg, composition: existing_comp }) = existing {
-                            let blended = blend_slag_composition(existing_comp, *existing_kg, &slag_composition, slag_kg);
+                        if let Some(InventoryItem::Slag {
+                            kg: existing_kg,
+                            composition: existing_comp,
+                        }) = existing
+                        {
+                            let blended = blend_slag_composition(
+                                existing_comp,
+                                *existing_kg,
+                                &slag_composition,
+                                slag_kg,
+                            );
                             *existing_kg += slag_kg;
                             *existing_comp = blended;
                         } else {
@@ -248,7 +297,13 @@ fn consume_ore_fifo_with_lots(
 
     for item in inventory.drain(..) {
         if remaining > 0.0 && matches!(item, InventoryItem::Ore { .. }) && filter(&item) {
-            let InventoryItem::Ore { lot_id, asteroid_id, kg, composition } = item else {
+            let InventoryItem::Ore {
+                lot_id,
+                asteroid_id,
+                kg,
+                composition,
+            } = item
+            else {
                 unreachable!()
             };
             let take = kg.min(remaining);
@@ -257,7 +312,12 @@ fn consume_ore_fifo_with_lots(
             lots.push((composition.clone(), take));
             let leftover = kg - take;
             if leftover > 1e-3 {
-                new_inventory.push(InventoryItem::Ore { lot_id, asteroid_id, kg: leftover, composition });
+                new_inventory.push(InventoryItem::Ore {
+                    lot_id,
+                    asteroid_id,
+                    kg: leftover,
+                    composition,
+                });
             }
         } else {
             new_inventory.push(item);

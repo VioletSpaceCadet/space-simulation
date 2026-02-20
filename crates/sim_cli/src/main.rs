@@ -35,6 +35,12 @@ enum Commands {
         print_every: u64,
         #[arg(long, default_value = "normal", value_parser = ["normal", "debug"])]
         event_level: String,
+        /// Path to write metrics CSV. If omitted, no metrics are collected.
+        #[arg(long = "metrics-out")]
+        metrics_out: Option<String>,
+        /// Sample metrics every N ticks (default 60).
+        #[arg(long, default_value_t = 60)]
+        metrics_every: u64,
     },
 }
 
@@ -49,6 +55,8 @@ fn run(
     content_dir: &str,
     print_every: u64,
     event_level: EventLevel,
+    metrics_out: Option<&str>,
+    metrics_every: u64,
 ) -> Result<()> {
     let content = load_content(content_dir)?;
 
@@ -68,6 +76,8 @@ fn run(
 
     let mut autopilot = AutopilotController;
     let mut next_command_id = 0u64;
+    let collect_metrics = metrics_out.is_some();
+    let mut snapshots: Vec<sim_core::MetricsSnapshot> = Vec::new();
 
     println!(
         "Starting simulation: ticks={ticks} seed={} sites={} content_version={}",
@@ -95,11 +105,21 @@ fn run(
         if state.meta.tick % print_every == 0 {
             print_status(&state);
         }
+
+        if collect_metrics && state.meta.tick % metrics_every == 0 {
+            snapshots.push(sim_core::compute_metrics(&state, &content));
+        }
     }
 
     println!("{}", "-".repeat(80));
     println!("Done. Final state at tick {}:", state.meta.tick);
     print_status(&state);
+
+    if let Some(path) = metrics_out {
+        sim_core::write_metrics_csv(path, &snapshots)
+            .with_context(|| format!("writing metrics CSV: {path}"))?;
+        println!("Wrote {} metrics snapshots to {path}", snapshots.len());
+    }
 
     Ok(())
 }
@@ -159,12 +179,23 @@ fn main() -> Result<()> {
             content_dir,
             print_every,
             event_level,
+            metrics_out,
+            metrics_every,
         } => {
             let level = match event_level.as_str() {
                 "debug" => EventLevel::Debug,
                 _ => EventLevel::Normal,
             };
-            run(ticks, seed, state_file, &content_dir, print_every, level)?;
+            run(
+                ticks,
+                seed,
+                state_file,
+                &content_dir,
+                print_every,
+                level,
+                metrics_out.as_deref(),
+                metrics_every,
+            )?;
         }
     }
     Ok(())

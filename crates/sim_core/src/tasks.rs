@@ -82,9 +82,7 @@ pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -
         .map(|item| match item {
             InventoryItem::Ore { kg, .. } => kg / element_density(content, "ore"),
             InventoryItem::Slag { kg, .. } => kg / element_density(content, "slag"),
-            InventoryItem::Material { element, kg, .. } => {
-                kg / element_density(content, element)
-            }
+            InventoryItem::Material { element, kg, .. } => kg / element_density(content, element),
             InventoryItem::Component { count, .. } => *count as f32 * 1.0, // 1.0 m³ per unit; replace with ComponentDef.volume_m3 when defs exist
             InventoryItem::Module { module_def_id, .. } => content
                 .module_defs

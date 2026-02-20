@@ -77,7 +77,10 @@ pub(crate) fn merge_material_lot(
             } if existing_element == &element && *existing_quality == quality
         )
     });
-    if let Some(InventoryItem::Material { kg: existing_kg, .. }) = existing {
+    if let Some(InventoryItem::Material {
+        kg: existing_kg, ..
+    }) = existing
+    {
         *existing_kg += kg;
     } else {
         inventory.push(InventoryItem::Material {
@@ -141,7 +144,11 @@ mod tests {
 
         assert_eq!(inventory.len(), 1);
         match &inventory[0] {
-            InventoryItem::Material { element, kg, quality } => {
+            InventoryItem::Material {
+                element,
+                kg,
+                quality,
+            } => {
                 assert_eq!(element, "Fe");
                 assert!((kg - 50.0).abs() < 1e-6);
                 assert!((quality - 0.9).abs() < 1e-6);

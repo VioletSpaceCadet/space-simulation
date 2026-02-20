@@ -44,6 +44,9 @@ enum Commands {
         ticks_per_sec: f64,
         #[arg(long)]
         max_ticks: Option<u64>,
+        /// Sample metrics every N ticks (default 60). 0 = disabled.
+        #[arg(long, default_value_t = 60)]
+        metrics_every: u64,
     },
 }
 
@@ -58,6 +61,7 @@ async fn main() -> Result<()> {
             port,
             ticks_per_sec,
             max_ticks,
+            metrics_every,
         } => {
             let content = load_content(&content_dir)?;
             let (game_state, rng) = if let Some(path) = state_file {
@@ -81,6 +85,8 @@ async fn main() -> Result<()> {
                     rng,
                     autopilot: AutopilotController,
                     next_command_id: 0,
+                    metrics_every,
+                    metrics_history: Vec::new(),
                 })),
                 event_tx: event_tx.clone(),
                 ticks_per_sec,
@@ -175,6 +181,8 @@ mod tests {
                 rng,
                 autopilot: AutopilotController,
                 next_command_id: 0,
+                metrics_every: 60,
+                metrics_history: Vec::new(),
             })),
             event_tx,
             ticks_per_sec: 10.0,

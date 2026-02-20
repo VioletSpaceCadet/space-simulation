@@ -28,6 +28,7 @@ pub fn make_router(state: AppState) -> Router {
     Router::new()
         .route("/api/v1/meta", get(meta_handler))
         .route("/api/v1/snapshot", get(snapshot_handler))
+        .route("/api/v1/metrics", get(metrics_handler))
         .route("/api/v1/stream", get(stream_handler))
         .layer(cors)
         .with_state(state)
@@ -55,6 +56,13 @@ pub async fn snapshot_handler(
         [(header::CONTENT_TYPE, "application/json")],
         body,
     )
+}
+
+pub async fn metrics_handler(
+    State(app_state): State<AppState>,
+) -> Json<Vec<sim_core::MetricsSnapshot>> {
+    let sim = app_state.sim.lock().unwrap();
+    Json(sim.metrics_history.clone())
 }
 
 pub async fn stream_handler(

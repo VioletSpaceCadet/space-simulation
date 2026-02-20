@@ -6,14 +6,16 @@ mod composition;
 mod engine;
 mod graph;
 mod id;
+pub mod metrics;
 mod research;
 mod station;
-mod tasks;
+pub(crate) mod tasks;
 mod types;
 
 pub use engine::tick;
 pub use graph::shortest_hop_count;
 pub use id::generate_uuid;
+pub use metrics::{compute_metrics, write_metrics_csv, MetricsSnapshot};
 pub use tasks::{inventory_volume_m3, mine_duration};
 pub use types::*;
 
