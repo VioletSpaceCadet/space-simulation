@@ -1684,3 +1684,202 @@ fn transit_moves_ship_and_starts_next_task() {
         "AsteroidDiscovered after survey completes"
     );
 }
+
+// --- Full gameplay cycle integration test --------------------------------
+
+#[test]
+fn test_full_survey_deepscan_mine_deposit_cycle() {
+    let content = test_content();
+    let mut state = test_state(&content);
+    let mut rng = make_rng();
+
+    let ship_id = ShipId("ship_0001".to_string());
+    let station_id = StationId("station_earth_orbit".to_string());
+    let owner = state.ships[&ship_id].owner.clone();
+
+    // --- Phase 1: Survey ---
+    // Issue a survey command and tick until the asteroid is created.
+    let cmd = survey_command(&state);
+    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Debug);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+
+    assert_eq!(state.asteroids.len(), 1, "one asteroid should exist after survey");
+    assert!(
+        !state.scan_sites.iter().any(|s| s.id.0 == "site_0001"),
+        "original scan site should be consumed"
+    );
+    let asteroid_id = state.asteroids.keys().next().unwrap().clone();
+    assert!(
+        (state.asteroids[&asteroid_id].mass_kg - 500.0).abs() < 1e-3,
+        "asteroid mass should be 500 kg"
+    );
+
+    // Ship should be idle after survey completion.
+    assert!(
+        matches!(
+            &state.ships[&ship_id].task,
+            Some(task) if matches!(task.kind, TaskKind::Idle)
+        ),
+        "ship should be idle after survey"
+    );
+
+    // --- Phase 2: Research unlocks deep scan ---
+    // difficulty=10, survey gave 5 ScanData. Research auto-advances each tick.
+    // Tick until tech_deep_scan_v1 is unlocked (should happen quickly with difficulty=10).
+    let tech_id = TechId("tech_deep_scan_v1".to_string());
+    let mut unlocked = false;
+    for _ in 0..100 {
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+        if state.research.unlocked.contains(&tech_id) {
+            unlocked = true;
+            break;
+        }
+    }
+    assert!(unlocked, "tech_deep_scan_v1 should unlock within 100 ticks");
+
+    // --- Phase 3: Deep Scan ---
+    assert!(
+        state.asteroids[&asteroid_id].knowledge.composition.is_none(),
+        "composition should be unknown before deep scan"
+    );
+
+    let deep_cmd = CommandEnvelope {
+        id: CommandId(format!("cmd_{:06}", state.counters.next_command_id)),
+        issued_by: owner.clone(),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::AssignShipTask {
+            ship_id: ship_id.clone(),
+            task_kind: TaskKind::DeepScan {
+                asteroid: asteroid_id.clone(),
+            },
+        },
+    };
+    tick(&mut state, &[deep_cmd], &content, &mut rng, EventLevel::Debug);
+    // deep_scan_ticks=1, so one more tick resolves it.
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+
+    let composition = state.asteroids[&asteroid_id]
+        .knowledge
+        .composition
+        .as_ref();
+    assert!(
+        composition.is_some(),
+        "composition should be known after deep scan"
+    );
+    // With sigma=0, mapped composition should match true composition exactly.
+    let mapped = composition.unwrap();
+    for (element, &true_val) in &state.asteroids[&asteroid_id].true_composition {
+        let mapped_val = mapped.get(element).copied().unwrap_or(0.0);
+        assert!(
+            (mapped_val - true_val).abs() < 1e-5,
+            "mapped {element} should match true composition (sigma=0)"
+        );
+    }
+
+    // --- Phase 4: Mine ---
+    // 500 kg at 50 kg/tick = 10 ticks duration.
+    let duration_ticks = (state.asteroids[&asteroid_id].mass_kg
+        / content.constants.mining_rate_kg_per_tick)
+        .ceil() as u64;
+    assert_eq!(duration_ticks, 10, "mining should take 10 ticks");
+
+    let mine_cmd = CommandEnvelope {
+        id: CommandId(format!("cmd_{:06}", state.counters.next_command_id + 1)),
+        issued_by: owner.clone(),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::AssignShipTask {
+            ship_id: ship_id.clone(),
+            task_kind: TaskKind::Mine {
+                asteroid: asteroid_id.clone(),
+                duration_ticks,
+            },
+        },
+    };
+    tick(
+        &mut state,
+        &[mine_cmd],
+        &content,
+        &mut rng,
+        EventLevel::Debug,
+    );
+
+    // Tick through the mining duration.
+    for _ in 0..duration_ticks {
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+    }
+
+    // Ship should now have ore in its inventory.
+    let ship_ore_kg: f32 = state.ships[&ship_id]
+        .inventory
+        .iter()
+        .filter_map(|i| {
+            if let InventoryItem::Ore { kg, .. } = i {
+                Some(*kg)
+            } else {
+                None
+            }
+        })
+        .sum();
+    assert!(
+        ship_ore_kg > 0.0,
+        "ship should have ore after mining, got {ship_ore_kg} kg"
+    );
+
+    // Asteroid should be depleted (500 kg mined at 50 kg/tick over 10 ticks = fully consumed).
+    assert!(
+        !state.asteroids.contains_key(&asteroid_id),
+        "asteroid should be removed after full depletion"
+    );
+
+    // --- Phase 5: Deposit ---
+    let deposit_cmd = CommandEnvelope {
+        id: CommandId(format!("cmd_{:06}", state.counters.next_command_id + 2)),
+        issued_by: owner.clone(),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::AssignShipTask {
+            ship_id: ship_id.clone(),
+            task_kind: TaskKind::Deposit {
+                station: station_id.clone(),
+            },
+        },
+    };
+    tick(
+        &mut state,
+        &[deposit_cmd],
+        &content,
+        &mut rng,
+        EventLevel::Debug,
+    );
+    // deposit_ticks=1, so one more tick resolves it.
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+
+    // Ship inventory should be empty.
+    assert!(
+        state.ships[&ship_id].inventory.is_empty(),
+        "ship inventory should be empty after deposit"
+    );
+
+    // Station should now have the ore.
+    let station_ore_kg: f32 = state.stations[&station_id]
+        .inventory
+        .iter()
+        .filter_map(|i| {
+            if let InventoryItem::Ore { kg, .. } = i {
+                Some(*kg)
+            } else {
+                None
+            }
+        })
+        .sum();
+    assert!(
+        station_ore_kg > 0.0,
+        "station should have ore after deposit, got {station_ore_kg} kg"
+    );
+    assert!(
+        (station_ore_kg - ship_ore_kg).abs() < 1e-3,
+        "station ore ({station_ore_kg} kg) should match what the ship had ({ship_ore_kg} kg)"
+    );
+}
