@@ -50,10 +50,10 @@ describe('App', () => {
     expect(handles.length).toBeGreaterThan(0)
   })
 
-  it('shows map placeholder when toggled to map view', async () => {
-    render(<App />)
+  it('shows solar system map when toggled to map view', async () => {
+    const { container } = render(<App />)
     await userEvent.click(screen.getByText(/System Map/))
-    expect(screen.getByText(/Solar System Map/)).toBeInTheDocument()
+    expect(container.querySelector('svg')).toBeInTheDocument()
     expect(screen.queryByText('Events')).not.toBeInTheDocument()
   })
 })

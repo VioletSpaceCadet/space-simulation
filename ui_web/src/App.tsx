@@ -4,6 +4,7 @@ import { AsteroidTable } from './components/AsteroidTable'
 import { EventsFeed } from './components/EventsFeed'
 import { FleetPanel } from './components/FleetPanel'
 import { ResearchPanel } from './components/ResearchPanel'
+import { SolarSystemMap } from './components/SolarSystemMap'
 import { StatusBar } from './components/StatusBar'
 import { useSimStream } from './hooks/useSimStream'
 
@@ -46,9 +47,7 @@ export default function App() {
         </Panel>
       </PanelGroup>
       ) : (
-      <div className="flex-1 overflow-hidden bg-void flex items-center justify-center text-dim">
-        Solar System Map (coming soon)
-      </div>
+      <SolarSystemMap snapshot={snapshot} currentTick={currentTick} oreCompositions={oreCompositions} />
       )}
     </div>
   )
