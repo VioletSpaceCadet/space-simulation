@@ -5,6 +5,7 @@
 mod composition;
 mod engine;
 mod graph;
+mod id;
 mod research;
 mod station;
 mod tasks;
@@ -12,6 +13,7 @@ mod types;
 
 pub use engine::tick;
 pub use graph::shortest_hop_count;
+pub use id::generate_uuid;
 pub use tasks::{inventory_volume_m3, mine_duration};
 pub use types::*;
 
@@ -323,7 +325,10 @@ mod tests {
             1,
             "asteroid should be created on survey completion"
         );
-        assert!(state.scan_sites.is_empty(), "scan site should be consumed");
+        assert!(
+            !state.scan_sites.iter().any(|s| s.id.0 == "site_0001"),
+            "original scan site should be consumed"
+        );
     }
 
     #[test]

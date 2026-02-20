@@ -1,6 +1,6 @@
 import { useEffect, useReducer } from 'react'
 import { createEventSource, fetchSnapshot } from '../api'
-import type { AsteroidState, MaterialItem, ModuleKindState, ResearchState, ShipState, SimEvent, SimSnapshot, SlagItem, StationState, TaskState } from '../types'
+import type { AsteroidState, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SimSnapshot, SlagItem, StationState, TaskState } from '../types'
 
 // Kept for backward compatibility with SolarSystemMap/DetailCard imports.
 // Composition is now embedded in InventoryItem::Ore; this type is unused in new code.
@@ -41,17 +41,20 @@ function applyEvents(
   ships: Record<string, ShipState>,
   stations: Record<string, StationState>,
   research: ResearchState,
+  scanSites: ScanSite[],
   events: SimEvent[],
 ): {
   asteroids: Record<string, AsteroidState>
   ships: Record<string, ShipState>
   stations: Record<string, StationState>
   research: ResearchState
+  scanSites: ScanSite[]
 } {
   let updatedAsteroids = { ...asteroids }
   let updatedShips = { ...ships }
   let updatedStations = { ...stations }
   let updatedResearch = research
+  let updatedScanSites = [...scanSites]
 
   for (const evt of events) {
     const e = evt.event
@@ -304,6 +307,12 @@ function applyEvents(
         }
         break
       }
+
+      case 'ScanSiteSpawned': {
+        const { site_id, node, template_id } = event as { site_id: string; node: string; template_id: string }
+        updatedScanSites.push({ id: site_id, node, template_id })
+        break
+      }
     }
 
     if (e['TaskStarted']) {
@@ -360,6 +369,7 @@ function applyEvents(
     ships: updatedShips,
     stations: updatedStations,
     research: updatedResearch,
+    scanSites: updatedScanSites,
   }
 }
 
@@ -372,18 +382,19 @@ function reducer(state: State, action: Action): State {
       const newEvents = [...action.events, ...state.events].slice(0, 500)
       const latestTick = action.events.reduce((max, e) => Math.max(max, e.tick), state.currentTick)
       if (!state.snapshot) return { ...state, events: newEvents, currentTick: latestTick }
-      const { asteroids, ships, stations, research } = applyEvents(
+      const { asteroids, ships, stations, research, scanSites } = applyEvents(
         state.snapshot.asteroids,
         state.snapshot.ships,
         state.snapshot.stations,
         state.snapshot.research,
+        state.snapshot.scan_sites,
         action.events,
       )
       return {
         ...state,
         events: newEvents,
         currentTick: latestTick,
-        snapshot: { ...state.snapshot, asteroids, ships, stations, research },
+        snapshot: { ...state.snapshot, asteroids, ships, stations, research, scan_sites: scanSites },
       }
     }
 

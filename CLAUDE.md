@@ -52,13 +52,15 @@ Pure deterministic simulation. No IO, no network. Modules: `types`, `engine`, `t
 2. Resolve ship tasks whose `eta_tick` has arrived.
 3. Tick station modules (refinery processors).
 4. Advance station research on all eligible techs.
-5. Increment `state.meta.tick`.
+5. Replenish scan sites if below threshold.
+6. Increment `state.meta.tick`.
 
 **Key design rules:**
 - Asteroids do not exist in state until surveyed. `state.scan_sites` holds pre-generated sites; survey completion creates and inserts an `AsteroidState`.
 - Research is fully automatic — compute distributes evenly across all eligible techs (prereqs met, not yet unlocked). No player allocation.
 - DeepScan commands are silently dropped if no unlocked tech has the `EnableDeepScan` effect.
 - All collection iteration is sorted by ID before RNG consumption to guarantee determinism.
+- Scan sites are replenished each tick when count drops below threshold (MIN_UNSCANNED_SITES=5). New sites use deterministic UUIDs from the seeded RNG.
 
 ### `crates/sim_control` (lib)
 Command sources. Implements the `CommandSource` trait.

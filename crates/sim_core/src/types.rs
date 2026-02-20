@@ -374,6 +374,11 @@ pub enum Event {
         slag_produced_kg: f32,
         material_element: ElementId,
     },
+    ScanSiteSpawned {
+        site_id: SiteId,
+        node: NodeId,
+        template_id: String,
+    },
     /// Only emitted at `EventLevel::Debug`.
     ResearchRoll {
         tech_id: TechId,

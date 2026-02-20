@@ -95,16 +95,15 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     };
     let node_ids: Vec<&NodeId> = content.solar_system.nodes.iter().map(|n| &n.id).collect();
     let mut scan_sites = Vec::new();
-    let mut site_counter = 1u64;
     for template in &content.asteroid_templates {
         for _ in 0..c.asteroid_count_per_template {
             let node = node_ids[rng.gen_range(0..node_ids.len())].clone();
+            let uuid = sim_core::generate_uuid(rng);
             scan_sites.push(ScanSite {
-                id: SiteId(format!("site_{site_counter:04}")),
+                id: SiteId(format!("site_{uuid}")),
                 node,
                 template_id: template.id.clone(),
             });
-            site_counter += 1;
         }
     }
     GameState {

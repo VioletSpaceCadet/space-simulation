@@ -206,6 +206,25 @@ describe('useSimStream', () => {
     expect(result.current.snapshot?.research.data_pool['ScanData']).toBeCloseTo(8.0)
   })
 
+  it('adds scan site on ScanSiteSpawned', async () => {
+    const mockEs = new MockEventSource()
+    vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
+    const { result } = renderHook(() => useSimStream())
+    await act(async () => { await Promise.resolve() })
+
+    expect(result.current.snapshot?.scan_sites).toEqual([])
+
+    const events = [
+      { id: 'evt_ss1', tick: 30, event: { ScanSiteSpawned: { site_id: 'site_new_001', node: 'node_belt_inner', template_id: 'tmpl_iron_rich' } } },
+    ]
+    act(() => {
+      mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }))
+    })
+
+    expect(result.current.snapshot?.scan_sites).toHaveLength(1)
+    expect(result.current.snapshot?.scan_sites[0]).toEqual({ id: 'site_new_001', node: 'node_belt_inner', template_id: 'tmpl_iron_rich' })
+  })
+
   it('updates currentTick from heartbeat', async () => {
     const mockEs = new MockEventSource()
     vi.spyOn(api, 'createEventSource').mockReturnValue(mockEs as unknown as EventSource)
