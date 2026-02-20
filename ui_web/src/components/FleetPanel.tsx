@@ -197,6 +197,9 @@ function StationsTable({ stations }: { stations: StationState[] }) {
           <th className={headerClass} onClick={() => requestSort('cargo_kg')}>
             Cargo<SortIndicator column="cargo_kg" sortConfig={sortConfig} />
           </th>
+          <th className={headerClass}>
+            Modules
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -205,14 +208,20 @@ function StationsTable({ stations }: { stations: StationState[] }) {
             <td className="px-2 py-0.5 border-b border-surface align-top">{station.id}</td>
             <td className="px-2 py-0.5 border-b border-surface align-top">{station.location_node}</td>
             <td className="px-2 py-0.5 border-b border-surface align-top">
-              {cargo_kg === 0 && station.modules.length === 0 ? (
+              {cargo_kg === 0 ? (
                 <span className="text-faint">empty</span>
               ) : (
                 <div>
-                  {cargo_kg > 0 && <span className="text-cargo">{formatKg(cargo_kg)} kg</span>}
+                  <span className="text-cargo">{formatKg(cargo_kg)} kg</span>
                   <InventoryDisplay inventory={station.inventory} />
-                  <ModulesDisplay modules={station.modules} />
                 </div>
+              )}
+            </td>
+            <td className="px-2 py-0.5 border-b border-surface align-top">
+              {station.modules.length === 0 ? (
+                <span className="text-faint">none</span>
+              ) : (
+                <ModulesDisplay modules={station.modules} />
               )}
             </td>
           </tr>
