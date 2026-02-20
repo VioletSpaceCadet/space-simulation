@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use rand::Rng;
 use serde::Deserialize;
 use sim_core::{
-    AsteroidTemplateDef, Constants, Counters, FacilitiesState, GameContent, GameState, MetaState,
-    NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef,
-    StationId, StationState, TechDef,
+    AsteroidTemplateDef, Constants, Counters, ElementDef, FacilitiesState, GameContent, GameState,
+    MetaState, NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId,
+    SolarSystemDef, StationId, StationState, TechDef,
 };
 use std::path::Path;
 
@@ -17,6 +17,11 @@ struct TechsFile {
 #[derive(Deserialize)]
 struct AsteroidTemplatesFile {
     templates: Vec<AsteroidTemplateDef>,
+}
+
+#[derive(Deserialize)]
+struct ElementsFile {
+    elements: Vec<ElementDef>,
 }
 
 pub fn load_content(content_dir: &str) -> Result<GameContent> {
@@ -39,11 +44,16 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
             .context("reading asteroid_templates.json")?,
     )
     .context("parsing asteroid_templates.json")?;
+    let elements_file: ElementsFile = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("elements.json")).context("reading elements.json")?,
+    )
+    .context("parsing elements.json")?;
     Ok(GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
         solar_system,
         asteroid_templates: templates_file.templates,
+        elements: elements_file.elements,
         constants,
     })
 }

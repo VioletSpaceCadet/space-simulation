@@ -7,8 +7,8 @@ use rand_chacha::ChaCha8Rng;
 use serde::Deserialize;
 use sim_control::{AutopilotController, CommandSource};
 use sim_core::{
-    AsteroidTemplateDef, Constants, Counters, EventLevel, FacilitiesState, GameContent, GameState,
-    MetaState, NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId,
+    AsteroidTemplateDef, Constants, Counters, ElementDef, EventLevel, FacilitiesState, GameContent,
+    GameState, MetaState, NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId,
     SolarSystemDef, StationId, StationState, TechDef,
 };
 
@@ -55,6 +55,11 @@ struct AsteroidTemplatesFile {
     templates: Vec<AsteroidTemplateDef>,
 }
 
+#[derive(Deserialize)]
+struct ElementsFile {
+    elements: Vec<ElementDef>,
+}
+
 fn load_content(content_dir: &str) -> Result<GameContent> {
     let dir = Path::new(content_dir);
 
@@ -80,11 +85,17 @@ fn load_content(content_dir: &str) -> Result<GameContent> {
     )
     .context("parsing asteroid_templates.json")?;
 
+    let elements_file: ElementsFile = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("elements.json")).context("reading elements.json")?,
+    )
+    .context("parsing elements.json")?;
+
     Ok(GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
         solar_system,
         asteroid_templates: templates_file.templates,
+        elements: elements_file.elements,
         constants,
     })
 }

@@ -93,7 +93,7 @@ mod tests {
     use super::*;
     use axum::{body::Body, http::Request, http::StatusCode};
     use http_body_util::BodyExt;
-    use sim_core::{Constants, GameContent, NodeDef, NodeId, SolarSystemDef};
+    use sim_core::{Constants, ElementDef, GameContent, NodeDef, NodeId, SolarSystemDef};
     use tower::ServiceExt;
 
     fn make_test_state() -> AppState {
@@ -108,6 +108,10 @@ mod tests {
                 edges: vec![],
             },
             asteroid_templates: vec![],
+            elements: vec![
+                ElementDef { id: "Fe".to_string(), density_kg_per_m3: 7874.0, display_name: "Iron".to_string() },
+                ElementDef { id: "Si".to_string(), density_kg_per_m3: 2329.0, display_name: "Silicon".to_string() },
+            ],
             constants: Constants {
                 survey_scan_ticks: 1,
                 deep_scan_ticks: 1,

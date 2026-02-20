@@ -266,6 +266,7 @@ pub struct GameContent {
     pub techs: Vec<TechDef>,
     pub solar_system: SolarSystemDef,
     pub asteroid_templates: Vec<AsteroidTemplateDef>,
+    pub elements: Vec<ElementDef>,
     pub constants: Constants,
 }
 
@@ -303,6 +304,13 @@ pub struct AsteroidTemplateDef {
     pub id: String,
     pub anomaly_tags: Vec<AnomalyTag>,
     pub composition_ranges: HashMap<ElementId, (f32, f32)>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElementDef {
+    pub id: String,
+    pub density_kg_per_m3: f32,
+    pub display_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

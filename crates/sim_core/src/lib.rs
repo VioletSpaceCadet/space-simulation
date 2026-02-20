@@ -62,6 +62,10 @@ mod tests {
                     ("Si".to_string(), (0.3, 0.3)),
                 ]),
             }],
+            elements: vec![
+                ElementDef { id: "Fe".to_string(), density_kg_per_m3: 7874.0, display_name: "Iron".to_string() },
+                ElementDef { id: "Si".to_string(), density_kg_per_m3: 2329.0, display_name: "Silicon".to_string() },
+            ],
             constants: Constants {
                 survey_scan_ticks: 1,
                 deep_scan_ticks: 1,
@@ -736,6 +740,16 @@ mod tests {
                 .any(|e| matches!(e.event, Event::ResearchRoll { .. })),
             "ResearchRoll events should not be emitted at EventLevel::Normal"
         );
+    }
+
+    // --- Element definitions ------------------------------------------------
+
+    #[test]
+    fn test_content_has_element_densities() {
+        let content = test_content();
+        let fe = content.elements.iter().find(|e| e.id == "Fe")
+            .expect("Fe element must be defined in content");
+        assert!((fe.density_kg_per_m3 - 7874.0).abs() < 1.0, "Fe density should be ~7874 kg/m³");
     }
 
     // --- Asteroid mass ------------------------------------------------------

@@ -1,0 +1,7 @@
+{
+  "elements": [
+    { "id": "Fe", "density_kg_per_m3": 7874.0, "display_name": "Iron" },
+    { "id": "Si", "density_kg_per_m3": 2329.0, "display_name": "Silicon" },
+    { "id": "He", "density_kg_per_m3": 0.164,  "display_name": "Helium" }
+  ]
+}
