@@ -1,6 +1,6 @@
 import { useEffect, useReducer } from 'react'
 import { createEventSource, fetchSnapshot } from '../api'
-import type { AsteroidState, ResearchState, ShipState, SimEvent, SimSnapshot, StationState } from '../types'
+import type { AsteroidState, ResearchState, ShipState, SimEvent, SimSnapshot, StationState, TaskState } from '../types'
 
 // Maps "ore:{asteroid_id}" cargo keys to composition fractions (0–1).
 // Populated from OreMined events; persists even after the asteroid is depleted.
@@ -12,6 +12,21 @@ interface State {
   connected: boolean
   currentTick: number
   oreCompositions: OreCompositions
+}
+
+function buildTaskStub(taskKind: string, target: string | null, tick: number): TaskState {
+  const kindMap: Record<string, Record<string, unknown>> = {
+    Survey: target ? { Survey: { site: target } } : { Idle: {} },
+    DeepScan: target ? { DeepScan: { asteroid: target } } : { Idle: {} },
+    Mine: target ? { Mine: { asteroid: target, duration_ticks: 0 } } : { Idle: {} },
+    Deposit: target ? { Deposit: { station: target } } : { Idle: {} },
+    Transit: target ? { Transit: { destination: target, total_ticks: 0 } } : { Idle: {} },
+  }
+  return {
+    kind: (kindMap[taskKind] ?? { Idle: {} }) as TaskState['kind'],
+    started_tick: tick,
+    eta_tick: 0,
+  }
 }
 
 function addToRecord(base: Record<string, number>, additions: Record<string, number>): Record<string, number> {
@@ -169,6 +184,54 @@ function applyEvents(
         unlocked: [...updatedResearch.unlocked, tech_id],
       }
     }
+
+    if (e['TaskStarted']) {
+      const { ship_id, task_kind, target } = e['TaskStarted'] as {
+        ship_id: string
+        task_kind: string
+        target: string | null
+      }
+      if (updatedShips[ship_id]) {
+        updatedShips = {
+          ...updatedShips,
+          [ship_id]: {
+            ...updatedShips[ship_id],
+            task: buildTaskStub(task_kind, target, evt.tick),
+          },
+        }
+      }
+    }
+
+    if (e['TaskCompleted']) {
+      const { ship_id } = e['TaskCompleted'] as { ship_id: string }
+      if (updatedShips[ship_id]) {
+        updatedShips = {
+          ...updatedShips,
+          [ship_id]: { ...updatedShips[ship_id], task: null },
+        }
+      }
+    }
+
+    if (e['ShipArrived']) {
+      const { ship_id, node } = e['ShipArrived'] as { ship_id: string; node: string }
+      if (updatedShips[ship_id]) {
+        updatedShips = {
+          ...updatedShips,
+          [ship_id]: { ...updatedShips[ship_id], location_node: node },
+        }
+      }
+    }
+
+    if (e['DataGenerated']) {
+      const { kind, amount } = e['DataGenerated'] as { kind: string; amount: number }
+      updatedResearch = {
+        ...updatedResearch,
+        data_pool: {
+          ...updatedResearch.data_pool,
+          [kind]: (updatedResearch.data_pool[kind] ?? 0) + amount,
+        },
+      }
+    }
   }
 
   return {
@@ -232,7 +295,7 @@ const initialState: State = {
 }
 
 const RECONNECT_DELAY_MS = 2000
-// Must be longer than heartbeat interval (5s) + flush interval (1s) with margin
+// Must be longer than heartbeat interval (5s) with margin
 const WATCHDOG_MS = 10_000
 
 export function useSimStream() {

@@ -64,7 +64,7 @@ pub async fn stream_handler(
     let stream = async_stream::stream! {
         let mut heartbeat = tokio::time::interval(Duration::from_secs(5));
         heartbeat.tick().await; // discard the immediate first tick
-        let mut flush = tokio::time::interval(Duration::from_secs(1));
+        let mut flush = tokio::time::interval(Duration::from_millis(50));
         flush.tick().await; // discard the immediate first tick
         let mut pending: Vec<EventEnvelope> = Vec::new();
         loop {
