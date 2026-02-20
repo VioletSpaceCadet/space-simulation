@@ -264,14 +264,13 @@ fn resolve_processor_run(
                 };
                 if material_kg > 1e-3 {
                     if let Some(station) = state.stations.get_mut(station_id) {
-                        // Merge into existing lot of same element if present.
+                        // Merge into existing lot of same element and exact same quality.
                         let existing = station.inventory.iter_mut().find(|i| {
-                            matches!(i, InventoryItem::Material { element: el, .. } if el == element)
+                            matches!(i, InventoryItem::Material { element: el, quality: q, .. }
+                                if el == element && *q == material_quality)
                         });
-                        if let Some(InventoryItem::Material { kg, quality, .. }) = existing {
-                            let total = *kg + material_kg;
-                            *quality = (*kg * *quality + material_kg * material_quality) / total;
-                            *kg = total;
+                        if let Some(InventoryItem::Material { kg, .. }) = existing {
+                            *kg += material_kg;
                         } else {
                             station.inventory.push(InventoryItem::Material {
                                 element: element.clone(),

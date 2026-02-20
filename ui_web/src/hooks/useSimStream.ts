@@ -1,6 +1,6 @@
 import { useEffect, useReducer } from 'react'
 import { createEventSource, fetchSnapshot } from '../api'
-import type { AsteroidState, ModuleKindState, ResearchState, ShipState, SimEvent, SimSnapshot, SlagItem, StationState } from '../types'
+import type { AsteroidState, MaterialItem, ModuleKindState, ResearchState, ShipState, SimEvent, SimSnapshot, SlagItem, StationState } from '../types'
 
 // Kept for backward compatibility with SolarSystemMap/DetailCard imports.
 // Composition is now embedded in InventoryItem::Ore; this type is unused in new code.
@@ -218,9 +218,20 @@ function applyEvents(
             return acc
           }, [])
 
-          // Add material
+          // Merge material into existing lot of same element, or push new
           if (material_produced_kg > 0.001) {
-            stationInv.push({ kind: 'Material', element: REFINERY_ELEMENT, kg: material_produced_kg, quality: material_quality })
+            const matIndex = stationInv.findIndex((i) => i.kind === 'Material' && i.element === REFINERY_ELEMENT)
+            if (matIndex >= 0) {
+              const existing = stationInv[matIndex] as MaterialItem
+              const total = existing.kg + material_produced_kg
+              stationInv[matIndex] = {
+                ...existing,
+                kg: total,
+                quality: (existing.kg * existing.quality + material_produced_kg * material_quality) / total,
+              }
+            } else {
+              stationInv.push({ kind: 'Material', element: REFINERY_ELEMENT, kg: material_produced_kg, quality: material_quality })
+            }
           }
 
           // Blend or add slag
