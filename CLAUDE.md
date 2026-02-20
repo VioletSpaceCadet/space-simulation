@@ -5,7 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 Space industry simulation game. Deterministic Rust sim core, HTTP daemon with SSE event streaming, React mission control UI.
-See `base-project.md` for the original design doc and `mvp0-contract.md` for the MVP-0 type/mechanic spec (foundational types only — see below for current state).
+
+**`docs/DESIGN_SPINE.md` is the authoritative design philosophy document.** All new features and systems must align with it. Key principles: deterministic core, compounding entropy (not sudden failure), recoverable pressure, automation encouraged but fragile at scale, no heavy physics, metrics-first, complexity only when it creates strategic tradeoffs.
+
+See also `base-project.md` for the original design doc and `mvp0-contract.md` for the MVP-0 type/mechanic spec (foundational types only — see below for current state).
 
 ## Common Commands
 
