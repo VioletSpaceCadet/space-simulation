@@ -2,12 +2,9 @@ import { useEffect, useReducer } from 'react'
 import { createEventSource, fetchSnapshot } from '../api'
 import type { AsteroidState, ResearchState, ShipState, SimEvent, SimSnapshot, StationState } from '../types'
 
-// Composition fractions (0–1) for ore currently held by a ship or station.
-// Blended by weighted average as loads are deposited.
-export interface OreCompositions {
-  ships: Record<string, Record<string, number> | null>
-  stations: Record<string, Record<string, number> | null>
-}
+// Maps "ore:{asteroid_id}" cargo keys to composition fractions (0–1).
+// Populated from OreMined events; persists even after the asteroid is depleted.
+export type OreCompositions = Record<string, Record<string, number>>
 
 interface State {
   snapshot: SimSnapshot | null
@@ -23,23 +20,6 @@ function addToRecord(base: Record<string, number>, additions: Record<string, num
     result[key] = (result[key] ?? 0) + val
   }
   return result
-}
-
-function blendCompositions(
-  existing: Record<string, number> | null,
-  existingKg: number,
-  incoming: Record<string, number>,
-  incomingKg: number,
-): Record<string, number> {
-  const totalKg = existingKg + incomingKg
-  if (totalKg === 0) return {}
-  if (!existing || existingKg === 0) return { ...incoming }
-  const blended: Record<string, number> = {}
-  const allKeys = new Set([...Object.keys(existing), ...Object.keys(incoming)])
-  for (const key of allKeys) {
-    blended[key] = ((existing[key] ?? 0) * existingKg + (incoming[key] ?? 0) * incomingKg) / totalKg
-  }
-  return blended
 }
 
 type Action =
@@ -103,7 +83,7 @@ function applyEvents(
           [asteroid_id]: { ...updatedAsteroids[asteroid_id], mass_kg: asteroid_remaining_kg },
         }
       }
-      // Add extracted ore to ship cargo
+      // Add extracted ore to ship cargo (key is "ore:{asteroid_id}")
       if (updatedShips[ship_id]) {
         updatedShips = {
           ...updatedShips,
@@ -113,18 +93,14 @@ function applyEvents(
           },
         }
       }
-      // Track ore composition from the source asteroid's known composition
-      const asteroidComp = updatedAsteroids[asteroid_id]?.knowledge.composition
-      if (asteroidComp) {
-        const currentOreKg = updatedShips[ship_id]?.cargo['ore'] ?? 0
-        const mined = extracted['ore'] ?? 0
-        const prevComp = updatedOreCompositions.ships[ship_id] ?? null
-        updatedOreCompositions = {
-          ...updatedOreCompositions,
-          ships: {
-            ...updatedOreCompositions.ships,
-            [ship_id]: blendCompositions(prevComp, currentOreKg, asteroidComp, mined),
-          },
+      // Record composition for each ore lot key. Cache it now so the
+      // composition survives even if the asteroid is later depleted and removed.
+      const composition = updatedAsteroids[asteroid_id]?.knowledge.composition
+      if (composition) {
+        for (const oreKey of Object.keys(extracted)) {
+          if (oreKey.startsWith('ore:') && !updatedOreCompositions[oreKey]) {
+            updatedOreCompositions = { ...updatedOreCompositions, [oreKey]: composition }
+          }
         }
       }
     }
@@ -135,27 +111,7 @@ function applyEvents(
         station_id: string
         deposited: Record<string, number>
       }
-      // Blend ore composition into station before updating station cargo
-      const shipComp = updatedOreCompositions.ships[ship_id] ?? null
-      const depositedOreKg = deposited['ore'] ?? 0
-      if (shipComp && depositedOreKg > 0) {
-        const currentStationOreKg = updatedStations[station_id]?.cargo['ore'] ?? 0
-        const stationComp = updatedOreCompositions.stations[station_id] ?? null
-        updatedOreCompositions = {
-          ...updatedOreCompositions,
-          stations: {
-            ...updatedOreCompositions.stations,
-            [station_id]: blendCompositions(stationComp, currentStationOreKg, shipComp, depositedOreKg),
-          },
-          ships: { ...updatedOreCompositions.ships, [ship_id]: null },
-        }
-      } else {
-        updatedOreCompositions = {
-          ...updatedOreCompositions,
-          ships: { ...updatedOreCompositions.ships, [ship_id]: null },
-        }
-      }
-      // Transfer cargo
+      // Add each ore lot to station cargo separately (no blending)
       if (updatedStations[station_id]) {
         updatedStations = {
           ...updatedStations,
@@ -266,7 +222,7 @@ const initialState: State = {
   events: [],
   connected: false,
   currentTick: 0,
-  oreCompositions: { ships: {}, stations: {} },
+  oreCompositions: {},
 }
 
 const RECONNECT_DELAY_MS = 2000

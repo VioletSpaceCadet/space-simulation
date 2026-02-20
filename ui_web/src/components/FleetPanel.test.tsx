@@ -12,16 +12,16 @@ const mockShip: ShipState = {
 }
 
 it('renders ship id', () => {
-  render(<FleetPanel ships={{ ship_0001: mockShip }} stations={{}} oreCompositions={{ ships: {}, stations: {} }} />)
+  render(<FleetPanel ships={{ ship_0001: mockShip }} stations={{}} oreCompositions={{}} />)
   expect(screen.getByText(/ship_0001/)).toBeInTheDocument()
 })
 
 it('renders cargo elements', () => {
-  render(<FleetPanel ships={{ ship_0001: mockShip }} stations={{}} oreCompositions={{ ships: {}, stations: {} }} />)
+  render(<FleetPanel ships={{ ship_0001: mockShip }} stations={{}} oreCompositions={{}} />)
   expect(screen.getByText(/Fe/)).toBeInTheDocument()
 })
 
 it('renders empty state when no ships', () => {
-  render(<FleetPanel ships={{}} stations={{}} oreCompositions={{ ships: {}, stations: {} }} />)
+  render(<FleetPanel ships={{}} stations={{}} oreCompositions={{}} />)
   expect(screen.getByText(/no ships/i)).toBeInTheDocument()
 })

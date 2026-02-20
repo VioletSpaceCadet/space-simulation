@@ -69,10 +69,12 @@ pub fn cargo_volume_used(cargo: &HashMap<ElementId, f32>, content: &GameContent)
     cargo
         .iter()
         .map(|(element_id, &mass_kg)| {
+            // Ore is keyed as "ore:{asteroid_id}"; all ore variants share the "ore" density.
+            let lookup_id: &str = if element_id.starts_with("ore:") { "ore" } else { element_id };
             let density = content
                 .elements
                 .iter()
-                .find(|e| &e.id == element_id)
+                .find(|e| e.id == lookup_id)
                 .map(|e| e.density_kg_per_m3)
                 .unwrap_or(1.0);
             mass_kg / density
@@ -321,10 +323,10 @@ pub(crate) fn resolve_mine(
     let max_kg_by_volume = free_volume / effective_m3_per_kg;
     let extracted_total_kg = asteroid.mass_kg.min(max_kg_by_volume);
 
-    // Extract as raw ore — composition is preserved in the asteroid record
-    // and will be used later by the refinery to split ore into elements.
-    let extracted: HashMap<ElementId, f32> =
-        HashMap::from([("ore".to_string(), extracted_total_kg)]);
+    // Extract as raw ore keyed by source asteroid — different asteroids produce
+    // distinct ore lots that must be tracked and refined separately.
+    let ore_key = format!("ore:{}", asteroid_id.0);
+    let extracted: HashMap<ElementId, f32> = HashMap::from([(ore_key, extracted_total_kg)]);
 
     // Update asteroid mass; remove if depleted.
     let asteroid_remaining_kg = asteroid.mass_kg - extracted_total_kg;
