@@ -57,7 +57,11 @@ Pure deterministic simulation. No IO, no network.
 ### `crates/sim_control` (lib)
 Command sources. Implements the `CommandSource` trait.
 
-- `AutopilotController`: surveys unscanned sites in order, then deep-scans IronRich asteroids once the tech is unlocked.
+- `AutopilotController`: four-priority loop per idle ship:
+  1. Deposit cargo at nearest station (if hold non-empty)
+  2. Mine best deep-scanned asteroid (sorted by `mass_kg × Fe_fraction` desc)
+  3. Deep-scan IronRich asteroids (if `tech_deep_scan_v1` unlocked)
+  4. Survey unscanned sites
 - `ScenarioSource`: stub — will replay scripted tick→commands from JSON.
 
 ### `crates/sim_cli` (bin)
@@ -81,7 +85,7 @@ Vite 5 + React 18 + TypeScript 5 mission control dashboard. Tests via Vitest + R
 
 - **Data flow:** on mount fetches `/api/v1/snapshot` to hydrate, then subscribes to `/api/v1/stream` (SSE) for live updates.
 - **State:** single `useReducer` in `useSimStream` hook; no external state library.
-- **Layout:** StatusBar (tick/time/connection) + three panels: EventsFeed | AsteroidTable | ResearchPanel.
+- **Layout:** StatusBar (tick/time/connection) + four resizable panels (react-resizable-panels v2): EventsFeed | AsteroidTable | FleetPanel | ResearchPanel.
 - **Proxy:** `/api` proxied to `http://localhost:3001` in dev (`vite.config.ts`).
 
 ## Key Types (sim_core)
@@ -90,12 +94,15 @@ Vite 5 + React 18 + TypeScript 5 mission control dashboard. Tests via Vitest + R
 |---|---|
 | `GameState` | Full mutable simulation state |
 | `ScanSite` | Unscanned potential asteroid location (consumed on survey) |
-| `AsteroidState` | Created on discovery; holds `true_composition` (hidden) and `knowledge` |
+| `AsteroidState` | Created on discovery; holds `true_composition` (hidden), `knowledge`, and `mass_kg` |
 | `ResearchState` | `unlocked`, `data_pool`, `evidence` — no active allocations |
-| `TaskKind` | `Idle`, `Survey { site }`, `DeepScan { asteroid }` |
-| `Command` | `AssignShipTask { ship_id, task_kind }` only in MVP-0 |
-| `GameContent` | Static config: techs, solar system, asteroid templates, constants |
+| `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station }`, `Transit { destination, total_ticks, then }` |
+| `Command` | `AssignShipTask { ship_id, task_kind }` |
+| `GameContent` | Static config: techs, solar system, asteroid templates, elements, constants |
+| `ElementDef` | `id`, `density_kg_per_m3`, `display_name` — used for cargo volume calculations |
 | `TechEffect` | `EnableDeepScan` or `DeepScanCompositionNoise { sigma }` |
+
+**Cargo model:** ships and stations both carry `cargo: HashMap<ElementId, f32>` (kg). Volume constraint: `Σ(cargo[el] / density[el]) ≤ capacity_m3`. Mining produces ore keyed as `"ore:{asteroid_id}"` — see Ore Design below.
 
 ## Content Files
 
@@ -103,10 +110,11 @@ All in `content/`. Loaded at runtime by `sim_cli` and `sim_daemon`; never compil
 
 | File | Key fields |
 |---|---|
-| `constants.json` | Scan durations, data amounts, detection probability, station config |
-| `techs.json` | Tech tree (`tech_deep_scan_v1` is the only MVP-0 tech) |
+| `constants.json` | Scan durations, travel ticks, mining rate, cargo capacities, deposit ticks |
+| `techs.json` | Tech tree (`tech_deep_scan_v1` is the only current tech) |
 | `solar_system.json` | Nodes and edges (static graph) |
 | `asteroid_templates.json` | Composition ranges and anomaly tags per template |
+| `elements.json` | Element definitions: `id`, `density_kg_per_m3`, `display_name`. Includes special `ore` entry (3000 kg/m³) used as density fallback for all `ore:*` cargo keys |
 
 ## After Every Change
 
@@ -118,10 +126,27 @@ Additionally, use judgment on the following:
 - **If you added a new mechanic or system:** add it to the Key Types table and Architecture section in CLAUDE.md.
 - **Before claiming work is complete:** confirm tests pass and no `TODO` stubs were introduced without being noted.
 
+## Ore Design
+
+Mining extracts **raw ore**, not pre-split elements. This reflects the real-world reality that ore is a mixed material requiring separate refining.
+
+**Current model (`ore:{asteroid_id}` keys):**
+- Each asteroid produces a distinct cargo item `"ore:asteroid_0000"`, `"ore:asteroid_0001"`, etc.
+- Different ores never blend — they accumulate separately in ship holds and station storage.
+- `cargo_volume_used` handles the `ore:` prefix by looking up the generic `ore` element density (3000 kg/m³).
+- `OreMined` event carries `ship_id` and `asteroid_id`; FE caches the asteroid's known composition to display alongside ore kg.
+
+**Future direction (not yet built):**
+- **Ore keyed by composition hash**, not asteroid ID. Two asteroids with Fe 71%/Si 29% produce the same ore lot and can blend freely. Key format: `ore:Fe70:Si30` (composition rounded to nearest N%).
+- **Blending tolerance** as a tech unlock: basic = ±2%, advanced = ±10%.
+- **Volatiles flag ore as unblendable** even if rock composition would otherwise match (He, etc. require separate cryo handling).
+- **Slag** is a single blended bulk commodity `slag: X kg` — composition is not tracked. This avoids inventory explosion while keeping disposal mechanics meaningful (hold limits, venting penalties, further refining).
+
 ## MVP Scope
 
 - **MVP-0 (done):** `sim_core` tick + tests, `sim_control` autopilot, `sim_cli` run loop.
 - **MVP-1 (done):** `sim_daemon` HTTP server (axum + tokio), SSE event stream, React mission control UI.
+- **MVP-2 (done):** Mining loop — cargo holds, Mine/Deposit tasks, ore extraction, autopilot priority reorder, FE fleet/station cargo display with per-lot ore composition.
 
 ## Notes
 
