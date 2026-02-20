@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Pre-push hook: run Rust and frontend tests.
+set -euo pipefail
+
+echo "=== pre-push: running tests ==="
+
+# --- Rust ---
+if command -v cargo &>/dev/null; then
+  echo "  cargo test..."
+  cargo test --quiet
+else
+  echo "  cargo not found, skipping Rust tests"
+fi
+
+# --- Frontend ---
+if [ -f ui_web/package.json ]; then
+  echo "  vitest..."
+  npm --prefix ui_web test
+else
+  echo "  ui_web/package.json not found, skipping FE tests"
+fi
+
+echo "=== pre-push: all tests passed ==="
