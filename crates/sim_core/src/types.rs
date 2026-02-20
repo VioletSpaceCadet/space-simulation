@@ -123,6 +123,8 @@ pub struct ShipState {
     pub id: ShipId,
     pub location_node: NodeId,
     pub owner: PrincipalId,
+    pub cargo: HashMap<ElementId, f32>,
+    pub cargo_capacity_m3: f32,
     pub task: Option<TaskState>,
 }
 
@@ -130,6 +132,8 @@ pub struct ShipState {
 pub struct StationState {
     pub id: StationId,
     pub location_node: NodeId,
+    pub cargo: HashMap<ElementId, f32>,
+    pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
     pub facilities: FacilitiesState,
 }
@@ -327,6 +331,8 @@ pub struct Constants {
     pub asteroid_count_per_template: u32,
     pub asteroid_mass_min_kg: f32,
     pub asteroid_mass_max_kg: f32,
+    pub ship_cargo_capacity_m3: f32,
+    pub station_cargo_capacity_m3: f32,
     pub station_compute_units_total: u32,
     pub station_power_per_compute_unit_per_tick: f32,
     pub station_efficiency: f32,

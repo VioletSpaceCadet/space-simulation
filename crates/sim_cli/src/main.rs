@@ -113,6 +113,8 @@ fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl rand::Rn
     let station = StationState {
         id: station_id.clone(),
         location_node: earth_orbit.clone(),
+        cargo: std::collections::HashMap::new(),
+        cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         facilities: FacilitiesState {
             compute_units_total: c.station_compute_units_total,
@@ -128,6 +130,8 @@ fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl rand::Rn
         id: ship_id.clone(),
         location_node: earth_orbit.clone(),
         owner,
+        cargo: std::collections::HashMap::new(),
+        cargo_capacity_m3: c.ship_cargo_capacity_m3,
         task: None,
     };
 

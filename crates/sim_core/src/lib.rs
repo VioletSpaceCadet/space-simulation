@@ -79,6 +79,8 @@ mod tests {
                 asteroid_count_per_template: 1,
                 asteroid_mass_min_kg: 500.0,   // fixed range so tests are deterministic
                 asteroid_mass_max_kg: 500.0,
+                ship_cargo_capacity_m3: 20.0,
+                station_cargo_capacity_m3: 10_000.0,
                 station_compute_units_total: 10,
                 station_power_per_compute_unit_per_tick: 1.0,
                 station_efficiency: 1.0,
@@ -112,6 +114,8 @@ mod tests {
                     id: ship_id,
                     location_node: node_id.clone(),
                     owner,
+                    cargo: HashMap::new(),
+                    cargo_capacity_m3: 20.0,
                     task: None,
                 },
             )]),
@@ -120,6 +124,8 @@ mod tests {
                 StationState {
                     id: station_id,
                     location_node: node_id,
+                    cargo: HashMap::new(),
+                    cargo_capacity_m3: 10_000.0,
                     power_available_per_tick: 100.0,
                     facilities: FacilitiesState {
                         compute_units_total: 10,
@@ -846,6 +852,26 @@ mod tests {
         );
     }
 
+    // --- Cargo holds --------------------------------------------------------
+
+    #[test]
+    fn test_ship_starts_with_empty_cargo() {
+        let content = test_content();
+        let state = test_state(&content);
+        let ship = state.ships.values().next().unwrap();
+        assert!(ship.cargo.is_empty(), "ship cargo should be empty at start");
+        assert!((ship.cargo_capacity_m3 - 20.0).abs() < 1e-5, "ship capacity should be 20 m³");
+    }
+
+    #[test]
+    fn test_station_starts_with_empty_cargo() {
+        let content = test_content();
+        let state = test_state(&content);
+        let station = state.stations.values().next().unwrap();
+        assert!(station.cargo.is_empty(), "station cargo should be empty at start");
+        assert!((station.cargo_capacity_m3 - 10_000.0).abs() < 1e-5, "station capacity should be 10,000 m³");
+    }
+
     // --- Transit ------------------------------------------------------------
 
     #[test]
@@ -995,6 +1021,8 @@ mod tests {
                     id: ship_id.clone(),
                     location_node: node_a.clone(),
                     owner: owner.clone(),
+                    cargo: HashMap::new(),
+                    cargo_capacity_m3: 20.0,
                     task: None,
                 },
             )]),
@@ -1003,6 +1031,8 @@ mod tests {
                 StationState {
                     id: station_id,
                     location_node: node_a.clone(),
+                    cargo: HashMap::new(),
+                    cargo_capacity_m3: 10_000.0,
                     power_available_per_tick: 100.0,
                     facilities: FacilitiesState {
                         compute_units_total: 10,
