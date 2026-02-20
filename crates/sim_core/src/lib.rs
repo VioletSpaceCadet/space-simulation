@@ -15,7 +15,10 @@ mod types;
 pub use engine::tick;
 pub use graph::shortest_hop_count;
 pub use id::generate_uuid;
-pub use metrics::{compute_metrics, write_metrics_csv, MetricsSnapshot};
+pub use metrics::{
+    append_metrics_row, compute_metrics, write_metrics_csv, write_metrics_header,
+    MetricsFileWriter, MetricsSnapshot,
+};
 pub use tasks::{inventory_volume_m3, mine_duration};
 pub use types::*;
 

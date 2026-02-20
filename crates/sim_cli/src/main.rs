@@ -35,18 +35,88 @@ enum Commands {
         print_every: u64,
         #[arg(long, default_value = "normal", value_parser = ["normal", "debug"])]
         event_level: String,
-        /// Path to write metrics CSV. If omitted, no metrics are collected.
-        #[arg(long = "metrics-out")]
-        metrics_out: Option<String>,
         /// Sample metrics every N ticks (default 60).
         #[arg(long, default_value_t = 60)]
         metrics_every: u64,
+        /// Disable automatic metrics collection to runs/ directory.
+        #[arg(long)]
+        no_metrics: bool,
     },
 }
 
 // ---------------------------------------------------------------------------
 // Run loop
 // ---------------------------------------------------------------------------
+
+fn generate_run_id(seed: u64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    // Manual UTC time formatting to avoid adding chrono dependency.
+    let days = secs / 86400;
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    // Days since epoch → year/month/day (simplified Gregorian).
+    let (year, month, day) = epoch_days_to_date(days);
+
+    format!("{year:04}{month:02}{day:02}_{hours:02}{minutes:02}{seconds:02}_seed{seed}")
+}
+
+fn epoch_days_to_date(mut days: u64) -> (u64, u64, u64) {
+    // Algorithm from http://howardhinnant.github.io/date_algorithms.html
+    days += 719_468;
+    let era = days / 146_097;
+    let day_of_era = days % 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let mp = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { year + 1 } else { year };
+    (year, month, day)
+}
+
+fn create_run_dir(run_id: &str) -> Result<std::path::PathBuf> {
+    let dir = std::path::PathBuf::from("runs").join(run_id);
+    std::fs::create_dir_all(&dir)
+        .with_context(|| format!("creating run directory: {}", dir.display()))?;
+    Ok(dir)
+}
+
+fn write_run_info(
+    dir: &std::path::Path,
+    run_id: &str,
+    seed: u64,
+    ticks: u64,
+    content_version: &str,
+    metrics_every: u64,
+    print_every: u64,
+) -> Result<()> {
+    let info = serde_json::json!({
+        "run_id": run_id,
+        "seed": seed,
+        "start_time": run_id.split('_').take(2).collect::<Vec<_>>().join("_"),
+        "content_version": content_version,
+        "metrics_every": metrics_every,
+        "runner": "sim_cli",
+        "args": {
+            "ticks": ticks,
+            "print_every": print_every,
+        }
+    });
+    let path = dir.join("run_info.json");
+    let file =
+        std::fs::File::create(&path).with_context(|| format!("creating {}", path.display()))?;
+    serde_json::to_writer_pretty(file, &info)
+        .with_context(|| format!("writing {}", path.display()))?;
+    Ok(())
+}
 
 fn run(
     ticks: u64,
@@ -55,8 +125,8 @@ fn run(
     content_dir: &str,
     print_every: u64,
     event_level: EventLevel,
-    metrics_out: Option<&str>,
     metrics_every: u64,
+    no_metrics: bool,
 ) -> Result<()> {
     let content = load_content(content_dir)?;
 
@@ -74,10 +144,28 @@ fn run(
         (new_state, new_rng)
     };
 
+    // Set up per-run metrics directory.
+    let mut metrics_writer: Option<sim_core::MetricsFileWriter> = None;
+    if !no_metrics {
+        let run_id = generate_run_id(state.meta.seed);
+        let run_dir = create_run_dir(&run_id)?;
+        write_run_info(
+            &run_dir,
+            &run_id,
+            state.meta.seed,
+            ticks,
+            &content.content_version,
+            metrics_every,
+            print_every,
+        )?;
+        let writer = sim_core::MetricsFileWriter::new(run_dir.clone())
+            .with_context(|| format!("opening metrics CSV in {}", run_dir.display()))?;
+        metrics_writer = Some(writer);
+        println!("Run directory: {}", run_dir.display());
+    }
+
     let mut autopilot = AutopilotController;
     let mut next_command_id = 0u64;
-    let collect_metrics = metrics_out.is_some();
-    let mut snapshots: Vec<sim_core::MetricsSnapshot> = Vec::new();
 
     println!(
         "Starting simulation: ticks={ticks} seed={} sites={} content_version={}",
@@ -106,8 +194,11 @@ fn run(
             print_status(&state);
         }
 
-        if collect_metrics && state.meta.tick % metrics_every == 0 {
-            snapshots.push(sim_core::compute_metrics(&state, &content));
+        if let Some(ref mut writer) = metrics_writer {
+            if state.meta.tick % metrics_every == 0 {
+                let snapshot = sim_core::compute_metrics(&state, &content);
+                writer.write_row(&snapshot).context("writing metrics row")?;
+            }
         }
     }
 
@@ -115,10 +206,9 @@ fn run(
     println!("Done. Final state at tick {}:", state.meta.tick);
     print_status(&state);
 
-    if let Some(path) = metrics_out {
-        sim_core::write_metrics_csv(path, &snapshots)
-            .with_context(|| format!("writing metrics CSV: {path}"))?;
-        println!("Wrote {} metrics snapshots to {path}", snapshots.len());
+    if let Some(ref mut writer) = metrics_writer {
+        writer.flush().context("final metrics flush")?;
+        println!("Metrics written to runs/ directory.");
     }
 
     Ok(())
@@ -179,8 +269,8 @@ fn main() -> Result<()> {
             content_dir,
             print_every,
             event_level,
-            metrics_out,
             metrics_every,
+            no_metrics,
         } => {
             let level = match event_level.as_str() {
                 "debug" => EventLevel::Debug,
@@ -193,8 +283,8 @@ fn main() -> Result<()> {
                 &content_dir,
                 print_every,
                 level,
-                metrics_out.as_deref(),
                 metrics_every,
+                no_metrics,
             )?;
         }
     }

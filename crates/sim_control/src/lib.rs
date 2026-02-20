@@ -176,7 +176,9 @@ fn deposit_priority(
             .unwrap_or(u64::MAX)
     })?;
     Some(maybe_transit(
-        TaskKind::Deposit { station: station.id.clone() },
+        TaskKind::Deposit {
+            station: station.id.clone(),
+        },
         &ship.location_node,
         &station.location_node,
         content,
@@ -223,7 +225,10 @@ impl CommandSource for AutopilotController {
                     &ship.owner,
                     state.meta.tick,
                     next_command_id,
-                    Command::AssignShipTask { ship_id, task_kind: task },
+                    Command::AssignShipTask {
+                        ship_id,
+                        task_kind: task,
+                    },
                 ));
                 continue;
             }
@@ -243,7 +248,10 @@ impl CommandSource for AutopilotController {
                     &ship.owner,
                     state.meta.tick,
                     next_command_id,
-                    Command::AssignShipTask { ship_id, task_kind: task },
+                    Command::AssignShipTask {
+                        ship_id,
+                        task_kind: task,
+                    },
                 ));
                 continue;
             }
@@ -253,7 +261,9 @@ impl CommandSource for AutopilotController {
                 if let Some(asteroid_id) = next_deep_scan.next() {
                     let node = state.asteroids[asteroid_id].location_node.clone();
                     let task = maybe_transit(
-                        TaskKind::DeepScan { asteroid: asteroid_id.clone() },
+                        TaskKind::DeepScan {
+                            asteroid: asteroid_id.clone(),
+                        },
                         &ship.location_node,
                         &node,
                         content,
@@ -262,7 +272,10 @@ impl CommandSource for AutopilotController {
                         &ship.owner,
                         state.meta.tick,
                         next_command_id,
-                        Command::AssignShipTask { ship_id, task_kind: task },
+                        Command::AssignShipTask {
+                            ship_id,
+                            task_kind: task,
+                        },
                     ));
                     continue;
                 }
@@ -271,7 +284,9 @@ impl CommandSource for AutopilotController {
             // Priority 4: survey unscanned sites.
             if let Some(site) = next_site.next() {
                 let task = maybe_transit(
-                    TaskKind::Survey { site: SiteId(site.id.0.clone()) },
+                    TaskKind::Survey {
+                        site: SiteId(site.id.0.clone()),
+                    },
                     &ship.location_node,
                     &site.node,
                     content,
@@ -280,7 +295,10 @@ impl CommandSource for AutopilotController {
                     &ship.owner,
                     state.meta.tick,
                     next_command_id,
-                    Command::AssignShipTask { ship_id, task_kind: task },
+                    Command::AssignShipTask {
+                        ship_id,
+                        task_kind: task,
+                    },
                 ));
             }
         }

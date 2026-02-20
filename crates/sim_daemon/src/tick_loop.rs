@@ -38,7 +38,7 @@ pub async fn run_tick_loop(
             let events = sim_core::tick(game_state, &commands, content, rng, EventLevel::Normal);
 
             let metrics_every = guard.metrics_every;
-            if metrics_every > 0 && guard.game_state.meta.tick % metrics_every == 0 {
+            if metrics_every > 0 && guard.game_state.meta.tick.is_multiple_of(metrics_every) {
                 let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
                 guard.push_metrics(snapshot);
             }

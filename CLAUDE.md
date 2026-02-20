@@ -18,7 +18,8 @@ cargo fmt                                                 # Format
 cargo run -p sim_cli -- run --ticks 1000 --seed 42
 cargo run -p sim_cli -- run --ticks 500 --seed 42 --print-every 50 --event-level debug
 cargo run -p sim_cli -- run --state content/dev_base_state.json
-cargo run -p sim_cli -- run --ticks 500 --seed 42 --metrics-out /tmp/metrics.csv --metrics-every 60
+cargo run -p sim_cli -- run --ticks 500 --seed 42 --metrics-every 60
+cargo run -p sim_cli -- run --ticks 500 --seed 42 --no-metrics
 
 # HTTP daemon (http://localhost:3001)
 cargo run -p sim_daemon -- run --seed 42
@@ -33,11 +34,11 @@ cd ui_web && npm test        # vitest
 
 Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus `sim_world` (shared content loading + world gen) and `ui_web/` (React).
 
-- **sim_core** — Pure deterministic sim. No IO. Modules: `types`, `engine`, `tasks`, `research`, `station`, `graph`, `id`, `composition`, `metrics`. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, `shortest_hop_count()`, `generate_uuid()`, `compute_metrics()`, `write_metrics_csv()`.
+- **sim_core** — Pure deterministic sim. No IO. Modules: `types`, `engine`, `tasks`, `research`, `station`, `graph`, `id`, `composition`, `metrics`. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, `shortest_hop_count()`, `generate_uuid()`, `compute_metrics()`, `write_metrics_csv()`, `write_metrics_header()`, `append_metrics_row()`.
 - **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management). `ScenarioSource` stub.
 - **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json` (7 files).
-- **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-out`, `--metrics-every` flags.
-- **sim_daemon** — axum 0.7. SSE (50ms flush, 200ms heartbeat). `--metrics-every` flag (default 60). Endpoints: `/api/v1/meta`, `/api/v1/snapshot`, `/api/v1/metrics`, `/api/v1/stream`.
+- **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags. Auto-writes to `runs/<run_id>/`.
+- **sim_daemon** — axum 0.7. SSE (50ms flush, 200ms heartbeat). `--metrics-every` flag (default 60), `--no-metrics`. Auto-writes to `runs/<run_id>/`. Endpoints: `/api/v1/meta`, `/api/v1/snapshot`, `/api/v1/metrics`, `/api/v1/stream`.
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. `useSimStream` (useReducer + applyEvents), `useAnimatedTick` (60fps interpolation), `useSortableData`. Panels: Map, Events, Asteroids, Fleet, Research.
 
 **Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.

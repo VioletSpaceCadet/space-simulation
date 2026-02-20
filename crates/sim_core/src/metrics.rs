@@ -8,6 +8,7 @@ use crate::{
     ModuleKindState, TaskKind,
 };
 use serde::Serialize;
+use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
 const METRICS_VERSION: u32 = 1;
@@ -316,14 +317,10 @@ fn accumulate_inventory(
     }
 }
 
-/// Write a collection of snapshots to a CSV file.
-pub fn write_metrics_csv(path: &str, snapshots: &[MetricsSnapshot]) -> std::io::Result<()> {
-    use std::io::Write;
-    let mut file = std::fs::File::create(path)?;
-
-    // Header
+/// Write the CSV header row for metrics.
+pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result<()> {
     writeln!(
-        file,
+        writer,
         "tick,metrics_version,\
          total_ore_kg,total_material_kg,total_slag_kg,total_iron_material_kg,\
          station_storage_used_pct,ship_cargo_used_pct,\
@@ -333,43 +330,111 @@ pub fn write_metrics_csv(path: &str, snapshots: &[MetricsSnapshot]) -> std::io::
          fleet_total,fleet_idle,fleet_mining,fleet_transiting,fleet_surveying,fleet_depositing,\
          scan_sites_remaining,asteroids_discovered,asteroids_depleted,\
          techs_unlocked,total_scan_data,max_tech_evidence"
-    )?;
+    )
+}
 
+/// Append a single metrics snapshot as a CSV row.
+pub fn append_metrics_row(
+    writer: &mut impl std::io::Write,
+    snapshot: &MetricsSnapshot,
+) -> std::io::Result<()> {
+    writeln!(
+        writer,
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        snapshot.tick,
+        snapshot.metrics_version,
+        snapshot.total_ore_kg,
+        snapshot.total_material_kg,
+        snapshot.total_slag_kg,
+        snapshot.total_iron_material_kg,
+        snapshot.station_storage_used_pct,
+        snapshot.ship_cargo_used_pct,
+        snapshot.avg_ore_fe_fraction,
+        snapshot.ore_lot_count,
+        snapshot.min_ore_fe_fraction,
+        snapshot.max_ore_fe_fraction,
+        snapshot.avg_material_quality,
+        snapshot.refinery_active_count,
+        snapshot.refinery_starved_count,
+        snapshot.fleet_total,
+        snapshot.fleet_idle,
+        snapshot.fleet_mining,
+        snapshot.fleet_transiting,
+        snapshot.fleet_surveying,
+        snapshot.fleet_depositing,
+        snapshot.scan_sites_remaining,
+        snapshot.asteroids_discovered,
+        snapshot.asteroids_depleted,
+        snapshot.techs_unlocked,
+        snapshot.total_scan_data,
+        snapshot.max_tech_evidence,
+    )
+}
+
+/// Write a collection of snapshots to a CSV file.
+pub fn write_metrics_csv(path: &str, snapshots: &[MetricsSnapshot]) -> std::io::Result<()> {
+    let mut file = std::fs::File::create(path)?;
+    write_metrics_header(&mut file)?;
     for snapshot in snapshots {
-        writeln!(
-            file,
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            snapshot.tick,
-            snapshot.metrics_version,
-            snapshot.total_ore_kg,
-            snapshot.total_material_kg,
-            snapshot.total_slag_kg,
-            snapshot.total_iron_material_kg,
-            snapshot.station_storage_used_pct,
-            snapshot.ship_cargo_used_pct,
-            snapshot.avg_ore_fe_fraction,
-            snapshot.ore_lot_count,
-            snapshot.min_ore_fe_fraction,
-            snapshot.max_ore_fe_fraction,
-            snapshot.avg_material_quality,
-            snapshot.refinery_active_count,
-            snapshot.refinery_starved_count,
-            snapshot.fleet_total,
-            snapshot.fleet_idle,
-            snapshot.fleet_mining,
-            snapshot.fleet_transiting,
-            snapshot.fleet_surveying,
-            snapshot.fleet_depositing,
-            snapshot.scan_sites_remaining,
-            snapshot.asteroids_discovered,
-            snapshot.asteroids_depleted,
-            snapshot.techs_unlocked,
-            snapshot.total_scan_data,
-            snapshot.max_tech_evidence,
-        )?;
+        append_metrics_row(&mut file, snapshot)?;
+    }
+    Ok(())
+}
+
+/// Maximum data rows per CSV file before rotating to a new file.
+const MAX_ROWS_PER_FILE: usize = 50_000;
+
+/// Rotating metrics CSV writer. Automatically splits into numbered files
+/// (`metrics_000.csv`, `metrics_001.csv`, ...) after [`MAX_ROWS_PER_FILE`] rows each.
+pub struct MetricsFileWriter {
+    run_dir: std::path::PathBuf,
+    file_index: u32,
+    rows_in_current_file: usize,
+    writer: std::io::BufWriter<std::fs::File>,
+}
+
+impl MetricsFileWriter {
+    /// Create a new writer, opening the first CSV file with a header row.
+    pub fn new(run_dir: std::path::PathBuf) -> std::io::Result<Self> {
+        let (writer, _) = open_csv_file(&run_dir, 0)?;
+        Ok(Self {
+            run_dir,
+            file_index: 0,
+            rows_in_current_file: 0,
+            writer,
+        })
     }
 
-    Ok(())
+    /// Append one snapshot row, rotating to a new file if the current one is full.
+    pub fn write_row(&mut self, snapshot: &MetricsSnapshot) -> std::io::Result<()> {
+        if self.rows_in_current_file >= MAX_ROWS_PER_FILE {
+            self.writer.flush()?;
+            self.file_index += 1;
+            let (new_writer, _) = open_csv_file(&self.run_dir, self.file_index)?;
+            self.writer = new_writer;
+            self.rows_in_current_file = 0;
+        }
+        append_metrics_row(&mut self.writer, snapshot)?;
+        self.writer.flush()?;
+        self.rows_in_current_file += 1;
+        Ok(())
+    }
+
+    pub fn flush(&mut self) -> std::io::Result<()> {
+        self.writer.flush()
+    }
+}
+
+fn open_csv_file(
+    run_dir: &std::path::Path,
+    index: u32,
+) -> std::io::Result<(std::io::BufWriter<std::fs::File>, std::path::PathBuf)> {
+    let name = format!("metrics_{index:03}.csv");
+    let path = run_dir.join(&name);
+    let file = std::fs::File::create(&path)?;
+    let mut writer = std::io::BufWriter::new(file);
+    write_metrics_header(&mut writer)?;
+    Ok((writer, path))
 }
 
 // ---------------------------------------------------------------------------

@@ -47,7 +47,73 @@ enum Commands {
         /// Sample metrics every N ticks (default 60). 0 = disabled.
         #[arg(long, default_value_t = 60)]
         metrics_every: u64,
+        /// Disable automatic metrics collection to runs/ directory.
+        #[arg(long)]
+        no_metrics: bool,
     },
+}
+
+fn generate_run_id(seed: u64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    let (year, month, day) = epoch_days_to_date(secs / 86400);
+
+    format!("{year:04}{month:02}{day:02}_{hours:02}{minutes:02}{seconds:02}_seed{seed}")
+}
+
+fn epoch_days_to_date(mut days: u64) -> (u64, u64, u64) {
+    days += 719_468;
+    let era = days / 146_097;
+    let day_of_era = days % 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let mp = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { year + 1 } else { year };
+    (year, month, day)
+}
+
+fn create_run_dir(run_id: &str) -> Result<std::path::PathBuf> {
+    let dir = std::path::PathBuf::from("runs").join(run_id);
+    std::fs::create_dir_all(&dir)
+        .with_context(|| format!("creating run directory: {}", dir.display()))?;
+    Ok(dir)
+}
+
+fn write_run_info(
+    dir: &std::path::Path,
+    run_id: &str,
+    seed: u64,
+    content_version: &str,
+    metrics_every: u64,
+    max_ticks: Option<u64>,
+) -> Result<()> {
+    let info = serde_json::json!({
+        "run_id": run_id,
+        "seed": seed,
+        "content_version": content_version,
+        "metrics_every": metrics_every,
+        "runner": "sim_daemon",
+        "args": {
+            "max_ticks": max_ticks,
+        }
+    });
+    let path = dir.join("run_info.json");
+    let file =
+        std::fs::File::create(&path).with_context(|| format!("creating {}", path.display()))?;
+    serde_json::to_writer_pretty(file, &info)
+        .with_context(|| format!("writing {}", path.display()))?;
+    Ok(())
 }
 
 #[tokio::main]
@@ -62,6 +128,7 @@ async fn main() -> Result<()> {
             ticks_per_sec,
             max_ticks,
             metrics_every,
+            no_metrics,
         } => {
             let content = load_content(&content_dir)?;
             let (game_state, rng) = if let Some(path) = state_file {
@@ -77,6 +144,27 @@ async fn main() -> Result<()> {
                 let new_state = build_initial_state(&content, resolved_seed, &mut rng);
                 (new_state, rng)
             };
+
+            // Set up per-run metrics directory.
+            let metrics_writer = if no_metrics {
+                None
+            } else {
+                let run_id = generate_run_id(game_state.meta.seed);
+                let run_dir = create_run_dir(&run_id)?;
+                write_run_info(
+                    &run_dir,
+                    &run_id,
+                    game_state.meta.seed,
+                    &content.content_version,
+                    metrics_every,
+                    max_ticks,
+                )?;
+                let writer = sim_core::MetricsFileWriter::new(run_dir.clone())
+                    .with_context(|| format!("opening metrics CSV in {}", run_dir.display()))?;
+                println!("Run directory: {}", run_dir.display());
+                Some(writer)
+            };
+
             let (event_tx, _) = broadcast::channel::<Vec<EventEnvelope>>(256);
             let app_state = AppState {
                 sim: Arc::new(Mutex::new(SimState {
@@ -87,6 +175,7 @@ async fn main() -> Result<()> {
                     next_command_id: 0,
                     metrics_every,
                     metrics_history: Vec::new(),
+                    metrics_writer,
                 })),
                 event_tx: event_tx.clone(),
                 ticks_per_sec,
@@ -183,6 +272,7 @@ mod tests {
                 next_command_id: 0,
                 metrics_every: 60,
                 metrics_history: Vec::new(),
+                metrics_writer: None,
             })),
             event_tx,
             ticks_per_sec: 10.0,

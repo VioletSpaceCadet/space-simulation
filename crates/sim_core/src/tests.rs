@@ -1156,7 +1156,11 @@ fn test_deposit_respects_station_capacity() {
 
     // Give the station the tiny capacity.
     let station_id = StationId("station_earth_orbit".to_string());
-    state.stations.get_mut(&station_id).unwrap().cargo_capacity_m3 = 0.001;
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 0.001;
 
     // Load ship with ore.
     let ship_id = ShipId("ship_0001".to_string());
@@ -1197,7 +1201,11 @@ fn test_deposit_partial_when_station_partially_full() {
     let mut state = test_state(&content);
 
     let station_id = StationId("station_earth_orbit".to_string());
-    state.stations.get_mut(&station_id).unwrap().cargo_capacity_m3 = 0.04;
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 0.04;
     content.constants.station_cargo_capacity_m3 = 0.04;
 
     let ship_id = ShipId("ship_0001".to_string());
@@ -1224,7 +1232,13 @@ fn test_deposit_partial_when_station_partially_full() {
     let station_ore_kg: f32 = state.stations[&station_id]
         .inventory
         .iter()
-        .filter_map(|i| if let InventoryItem::Ore { kg, .. } = i { Some(*kg) } else { None })
+        .filter_map(|i| {
+            if let InventoryItem::Ore { kg, .. } = i {
+                Some(*kg)
+            } else {
+                None
+            }
+        })
         .sum();
     assert!(
         (station_ore_kg - 100.0).abs() < 1.0,
@@ -1234,7 +1248,13 @@ fn test_deposit_partial_when_station_partially_full() {
     let ship_ore_kg: f32 = state.ships[&ship_id]
         .inventory
         .iter()
-        .filter_map(|i| if let InventoryItem::Ore { kg, .. } = i { Some(*kg) } else { None })
+        .filter_map(|i| {
+            if let InventoryItem::Ore { kg, .. } = i {
+                Some(*kg)
+            } else {
+                None
+            }
+        })
         .sum();
     assert!(
         (ship_ore_kg - 100.0).abs() < 1.0,
@@ -1703,7 +1723,11 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
     tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Debug);
     tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
 
-    assert_eq!(state.asteroids.len(), 1, "one asteroid should exist after survey");
+    assert_eq!(
+        state.asteroids.len(),
+        1,
+        "one asteroid should exist after survey"
+    );
     assert!(
         !state.scan_sites.iter().any(|s| s.id.0 == "site_0001"),
         "original scan site should be consumed"
@@ -1739,7 +1763,10 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
 
     // --- Phase 3: Deep Scan ---
     assert!(
-        state.asteroids[&asteroid_id].knowledge.composition.is_none(),
+        state.asteroids[&asteroid_id]
+            .knowledge
+            .composition
+            .is_none(),
         "composition should be unknown before deep scan"
     );
 
@@ -1755,14 +1782,17 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
             },
         },
     };
-    tick(&mut state, &[deep_cmd], &content, &mut rng, EventLevel::Debug);
+    tick(
+        &mut state,
+        &[deep_cmd],
+        &content,
+        &mut rng,
+        EventLevel::Debug,
+    );
     // deep_scan_ticks=1, so one more tick resolves it.
     tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
 
-    let composition = state.asteroids[&asteroid_id]
-        .knowledge
-        .composition
-        .as_ref();
+    let composition = state.asteroids[&asteroid_id].knowledge.composition.as_ref();
     assert!(
         composition.is_some(),
         "composition should be known after deep scan"

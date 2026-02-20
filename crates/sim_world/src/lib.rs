@@ -5,7 +5,7 @@ use rand::Rng;
 use serde::Deserialize;
 use sim_core::{
     AsteroidTemplateDef, Constants, Counters, ElementDef, FacilitiesState, GameContent, GameState,
-    InputFilter, MetaState, ModuleDef, ModuleBehaviorDef, NodeId, OutputSpec, PrincipalId,
+    InputFilter, MetaState, ModuleBehaviorDef, ModuleDef, NodeId, OutputSpec, PrincipalId,
     QualityFormula, ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId,
     StationState, TechDef, TechId, YieldFormula,
 };
@@ -99,7 +99,11 @@ pub fn validate_content(content: &GameContent) {
                 // Validate outputs.
                 for output in &recipe.outputs {
                     match output {
-                        OutputSpec::Material { element, yield_formula, quality_formula } => {
+                        OutputSpec::Material {
+                            element,
+                            yield_formula,
+                            quality_formula,
+                        } => {
                             assert!(
                                 element_ids.contains(element.as_str()),
                                 "module '{}' recipe '{}' output element '{}' is not a known element",
@@ -116,7 +120,11 @@ pub fn validate_content(content: &GameContent) {
                                     fe,
                                 );
                             }
-                            if let QualityFormula::ElementFractionTimesMultiplier { element: fe, .. } = quality_formula {
+                            if let QualityFormula::ElementFractionTimesMultiplier {
+                                element: fe,
+                                ..
+                            } = quality_formula
+                            {
                                 assert!(
                                     element_ids.contains(fe.as_str()),
                                     "module '{}' recipe '{}' QualityFormula element '{}' is not a known element",
@@ -256,11 +264,17 @@ mod tests {
         GameContent {
             content_version: "test".to_string(),
             techs: vec![],
-            solar_system: SolarSystemDef { nodes: vec![], edges: vec![] },
+            solar_system: SolarSystemDef {
+                nodes: vec![],
+                edges: vec![],
+            },
             asteroid_templates: vec![],
-            elements: vec![
-                ElementDef { id: "Fe".to_string(), density_kg_per_m3: 7874.0, display_name: "Iron".to_string(), refined_name: None },
-            ],
+            elements: vec![ElementDef {
+                id: "Fe".to_string(),
+                density_kg_per_m3: 7874.0,
+                display_name: "Iron".to_string(),
+                refined_name: None,
+            }],
             module_defs: vec![],
             constants: Constants {
                 survey_scan_ticks: 1,
@@ -317,7 +331,10 @@ mod tests {
             id: NodeId("node_a".to_string()),
             name: "A".to_string(),
         });
-        content.solar_system.edges.push((NodeId("node_a".to_string()), NodeId("node_missing".to_string())));
+        content.solar_system.edges.push((
+            NodeId("node_a".to_string()),
+            NodeId("node_missing".to_string()),
+        ));
         validate_content(&content);
     }
 
