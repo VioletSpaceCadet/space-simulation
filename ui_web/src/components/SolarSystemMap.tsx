@@ -89,6 +89,23 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props
         onClick={(e) => { if (e.target === svgRef.current) setSelected(null) }}
       >
         <g ref={groupRef}>
+          {/* Starfield */}
+          {Array.from({ length: 80 }, (_, starIndex) => {
+            const sx = ((starIndex * 7919 + 1) % 1000) - 500
+            const sy = ((starIndex * 6271 + 3) % 1000) - 500
+            const size = (starIndex % 3 === 0) ? 1.5 : 0.8
+            return (
+              <circle
+                key={`star-${starIndex}`}
+                cx={sx}
+                cy={sy}
+                r={size}
+                fill="var(--color-faint)"
+                opacity={0.3 + (starIndex % 5) * 0.1}
+              />
+            )
+          })}
+
           {/* Sun at center */}
           <circle cx={0} cy={0} r={12} fill="#f5c842" opacity={0.9} />
           <circle cx={0} cy={0} r={18} fill="none" stroke="#f5c842" opacity={0.2} strokeWidth={4} />

@@ -50,6 +50,21 @@ describe('App', () => {
     expect(handles.length).toBeGreaterThan(0)
   })
 
+  it('toggles between dashboard and map views', async () => {
+    render(<App />)
+    // Start in dashboard
+    expect(screen.getByText('Events')).toBeInTheDocument()
+
+    // Switch to map
+    await userEvent.click(screen.getByText(/System Map/))
+    expect(screen.queryByText('Events')).not.toBeInTheDocument()
+    expect(screen.getByText('Earth Orbit')).toBeInTheDocument()
+
+    // Switch back
+    await userEvent.click(screen.getByText(/Dashboard/))
+    expect(screen.getByText('Events')).toBeInTheDocument()
+  })
+
   it('shows solar system map when toggled to map view', async () => {
     const { container } = render(<App />)
     await userEvent.click(screen.getByText(/System Map/))
