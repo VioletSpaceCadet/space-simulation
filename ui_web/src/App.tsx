@@ -95,7 +95,7 @@ export default function App() {
               onClick={() => toggle(id)}
               className={`text-[10px] uppercase tracking-widest px-2 py-1.5 rounded-sm transition-colors cursor-pointer text-left ${
                 visible.has(id)
-                  ? 'text-accent bg-edge/30'
+                  ? 'text-active bg-edge/40'
                   : 'text-muted hover:text-dim hover:bg-edge/15'
               }`}
             >

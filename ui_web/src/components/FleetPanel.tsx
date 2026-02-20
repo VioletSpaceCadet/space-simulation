@@ -45,7 +45,7 @@ function CargoDetail({
         const label = isOre ? 'ore' : key
 
         return (
-          <span key={key} className="text-dim">
+          <span key={key} className="text-cargo">
             {label} {formatKg(kg)} kg
             {composition && (
               <span className="text-faint ml-1">
@@ -115,7 +115,7 @@ function ShipsTable({ ships, oreCompositions }: { ships: ShipState[]; oreComposi
                 ? <span className="text-faint">empty</span>
                 : (
                   <div>
-                    <span>{formatKg(cargo_kg)} kg</span>
+                    <span className="text-cargo">{formatKg(cargo_kg)} kg</span>
                     <CargoDetail cargo={ship.cargo} oreCompositions={oreCompositions} />
                   </div>
                 )}
@@ -173,7 +173,7 @@ function StationsTable({ stations, oreCompositions }: { stations: StationState[]
                 ? <span className="text-faint">empty</span>
                 : (
                   <div>
-                    <span>{formatKg(cargo_kg)} kg</span>
+                    <span className="text-cargo">{formatKg(cargo_kg)} kg</span>
                     <CargoDetail cargo={station.cargo} oreCompositions={oreCompositions} />
                   </div>
                 )}
