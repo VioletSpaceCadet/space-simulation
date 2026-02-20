@@ -1,12 +1,20 @@
 import { useEffect, useReducer } from 'react'
 import { createEventSource, fetchSnapshot } from '../api'
-import type { AsteroidState, ResearchState, SimEvent, SimSnapshot } from '../types'
+import type { AsteroidState, ResearchState, ShipState, SimEvent, SimSnapshot, StationState } from '../types'
+
+// Composition fractions (0–1) for ore currently held by a ship or station.
+// Blended by weighted average as loads are deposited.
+export interface OreCompositions {
+  ships: Record<string, Record<string, number> | null>
+  stations: Record<string, Record<string, number> | null>
+}
 
 interface State {
   snapshot: SimSnapshot | null
   events: SimEvent[]
   connected: boolean
   currentTick: number
+  oreCompositions: OreCompositions
 }
 
 function addToRecord(base: Record<string, number>, additions: Record<string, number>): Record<string, number> {
@@ -15,6 +23,23 @@ function addToRecord(base: Record<string, number>, additions: Record<string, num
     result[key] = (result[key] ?? 0) + val
   }
   return result
+}
+
+function blendCompositions(
+  existing: Record<string, number> | null,
+  existingKg: number,
+  incoming: Record<string, number>,
+  incomingKg: number,
+): Record<string, number> {
+  const totalKg = existingKg + incomingKg
+  if (totalKg === 0) return {}
+  if (!existing || existingKg === 0) return { ...incoming }
+  const blended: Record<string, number> = {}
+  const allKeys = new Set([...Object.keys(existing), ...Object.keys(incoming)])
+  for (const key of allKeys) {
+    blended[key] = ((existing[key] ?? 0) * existingKg + (incoming[key] ?? 0) * incomingKg) / totalKg
+  }
+  return blended
 }
 
 type Action =
@@ -27,20 +52,23 @@ type Action =
 
 function applyEvents(
   asteroids: Record<string, AsteroidState>,
-  ships: Record<string, import('../types').ShipState>,
-  stations: Record<string, import('../types').StationState>,
+  ships: Record<string, ShipState>,
+  stations: Record<string, StationState>,
   research: ResearchState,
+  oreCompositions: OreCompositions,
   events: SimEvent[],
 ): {
   asteroids: Record<string, AsteroidState>
-  ships: Record<string, import('../types').ShipState>
-  stations: Record<string, import('../types').StationState>
+  ships: Record<string, ShipState>
+  stations: Record<string, StationState>
   research: ResearchState
+  oreCompositions: OreCompositions
 } {
   let updatedAsteroids = { ...asteroids }
   let updatedShips = { ...ships }
   let updatedStations = { ...stations }
   let updatedResearch = research
+  let updatedOreCompositions = oreCompositions
 
   for (const evt of events) {
     const e = evt.event
@@ -85,6 +113,20 @@ function applyEvents(
           },
         }
       }
+      // Track ore composition from the source asteroid's known composition
+      const asteroidComp = updatedAsteroids[asteroid_id]?.knowledge.composition
+      if (asteroidComp) {
+        const currentOreKg = updatedShips[ship_id]?.cargo['ore'] ?? 0
+        const mined = extracted['ore'] ?? 0
+        const prevComp = updatedOreCompositions.ships[ship_id] ?? null
+        updatedOreCompositions = {
+          ...updatedOreCompositions,
+          ships: {
+            ...updatedOreCompositions.ships,
+            [ship_id]: blendCompositions(prevComp, currentOreKg, asteroidComp, mined),
+          },
+        }
+      }
     }
 
     if (e['OreDeposited']) {
@@ -93,7 +135,27 @@ function applyEvents(
         station_id: string
         deposited: Record<string, number>
       }
-      // Add deposited ore to station cargo
+      // Blend ore composition into station before updating station cargo
+      const shipComp = updatedOreCompositions.ships[ship_id] ?? null
+      const depositedOreKg = deposited['ore'] ?? 0
+      if (shipComp && depositedOreKg > 0) {
+        const currentStationOreKg = updatedStations[station_id]?.cargo['ore'] ?? 0
+        const stationComp = updatedOreCompositions.stations[station_id] ?? null
+        updatedOreCompositions = {
+          ...updatedOreCompositions,
+          stations: {
+            ...updatedOreCompositions.stations,
+            [station_id]: blendCompositions(stationComp, currentStationOreKg, shipComp, depositedOreKg),
+          },
+          ships: { ...updatedOreCompositions.ships, [ship_id]: null },
+        }
+      } else {
+        updatedOreCompositions = {
+          ...updatedOreCompositions,
+          ships: { ...updatedOreCompositions.ships, [ship_id]: null },
+        }
+      }
+      // Transfer cargo
       if (updatedStations[station_id]) {
         updatedStations = {
           ...updatedStations,
@@ -147,7 +209,13 @@ function applyEvents(
     }
   }
 
-  return { asteroids: updatedAsteroids, ships: updatedShips, stations: updatedStations, research: updatedResearch }
+  return {
+    asteroids: updatedAsteroids,
+    ships: updatedShips,
+    stations: updatedStations,
+    research: updatedResearch,
+    oreCompositions: updatedOreCompositions,
+  }
 }
 
 function reducer(state: State, action: Action): State {
@@ -159,11 +227,12 @@ function reducer(state: State, action: Action): State {
       const newEvents = [...action.events, ...state.events].slice(0, 500)
       const latestTick = action.events.reduce((max, e) => Math.max(max, e.tick), state.currentTick)
       if (!state.snapshot) return { ...state, events: newEvents, currentTick: latestTick }
-      const { asteroids, ships, stations, research } = applyEvents(
+      const { asteroids, ships, stations, research, oreCompositions } = applyEvents(
         state.snapshot.asteroids,
         state.snapshot.ships,
         state.snapshot.stations,
         state.snapshot.research,
+        state.oreCompositions,
         action.events,
       )
       return {
@@ -171,6 +240,7 @@ function reducer(state: State, action: Action): State {
         events: newEvents,
         currentTick: latestTick,
         snapshot: { ...state.snapshot, asteroids, ships, stations, research },
+        oreCompositions,
       }
     }
 
@@ -196,6 +266,7 @@ const initialState: State = {
   events: [],
   connected: false,
   currentTick: 0,
+  oreCompositions: { ships: {}, stations: {} },
 }
 
 const RECONNECT_DELAY_MS = 2000
@@ -287,5 +358,11 @@ export function useSimStream() {
     }
   }, [])
 
-  return { snapshot: state.snapshot, events: state.events, connected: state.connected, currentTick: state.currentTick }
+  return {
+    snapshot: state.snapshot,
+    events: state.events,
+    connected: state.connected,
+    currentTick: state.currentTick,
+    oreCompositions: state.oreCompositions,
+  }
 }

@@ -1,8 +1,10 @@
+import type { OreCompositions } from '../hooks/useSimStream'
 import type { ShipState, StationState } from '../types'
 
 interface Props {
   ships: Record<string, ShipState>
   stations: Record<string, StationState>
+  oreCompositions: OreCompositions
 }
 
 function taskLabel(task: ShipState['task']): string {
@@ -15,7 +17,28 @@ function totalCargoKg(cargo: Record<string, number>): number {
   return Object.values(cargo).reduce((sum, kg) => sum + kg, 0)
 }
 
-function CargoBreakdown({ cargo }: { cargo: Record<string, number> }) {
+function OreCompositionLine({ composition }: { composition: Record<string, number> | null | undefined }) {
+  if (!composition) return null
+  const entries = Object.entries(composition)
+    .sort(([, a], [, b]) => b - a)
+    .filter(([, frac]) => frac > 0.001)
+  if (entries.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-x-2 text-[10px] text-dim mt-0.5">
+      {entries.map(([el, frac]) => (
+        <span key={el}>{el} {Math.round(frac * 100)}%</span>
+      ))}
+    </div>
+  )
+}
+
+function CargoBreakdown({
+  cargo,
+  oreComposition,
+}: {
+  cargo: Record<string, number>
+  oreComposition?: Record<string, number> | null
+}) {
   const totalKg = totalCargoKg(cargo)
   if (totalKg === 0) return <div className="text-faint mt-0.5">hold empty</div>
   return (
@@ -28,11 +51,12 @@ function CargoBreakdown({ cargo }: { cargo: Record<string, number> }) {
           <span key={element}>{element} {kg.toFixed(1)}</span>
         ))}
       </div>
+      {cargo['ore'] && <OreCompositionLine composition={oreComposition} />}
     </div>
   )
 }
 
-export function FleetPanel({ ships, stations }: Props) {
+export function FleetPanel({ ships, stations, oreCompositions }: Props) {
   const shipRows = Object.values(ships)
   const stationRows = Object.values(stations)
 
@@ -45,7 +69,7 @@ export function FleetPanel({ ships, stations }: Props) {
           <div key={ship.id} className="py-1.5 border-b border-surface text-[11px]">
             <div className="text-bright mb-0.5">{ship.id}</div>
             <div className="text-dim">{ship.location_node} · {taskLabel(ship.task)}</div>
-            <CargoBreakdown cargo={ship.cargo} />
+            <CargoBreakdown cargo={ship.cargo} oreComposition={oreCompositions.ships[ship.id]} />
           </div>
         ))
       )}
@@ -61,7 +85,7 @@ export function FleetPanel({ ships, stations }: Props) {
           <div key={station.id} className="py-1.5 border-b border-surface text-[11px]">
             <div className="text-bright mb-0.5">{station.id}</div>
             <div className="text-dim">{station.location_node}</div>
-            <CargoBreakdown cargo={station.cargo} />
+            <CargoBreakdown cargo={station.cargo} oreComposition={oreCompositions.stations[station.id]} />
           </div>
         ))
       )}
