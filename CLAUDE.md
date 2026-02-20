@@ -148,6 +148,27 @@ Mining extracts **raw ore**, not pre-split elements. This reflects the real-worl
 - **MVP-1 (done):** `sim_daemon` HTTP server (axum + tokio), SSE event stream, React mission control UI.
 - **MVP-2 (done):** Mining loop — cargo holds, Mine/Deposit tasks, ore extraction, autopilot priority reorder, FE fleet/station cargo display with per-lot ore composition.
 
+## Merging Branches to Main
+
+**Always squash merge** when merging feature branches or worktrees into main. Never fast-forward or create merge commits.
+
+```bash
+# From the main branch:
+git merge --squash <branch-name>
+git commit  # with AI-generated message (see below)
+```
+
+**Commit message format** — read `git log main..<branch>` to understand all the changes, then write a single squash commit message:
+- Subject line: `feat(scope): short summary` (or `fix`, `refactor`, etc.)
+- Body: bullet list of the key changes from the branch (not a 1:1 copy of each commit — summarize and group logically)
+- End with `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`
+
+**After merging**, clean up the branch and worktree:
+```bash
+git worktree remove .worktrees/<name>   # if it was a worktree
+git branch -D <branch-name>             # delete the local branch
+```
+
 ## Notes
 
 - IDE: RustRover (JetBrains)
