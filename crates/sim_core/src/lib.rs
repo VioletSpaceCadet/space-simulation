@@ -916,11 +916,12 @@ mod tests {
 
         let cmd = mine_command(&state, &asteroid_id, &content);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
-        // Fast forward to completion (duration_ticks=10)
-        let completion_tick = state.meta.tick + 10;
+        // Fast forward to completion (duration_ticks=10, so task eta is 10 ticks from start)
+        let completion_tick = state.meta.tick + 9;
         while state.meta.tick < completion_tick {
             tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
         }
+        // Tick once more to hit the eta_tick and resolve the task
         let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         assert!(

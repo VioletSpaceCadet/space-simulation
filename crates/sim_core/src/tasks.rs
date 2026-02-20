@@ -11,7 +11,7 @@ pub(crate) fn task_duration(kind: &TaskKind, constants: &Constants) -> u64 {
         TaskKind::Transit { total_ticks, .. } => *total_ticks,
         TaskKind::Survey { .. } => constants.survey_scan_ticks,
         TaskKind::DeepScan { .. } => constants.deep_scan_ticks,
-        TaskKind::Mine { duration_ticks, .. } => duration_ticks + 1,
+        TaskKind::Mine { duration_ticks, .. } => *duration_ticks,
         TaskKind::Idle => 0,
     }
 }
