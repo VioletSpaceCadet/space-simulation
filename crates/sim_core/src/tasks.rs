@@ -63,34 +63,27 @@ fn composition_noise_sigma(research: &ResearchState, content: &GameContent) -> f
         .unwrap_or(0.0)
 }
 
+/// Returns the density (kg/m³) for the given element id.
+///
+/// Panics if the element is not found in content — that is a content authoring error.
+fn element_density(content: &GameContent, element_id: &str) -> f32 {
+    content
+        .elements
+        .iter()
+        .find(|e| e.id == element_id)
+        .unwrap_or_else(|| panic!("element '{element_id}' not found in content"))
+        .density_kg_per_m3
+}
+
 /// Volume (m³) currently occupied by the inventory items.
 pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -> f32 {
     inventory
         .iter()
         .map(|item| match item {
-            InventoryItem::Ore { kg, .. } => {
-                let density = content
-                    .elements
-                    .iter()
-                    .find(|e| e.id == "ore")
-                    .map_or(3000.0, |e| e.density_kg_per_m3);
-                kg / density
-            }
-            InventoryItem::Slag { kg, .. } => {
-                let density = content
-                    .elements
-                    .iter()
-                    .find(|e| e.id == "slag")
-                    .map_or(2500.0, |e| e.density_kg_per_m3);
-                kg / density
-            }
+            InventoryItem::Ore { kg, .. } => kg / element_density(content, "ore"),
+            InventoryItem::Slag { kg, .. } => kg / element_density(content, "slag"),
             InventoryItem::Material { element, kg, .. } => {
-                let density = content
-                    .elements
-                    .iter()
-                    .find(|e| e.id == *element)
-                    .map_or(1000.0, |e| e.density_kg_per_m3);
-                kg / density
+                kg / element_density(content, element)
             }
             InventoryItem::Component { count, .. } => *count as f32 * 1.0, // 1.0 m³ per unit; replace with ComponentDef.volume_m3 when defs exist
             InventoryItem::Module { module_def_id, .. } => content
@@ -106,11 +99,7 @@ pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -
 ///
 /// Stops when the cargo hold fills OR the asteroid is depleted, whichever comes first.
 pub fn mine_duration(asteroid: &AsteroidState, ship: &ShipState, content: &GameContent) -> u64 {
-    let ore_density = content
-        .elements
-        .iter()
-        .find(|e| e.id == "ore")
-        .map_or(3000.0, |e| e.density_kg_per_m3);
+    let ore_density = element_density(content, "ore");
     let effective_m3_per_kg = 1.0 / ore_density;
 
     let volume_used = inventory_volume_m3(&ship.inventory, content);
@@ -324,11 +313,7 @@ pub(crate) fn resolve_mine(
         return;
     };
 
-    let ore_density = content
-        .elements
-        .iter()
-        .find(|e| e.id == "ore")
-        .map_or(3000.0, |e| e.density_kg_per_m3);
+    let ore_density = element_density(content, "ore");
     let effective_m3_per_kg = 1.0 / ore_density;
 
     let volume_used = inventory_volume_m3(&ship.inventory, content);

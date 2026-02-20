@@ -1,12 +1,11 @@
 mod routes;
 mod state;
 mod tick_loop;
-mod world;
 
 use routes::make_router;
+use sim_world::{build_initial_state, load_content};
 use state::{AppState, SimState};
 use tick_loop::run_tick_loop;
-use world::{build_initial_state, load_content};
 
 use anyhow::Context;
 
@@ -162,6 +161,8 @@ mod tests {
                 station_power_available_per_tick: 100.0,
                 mining_rate_kg_per_tick: 50.0,
                 deposit_ticks: 1,
+                autopilot_iron_rich_confidence_threshold: 0.7,
+                autopilot_refinery_threshold_kg: 500.0,
             },
         };
         let mut rng = ChaCha8Rng::seed_from_u64(0);

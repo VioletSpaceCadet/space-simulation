@@ -2,6 +2,7 @@
 //!
 //! No IO, no network. All randomness via the passed-in Rng.
 
+mod composition;
 mod engine;
 mod graph;
 mod research;
@@ -106,6 +107,8 @@ mod tests {
                 station_power_available_per_tick: 100.0,
                 mining_rate_kg_per_tick: 50.0,
                 deposit_ticks: 1, // fast for tests
+                autopilot_iron_rich_confidence_threshold: 0.7,
+                autopilot_refinery_threshold_kg: 500.0,
             },
         }
     }

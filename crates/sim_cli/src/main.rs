@@ -1,16 +1,10 @@
-use std::path::Path;
-
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use serde::Deserialize;
 use sim_control::{AutopilotController, CommandSource};
-use sim_core::{
-    AsteroidTemplateDef, Constants, Counters, ElementDef, EventLevel, FacilitiesState, GameContent,
-    GameState, MetaState, ModuleDef, NodeId, PrincipalId, ResearchState, ScanSite, ShipId,
-    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef,
-};
+use sim_core::{EventLevel, GameState};
+use sim_world::{build_initial_state, load_content};
 
 // ---------------------------------------------------------------------------
 // CLI definition
@@ -42,151 +36,6 @@ enum Commands {
         #[arg(long, default_value = "normal", value_parser = ["normal", "debug"])]
         event_level: String,
     },
-}
-
-// ---------------------------------------------------------------------------
-// Content loading
-// ---------------------------------------------------------------------------
-
-#[derive(Deserialize)]
-struct TechsFile {
-    content_version: String,
-    techs: Vec<TechDef>,
-}
-
-#[derive(Deserialize)]
-struct AsteroidTemplatesFile {
-    templates: Vec<AsteroidTemplateDef>,
-}
-
-#[derive(Deserialize)]
-struct ElementsFile {
-    elements: Vec<ElementDef>,
-}
-
-fn load_content(content_dir: &str) -> Result<GameContent> {
-    let dir = Path::new(content_dir);
-
-    let constants: Constants = serde_json::from_str(
-        &std::fs::read_to_string(dir.join("constants.json")).context("reading constants.json")?,
-    )
-    .context("parsing constants.json")?;
-
-    let techs_file: TechsFile = serde_json::from_str(
-        &std::fs::read_to_string(dir.join("techs.json")).context("reading techs.json")?,
-    )
-    .context("parsing techs.json")?;
-
-    let solar_system: SolarSystemDef = serde_json::from_str(
-        &std::fs::read_to_string(dir.join("solar_system.json"))
-            .context("reading solar_system.json")?,
-    )
-    .context("parsing solar_system.json")?;
-
-    let templates_file: AsteroidTemplatesFile = serde_json::from_str(
-        &std::fs::read_to_string(dir.join("asteroid_templates.json"))
-            .context("reading asteroid_templates.json")?,
-    )
-    .context("parsing asteroid_templates.json")?;
-
-    let elements_file: ElementsFile = serde_json::from_str(
-        &std::fs::read_to_string(dir.join("elements.json")).context("reading elements.json")?,
-    )
-    .context("parsing elements.json")?;
-
-    let module_defs: Vec<ModuleDef> = serde_json::from_str(
-        &std::fs::read_to_string(dir.join("module_defs.json"))
-            .context("reading module_defs.json")?,
-    )
-    .context("parsing module_defs.json")?;
-
-    Ok(GameContent {
-        content_version: techs_file.content_version,
-        techs: techs_file.techs,
-        solar_system,
-        asteroid_templates: templates_file.templates,
-        elements: elements_file.elements,
-        module_defs,
-        constants,
-    })
-}
-
-// ---------------------------------------------------------------------------
-// World generation
-// ---------------------------------------------------------------------------
-
-fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl rand::Rng) -> GameState {
-    let earth_orbit = NodeId("node_earth_orbit".to_string());
-    let c = &content.constants;
-
-    // Station
-    let station_id = StationId("station_earth_orbit".to_string());
-    let station = StationState {
-        id: station_id.clone(),
-        location_node: earth_orbit.clone(),
-        inventory: vec![],
-        cargo_capacity_m3: c.station_cargo_capacity_m3,
-        power_available_per_tick: c.station_power_available_per_tick,
-        facilities: FacilitiesState {
-            compute_units_total: c.station_compute_units_total,
-            power_per_compute_unit_per_tick: c.station_power_per_compute_unit_per_tick,
-            efficiency: c.station_efficiency,
-        },
-        modules: vec![],
-    };
-
-    // Ship
-    let ship_id = ShipId("ship_0001".to_string());
-    let owner = PrincipalId("principal_autopilot".to_string());
-    let ship = ShipState {
-        id: ship_id.clone(),
-        location_node: earth_orbit.clone(),
-        owner,
-        inventory: vec![],
-        cargo_capacity_m3: c.ship_cargo_capacity_m3,
-        task: None,
-    };
-
-    // Scan sites: one per template × count_per_template, random node
-    let node_ids: Vec<&NodeId> = content.solar_system.nodes.iter().map(|n| &n.id).collect();
-    let mut scan_sites = Vec::new();
-    let mut site_counter = 1u64;
-    for template in &content.asteroid_templates {
-        for _ in 0..c.asteroid_count_per_template {
-            let node = node_ids[rng.gen_range(0..node_ids.len())].clone();
-            scan_sites.push(ScanSite {
-                id: SiteId(format!("site_{site_counter:04}")),
-                node,
-                template_id: template.id.clone(),
-            });
-            site_counter += 1;
-        }
-    }
-
-    GameState {
-        meta: MetaState {
-            tick: 0,
-            seed,
-            schema_version: 1,
-            content_version: content.content_version.clone(),
-        },
-        scan_sites,
-        asteroids: std::collections::HashMap::new(),
-        ships: std::collections::HashMap::from([(ship_id, ship)]),
-        stations: std::collections::HashMap::from([(station_id, station)]),
-        research: ResearchState {
-            unlocked: std::collections::HashSet::new(),
-            data_pool: std::collections::HashMap::new(),
-            evidence: std::collections::HashMap::new(),
-        },
-        counters: Counters {
-            next_event_id: 0,
-            next_command_id: 0,
-            next_asteroid_id: 0,
-            next_lot_id: 0,
-            next_module_instance_id: 0,
-        },
-    }
 }
 
 // ---------------------------------------------------------------------------

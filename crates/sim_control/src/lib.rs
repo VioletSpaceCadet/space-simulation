@@ -21,7 +21,6 @@ pub trait CommandSource {
 pub struct AutopilotController;
 
 const AUTOPILOT_OWNER: &str = "principal_autopilot";
-const IRON_RICH_CONFIDENCE_THRESHOLD: f32 = 0.7;
 
 impl CommandSource for AutopilotController {
     #[allow(clippy::too_many_lines)]
@@ -65,7 +64,8 @@ impl CommandSource for AutopilotController {
             .filter(|asteroid| {
                 asteroid.knowledge.composition.is_none()
                     && asteroid.knowledge.tag_beliefs.iter().any(|(tag, conf)| {
-                        *tag == AnomalyTag::IronRich && *conf > IRON_RICH_CONFIDENCE_THRESHOLD
+                        *tag == AnomalyTag::IronRich
+                            && *conf > content.constants.autopilot_iron_rich_confidence_threshold
                     })
             })
             .map(|a| a.id.clone())
@@ -146,7 +146,7 @@ impl CommandSource for AutopilotController {
                             command: Command::SetModuleThreshold {
                                 station_id: station.id.clone(),
                                 module_id: module.id.clone(),
-                                threshold_kg: 500.0,
+                                threshold_kg: content.constants.autopilot_refinery_threshold_kg,
                             },
                         });
                     }
@@ -347,12 +347,11 @@ mod tests {
                 edges: vec![],
             },
             asteroid_templates: vec![],
-            elements: vec![ElementDef {
-                id: "Fe".to_string(),
-                density_kg_per_m3: 7874.0,
-                display_name: "Iron".to_string(),
-                refined_name: None,
-            }],
+            elements: vec![
+                ElementDef { id: "ore".to_string(), density_kg_per_m3: 3000.0, display_name: "Raw Ore".to_string(), refined_name: None },
+                ElementDef { id: "slag".to_string(), density_kg_per_m3: 2500.0, display_name: "Slag".to_string(), refined_name: None },
+                ElementDef { id: "Fe".to_string(), density_kg_per_m3: 7874.0, display_name: "Iron".to_string(), refined_name: None },
+            ],
             module_defs: vec![],
             constants: Constants {
                 survey_scan_ticks: 1,
@@ -374,6 +373,8 @@ mod tests {
                 station_cargo_capacity_m3: 10_000.0,
                 mining_rate_kg_per_tick: 50.0,
                 deposit_ticks: 1,
+                autopilot_iron_rich_confidence_threshold: 0.7,
+                autopilot_refinery_threshold_kg: 500.0,
             },
         }
     }

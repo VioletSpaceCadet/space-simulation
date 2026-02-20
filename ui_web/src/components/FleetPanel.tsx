@@ -2,9 +2,12 @@ import { useSortableData } from '../hooks/useSortableData'
 import type { InventoryItem, ModuleState, ShipState, StationState } from '../types'
 import { SortIndicator } from './SortIndicator'
 
+const QUALITY_TIER_EXCELLENT = 0.8
+const QUALITY_TIER_GOOD = 0.5
+
 function qualityTier(quality: number): string {
-  if (quality >= 0.8) return 'excellent'
-  if (quality >= 0.5) return 'good'
+  if (quality >= QUALITY_TIER_EXCELLENT) return 'excellent'
+  if (quality >= QUALITY_TIER_GOOD) return 'good'
   return 'poor'
 }
 

@@ -2,6 +2,7 @@
 members = [
     "crates/sim_core",
     "crates/sim_control",
+    "crates/sim_world",
     "crates/sim_cli",
     "crates/sim_daemon",
 ]

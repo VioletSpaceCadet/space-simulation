@@ -9,6 +9,7 @@ workspace = true
 [dependencies]
 sim_core = { path = "../sim_core" }
 sim_control = { path = "../sim_control" }
+sim_world = { path = "../sim_world" }
 tokio = { version = "1", features = ["full"] }
 axum = "0.7"
 tower-http = { version = "0.5", features = ["cors"] }

@@ -1,3 +1,5 @@
+//! World generation and content loading shared between sim_cli and sim_daemon.
+
 use anyhow::{Context, Result};
 use rand::Rng;
 use serde::Deserialize;
