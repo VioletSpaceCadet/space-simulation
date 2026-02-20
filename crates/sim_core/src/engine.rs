@@ -1,10 +1,12 @@
-use rand::Rng;
-use crate::{Command, CommandEnvelope, EventLevel, GameContent, GameState, ShipId, TaskKind, TaskState};
-use crate::tasks::{
-    deep_scan_enabled, resolve_deep_scan, resolve_survey, resolve_transit,
-    task_duration, task_kind_label, task_target,
-};
 use crate::research::advance_research;
+use crate::tasks::{
+    deep_scan_enabled, resolve_deep_scan, resolve_survey, resolve_transit, task_duration,
+    task_kind_label, task_target,
+};
+use crate::{
+    Command, CommandEnvelope, EventLevel, GameContent, GameState, ShipId, TaskKind, TaskState,
+};
+use rand::Rng;
 
 /// Advance the simulation by one tick.
 ///
@@ -123,7 +125,11 @@ fn resolve_ship_tasks(
         };
 
         match task_kind {
-            TaskKind::Transit { ref destination, ref then, .. } => {
+            TaskKind::Transit {
+                ref destination,
+                ref then,
+                ..
+            } => {
                 resolve_transit(state, &ship_id, destination, then, content, events);
             }
             TaskKind::Survey { ref site } => {

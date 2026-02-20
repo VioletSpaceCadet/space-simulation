@@ -1,5 +1,4 @@
-use std::convert::Infallible;
-use std::time::Duration;
+use crate::state::AppState;
 use axum::{
     extract::State,
     http::{header, Method, StatusCode},
@@ -10,10 +9,11 @@ use axum::{
     routing::get,
     Router,
 };
-use tower_http::cors::{Any, CorsLayer};
-use crate::state::AppState;
 use sim_core::EventEnvelope;
+use std::convert::Infallible;
+use std::time::Duration;
 use tokio::sync::broadcast;
+use tower_http::cors::{Any, CorsLayer};
 
 pub fn make_router(state: AppState) -> Router {
     let cors = CorsLayer::new()

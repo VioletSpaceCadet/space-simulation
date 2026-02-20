@@ -1,9 +1,9 @@
-use rand::Rng;
 use crate::{
-    AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, CompositionVec,
-    Constants, DataKind, Event, EventEnvelope, GameContent, GameState,
-    NodeId, ResearchState, ShipId, SiteId, TaskKind, TaskState, TechEffect,
+    AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, CompositionVec, Constants, DataKind,
+    Event, EventEnvelope, GameContent, GameState, NodeId, ResearchState, ShipId, SiteId, TaskKind,
+    TaskState, TechEffect,
 };
+use rand::Rng;
 
 pub(crate) fn task_duration(kind: &TaskKind, constants: &Constants) -> u64 {
     match kind {
@@ -32,7 +32,7 @@ pub(crate) fn task_target(kind: &TaskKind) -> Option<String> {
     }
 }
 
-/// True if any unlocked tech grants the EnableDeepScan effect.
+/// True if any unlocked tech grants the `EnableDeepScan` effect.
 pub(crate) fn deep_scan_enabled(research: &ResearchState, content: &GameContent) -> bool {
     content
         .techs
@@ -51,7 +51,7 @@ fn composition_noise_sigma(research: &ResearchState, content: &GameContent) -> f
         .flat_map(|tech| &tech.effects)
         .find_map(|effect| match effect {
             TechEffect::DeepScanCompositionNoise { sigma } => Some(*sigma),
-            _ => None,
+            TechEffect::EnableDeepScan => None,
         })
         .unwrap_or(0.0)
 }
@@ -190,7 +190,7 @@ pub(crate) fn resolve_survey(
         .collect();
 
     if let Some(asteroid) = state.asteroids.get_mut(&asteroid_id) {
-        asteroid.knowledge.tag_beliefs = detected_tags.clone();
+        asteroid.knowledge.tag_beliefs.clone_from(&detected_tags);
     }
 
     events.push(crate::emit(

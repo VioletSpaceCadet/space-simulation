@@ -1,5 +1,5 @@
-use rand::Rng;
 use crate::{Event, EventLevel, GameContent, GameState, StationId, TechId};
+use rand::Rng;
 
 pub(crate) fn advance_research(
     state: &mut GameState,

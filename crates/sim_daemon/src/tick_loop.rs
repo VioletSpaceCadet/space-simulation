@@ -1,7 +1,7 @@
-use std::time::Duration;
+use crate::state::{EventTx, SharedSim, SimState};
 use sim_control::CommandSource;
 use sim_core::EventLevel;
-use crate::state::{EventTx, SharedSim, SimState};
+use std::time::Duration;
 
 pub async fn run_tick_loop(
     sim: SharedSim,
@@ -38,7 +38,7 @@ pub async fn run_tick_loop(
                 ..
             } = *guard;
             let events = sim_core::tick(game_state, &commands, content, rng, EventLevel::Normal);
-            let done = max_ticks.map_or(false, |max| guard.game_state.meta.tick >= max);
+            let done = max_ticks.is_some_and(|max| guard.game_state.meta.tick >= max);
             (events, done)
         };
 
@@ -51,7 +51,7 @@ pub async fn run_tick_loop(
         if let Some(duration) = sleep_duration {
             let elapsed = start.elapsed();
             if elapsed < duration {
-                tokio::time::sleep(duration - elapsed).await;
+                tokio::time::sleep(duration.checked_sub(elapsed).unwrap()).await;
             }
         } else {
             tokio::task::yield_now().await;

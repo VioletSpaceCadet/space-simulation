@@ -15,7 +15,7 @@ use clap::{Parser, Subcommand};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use sim_control::AutopilotController;
-use sim_core::{EventEnvelope};
+use sim_core::EventEnvelope;
 use tokio::sync::broadcast;
 
 #[derive(Parser)]
@@ -72,7 +72,7 @@ async fn main() -> Result<()> {
             let speed = if ticks_per_sec == 0.0 {
                 "max".to_string()
             } else {
-                format!("{} ticks/sec", ticks_per_sec)
+                format!("{ticks_per_sec} ticks/sec")
             };
             println!("sim_daemon listening on http://localhost:{port}  speed={speed}");
             tokio::spawn(run_tick_loop(
@@ -93,7 +93,7 @@ mod tests {
     use super::*;
     use axum::{body::Body, http::Request, http::StatusCode};
     use http_body_util::BodyExt;
-    use sim_core::NodeDef;
+    use sim_core::{Constants, GameContent, NodeDef, NodeId, SolarSystemDef};
     use tower::ServiceExt;
 
     fn make_test_state() -> AppState {

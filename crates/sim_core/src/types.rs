@@ -1,4 +1,4 @@
-//! Type definitions for sim_core.
+//! Type definitions for `sim_core`.
 //!
 //! All public types, structs, enums, and ID newtypes used by the simulation.
 
@@ -68,7 +68,7 @@ pub enum EventLevel {
 pub struct GameState {
     pub meta: MetaState,
     /// Unscanned potential asteroid locations. Populated at world-gen; entries
-    /// are removed when surveyed and replaced by a real AsteroidState.
+    /// are removed when surveyed and replaced by a real `AsteroidState`.
     pub scan_sites: Vec<ScanSite>,
     pub asteroids: HashMap<AsteroidId, AsteroidState>,
     pub ships: HashMap<ShipId, ShipState>,
@@ -89,7 +89,7 @@ pub struct MetaState {
 pub struct ScanSite {
     pub id: SiteId,
     pub node: NodeId,
-    /// References an AsteroidTemplateDef id in GameContent.
+    /// References an `AsteroidTemplateDef` id in `GameContent`.
     pub template_id: String,
 }
 
@@ -162,12 +162,16 @@ pub enum TaskKind {
     /// Ship is in transit. On arrival it will immediately start `then`.
     Transit {
         destination: NodeId,
-        /// Pre-computed total travel ticks (hop_count × travel_ticks_per_hop).
+        /// Pre-computed total travel ticks (`hop_count` × `travel_ticks_per_hop`).
         total_ticks: u64,
         then: Box<TaskKind>,
     },
-    Survey { site: SiteId },
-    DeepScan { asteroid: AsteroidId },
+    Survey {
+        site: SiteId,
+    },
+    DeepScan {
+        asteroid: AsteroidId,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +246,7 @@ pub enum Event {
         ship_id: ShipId,
         node: NodeId,
     },
-    /// Only emitted at EventLevel::Debug.
+    /// Only emitted at `EventLevel::Debug`.
     ResearchRoll {
         tech_id: TechId,
         evidence: f32,

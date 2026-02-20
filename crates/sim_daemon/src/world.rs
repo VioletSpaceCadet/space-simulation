@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use rand::Rng;
 use serde::Deserialize;
 use sim_core::{
-    AsteroidTemplateDef, Constants, Counters, FacilitiesState, GameContent,
-    GameState, MetaState, NodeId, PrincipalId, ResearchState, ScanSite,
-    ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef,
+    AsteroidTemplateDef, Constants, Counters, FacilitiesState, GameContent, GameState, MetaState,
+    NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef,
+    StationId, StationState, TechDef,
 };
 use std::path::Path;
 
@@ -77,7 +77,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         for _ in 0..c.asteroid_count_per_template {
             let node = node_ids[rng.gen_range(0..node_ids.len())].clone();
             scan_sites.push(ScanSite {
-                id: SiteId(format!("site_{:04}", site_counter)),
+                id: SiteId(format!("site_{site_counter:04}")),
                 node,
                 template_id: template.id.clone(),
             });

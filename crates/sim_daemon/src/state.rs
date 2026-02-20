@@ -1,7 +1,7 @@
-use std::sync::{Arc, Mutex};
 use rand_chacha::ChaCha8Rng;
 use sim_control::AutopilotController;
 use sim_core::{EventEnvelope, GameContent, GameState};
+use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
 pub struct SimState {

@@ -1,16 +1,16 @@
-//! sim_core — deterministic simulation tick.
+//! `sim_core` — deterministic simulation tick.
 //!
 //! No IO, no network. All randomness via the passed-in Rng.
 
-mod types;
-mod graph;
-mod tasks;
-mod research;
 mod engine;
+mod graph;
+mod research;
+mod tasks;
+mod types;
 
-pub use types::*;
-pub use graph::shortest_hop_count;
 pub use engine::tick;
+pub use graph::shortest_hop_count;
+pub use types::*;
 
 pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnvelope {
     let id = EventId(format!("evt_{:06}", counters.next_event_id));
@@ -25,9 +25,9 @@ pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnv
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::{HashMap, HashSet};
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
+    use std::collections::{HashMap, HashSet};
 
     // --- Test helpers -------------------------------------------------------
 
@@ -812,8 +812,14 @@ mod tests {
     fn test_shortest_hop_count_adjacent() {
         let solar_system = SolarSystemDef {
             nodes: vec![
-                NodeDef { id: NodeId("a".to_string()), name: "A".to_string() },
-                NodeDef { id: NodeId("b".to_string()), name: "B".to_string() },
+                NodeDef {
+                    id: NodeId("a".to_string()),
+                    name: "A".to_string(),
+                },
+                NodeDef {
+                    id: NodeId("b".to_string()),
+                    name: "B".to_string(),
+                },
             ],
             edges: vec![(NodeId("a".to_string()), NodeId("b".to_string()))],
         };
@@ -840,9 +846,18 @@ mod tests {
     fn test_shortest_hop_count_two_hops() {
         let solar_system = SolarSystemDef {
             nodes: vec![
-                NodeDef { id: NodeId("a".to_string()), name: "A".to_string() },
-                NodeDef { id: NodeId("b".to_string()), name: "B".to_string() },
-                NodeDef { id: NodeId("c".to_string()), name: "C".to_string() },
+                NodeDef {
+                    id: NodeId("a".to_string()),
+                    name: "A".to_string(),
+                },
+                NodeDef {
+                    id: NodeId("b".to_string()),
+                    name: "B".to_string(),
+                },
+                NodeDef {
+                    id: NodeId("c".to_string()),
+                    name: "C".to_string(),
+                },
             ],
             edges: vec![
                 (NodeId("a".to_string()), NodeId("b".to_string())),
@@ -863,8 +878,14 @@ mod tests {
     fn test_shortest_hop_count_no_path() {
         let solar_system = SolarSystemDef {
             nodes: vec![
-                NodeDef { id: NodeId("a".to_string()), name: "A".to_string() },
-                NodeDef { id: NodeId("b".to_string()), name: "B".to_string() },
+                NodeDef {
+                    id: NodeId("a".to_string()),
+                    name: "A".to_string(),
+                },
+                NodeDef {
+                    id: NodeId("b".to_string()),
+                    name: "B".to_string(),
+                },
             ],
             edges: vec![],
         };
@@ -886,8 +907,14 @@ mod tests {
         let node_b = NodeId("node_b".to_string());
         content.solar_system = SolarSystemDef {
             nodes: vec![
-                NodeDef { id: node_a.clone(), name: "A".to_string() },
-                NodeDef { id: node_b.clone(), name: "B".to_string() },
+                NodeDef {
+                    id: node_a.clone(),
+                    name: "A".to_string(),
+                },
+                NodeDef {
+                    id: node_b.clone(),
+                    name: "B".to_string(),
+                },
             ],
             edges: vec![(node_a.clone(), node_b.clone())],
         };
@@ -900,12 +927,26 @@ mod tests {
         let station_id = StationId("station_test".to_string());
 
         let mut state = GameState {
-            meta: MetaState { tick: 0, seed: 0, schema_version: 1, content_version: "test".to_string() },
-            scan_sites: vec![ScanSite { id: site_id.clone(), node: node_b.clone(), template_id: "tmpl_iron_rich".to_string() }],
+            meta: MetaState {
+                tick: 0,
+                seed: 0,
+                schema_version: 1,
+                content_version: "test".to_string(),
+            },
+            scan_sites: vec![ScanSite {
+                id: site_id.clone(),
+                node: node_b.clone(),
+                template_id: "tmpl_iron_rich".to_string(),
+            }],
             asteroids: HashMap::new(),
             ships: HashMap::from([(
                 ship_id.clone(),
-                ShipState { id: ship_id.clone(), location_node: node_a.clone(), owner: owner.clone(), task: None },
+                ShipState {
+                    id: ship_id.clone(),
+                    location_node: node_a.clone(),
+                    owner: owner.clone(),
+                    task: None,
+                },
             )]),
             stations: HashMap::from([(
                 station_id.clone(),
@@ -925,7 +966,11 @@ mod tests {
                 data_pool: HashMap::new(),
                 evidence: HashMap::new(),
             },
-            counters: Counters { next_event_id: 0, next_command_id: 0, next_asteroid_id: 0 },
+            counters: Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+            },
         };
 
         let mut rng = ChaCha8Rng::seed_from_u64(0);
@@ -941,37 +986,63 @@ mod tests {
                 task_kind: TaskKind::Transit {
                     destination: node_b.clone(),
                     total_ticks: 5,
-                    then: Box::new(TaskKind::Survey { site: site_id.clone() }),
+                    then: Box::new(TaskKind::Survey {
+                        site: site_id.clone(),
+                    }),
                 },
             },
         };
 
         // Tick 0: assign transit.
-        tick(&mut state, &[transit_cmd], &content, &mut rng, EventLevel::Normal);
-        assert_eq!(state.ships[&ship_id].location_node, node_a, "ship still at origin during transit");
+        tick(
+            &mut state,
+            &[transit_cmd],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+        );
+        assert_eq!(
+            state.ships[&ship_id].location_node, node_a,
+            "ship still at origin during transit"
+        );
 
         // Ticks 1–4: transit in progress, ship still at node_a.
         for _ in 1..5 {
             tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
         }
-        assert_eq!(state.ships[&ship_id].location_node, node_a, "ship still in transit");
+        assert_eq!(
+            state.ships[&ship_id].location_node, node_a,
+            "ship still in transit"
+        );
 
         // Tick 5: transit resolves → ship moves to node_b, survey starts.
         let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-        assert_eq!(state.ships[&ship_id].location_node, node_b, "ship arrived at destination");
+        assert_eq!(
+            state.ships[&ship_id].location_node, node_b,
+            "ship arrived at destination"
+        );
         assert!(
-            events.iter().any(|e| matches!(&e.event, Event::ShipArrived { node, .. } if node == &node_b)),
+            events
+                .iter()
+                .any(|e| matches!(&e.event, Event::ShipArrived { node, .. } if node == &node_b)),
             "ShipArrived event should be emitted"
         );
-        let survey_started = events.iter().any(|e| matches!(&e.event,
-            Event::TaskStarted { task_kind, .. } if task_kind == "Survey"
-        ));
-        assert!(survey_started, "Survey task should start immediately after arrival");
+        let survey_started = events.iter().any(|e| {
+            matches!(&e.event,
+                Event::TaskStarted { task_kind, .. } if task_kind == "Survey"
+            )
+        });
+        assert!(
+            survey_started,
+            "Survey task should start immediately after arrival"
+        );
 
         // Tick 6: survey resolves → asteroid discovered.
         let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
         assert!(
-            events.iter().any(|e| matches!(e.event, Event::AsteroidDiscovered { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e.event, Event::AsteroidDiscovered { .. })),
             "AsteroidDiscovered after survey completes"
         );
     }

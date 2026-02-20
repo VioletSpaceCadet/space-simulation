@@ -1,9 +1,13 @@
-use std::collections::{HashSet, VecDeque};
 use crate::{NodeId, SolarSystemDef};
+use std::collections::{HashSet, VecDeque};
 
 /// Returns the number of hops on the shortest undirected path between two nodes,
 /// or `None` if no path exists. Returns `Some(0)` when `from == to`.
-pub fn shortest_hop_count(from: &NodeId, to: &NodeId, solar_system: &SolarSystemDef) -> Option<u64> {
+pub fn shortest_hop_count(
+    from: &NodeId,
+    to: &NodeId,
+    solar_system: &SolarSystemDef,
+) -> Option<u64> {
     if from == to {
         return Some(0);
     }

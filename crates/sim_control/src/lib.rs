@@ -15,7 +15,7 @@ pub trait CommandSource {
 /// Drives ships automatically:
 /// 1. Survey unscanned sites in order.
 /// 2. Once all sites are surveyed and deep scan is unlocked, deep-scan
-///    IronRich asteroids whose composition is still unknown.
+///    `IronRich` asteroids whose composition is still unknown.
 pub struct AutopilotController;
 
 const AUTOPILOT_OWNER: &str = "principal_autopilot";
@@ -39,7 +39,7 @@ impl CommandSource for AutopilotController {
                     && ship
                         .task
                         .as_ref()
-                        .map_or(true, |t| matches!(t.kind, TaskKind::Idle))
+                        .is_none_or(|t| matches!(t.kind, TaskKind::Idle))
             })
             .map(|ship| ship.id.clone())
             .collect();
@@ -72,14 +72,21 @@ impl CommandSource for AutopilotController {
             let ship = &state.ships[&ship_id];
             let (task_kind, target_node) = if let Some(site) = next_site.next() {
                 (
-                    TaskKind::Survey { site: SiteId(site.id.0.clone()) },
+                    TaskKind::Survey {
+                        site: SiteId(site.id.0.clone()),
+                    },
                     site.node.clone(),
                 )
             } else if deep_scan_unlocked {
                 match next_deep_scan.next() {
                     Some(asteroid_id) => {
                         let node = state.asteroids[asteroid_id].location_node.clone();
-                        (TaskKind::DeepScan { asteroid: asteroid_id.clone() }, node)
+                        (
+                            TaskKind::DeepScan {
+                                asteroid: asteroid_id.clone(),
+                            },
+                            node,
+                        )
                     }
                     None => continue, // nothing to do
                 }
@@ -109,7 +116,10 @@ impl CommandSource for AutopilotController {
                 issued_by: ship.owner.clone(),
                 issued_tick: state.meta.tick,
                 execute_at_tick: state.meta.tick,
-                command: Command::AssignShipTask { ship_id, task_kind: final_task },
+                command: Command::AssignShipTask {
+                    ship_id,
+                    task_kind: final_task,
+                },
             });
         }
 
