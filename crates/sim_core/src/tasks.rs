@@ -1,10 +1,9 @@
 use crate::{
     AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, CompositionVec, Constants, DataKind,
-    ElementId, Event, EventEnvelope, GameContent, GameState, NodeId, ResearchState, ShipId,
-    ShipState, SiteId, StationId, TaskKind, TaskState, TechEffect,
+    Event, EventEnvelope, GameContent, GameState, InventoryItem, LotId, NodeId, ResearchState,
+    ShipId, ShipState, SiteId, StationId, TaskKind, TaskState, TechEffect,
 };
 use rand::Rng;
-use std::collections::HashMap;
 
 pub(crate) fn task_duration(kind: &TaskKind, constants: &Constants) -> u64 {
     match kind {
@@ -64,27 +63,45 @@ fn composition_noise_sigma(research: &ResearchState, content: &GameContent) -> f
         .unwrap_or(0.0)
 }
 
-/// Volume (m³) currently occupied by the ship's cargo.
-/// Unknown elements default to 1.0 kg/m³ (safe fallback).
-pub fn cargo_volume_used<S: std::hash::BuildHasher>(
-    cargo: &HashMap<ElementId, f32, S>,
-    content: &GameContent,
-) -> f32 {
-    cargo
+/// Volume (m³) currently occupied by the inventory items.
+pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -> f32 {
+    inventory
         .iter()
-        .map(|(element_id, &mass_kg)| {
-            // Ore is keyed as "ore:{asteroid_id}"; all ore variants share the "ore" density.
-            let lookup_id: &str = if element_id.starts_with("ore:") {
-                "ore"
-            } else {
-                element_id
-            };
-            let density = content
-                .elements
+        .map(|item| match item {
+            InventoryItem::Ore { kg, .. } => {
+                let density = content
+                    .elements
+                    .iter()
+                    .find(|e| e.id == "ore")
+                    .map(|e| e.density_kg_per_m3)
+                    .unwrap_or(3000.0);
+                kg / density
+            }
+            InventoryItem::Slag { kg, .. } => {
+                let density = content
+                    .elements
+                    .iter()
+                    .find(|e| e.id == "slag")
+                    .map(|e| e.density_kg_per_m3)
+                    .unwrap_or(2500.0);
+                kg / density
+            }
+            InventoryItem::Material { element, kg, .. } => {
+                let density = content
+                    .elements
+                    .iter()
+                    .find(|e| e.id == *element)
+                    .map(|e| e.density_kg_per_m3)
+                    .unwrap_or(1000.0);
+                kg / density
+            }
+            InventoryItem::Component { .. } => 0.0,
+            InventoryItem::Module { module_def_id, .. } => content
+                .module_defs
                 .iter()
-                .find(|e| e.id == lookup_id)
-                .map_or(1.0, |e| e.density_kg_per_m3);
-            mass_kg / density
+                .find(|m| m.id == *module_def_id)
+                .map(|m| m.volume_m3)
+                .unwrap_or(0.0),
         })
         .sum()
 }
@@ -93,16 +110,15 @@ pub fn cargo_volume_used<S: std::hash::BuildHasher>(
 ///
 /// Stops when the cargo hold fills OR the asteroid is depleted, whichever comes first.
 pub fn mine_duration(asteroid: &AsteroidState, ship: &ShipState, content: &GameContent) -> u64 {
-    // Mining extracts raw ore (unrefined bulk rock). Use the ore element's density
-    // for volume calculations; fall back to 3000 kg/m³ if ore is not in the element list.
     let ore_density = content
         .elements
         .iter()
         .find(|e| e.id == "ore")
-        .map_or(3000.0, |e| e.density_kg_per_m3);
+        .map(|e| e.density_kg_per_m3)
+        .unwrap_or(3000.0);
     let effective_m3_per_kg = 1.0 / ore_density;
 
-    let volume_used = cargo_volume_used(&ship.cargo, content);
+    let volume_used = inventory_volume_m3(&ship.inventory, content);
     let free_volume = (ship.cargo_capacity_m3 - volume_used).max(0.0);
     let rate = content.constants.mining_rate_kg_per_tick;
 
@@ -306,35 +322,34 @@ pub(crate) fn resolve_mine(
 
     let Some(asteroid) = state.asteroids.get(asteroid_id) else {
         set_ship_idle(state, ship_id, current_tick);
-        return; // Asteroid already gone — nothing to do.
-    };
-
-    let Some(ship) = state.ships.get(ship_id) else {
         return;
     };
 
-    // How much volume is free in the hold?
-    let volume_used = cargo_volume_used(&ship.cargo, content);
-    let free_volume = (ship.cargo_capacity_m3 - volume_used).max(0.0);
+    let Some(ship) = state.ships.get(ship_id) else { return };
 
-    // Mining extracts raw ore. Use ore density for volume calculation.
     let ore_density = content
         .elements
         .iter()
         .find(|e| e.id == "ore")
-        .map_or(3000.0, |e| e.density_kg_per_m3);
+        .map(|e| e.density_kg_per_m3)
+        .unwrap_or(3000.0);
     let effective_m3_per_kg = 1.0 / ore_density;
 
-    // Total kg we can extract: limited by asteroid mass and cargo space.
+    let volume_used = inventory_volume_m3(&ship.inventory, content);
+    let free_volume = (ship.cargo_capacity_m3 - volume_used).max(0.0);
     let max_kg_by_volume = free_volume / effective_m3_per_kg;
     let extracted_total_kg = asteroid.mass_kg.min(max_kg_by_volume);
 
-    // Extract as raw ore keyed by source asteroid — different asteroids produce
-    // distinct ore lots that must be tracked and refined separately.
-    let ore_key = format!("ore:{}", asteroid_id.0);
-    let extracted: HashMap<ElementId, f32> = HashMap::from([(ore_key, extracted_total_kg)]);
+    // Snapshot composition at mine-time (known composition if deep-scanned, else true composition).
+    let composition = asteroid
+        .knowledge
+        .composition
+        .clone()
+        .unwrap_or_else(|| asteroid.true_composition.clone());
 
-    // Update asteroid mass; remove if depleted.
+    let lot_id = LotId(format!("lot_{:04}", state.counters.next_lot_id));
+    state.counters.next_lot_id += 1;
+
     let asteroid_remaining_kg = asteroid.mass_kg - extracted_total_kg;
     if asteroid_remaining_kg <= 0.0 {
         state.asteroids.remove(asteroid_id);
@@ -342,11 +357,15 @@ pub(crate) fn resolve_mine(
         asteroid.mass_kg = asteroid_remaining_kg;
     }
 
-    // Add extracted ore to ship cargo.
+    let ore_item = InventoryItem::Ore {
+        lot_id,
+        asteroid_id: asteroid_id.clone(),
+        kg: extracted_total_kg,
+        composition,
+    };
+
     if let Some(ship) = state.ships.get_mut(ship_id) {
-        for (element_id, kg) in &extracted {
-            *ship.cargo.entry(element_id.clone()).or_insert(0.0) += kg;
-        }
+        ship.inventory.push(ore_item.clone());
     }
 
     events.push(crate::emit(
@@ -355,7 +374,7 @@ pub(crate) fn resolve_mine(
         Event::OreMined {
             ship_id: ship_id.clone(),
             asteroid_id: asteroid_id.clone(),
-            extracted: extracted.clone(),
+            ore_lot: ore_item,
             asteroid_remaining_kg: asteroid_remaining_kg.max(0.0),
         },
     ));
@@ -381,29 +400,26 @@ pub(crate) fn resolve_deposit(
 ) {
     let current_tick = state.meta.tick;
 
-    let Some(ship) = state.ships.get(ship_id) else {
+    let items = if let Some(ship) = state.ships.get_mut(ship_id) {
+        std::mem::take(&mut ship.inventory)
+    } else {
         return;
     };
-    let cargo = ship.cargo.clone();
 
-    if cargo.is_empty() {
+    if items.is_empty() {
         set_ship_idle(state, ship_id, current_tick);
         return;
     }
 
-    let Some(station) = state.stations.get_mut(station_id) else {
+    if let Some(station) = state.stations.get_mut(station_id) {
+        station.inventory.extend(items.clone());
+    } else {
+        // Station gone — return items to ship and idle.
+        if let Some(ship) = state.ships.get_mut(ship_id) {
+            ship.inventory = items;
+        }
         set_ship_idle(state, ship_id, current_tick);
         return;
-    };
-
-    // Transfer all ship cargo to the station.
-    for (element_id, kg) in &cargo {
-        *station.cargo.entry(element_id.clone()).or_insert(0.0) += kg;
-    }
-
-    // Clear ship cargo.
-    if let Some(ship) = state.ships.get_mut(ship_id) {
-        ship.cargo.clear();
     }
 
     events.push(crate::emit(
@@ -412,7 +428,7 @@ pub(crate) fn resolve_deposit(
         Event::OreDeposited {
             ship_id: ship_id.clone(),
             station_id: station_id.clone(),
-            deposited: cargo,
+            items,
         },
     ));
 

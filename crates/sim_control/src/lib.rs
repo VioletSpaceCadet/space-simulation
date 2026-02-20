@@ -1,6 +1,7 @@
 use sim_core::{
     mine_duration, shortest_hop_count, AnomalyTag, AsteroidId, AsteroidState, Command,
-    CommandEnvelope, CommandId, GameContent, GameState, PrincipalId, SiteId, TaskKind, TechId,
+    CommandEnvelope, CommandId, GameContent, GameState, InventoryItem, PrincipalId, SiteId,
+    TaskKind, TechId,
 };
 
 pub trait CommandSource {
@@ -98,8 +99,8 @@ impl CommandSource for AutopilotController {
         for ship_id in idle_ships {
             let ship = &state.ships[&ship_id];
 
-            // Priority 1: ship has cargo → deposit at nearest station.
-            if !ship.cargo.is_empty() {
+            // Priority 1: ship has ore → deposit at nearest station.
+            if ship.inventory.iter().any(|i| matches!(i, InventoryItem::Ore { .. })) {
                 let Some(station) = state.stations.values().min_by_key(|s| {
                     shortest_hop_count(&ship.location_node, &s.location_node, &content.solar_system)
                         .unwrap_or(u64::MAX)
@@ -267,8 +268,8 @@ mod tests {
     use super::*;
     use sim_core::{
         AsteroidId, AsteroidKnowledge, AsteroidState, Constants, Counters, ElementDef,
-        FacilitiesState, GameContent, GameState, MetaState, NodeDef, NodeId, PrincipalId,
-        ResearchState, ShipId, ShipState, SolarSystemDef, StationId, StationState,
+        FacilitiesState, GameContent, GameState, InventoryItem, LotId, MetaState, NodeDef, NodeId,
+        PrincipalId, ResearchState, ShipId, ShipState, SolarSystemDef, StationId, StationState,
     };
     use std::collections::{HashMap, HashSet};
 
@@ -335,7 +336,7 @@ mod tests {
                     id: ship_id,
                     location_node: node.clone(),
                     owner,
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: content.constants.ship_cargo_capacity_m3,
                     task: None,
                 },
@@ -346,13 +347,14 @@ mod tests {
                     id: station_id,
                     location_node: node,
                     power_available_per_tick: 0.0,
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: content.constants.station_cargo_capacity_m3,
                     facilities: FacilitiesState {
                         compute_units_total: 0,
                         power_per_compute_unit_per_tick: 0.0,
                         efficiency: 1.0,
                     },
+                    modules: vec![],
                 },
             )]),
             research: ResearchState {
@@ -413,12 +415,12 @@ mod tests {
         let mut state = autopilot_state(&content);
 
         let ship_id = ShipId("ship_0001".to_string());
-        state
-            .ships
-            .get_mut(&ship_id)
-            .unwrap()
-            .cargo
-            .insert("Fe".to_string(), 100.0);
+        state.ships.get_mut(&ship_id).unwrap().inventory.push(InventoryItem::Ore {
+            lot_id: LotId("lot_test_0001".to_string()),
+            asteroid_id: AsteroidId("asteroid_test".to_string()),
+            kg: 100.0,
+            composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
+        });
 
         let mut autopilot = AutopilotController;
         let mut next_id = 0u64;

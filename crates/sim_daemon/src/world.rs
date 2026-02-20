@@ -66,7 +66,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     let station = StationState {
         id: station_id.clone(),
         location_node: earth_orbit.clone(),
-        cargo: std::collections::HashMap::new(),
+        inventory: vec![],
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         facilities: FacilitiesState {
@@ -74,6 +74,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             power_per_compute_unit_per_tick: c.station_power_per_compute_unit_per_tick,
             efficiency: c.station_efficiency,
         },
+        modules: vec![],
     };
     let ship_id = ShipId("ship_0001".to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
@@ -81,7 +82,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         id: ship_id.clone(),
         location_node: earth_orbit.clone(),
         owner,
-        cargo: std::collections::HashMap::new(),
+        inventory: vec![],
         cargo_capacity_m3: c.ship_cargo_capacity_m3,
         task: None,
     };

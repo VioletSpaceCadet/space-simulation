@@ -178,7 +178,7 @@ pub struct ShipState {
     pub id: ShipId,
     pub location_node: NodeId,
     pub owner: PrincipalId,
-    pub cargo: HashMap<ElementId, f32>,
+    pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
     pub task: Option<TaskState>,
 }
@@ -187,10 +187,11 @@ pub struct ShipState {
 pub struct StationState {
     pub id: StationId,
     pub location_node: NodeId,
-    pub cargo: HashMap<ElementId, f32>,
+    pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
     pub facilities: FacilitiesState,
+    pub modules: Vec<ModuleState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -335,14 +336,13 @@ pub enum Event {
     OreMined {
         ship_id: ShipId,
         asteroid_id: AsteroidId,
-        /// kg extracted per element
-        extracted: HashMap<ElementId, f32>,
+        ore_lot: InventoryItem,
         asteroid_remaining_kg: f32,
     },
     OreDeposited {
         ship_id: ShipId,
         station_id: StationId,
-        deposited: HashMap<ElementId, f32>,
+        items: Vec<InventoryItem>,
     },
     ModuleInstalled {
         station_id: StationId,

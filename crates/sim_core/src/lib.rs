@@ -10,7 +10,7 @@ mod types;
 
 pub use engine::tick;
 pub use graph::shortest_hop_count;
-pub use tasks::{cargo_volume_used, mine_duration};
+pub use tasks::{inventory_volume_m3, mine_duration};
 pub use types::*;
 
 pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnvelope {
@@ -134,7 +134,7 @@ mod tests {
                     id: ship_id,
                     location_node: node_id.clone(),
                     owner,
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: 20.0,
                     task: None,
                 },
@@ -144,7 +144,7 @@ mod tests {
                 StationState {
                     id: station_id,
                     location_node: node_id,
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: 10_000.0,
                     power_available_per_tick: 100.0,
                     facilities: FacilitiesState {
@@ -152,6 +152,7 @@ mod tests {
                         power_per_compute_unit_per_tick: 1.0,
                         efficiency: 1.0,
                     },
+                    modules: vec![],
                 },
             )]),
             research: ResearchState {
@@ -945,13 +946,13 @@ mod tests {
     }
 
     #[test]
-    fn test_mine_adds_ore_to_ship_cargo() {
+    fn test_mine_adds_ore_to_ship_inventory() {
         let content = test_content();
         let (mut state, asteroid_id) = state_with_asteroid(&content);
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        assert!(state.ships[&ship_id].cargo.is_empty());
+        assert!(state.ships[&ship_id].inventory.is_empty());
 
         let cmd = mine_command(&state, &asteroid_id, &content);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
@@ -960,13 +961,10 @@ mod tests {
             tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
         }
 
-        let cargo = &state.ships[&ship_id].cargo;
+        let inv = &state.ships[&ship_id].inventory;
+        assert!(!inv.is_empty(), "ship inventory should not be empty after mining");
         assert!(
-            !cargo.is_empty(),
-            "ship cargo should not be empty after mining"
-        );
-        assert!(
-            cargo.values().any(|&kg| kg > 0.0),
+            inv.iter().any(|i| matches!(i, InventoryItem::Ore { kg, .. } if *kg > 0.0)),
             "extracted mass must be positive"
         );
     }
@@ -1037,56 +1035,59 @@ mod tests {
     }
 
     #[test]
-    fn test_deposit_moves_cargo_to_station() {
+    fn test_deposit_moves_inventory_to_station() {
         let content = test_content();
         let mut state = test_state(&content);
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        state
-            .ships
-            .get_mut(&ship_id)
-            .unwrap()
-            .cargo
-            .insert("Fe".to_string(), 100.0);
+        state.ships.get_mut(&ship_id).unwrap().inventory.push(InventoryItem::Ore {
+            lot_id: LotId("lot_test_0001".to_string()),
+            asteroid_id: AsteroidId("asteroid_test".to_string()),
+            kg: 100.0,
+            composition: std::collections::HashMap::from([
+                ("Fe".to_string(), 0.7_f32),
+                ("Si".to_string(), 0.3_f32),
+            ]),
+        });
 
         let cmd = deposit_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         let station_id = StationId("station_earth_orbit".to_string());
-        let station_fe = state.stations[&station_id]
-            .cargo
-            .get("Fe")
-            .copied()
-            .unwrap_or(0.0);
-        assert!(
-            (station_fe - 100.0).abs() < 1e-3,
-            "Fe should transfer to station"
-        );
+        let station_has_ore = state.stations[&station_id]
+            .inventory
+            .iter()
+            .any(|i| matches!(i, InventoryItem::Ore { kg, .. } if *kg > 90.0));
+        assert!(station_has_ore, "ore should transfer to station");
     }
 
     #[test]
-    fn test_deposit_clears_ship_cargo() {
+    fn test_deposit_clears_ship_inventory() {
         let content = test_content();
         let mut state = test_state(&content);
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        state
-            .ships
-            .get_mut(&ship_id)
-            .unwrap()
-            .cargo
-            .insert("Fe".to_string(), 100.0);
+        state.ships.get_mut(&ship_id).unwrap().inventory.push(InventoryItem::Ore {
+            lot_id: LotId("lot_test_0001".to_string()),
+            asteroid_id: AsteroidId("asteroid_test".to_string()),
+            kg: 100.0,
+            composition: std::collections::HashMap::from([
+                ("Fe".to_string(), 0.7_f32),
+                ("Si".to_string(), 0.3_f32),
+            ]),
+        });
 
         let cmd = deposit_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
-        let cargo = &state.ships[&ship_id].cargo;
-        let total: f32 = cargo.values().sum();
-        assert!(total < 1e-3, "ship cargo should be empty after deposit");
+        assert!(
+            state.ships[&ship_id].inventory.is_empty(),
+            "ship inventory should be empty after deposit"
+        );
     }
 
     #[test]
@@ -1096,12 +1097,12 @@ mod tests {
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        state
-            .ships
-            .get_mut(&ship_id)
-            .unwrap()
-            .cargo
-            .insert("Fe".to_string(), 50.0);
+        state.ships.get_mut(&ship_id).unwrap().inventory.push(InventoryItem::Ore {
+            lot_id: LotId("lot_test_0001".to_string()),
+            asteroid_id: AsteroidId("asteroid_test".to_string()),
+            kg: 50.0,
+            composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
+        });
 
         let cmd = deposit_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
@@ -1118,11 +1119,11 @@ mod tests {
     // --- Cargo holds --------------------------------------------------------
 
     #[test]
-    fn test_ship_starts_with_empty_cargo() {
+    fn test_ship_starts_with_empty_inventory() {
         let content = test_content();
         let state = test_state(&content);
         let ship = state.ships.values().next().unwrap();
-        assert!(ship.cargo.is_empty(), "ship cargo should be empty at start");
+        assert!(ship.inventory.is_empty(), "ship inventory should be empty at start");
         assert!(
             (ship.cargo_capacity_m3 - 20.0).abs() < 1e-5,
             "ship capacity should be 20 m³"
@@ -1130,13 +1131,13 @@ mod tests {
     }
 
     #[test]
-    fn test_station_starts_with_empty_cargo() {
+    fn test_station_starts_with_empty_inventory() {
         let content = test_content();
         let state = test_state(&content);
         let station = state.stations.values().next().unwrap();
         assert!(
-            station.cargo.is_empty(),
-            "station cargo should be empty at start"
+            station.inventory.is_empty(),
+            "station inventory should be empty at start"
         );
         assert!(
             (station.cargo_capacity_m3 - 10_000.0).abs() < 1e-5,
@@ -1293,7 +1294,7 @@ mod tests {
                     id: ship_id.clone(),
                     location_node: node_a.clone(),
                     owner: owner.clone(),
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: 20.0,
                     task: None,
                 },
@@ -1303,7 +1304,7 @@ mod tests {
                 StationState {
                     id: station_id,
                     location_node: node_a.clone(),
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: 10_000.0,
                     power_available_per_tick: 100.0,
                     facilities: FacilitiesState {
@@ -1311,6 +1312,7 @@ mod tests {
                         power_per_compute_unit_per_tick: 1.0,
                         efficiency: 1.0,
                     },
+                    modules: vec![],
                 },
             )]),
             research: ResearchState {
