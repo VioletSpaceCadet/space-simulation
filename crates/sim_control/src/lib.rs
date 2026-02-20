@@ -1,7 +1,7 @@
 use sim_core::{
     mine_duration, shortest_hop_count, AnomalyTag, AsteroidId, AsteroidState, Command,
-    CommandEnvelope, CommandId, GameContent, GameState, InventoryItem, PrincipalId, SiteId,
-    TaskKind, TechId,
+    CommandEnvelope, CommandId, GameContent, GameState, InventoryItem, ModuleKindState,
+    PrincipalId, SiteId, TaskKind, TechId,
 };
 
 pub trait CommandSource {
@@ -96,11 +96,73 @@ impl CommandSource for AutopilotController {
 
         let mut commands = Vec::new();
 
+        // Station module management: install uninstalled modules, enable/configure installed ones.
+        for station in state.stations.values() {
+            // Install any Module items sitting in station inventory.
+            for item in &station.inventory {
+                if let InventoryItem::Module { item_id, .. } = item {
+                    let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
+                    *next_command_id += 1;
+                    commands.push(CommandEnvelope {
+                        id: cmd_id,
+                        issued_by: owner.clone(),
+                        issued_tick: state.meta.tick,
+                        execute_at_tick: state.meta.tick,
+                        command: Command::InstallModule {
+                            station_id: station.id.clone(),
+                            module_item_id: item_id.clone(),
+                        },
+                    });
+                }
+            }
+
+            // Enable disabled modules and set default threshold.
+            for module in &station.modules {
+                if !module.enabled {
+                    let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
+                    *next_command_id += 1;
+                    commands.push(CommandEnvelope {
+                        id: cmd_id,
+                        issued_by: owner.clone(),
+                        issued_tick: state.meta.tick,
+                        execute_at_tick: state.meta.tick,
+                        command: Command::SetModuleEnabled {
+                            station_id: station.id.clone(),
+                            module_id: module.id.clone(),
+                            enabled: true,
+                        },
+                    });
+                }
+
+                if let ModuleKindState::Processor(ps) = &module.kind_state {
+                    if ps.threshold_kg == 0.0 {
+                        let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
+                        *next_command_id += 1;
+                        commands.push(CommandEnvelope {
+                            id: cmd_id,
+                            issued_by: owner.clone(),
+                            issued_tick: state.meta.tick,
+                            execute_at_tick: state.meta.tick,
+                            command: Command::SetModuleThreshold {
+                                station_id: station.id.clone(),
+                                module_id: module.id.clone(),
+                                threshold_kg: 500.0,
+                            },
+                        });
+                    }
+                }
+            }
+        }
+
         for ship_id in idle_ships {
             let ship = &state.ships[&ship_id];
 
             // Priority 1: ship has ore → deposit at nearest station.
-            if ship.inventory.iter().any(|i| matches!(i, InventoryItem::Ore { .. })) {
+            if ship
+                .inventory
+                .iter()
+                .any(|i| matches!(i, InventoryItem::Ore { .. }))
+            {
                 let Some(station) = state.stations.values().min_by_key(|s| {
                     shortest_hop_count(&ship.location_node, &s.location_node, &content.solar_system)
                         .unwrap_or(u64::MAX)
@@ -415,12 +477,17 @@ mod tests {
         let mut state = autopilot_state(&content);
 
         let ship_id = ShipId("ship_0001".to_string());
-        state.ships.get_mut(&ship_id).unwrap().inventory.push(InventoryItem::Ore {
-            lot_id: LotId("lot_test_0001".to_string()),
-            asteroid_id: AsteroidId("asteroid_test".to_string()),
-            kg: 100.0,
-            composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
-        });
+        state
+            .ships
+            .get_mut(&ship_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Ore {
+                lot_id: LotId("lot_test_0001".to_string()),
+                asteroid_id: AsteroidId("asteroid_test".to_string()),
+                kg: 100.0,
+                composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
+            });
 
         let mut autopilot = AutopilotController;
         let mut next_id = 0u64;
@@ -438,6 +505,65 @@ mod tests {
                 }
             )),
             "autopilot should assign Deposit (or Transit→Deposit) when ship has cargo"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_installs_module_in_station_inventory() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        let station_id = sim_core::StationId("station_earth_orbit".to_string());
+        state.stations.get_mut(&station_id).unwrap().inventory.push(
+            sim_core::InventoryItem::Module {
+                item_id: sim_core::ModuleItemId("module_item_0001".to_string()),
+                module_def_id: "module_basic_iron_refinery".to_string(),
+            },
+        );
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(&cmd.command, sim_core::Command::InstallModule { .. })),
+            "autopilot should issue InstallModule when Module item is in station inventory"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_enables_disabled_module() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        let station_id = sim_core::StationId("station_earth_orbit".to_string());
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .modules
+            .push(sim_core::ModuleState {
+                id: sim_core::ModuleInstanceId("module_inst_0001".to_string()),
+                def_id: "module_basic_iron_refinery".to_string(),
+                enabled: false,
+                kind_state: sim_core::ModuleKindState::Processor(sim_core::ProcessorState {
+                    threshold_kg: 0.0,
+                    ticks_since_last_run: 0,
+                }),
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                sim_core::Command::SetModuleEnabled { enabled: true, .. }
+            )),
+            "autopilot should enable a disabled installed module"
         );
     }
 }
