@@ -54,6 +54,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         solar_system,
         asteroid_templates: templates_file.templates,
         elements: elements_file.elements,
+        module_defs: vec![],
         constants,
     })
 }
@@ -118,6 +119,8 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             next_event_id: 0,
             next_command_id: 0,
             next_asteroid_id: 0,
+            next_lot_id: 0,
+            next_module_instance_id: 0,
         },
     }
 }

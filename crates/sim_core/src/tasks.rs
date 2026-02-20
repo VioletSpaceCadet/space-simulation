@@ -33,8 +33,9 @@ pub(crate) fn task_target(kind: &TaskKind) -> Option<String> {
         TaskKind::Idle => None,
         TaskKind::Transit { destination, .. } => Some(destination.0.clone()),
         TaskKind::Survey { site } => Some(site.0.clone()),
-        TaskKind::DeepScan { asteroid } => Some(asteroid.0.clone()),
-        TaskKind::Mine { asteroid, .. } => Some(asteroid.0.clone()),
+        TaskKind::DeepScan { asteroid } | TaskKind::Mine { asteroid, .. } => {
+            Some(asteroid.0.clone())
+        }
         TaskKind::Deposit { station } => Some(station.0.clone()),
     }
 }
@@ -65,18 +66,24 @@ fn composition_noise_sigma(research: &ResearchState, content: &GameContent) -> f
 
 /// Volume (m³) currently occupied by the ship's cargo.
 /// Unknown elements default to 1.0 kg/m³ (safe fallback).
-pub fn cargo_volume_used(cargo: &HashMap<ElementId, f32>, content: &GameContent) -> f32 {
+pub fn cargo_volume_used<S: std::hash::BuildHasher>(
+    cargo: &HashMap<ElementId, f32, S>,
+    content: &GameContent,
+) -> f32 {
     cargo
         .iter()
         .map(|(element_id, &mass_kg)| {
             // Ore is keyed as "ore:{asteroid_id}"; all ore variants share the "ore" density.
-            let lookup_id: &str = if element_id.starts_with("ore:") { "ore" } else { element_id };
+            let lookup_id: &str = if element_id.starts_with("ore:") {
+                "ore"
+            } else {
+                element_id
+            };
             let density = content
                 .elements
                 .iter()
                 .find(|e| e.id == lookup_id)
-                .map(|e| e.density_kg_per_m3)
-                .unwrap_or(1.0);
+                .map_or(1.0, |e| e.density_kg_per_m3);
             mass_kg / density
         })
         .sum()
@@ -92,15 +99,16 @@ pub fn mine_duration(asteroid: &AsteroidState, ship: &ShipState, content: &GameC
         .elements
         .iter()
         .find(|e| e.id == "ore")
-        .map(|e| e.density_kg_per_m3)
-        .unwrap_or(3000.0);
+        .map_or(3000.0, |e| e.density_kg_per_m3);
     let effective_m3_per_kg = 1.0 / ore_density;
 
     let volume_used = cargo_volume_used(&ship.cargo, content);
     let free_volume = (ship.cargo_capacity_m3 - volume_used).max(0.0);
     let rate = content.constants.mining_rate_kg_per_tick;
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let ticks_to_fill = (free_volume / (rate * effective_m3_per_kg)).ceil() as u64;
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let ticks_to_deplete = (asteroid.mass_kg / rate).ceil() as u64;
 
     ticks_to_fill.min(ticks_to_deplete).max(1)
@@ -301,9 +309,8 @@ pub(crate) fn resolve_mine(
         return; // Asteroid already gone — nothing to do.
     };
 
-    let ship = match state.ships.get(ship_id) {
-        Some(s) => s,
-        None => return,
+    let Some(ship) = state.ships.get(ship_id) else {
+        return;
     };
 
     // How much volume is free in the hold?
@@ -315,8 +322,7 @@ pub(crate) fn resolve_mine(
         .elements
         .iter()
         .find(|e| e.id == "ore")
-        .map(|e| e.density_kg_per_m3)
-        .unwrap_or(3000.0);
+        .map_or(3000.0, |e| e.density_kg_per_m3);
     let effective_m3_per_kg = 1.0 / ore_density;
 
     // Total kg we can extract: limited by asteroid mass and cargo space.
@@ -375,7 +381,9 @@ pub(crate) fn resolve_deposit(
 ) {
     let current_tick = state.meta.tick;
 
-    let Some(ship) = state.ships.get(ship_id) else { return };
+    let Some(ship) = state.ships.get(ship_id) else {
+        return;
+    };
     let cargo = ship.cargo.clone();
 
     if cargo.is_empty() {

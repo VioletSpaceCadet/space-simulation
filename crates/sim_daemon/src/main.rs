@@ -113,13 +113,16 @@ mod tests {
                     id: "Fe".to_string(),
                     density_kg_per_m3: 7874.0,
                     display_name: "Iron".to_string(),
+                    refined_name: None,
                 },
                 ElementDef {
                     id: "Si".to_string(),
                     density_kg_per_m3: 2329.0,
                     display_name: "Silicon".to_string(),
+                    refined_name: None,
                 },
             ],
+            module_defs: vec![],
             constants: Constants {
                 survey_scan_ticks: 1,
                 deep_scan_ticks: 1,

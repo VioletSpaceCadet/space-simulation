@@ -64,6 +64,11 @@ fn apply_commands(
                 }
                 assignments.push((ship_id.clone(), task_kind.clone()));
             }
+            // New module commands are not yet handled — ignored for now.
+            Command::InstallModule { .. }
+            | Command::UninstallModule { .. }
+            | Command::SetModuleEnabled { .. }
+            | Command::SetModuleThreshold { .. } => {}
         }
     }
 

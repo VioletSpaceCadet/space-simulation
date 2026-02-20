@@ -23,6 +23,7 @@ const AUTOPILOT_OWNER: &str = "principal_autopilot";
 const IRON_RICH_CONFIDENCE_THRESHOLD: f32 = 0.7;
 
 impl CommandSource for AutopilotController {
+    #[allow(clippy::too_many_lines)]
     fn generate_commands(
         &mut self,
         state: &GameState,
@@ -88,9 +89,7 @@ impl CommandSource for AutopilotController {
                         .copied()
                         .unwrap_or(0.0)
             };
-            value(b)
-                .partial_cmp(&value(a))
-                .unwrap_or(Ordering::Equal)
+            value(b).partial_cmp(&value(a)).unwrap_or(Ordering::Equal)
         });
         let mut next_mine = mine_candidates.iter();
 
@@ -101,18 +100,16 @@ impl CommandSource for AutopilotController {
 
             // Priority 1: ship has cargo → deposit at nearest station.
             if !ship.cargo.is_empty() {
-                let Some(station) = state
-                    .stations
-                    .values()
-                    .min_by_key(|s| {
-                        shortest_hop_count(&ship.location_node, &s.location_node, &content.solar_system)
-                            .unwrap_or(u64::MAX)
-                    })
-                else {
+                let Some(station) = state.stations.values().min_by_key(|s| {
+                    shortest_hop_count(&ship.location_node, &s.location_node, &content.solar_system)
+                        .unwrap_or(u64::MAX)
+                }) else {
                     continue;
                 };
 
-                let deposit_task = TaskKind::Deposit { station: station.id.clone() };
+                let deposit_task = TaskKind::Deposit {
+                    station: station.id.clone(),
+                };
                 let final_task = match shortest_hop_count(
                     &ship.location_node,
                     &station.location_node,
@@ -133,7 +130,10 @@ impl CommandSource for AutopilotController {
                     issued_by: ship.owner.clone(),
                     issued_tick: state.meta.tick,
                     execute_at_tick: state.meta.tick,
-                    command: Command::AssignShipTask { ship_id, task_kind: final_task },
+                    command: Command::AssignShipTask {
+                        ship_id,
+                        task_kind: final_task,
+                    },
                 });
                 continue;
             }
@@ -142,7 +142,10 @@ impl CommandSource for AutopilotController {
             if let Some(asteroid) = next_mine.next() {
                 let target_node = asteroid.location_node.clone();
                 let duration_ticks = mine_duration(asteroid, ship, content);
-                let task_kind = TaskKind::Mine { asteroid: asteroid.id.clone(), duration_ticks };
+                let task_kind = TaskKind::Mine {
+                    asteroid: asteroid.id.clone(),
+                    duration_ticks,
+                };
                 let final_task = match shortest_hop_count(
                     &ship.location_node,
                     &target_node,
@@ -162,7 +165,10 @@ impl CommandSource for AutopilotController {
                     issued_by: ship.owner.clone(),
                     issued_tick: state.meta.tick,
                     execute_at_tick: state.meta.tick,
-                    command: Command::AssignShipTask { ship_id, task_kind: final_task },
+                    command: Command::AssignShipTask {
+                        ship_id,
+                        task_kind: final_task,
+                    },
                 });
                 continue;
             }
@@ -171,19 +177,19 @@ impl CommandSource for AutopilotController {
             if deep_scan_unlocked {
                 if let Some(asteroid_id) = next_deep_scan.next() {
                     let node = state.asteroids[asteroid_id].location_node.clone();
-                    let task_kind = TaskKind::DeepScan { asteroid: asteroid_id.clone() };
-                    let final_task = match shortest_hop_count(
-                        &ship.location_node,
-                        &node,
-                        &content.solar_system,
-                    ) {
-                        Some(0) | None => task_kind,
-                        Some(hops) => TaskKind::Transit {
-                            destination: node,
-                            total_ticks: hops * content.constants.travel_ticks_per_hop,
-                            then: Box::new(task_kind),
-                        },
+                    let task_kind = TaskKind::DeepScan {
+                        asteroid: asteroid_id.clone(),
                     };
+                    let final_task =
+                        match shortest_hop_count(&ship.location_node, &node, &content.solar_system)
+                        {
+                            Some(0) | None => task_kind,
+                            Some(hops) => TaskKind::Transit {
+                                destination: node,
+                                total_ticks: hops * content.constants.travel_ticks_per_hop,
+                                then: Box::new(task_kind),
+                            },
+                        };
                     let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
                     *next_command_id += 1;
                     commands.push(CommandEnvelope {
@@ -191,7 +197,10 @@ impl CommandSource for AutopilotController {
                         issued_by: ship.owner.clone(),
                         issued_tick: state.meta.tick,
                         execute_at_tick: state.meta.tick,
-                        command: Command::AssignShipTask { ship_id, task_kind: final_task },
+                        command: Command::AssignShipTask {
+                            ship_id,
+                            task_kind: final_task,
+                        },
                     });
                     continue;
                 }
@@ -200,7 +209,9 @@ impl CommandSource for AutopilotController {
             // Priority 4: survey unscanned sites.
             if let Some(site) = next_site.next() {
                 let target_node = site.node.clone();
-                let task_kind = TaskKind::Survey { site: SiteId(site.id.0.clone()) };
+                let task_kind = TaskKind::Survey {
+                    site: SiteId(site.id.0.clone()),
+                };
                 let final_task = match shortest_hop_count(
                     &ship.location_node,
                     &target_node,
@@ -220,9 +231,11 @@ impl CommandSource for AutopilotController {
                     issued_by: ship.owner.clone(),
                     issued_tick: state.meta.tick,
                     execute_at_tick: state.meta.tick,
-                    command: Command::AssignShipTask { ship_id, task_kind: final_task },
+                    command: Command::AssignShipTask {
+                        ship_id,
+                        task_kind: final_task,
+                    },
                 });
-                continue;
             }
 
             // Nothing to do for this ship.
@@ -264,13 +277,20 @@ mod tests {
             content_version: "test".to_string(),
             techs: vec![],
             solar_system: SolarSystemDef {
-                nodes: vec![NodeDef { id: NodeId("node_a".to_string()), name: "A".to_string() }],
+                nodes: vec![NodeDef {
+                    id: NodeId("node_a".to_string()),
+                    name: "A".to_string(),
+                }],
                 edges: vec![],
             },
             asteroid_templates: vec![],
-            elements: vec![
-                ElementDef { id: "Fe".to_string(), density_kg_per_m3: 7874.0, display_name: "Iron".to_string() },
-            ],
+            elements: vec![ElementDef {
+                id: "Fe".to_string(),
+                density_kg_per_m3: 7874.0,
+                display_name: "Iron".to_string(),
+                refined_name: None,
+            }],
+            module_defs: vec![],
             constants: Constants {
                 survey_scan_ticks: 1,
                 deep_scan_ticks: 1,
@@ -301,7 +321,12 @@ mod tests {
         let station_id = StationId("station_earth_orbit".to_string());
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         GameState {
-            meta: MetaState { tick: 0, seed: 0, schema_version: 1, content_version: "test".to_string() },
+            meta: MetaState {
+                tick: 0,
+                seed: 0,
+                schema_version: 1,
+                content_version: "test".to_string(),
+            },
             scan_sites: vec![],
             asteroids: HashMap::new(),
             ships: HashMap::from([(
@@ -335,7 +360,13 @@ mod tests {
                 data_pool: HashMap::new(),
                 evidence: HashMap::new(),
             },
-            counters: Counters { next_event_id: 0, next_command_id: 0, next_asteroid_id: 0 },
+            counters: Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 0,
+            },
         }
     }
 
@@ -345,17 +376,20 @@ mod tests {
         let mut state = autopilot_state(&content);
 
         let asteroid_id = AsteroidId("asteroid_0001".to_string());
-        state.asteroids.insert(asteroid_id.clone(), AsteroidState {
-            id: asteroid_id.clone(),
-            location_node: NodeId("node_a".to_string()),
-            true_composition: HashMap::from([("Fe".to_string(), 1.0)]),
-            anomaly_tags: vec![],
-            mass_kg: 500.0,
-            knowledge: AsteroidKnowledge {
-                tag_beliefs: vec![],
-                composition: Some(HashMap::from([("Fe".to_string(), 1.0)])),
+        state.asteroids.insert(
+            asteroid_id.clone(),
+            AsteroidState {
+                id: asteroid_id.clone(),
+                location_node: NodeId("node_a".to_string()),
+                true_composition: HashMap::from([("Fe".to_string(), 1.0)]),
+                anomaly_tags: vec![],
+                mass_kg: 500.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![],
+                    composition: Some(HashMap::from([("Fe".to_string(), 1.0)])),
+                },
             },
-        });
+        );
 
         let mut autopilot = AutopilotController;
         let mut next_id = 0u64;
@@ -364,7 +398,10 @@ mod tests {
         assert!(
             commands.iter().any(|cmd| matches!(
                 &cmd.command,
-                sim_core::Command::AssignShipTask { task_kind: TaskKind::Mine { .. }, .. }
+                sim_core::Command::AssignShipTask {
+                    task_kind: TaskKind::Mine { .. },
+                    ..
+                }
             )),
             "autopilot should assign Mine task when deep-scanned asteroid is available"
         );
@@ -376,7 +413,12 @@ mod tests {
         let mut state = autopilot_state(&content);
 
         let ship_id = ShipId("ship_0001".to_string());
-        state.ships.get_mut(&ship_id).unwrap().cargo.insert("Fe".to_string(), 100.0);
+        state
+            .ships
+            .get_mut(&ship_id)
+            .unwrap()
+            .cargo
+            .insert("Fe".to_string(), 100.0);
 
         let mut autopilot = AutopilotController;
         let mut next_id = 0u64;
@@ -385,10 +427,13 @@ mod tests {
         assert!(
             commands.iter().any(|cmd| matches!(
                 &cmd.command,
-                sim_core::Command::AssignShipTask { task_kind: TaskKind::Deposit { .. }, .. }
-                    | sim_core::Command::AssignShipTask {
-                        task_kind: TaskKind::Transit { .. }, ..
-                    }
+                sim_core::Command::AssignShipTask {
+                    task_kind: TaskKind::Deposit { .. },
+                    ..
+                } | sim_core::Command::AssignShipTask {
+                    task_kind: TaskKind::Transit { .. },
+                    ..
+                }
             )),
             "autopilot should assign Deposit (or Transit→Deposit) when ship has cargo"
         );
