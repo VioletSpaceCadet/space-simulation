@@ -1,7 +1,9 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useSvgZoomPan } from '../hooks/useSvgZoomPan'
 import type { OreCompositions } from '../hooks/useSimStream'
-import type { ShipState, SimSnapshot } from '../types'
+import type { AsteroidState, ScanSite, ShipState, SimSnapshot, StationState } from '../types'
+import { Tooltip } from './solar-system/Tooltip'
+import { DetailCard } from './solar-system/DetailCard'
 import { angleFromId, polarToCartesian, ringRadiusForNode, transitPosition } from './solar-system/layout'
 
 interface Props {
@@ -30,11 +32,52 @@ function shipColor(task: ShipState['task']): string {
   }
 }
 
-export function SolarSystemMap({ snapshot, currentTick, oreCompositions: _oreCompositions }: Props) {
+export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const groupRef = useRef<SVGGElement>(null)
 
   useSvgZoomPan(svgRef, groupRef)
+
+  const [hovered, setHovered] = useState<{
+    type: string
+    id: string
+    screenX: number
+    screenY: number
+  } | null>(null)
+
+  const [selected, setSelected] = useState<{ type: string; id: string } | null>(null)
+
+  function entityMouseHandlers(type: string, id: string) {
+    return {
+      onMouseEnter: (e: React.MouseEvent) => {
+        setHovered({ type, id, screenX: e.clientX, screenY: e.clientY })
+      },
+      onMouseMove: (e: React.MouseEvent) => {
+        setHovered((prev) => prev ? { ...prev, screenX: e.clientX, screenY: e.clientY } : null)
+      },
+      onMouseLeave: () => setHovered(null),
+    }
+  }
+
+  function lookupEntity(sel: { type: string; id: string }):
+    | { type: 'station'; data: StationState }
+    | { type: 'ship'; data: ShipState }
+    | { type: 'asteroid'; data: AsteroidState }
+    | { type: 'scan-site'; data: ScanSite }
+    | null {
+    if (!snapshot) return null
+    if (sel.type === 'station' && snapshot.stations[sel.id])
+      return { type: 'station', data: snapshot.stations[sel.id] }
+    if (sel.type === 'ship' && snapshot.ships[sel.id])
+      return { type: 'ship', data: snapshot.ships[sel.id] }
+    if (sel.type === 'asteroid' && snapshot.asteroids[sel.id])
+      return { type: 'asteroid', data: snapshot.asteroids[sel.id] }
+    if (sel.type === 'scan-site') {
+      const site = snapshot.scan_sites.find(s => s.id === sel.id)
+      if (site) return { type: 'scan-site', data: site }
+    }
+    return null
+  }
 
   return (
     <div className="relative w-full h-full bg-void overflow-hidden">
@@ -43,6 +86,7 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions: _oreCom
         className="w-full h-full"
         viewBox="-500 -500 1000 1000"
         preserveAspectRatio="xMidYMid meet"
+        onClick={(e) => { if (e.target === svgRef.current) setSelected(null) }}
       >
         <g ref={groupRef}>
           {/* Sun at center */}
@@ -91,7 +135,11 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions: _oreCom
                 height={12}
                 fill="var(--color-accent)"
                 transform={`rotate(45 ${x} ${y})`}
+                stroke={selected?.id === station.id ? 'var(--color-bright)' : undefined}
+                strokeWidth={selected?.id === station.id ? 2 : undefined}
                 className="cursor-pointer"
+                {...entityMouseHandlers('station', station.id)}
+                onClick={() => setSelected({ type: 'station', id: station.id })}
               />
             )
           })}
@@ -132,7 +180,11 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions: _oreCom
                 data-entity-id={ship.id}
                 points={`${x},${y - 6} ${x - 4},${y + 4} ${x + 4},${y + 4}`}
                 fill={shipColor(ship.task)}
+                stroke={selected?.id === ship.id ? 'var(--color-bright)' : undefined}
+                strokeWidth={selected?.id === ship.id ? 2 : undefined}
                 className="cursor-pointer"
+                {...entityMouseHandlers('ship', ship.id)}
+                onClick={() => setSelected({ type: 'ship', id: ship.id })}
               />
             )
           })}
@@ -156,7 +208,11 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions: _oreCom
                 r={size}
                 fill={isIronRich ? '#a0522d' : 'var(--color-muted)'}
                 opacity={0.8}
+                stroke={selected?.id === asteroid.id ? 'var(--color-bright)' : undefined}
+                strokeWidth={selected?.id === asteroid.id ? 2 : undefined}
                 className="cursor-pointer"
+                {...entityMouseHandlers('asteroid', asteroid.id)}
+                onClick={() => setSelected({ type: 'asteroid', id: asteroid.id })}
               />
             )
           })}
@@ -176,10 +232,14 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions: _oreCom
                 y={y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                fill="var(--color-faint)"
+                fill={selected?.id === site.id ? 'var(--color-bright)' : 'var(--color-faint)'}
                 fontSize={8}
                 fontFamily="monospace"
+                stroke={selected?.id === site.id ? 'var(--color-bright)' : undefined}
+                strokeWidth={selected?.id === site.id ? 0.5 : undefined}
                 className="cursor-pointer"
+                {...entityMouseHandlers('scan-site', site.id)}
+                onClick={() => setSelected({ type: 'scan-site', id: site.id })}
               >
                 ?
               </text>
@@ -187,6 +247,23 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions: _oreCom
           })}
         </g>
       </svg>
+
+      {hovered && snapshot && (() => {
+        const entity = lookupEntity(hovered)
+        if (!entity) return null
+        return (
+          <Tooltip x={hovered.screenX} y={hovered.screenY}>
+            <div className="text-accent">{entity.data.id}</div>
+            <div className="text-dim">{entity.type}</div>
+          </Tooltip>
+        )
+      })()}
+
+      {selected && snapshot && (() => {
+        const entity = lookupEntity(selected)
+        if (!entity) return null
+        return <DetailCard entity={entity} oreCompositions={oreCompositions} onClose={() => setSelected(null)} />
+      })()}
     </div>
   )
 }
