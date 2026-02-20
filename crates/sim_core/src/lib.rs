@@ -5,6 +5,7 @@
 mod engine;
 mod graph;
 mod research;
+mod station;
 mod tasks;
 mod types;
 
@@ -1267,6 +1268,191 @@ mod tests {
                 &solar_system
             ),
             None
+        );
+    }
+
+    // --- Refinery ---
+
+    fn refinery_content() -> GameContent {
+        let mut content = test_content();
+        content.module_defs = vec![ModuleDef {
+            id: "module_basic_iron_refinery".to_string(),
+            name: "Basic Iron Refinery".to_string(),
+            mass_kg: 5000.0,
+            volume_m3: 10.0,
+            power_consumption_per_run: 10.0,
+            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_ticks: 2, // short for tests
+                recipes: vec![RecipeDef {
+                    id: "recipe_basic_iron".to_string(),
+                    inputs: vec![RecipeInput {
+                        filter: InputFilter::ItemKind(ItemKind::Ore),
+                        amount: InputAmount::Kg(500.0),
+                    }],
+                    outputs: vec![
+                        OutputSpec::Material {
+                            element: "Fe".to_string(),
+                            yield_formula: YieldFormula::ElementFraction {
+                                element: "Fe".to_string(),
+                            },
+                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                                element: "Fe".to_string(),
+                                multiplier: 1.0,
+                            },
+                        },
+                        OutputSpec::Slag {
+                            yield_formula: YieldFormula::FixedFraction(1.0),
+                        },
+                    ],
+                    efficiency: 1.0,
+                }],
+            }),
+        }];
+        content
+    }
+
+    fn state_with_refinery(content: &GameContent) -> GameState {
+        let mut state = test_state(content);
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+
+        station.modules.push(ModuleState {
+            id: ModuleInstanceId("module_inst_0001".to_string()),
+            def_id: "module_basic_iron_refinery".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 0,
+            }),
+        });
+
+        station.inventory.push(InventoryItem::Ore {
+            lot_id: LotId("lot_0001".to_string()),
+            asteroid_id: AsteroidId("asteroid_0001".to_string()),
+            kg: 1000.0,
+            composition: std::collections::HashMap::from([
+                ("Fe".to_string(), 0.7f32),
+                ("Si".to_string(), 0.3f32),
+            ]),
+        });
+
+        state
+    }
+
+    #[test]
+    fn test_refinery_produces_material_and_slag() {
+        let content = refinery_content();
+        let mut state = state_with_refinery(&content);
+        let mut rng = make_rng();
+
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = &state.stations[&station_id];
+
+        let has_material = station.inventory.iter().any(|i| {
+            matches!(i, InventoryItem::Material { element, kg, .. } if element == "Fe" && *kg > 0.0)
+        });
+        assert!(
+            has_material,
+            "station should have Fe Material after refinery runs"
+        );
+
+        let has_slag = station
+            .inventory
+            .iter()
+            .any(|i| matches!(i, InventoryItem::Slag { kg, .. } if *kg > 0.0));
+        assert!(has_slag, "station should have Slag after refinery runs");
+    }
+
+    #[test]
+    fn test_refinery_quality_equals_fe_fraction() {
+        let content = refinery_content();
+        let mut state = state_with_refinery(&content);
+        let mut rng = make_rng();
+
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = &state.stations[&station_id];
+
+        let quality = station.inventory.iter().find_map(|i| {
+            if let InventoryItem::Material {
+                element, quality, ..
+            } = i
+            {
+                if element == "Fe" {
+                    Some(*quality)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+        assert!(quality.is_some(), "Fe Material should exist");
+        assert!(
+            (quality.unwrap() - 0.7).abs() < 1e-4,
+            "quality should equal Fe fraction (0.7) with multiplier 1.0"
+        );
+    }
+
+    #[test]
+    fn test_refinery_skips_when_below_threshold() {
+        let content = refinery_content();
+        let mut state = test_state(&content);
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+
+        station.modules.push(ModuleState {
+            id: ModuleInstanceId("module_inst_0001".to_string()),
+            def_id: "module_basic_iron_refinery".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 9999.0,
+                ticks_since_last_run: 0,
+            }),
+        });
+        station.inventory.push(InventoryItem::Ore {
+            lot_id: LotId("lot_0001".to_string()),
+            asteroid_id: AsteroidId("asteroid_0001".to_string()),
+            kg: 1000.0,
+            composition: std::collections::HashMap::from([
+                ("Fe".to_string(), 0.7f32),
+                ("Si".to_string(), 0.3f32),
+            ]),
+        });
+
+        let mut rng = make_rng();
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let station = &state.stations[&station_id];
+        assert!(
+            !station
+                .inventory
+                .iter()
+                .any(|i| matches!(i, InventoryItem::Material { .. })),
+            "refinery should not run when ore is below threshold"
+        );
+    }
+
+    #[test]
+    fn test_refinery_emits_refinery_ran_event() {
+        let content = refinery_content();
+        let mut state = state_with_refinery(&content);
+        let mut rng = make_rng();
+
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e.event, Event::RefineryRan { .. })),
+            "RefineryRan event should be emitted when refinery processes ore"
         );
     }
 

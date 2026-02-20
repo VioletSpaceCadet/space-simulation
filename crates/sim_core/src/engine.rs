@@ -1,10 +1,12 @@
 use crate::research::advance_research;
+use crate::station::tick_stations;
 use crate::tasks::{
     deep_scan_enabled, resolve_deep_scan, resolve_deposit, resolve_mine, resolve_survey,
     resolve_transit, task_duration, task_kind_label, task_target,
 };
 use crate::{
-    Command, CommandEnvelope, EventLevel, GameContent, GameState, ShipId, TaskKind, TaskState,
+    Command, CommandEnvelope, EventLevel, GameContent, GameState, InventoryItem, ShipId, TaskKind,
+    TaskState,
 };
 use rand::Rng;
 
@@ -28,12 +30,14 @@ pub fn tick(
 
     apply_commands(state, commands, content, &mut events);
     resolve_ship_tasks(state, content, rng, &mut events);
+    tick_stations(state, content, &mut events);
     advance_research(state, content, rng, event_level, &mut events);
 
     state.meta.tick += 1;
     events
 }
 
+#[allow(clippy::too_many_lines)]
 fn apply_commands(
     state: &mut GameState,
     commands: &[CommandEnvelope],
@@ -64,11 +68,141 @@ fn apply_commands(
                 }
                 assignments.push((ship_id.clone(), task_kind.clone()));
             }
-            // New module commands are not yet handled — ignored for now.
-            Command::InstallModule { .. }
-            | Command::UninstallModule { .. }
-            | Command::SetModuleEnabled { .. }
-            | Command::SetModuleThreshold { .. } => {}
+            Command::InstallModule {
+                station_id,
+                module_item_id,
+            } => {
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
+                let item_pos = station.inventory.iter().position(|i| {
+                    matches!(i, InventoryItem::Module { item_id, .. } if item_id == module_item_id)
+                });
+                let Some(pos) = item_pos else { continue };
+                let InventoryItem::Module {
+                    item_id,
+                    module_def_id,
+                } = station.inventory.remove(pos)
+                else {
+                    continue;
+                };
+
+                let module_id_str =
+                    format!("module_inst_{:04}", state.counters.next_module_instance_id);
+                state.counters.next_module_instance_id += 1;
+                let module_id = crate::ModuleInstanceId(module_id_str);
+
+                let kind_state = match content.module_defs.iter().find(|d| d.id == module_def_id) {
+                    Some(def) => match &def.behavior {
+                        crate::ModuleBehaviorDef::Processor(_) => {
+                            crate::ModuleKindState::Processor(crate::ProcessorState {
+                                threshold_kg: 0.0,
+                                ticks_since_last_run: 0,
+                            })
+                        }
+                        crate::ModuleBehaviorDef::Storage { .. } => crate::ModuleKindState::Storage,
+                    },
+                    None => continue,
+                };
+
+                let station = state.stations.get_mut(station_id).unwrap();
+                station.modules.push(crate::ModuleState {
+                    id: module_id.clone(),
+                    def_id: module_def_id.clone(),
+                    enabled: false,
+                    kind_state,
+                });
+
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    crate::Event::ModuleInstalled {
+                        station_id: station_id.clone(),
+                        module_id,
+                        module_item_id: item_id,
+                        module_def_id,
+                    },
+                ));
+            }
+            Command::UninstallModule {
+                station_id,
+                module_id,
+            } => {
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
+                let pos = station.modules.iter().position(|m| &m.id == module_id);
+                let Some(pos) = pos else { continue };
+                let module = station.modules.remove(pos);
+
+                let item_id = crate::ModuleItemId(format!(
+                    "module_item_{:04}",
+                    state.counters.next_module_instance_id
+                ));
+                state.counters.next_module_instance_id += 1;
+
+                let station = state.stations.get_mut(station_id).unwrap();
+                station.inventory.push(InventoryItem::Module {
+                    item_id: item_id.clone(),
+                    module_def_id: module.def_id.clone(),
+                });
+
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    crate::Event::ModuleUninstalled {
+                        station_id: station_id.clone(),
+                        module_id: module_id.clone(),
+                        module_item_id: item_id,
+                    },
+                ));
+            }
+            Command::SetModuleEnabled {
+                station_id,
+                module_id,
+                enabled,
+            } => {
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
+                let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+                    continue;
+                };
+                module.enabled = *enabled;
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    crate::Event::ModuleToggled {
+                        station_id: station_id.clone(),
+                        module_id: module_id.clone(),
+                        enabled: *enabled,
+                    },
+                ));
+            }
+            Command::SetModuleThreshold {
+                station_id,
+                module_id,
+                threshold_kg,
+            } => {
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
+                let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+                    continue;
+                };
+                if let crate::ModuleKindState::Processor(ps) = &mut module.kind_state {
+                    ps.threshold_kg = *threshold_kg;
+                }
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    crate::Event::ModuleThresholdSet {
+                        station_id: station_id.clone(),
+                        module_id: module_id.clone(),
+                        threshold_kg: *threshold_kg,
+                    },
+                ));
+            }
         }
     }
 
