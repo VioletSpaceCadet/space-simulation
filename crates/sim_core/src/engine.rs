@@ -287,7 +287,7 @@ fn resolve_ship_tasks(
                 resolve_mine(state, &ship_id, asteroid, content, events);
             }
             TaskKind::Deposit { ref station } => {
-                resolve_deposit(state, &ship_id, station, events);
+                resolve_deposit(state, &ship_id, station, content, events);
             }
             TaskKind::Idle => {}
         }

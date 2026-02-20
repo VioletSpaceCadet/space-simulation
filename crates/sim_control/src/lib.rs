@@ -1,7 +1,7 @@
 use sim_core::{
     mine_duration, shortest_hop_count, AnomalyTag, AsteroidId, AsteroidState, Command,
-    CommandEnvelope, CommandId, GameContent, GameState, InventoryItem, ModuleKindState,
-    PrincipalId, SiteId, TaskKind, TechId,
+    CommandEnvelope, CommandId, GameContent, GameState, InventoryItem, ModuleKindState, NodeId,
+    PrincipalId, ShipId, ShipState, SiteId, TaskKind, TechId,
 };
 
 pub trait CommandSource {
@@ -22,217 +22,229 @@ pub struct AutopilotController;
 
 const AUTOPILOT_OWNER: &str = "principal_autopilot";
 
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+/// Wraps `task` in a Transit if `from` and `to` are different nodes; else returns `task` as-is.
+fn maybe_transit(task: TaskKind, from: &NodeId, to: &NodeId, content: &GameContent) -> TaskKind {
+    match shortest_hop_count(from, to, &content.solar_system) {
+        Some(0) | None => task,
+        Some(hops) => TaskKind::Transit {
+            destination: to.clone(),
+            total_ticks: hops * content.constants.travel_ticks_per_hop,
+            then: Box::new(task),
+        },
+    }
+}
+
+/// Allocates a command ID and builds a `CommandEnvelope`.
+fn make_cmd(
+    owner: &PrincipalId,
+    tick: u64,
+    next_id: &mut u64,
+    command: Command,
+) -> CommandEnvelope {
+    let cmd_id = CommandId(format!("cmd_{:06}", *next_id));
+    *next_id += 1;
+    CommandEnvelope {
+        id: cmd_id,
+        issued_by: owner.clone(),
+        issued_tick: tick,
+        execute_at_tick: tick,
+        command,
+    }
+}
+
+/// Emits commands to install, enable, and configure station modules.
+fn station_module_commands(
+    state: &GameState,
+    content: &GameContent,
+    owner: &PrincipalId,
+    next_id: &mut u64,
+) -> Vec<CommandEnvelope> {
+    let mut commands = Vec::new();
+    for station in state.stations.values() {
+        for item in &station.inventory {
+            if let InventoryItem::Module { item_id, .. } = item {
+                commands.push(make_cmd(
+                    owner,
+                    state.meta.tick,
+                    next_id,
+                    Command::InstallModule {
+                        station_id: station.id.clone(),
+                        module_item_id: item_id.clone(),
+                    },
+                ));
+            }
+        }
+        for module in &station.modules {
+            if !module.enabled {
+                commands.push(make_cmd(
+                    owner,
+                    state.meta.tick,
+                    next_id,
+                    Command::SetModuleEnabled {
+                        station_id: station.id.clone(),
+                        module_id: module.id.clone(),
+                        enabled: true,
+                    },
+                ));
+            }
+            if let ModuleKindState::Processor(ps) = &module.kind_state {
+                if ps.threshold_kg == 0.0 {
+                    commands.push(make_cmd(
+                        owner,
+                        state.meta.tick,
+                        next_id,
+                        Command::SetModuleThreshold {
+                            station_id: station.id.clone(),
+                            module_id: module.id.clone(),
+                            threshold_kg: content.constants.autopilot_refinery_threshold_kg,
+                        },
+                    ));
+                }
+            }
+        }
+    }
+    commands
+}
+
+/// Returns idle autopilot ships sorted by ID for determinism.
+fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
+    let mut ships: Vec<ShipId> = state
+        .ships
+        .values()
+        .filter(|ship| {
+            ship.owner == *owner
+                && ship
+                    .task
+                    .as_ref()
+                    .is_none_or(|t| matches!(t.kind, TaskKind::Idle))
+        })
+        .map(|ship| ship.id.clone())
+        .collect();
+    ships.sort_by(|a, b| a.0.cmp(&b.0));
+    ships
+}
+
+/// Returns `IronRich` asteroid IDs above confidence threshold with unknown composition, sorted by ID.
+fn collect_deep_scan_candidates(state: &GameState, content: &GameContent) -> Vec<AsteroidId> {
+    let mut candidates: Vec<AsteroidId> = state
+        .asteroids
+        .values()
+        .filter(|asteroid| {
+            asteroid.knowledge.composition.is_none()
+                && asteroid.knowledge.tag_beliefs.iter().any(|(tag, conf)| {
+                    *tag == AnomalyTag::IronRich
+                        && *conf > content.constants.autopilot_iron_rich_confidence_threshold
+                })
+        })
+        .map(|a| a.id.clone())
+        .collect();
+    candidates.sort_by(|a, b| a.0.cmp(&b.0));
+    candidates
+}
+
+/// Mining value for sorting: `mass_kg × Fe_fraction`.
+fn fe_mining_value(asteroid: &AsteroidState) -> f32 {
+    asteroid.mass_kg
+        * asteroid
+            .knowledge
+            .composition
+            .as_ref()
+            .and_then(|c| c.get("Fe"))
+            .copied()
+            .unwrap_or(0.0)
+}
+
+/// Priority 1: if ship has ore, return a Deposit (or Transit→Deposit) task to the nearest station.
+fn deposit_priority(
+    ship: &ShipState,
+    state: &GameState,
+    content: &GameContent,
+) -> Option<TaskKind> {
+    if !ship
+        .inventory
+        .iter()
+        .any(|i| matches!(i, InventoryItem::Ore { .. }))
+    {
+        return None;
+    }
+    let station = state.stations.values().min_by_key(|s| {
+        shortest_hop_count(&ship.location_node, &s.location_node, &content.solar_system)
+            .unwrap_or(u64::MAX)
+    })?;
+    Some(maybe_transit(
+        TaskKind::Deposit { station: station.id.clone() },
+        &ship.location_node,
+        &station.location_node,
+        content,
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// AutopilotController
+// ---------------------------------------------------------------------------
+
 impl CommandSource for AutopilotController {
-    #[allow(clippy::too_many_lines)]
     fn generate_commands(
         &mut self,
         state: &GameState,
         content: &GameContent,
         next_command_id: &mut u64,
     ) -> Vec<CommandEnvelope> {
-        use std::cmp::Ordering;
-
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
+        let mut commands = station_module_commands(state, content, &owner, next_command_id);
 
-        // Collect idle autopilot ships, sorted for determinism.
-        let mut idle_ships: Vec<_> = state
-            .ships
-            .values()
-            .filter(|ship| {
-                ship.owner == owner
-                    && ship
-                        .task
-                        .as_ref()
-                        .is_none_or(|t| matches!(t.kind, TaskKind::Idle))
-            })
-            .map(|ship| ship.id.clone())
-            .collect();
-        idle_ships.sort_by(|a, b| a.0.cmp(&b.0));
-
+        let idle_ships = collect_idle_ships(state, &owner);
         let deep_scan_unlocked = state
             .research
             .unlocked
             .contains(&TechId("tech_deep_scan_v1".to_string()));
-
-        // Survey candidates.
+        let deep_scan_candidates = collect_deep_scan_candidates(state, content);
+        let mut next_deep_scan = deep_scan_candidates.iter();
         let mut next_site = state.scan_sites.iter();
 
-        // Deep scan candidates: IronRich confidence above threshold, composition unknown.
-        let mut deep_scan_candidates: Vec<AsteroidId> = state
-            .asteroids
-            .values()
-            .filter(|asteroid| {
-                asteroid.knowledge.composition.is_none()
-                    && asteroid.knowledge.tag_beliefs.iter().any(|(tag, conf)| {
-                        *tag == AnomalyTag::IronRich
-                            && *conf > content.constants.autopilot_iron_rich_confidence_threshold
-                    })
-            })
-            .map(|a| a.id.clone())
-            .collect();
-        deep_scan_candidates.sort_by(|a, b| a.0.cmp(&b.0));
-        let mut next_deep_scan = deep_scan_candidates.iter();
-
-        // Mine candidates: deep-scanned, has remaining mass, sorted by value desc.
         let mut mine_candidates: Vec<&AsteroidState> = state
             .asteroids
             .values()
             .filter(|a| a.mass_kg > 0.0 && a.knowledge.composition.is_some())
             .collect();
-        mine_candidates.sort_by(|a, b| {
-            let value = |ast: &&AsteroidState| {
-                ast.mass_kg
-                    * ast
-                        .knowledge
-                        .composition
-                        .as_ref()
-                        .and_then(|c| c.get("Fe"))
-                        .copied()
-                        .unwrap_or(0.0)
-            };
-            value(b).partial_cmp(&value(a)).unwrap_or(Ordering::Equal)
-        });
+        mine_candidates.sort_by(|a, b| fe_mining_value(b).total_cmp(&fe_mining_value(a)));
         let mut next_mine = mine_candidates.iter();
-
-        let mut commands = Vec::new();
-
-        // Station module management: install uninstalled modules, enable/configure installed ones.
-        for station in state.stations.values() {
-            // Install any Module items sitting in station inventory.
-            for item in &station.inventory {
-                if let InventoryItem::Module { item_id, .. } = item {
-                    let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
-                    *next_command_id += 1;
-                    commands.push(CommandEnvelope {
-                        id: cmd_id,
-                        issued_by: owner.clone(),
-                        issued_tick: state.meta.tick,
-                        execute_at_tick: state.meta.tick,
-                        command: Command::InstallModule {
-                            station_id: station.id.clone(),
-                            module_item_id: item_id.clone(),
-                        },
-                    });
-                }
-            }
-
-            // Enable disabled modules and set default threshold.
-            for module in &station.modules {
-                if !module.enabled {
-                    let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
-                    *next_command_id += 1;
-                    commands.push(CommandEnvelope {
-                        id: cmd_id,
-                        issued_by: owner.clone(),
-                        issued_tick: state.meta.tick,
-                        execute_at_tick: state.meta.tick,
-                        command: Command::SetModuleEnabled {
-                            station_id: station.id.clone(),
-                            module_id: module.id.clone(),
-                            enabled: true,
-                        },
-                    });
-                }
-
-                if let ModuleKindState::Processor(ps) = &module.kind_state {
-                    if ps.threshold_kg == 0.0 {
-                        let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
-                        *next_command_id += 1;
-                        commands.push(CommandEnvelope {
-                            id: cmd_id,
-                            issued_by: owner.clone(),
-                            issued_tick: state.meta.tick,
-                            execute_at_tick: state.meta.tick,
-                            command: Command::SetModuleThreshold {
-                                station_id: station.id.clone(),
-                                module_id: module.id.clone(),
-                                threshold_kg: content.constants.autopilot_refinery_threshold_kg,
-                            },
-                        });
-                    }
-                }
-            }
-        }
 
         for ship_id in idle_ships {
             let ship = &state.ships[&ship_id];
 
             // Priority 1: ship has ore → deposit at nearest station.
-            if ship
-                .inventory
-                .iter()
-                .any(|i| matches!(i, InventoryItem::Ore { .. }))
-            {
-                let Some(station) = state.stations.values().min_by_key(|s| {
-                    shortest_hop_count(&ship.location_node, &s.location_node, &content.solar_system)
-                        .unwrap_or(u64::MAX)
-                }) else {
-                    continue;
-                };
-
-                let deposit_task = TaskKind::Deposit {
-                    station: station.id.clone(),
-                };
-                let final_task = match shortest_hop_count(
-                    &ship.location_node,
-                    &station.location_node,
-                    &content.solar_system,
-                ) {
-                    Some(0) | None => deposit_task,
-                    Some(hops) => TaskKind::Transit {
-                        destination: station.location_node.clone(),
-                        total_ticks: hops * content.constants.travel_ticks_per_hop,
-                        then: Box::new(deposit_task),
-                    },
-                };
-
-                let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
-                *next_command_id += 1;
-                commands.push(CommandEnvelope {
-                    id: cmd_id,
-                    issued_by: ship.owner.clone(),
-                    issued_tick: state.meta.tick,
-                    execute_at_tick: state.meta.tick,
-                    command: Command::AssignShipTask {
-                        ship_id,
-                        task_kind: final_task,
-                    },
-                });
+            if let Some(task) = deposit_priority(ship, state, content) {
+                commands.push(make_cmd(
+                    &ship.owner,
+                    state.meta.tick,
+                    next_command_id,
+                    Command::AssignShipTask { ship_id, task_kind: task },
+                ));
                 continue;
             }
 
             // Priority 2: mine best available asteroid.
             if let Some(asteroid) = next_mine.next() {
-                let target_node = asteroid.location_node.clone();
-                let duration_ticks = mine_duration(asteroid, ship, content);
-                let task_kind = TaskKind::Mine {
-                    asteroid: asteroid.id.clone(),
-                    duration_ticks,
-                };
-                let final_task = match shortest_hop_count(
+                let task = maybe_transit(
+                    TaskKind::Mine {
+                        asteroid: asteroid.id.clone(),
+                        duration_ticks: mine_duration(asteroid, ship, content),
+                    },
                     &ship.location_node,
-                    &target_node,
-                    &content.solar_system,
-                ) {
-                    Some(0) | None => task_kind,
-                    Some(hops) => TaskKind::Transit {
-                        destination: target_node,
-                        total_ticks: hops * content.constants.travel_ticks_per_hop,
-                        then: Box::new(task_kind),
-                    },
-                };
-                let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
-                *next_command_id += 1;
-                commands.push(CommandEnvelope {
-                    id: cmd_id,
-                    issued_by: ship.owner.clone(),
-                    issued_tick: state.meta.tick,
-                    execute_at_tick: state.meta.tick,
-                    command: Command::AssignShipTask {
-                        ship_id,
-                        task_kind: final_task,
-                    },
-                });
+                    &asteroid.location_node,
+                    content,
+                );
+                commands.push(make_cmd(
+                    &ship.owner,
+                    state.meta.tick,
+                    next_command_id,
+                    Command::AssignShipTask { ship_id, task_kind: task },
+                ));
                 continue;
             }
 
@@ -240,68 +252,37 @@ impl CommandSource for AutopilotController {
             if deep_scan_unlocked {
                 if let Some(asteroid_id) = next_deep_scan.next() {
                     let node = state.asteroids[asteroid_id].location_node.clone();
-                    let task_kind = TaskKind::DeepScan {
-                        asteroid: asteroid_id.clone(),
-                    };
-                    let final_task =
-                        match shortest_hop_count(&ship.location_node, &node, &content.solar_system)
-                        {
-                            Some(0) | None => task_kind,
-                            Some(hops) => TaskKind::Transit {
-                                destination: node,
-                                total_ticks: hops * content.constants.travel_ticks_per_hop,
-                                then: Box::new(task_kind),
-                            },
-                        };
-                    let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
-                    *next_command_id += 1;
-                    commands.push(CommandEnvelope {
-                        id: cmd_id,
-                        issued_by: ship.owner.clone(),
-                        issued_tick: state.meta.tick,
-                        execute_at_tick: state.meta.tick,
-                        command: Command::AssignShipTask {
-                            ship_id,
-                            task_kind: final_task,
-                        },
-                    });
+                    let task = maybe_transit(
+                        TaskKind::DeepScan { asteroid: asteroid_id.clone() },
+                        &ship.location_node,
+                        &node,
+                        content,
+                    );
+                    commands.push(make_cmd(
+                        &ship.owner,
+                        state.meta.tick,
+                        next_command_id,
+                        Command::AssignShipTask { ship_id, task_kind: task },
+                    ));
                     continue;
                 }
             }
 
             // Priority 4: survey unscanned sites.
             if let Some(site) = next_site.next() {
-                let target_node = site.node.clone();
-                let task_kind = TaskKind::Survey {
-                    site: SiteId(site.id.0.clone()),
-                };
-                let final_task = match shortest_hop_count(
+                let task = maybe_transit(
+                    TaskKind::Survey { site: SiteId(site.id.0.clone()) },
                     &ship.location_node,
-                    &target_node,
-                    &content.solar_system,
-                ) {
-                    Some(0) | None => task_kind,
-                    Some(hops) => TaskKind::Transit {
-                        destination: target_node,
-                        total_ticks: hops * content.constants.travel_ticks_per_hop,
-                        then: Box::new(task_kind),
-                    },
-                };
-                let cmd_id = CommandId(format!("cmd_{:06}", *next_command_id));
-                *next_command_id += 1;
-                commands.push(CommandEnvelope {
-                    id: cmd_id,
-                    issued_by: ship.owner.clone(),
-                    issued_tick: state.meta.tick,
-                    execute_at_tick: state.meta.tick,
-                    command: Command::AssignShipTask {
-                        ship_id,
-                        task_kind: final_task,
-                    },
-                });
+                    &site.node,
+                    content,
+                );
+                commands.push(make_cmd(
+                    &ship.owner,
+                    state.meta.tick,
+                    next_command_id,
+                    Command::AssignShipTask { ship_id, task_kind: task },
+                ));
             }
-
-            // Nothing to do for this ship.
         }
 
         commands

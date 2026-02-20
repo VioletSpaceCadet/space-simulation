@@ -375,6 +375,7 @@ pub(crate) fn resolve_deposit(
     state: &mut GameState,
     ship_id: &ShipId,
     station_id: &StationId,
+    content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) {
     let current_tick = state.meta.tick;
@@ -390,15 +391,44 @@ pub(crate) fn resolve_deposit(
         return;
     }
 
-    if let Some(station) = state.stations.get_mut(station_id) {
-        station.inventory.extend(items.clone());
-    } else {
+    let Some(station) = state.stations.get(station_id) else {
         // Station gone — return items to ship and idle.
         if let Some(ship) = state.ships.get_mut(ship_id) {
             ship.inventory = items;
         }
         set_ship_idle(state, ship_id, current_tick);
         return;
+    };
+
+    // Split items into those that fit in the station and those that don't.
+    let mut station_volume = inventory_volume_m3(&station.inventory, content);
+    let station_capacity = station.cargo_capacity_m3;
+    let mut to_deposit = Vec::new();
+    let mut to_return = Vec::new();
+    for item in items {
+        let item_volume = inventory_volume_m3(std::slice::from_ref(&item), content);
+        if station_volume + item_volume <= station_capacity {
+            station_volume += item_volume;
+            to_deposit.push(item);
+        } else {
+            to_return.push(item);
+        }
+    }
+
+    // Return overflow items to the ship.
+    if !to_return.is_empty() {
+        if let Some(ship) = state.ships.get_mut(ship_id) {
+            ship.inventory = to_return;
+        }
+    }
+
+    if to_deposit.is_empty() {
+        set_ship_idle(state, ship_id, current_tick);
+        return;
+    }
+
+    if let Some(station) = state.stations.get_mut(station_id) {
+        station.inventory.extend(to_deposit.clone());
     }
 
     events.push(crate::emit(
@@ -407,7 +437,7 @@ pub(crate) fn resolve_deposit(
         Event::OreDeposited {
             ship_id: ship_id.clone(),
             station_id: station_id.clone(),
-            items,
+            items: to_deposit,
         },
     ));
 
