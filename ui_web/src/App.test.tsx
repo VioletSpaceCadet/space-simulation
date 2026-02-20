@@ -34,11 +34,12 @@ describe('App', () => {
     expect(screen.getByText(/tick/i)).toBeInTheDocument()
   })
 
-  it('renders all three panel headings', () => {
+  it('renders all four panel headings', () => {
     render(<App />)
-    expect(screen.getByText(/events/i)).toBeInTheDocument()
-    expect(screen.getByText(/asteroids/i)).toBeInTheDocument()
-    expect(screen.getByText(/research/i)).toBeInTheDocument()
+    expect(screen.getByText('Events')).toBeInTheDocument()
+    expect(screen.getByText('Asteroids')).toBeInTheDocument()
+    expect(screen.getByText('Fleet')).toBeInTheDocument()
+    expect(screen.getByText('Research')).toBeInTheDocument()
   })
 
   it('renders resize handles between panels', () => {

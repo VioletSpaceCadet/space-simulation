@@ -10,15 +10,14 @@ export interface FacilitiesState {
   efficiency: number
 }
 
-export interface StationState {
-  id: string
-  location_node: string
-  power_available_per_tick: number
-  facilities: FacilitiesState
-}
-
 export interface TaskState {
-  kind: { Idle: Record<string, never> } | { Survey: { site: string } } | { DeepScan: { asteroid: string } }
+  kind:
+    | { Idle: Record<string, never> }
+    | { Survey: { site: string } }
+    | { DeepScan: { asteroid: string } }
+    | { Mine: { asteroid: string; duration_ticks: number } }
+    | { Deposit: { station: string } }
+    | { Transit: { destination: string; total_ticks: number } }
   started_tick: number
   eta_tick: number
 }
@@ -27,7 +26,18 @@ export interface ShipState {
   id: string
   location_node: string
   owner: string
+  cargo: Record<string, number>       // element_id -> kg
+  cargo_capacity_m3: number
   task: TaskState | null
+}
+
+export interface StationState {
+  id: string
+  location_node: string
+  power_available_per_tick: number
+  cargo: Record<string, number>       // element_id -> kg
+  cargo_capacity_m3: number
+  facilities: FacilitiesState
 }
 
 export interface AsteroidKnowledge {
@@ -40,6 +50,7 @@ export interface AsteroidState {
   id: string
   location_node: string
   anomaly_tags: string[]
+  mass_kg: number
   knowledge: AsteroidKnowledge
 }
 

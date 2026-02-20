@@ -41,6 +41,7 @@ export function AsteroidTable({ asteroids }: Props) {
             <th className="text-left text-label px-2 py-1 border-b border-edge font-normal">Node</th>
             <th className="text-left text-label px-2 py-1 border-b border-edge font-normal">Tags</th>
             <th className="text-left text-label px-2 py-1 border-b border-edge font-normal">Composition</th>
+            <th className="text-left text-label px-2 py-1 border-b border-edge font-normal">Mass</th>
           </tr>
         </thead>
         <tbody>
@@ -50,6 +51,11 @@ export function AsteroidTable({ asteroids }: Props) {
               <td className="px-2 py-0.5 border-b border-surface">{asteroid.location_node}</td>
               <td className="px-2 py-0.5 border-b border-surface">{tagSummary(asteroid.knowledge.tag_beliefs)}</td>
               <td className="px-2 py-0.5 border-b border-surface">{compositionSummary(asteroid.knowledge.composition)}</td>
+              <td className="px-2 py-0.5 border-b border-surface">
+                {asteroid.mass_kg > 0
+                  ? `${asteroid.mass_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`
+                  : <span className="text-faint">depleted</span>}
+              </td>
             </tr>
           ))}
         </tbody>

@@ -37,6 +37,7 @@ function applyEvents(
             id: asteroid_id,
             location_node,
             anomaly_tags: [],
+            mass_kg: 0,
             knowledge: { tag_beliefs: [], composition: null },
           },
         }
