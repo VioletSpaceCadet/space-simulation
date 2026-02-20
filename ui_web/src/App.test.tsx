@@ -42,6 +42,16 @@ describe('App', () => {
     expect(screen.getByText('Research')).toBeInTheDocument()
   })
 
+  it('renders PanelHeader for each panel', () => {
+    render(<App />)
+    const buttons = screen.getAllByRole('button')
+    const titles = buttons.map((b) => b.textContent?.replace(/[▸▾]\s*/, ''))
+    expect(titles).toContain('Events')
+    expect(titles).toContain('Asteroids')
+    expect(titles).toContain('Fleet')
+    expect(titles).toContain('Research')
+  })
+
   it('renders resize handles between panels', () => {
     render(<App />)
     // react-resizable-panels renders [data-panel-resize-handle-id] attributes
