@@ -95,7 +95,7 @@ pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -
                     .unwrap_or(1000.0);
                 kg / density
             }
-            InventoryItem::Component { .. } => 0.0,
+            InventoryItem::Component { .. } => 1.0,
             InventoryItem::Module { module_def_id, .. } => content
                 .module_defs
                 .iter()
@@ -325,7 +325,9 @@ pub(crate) fn resolve_mine(
         return;
     };
 
-    let Some(ship) = state.ships.get(ship_id) else { return };
+    let Some(ship) = state.ships.get(ship_id) else {
+        return;
+    };
 
     let ore_density = content
         .elements
