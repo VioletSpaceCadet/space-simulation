@@ -76,11 +76,17 @@ function applyEvents(
         extracted: Record<string, number>
         asteroid_remaining_kg: number
       }
-      // Update asteroid remaining mass
+      // Update asteroid remaining mass, or remove it if fully depleted
       if (updatedAsteroids[asteroid_id]) {
-        updatedAsteroids = {
-          ...updatedAsteroids,
-          [asteroid_id]: { ...updatedAsteroids[asteroid_id], mass_kg: asteroid_remaining_kg },
+        if (asteroid_remaining_kg <= 0) {
+          updatedAsteroids = Object.fromEntries(
+            Object.entries(updatedAsteroids).filter(([id]) => id !== asteroid_id)
+          )
+        } else {
+          updatedAsteroids = {
+            ...updatedAsteroids,
+            [asteroid_id]: { ...updatedAsteroids[asteroid_id], mass_kg: asteroid_remaining_kg },
+          }
         }
       }
       // Add extracted ore to ship cargo (key is "ore:{asteroid_id}")
