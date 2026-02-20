@@ -350,6 +350,7 @@ fn resolve_processor_run(
             material_produced_kg: material_kg,
             material_quality,
             slag_produced_kg: slag_kg,
+            material_element: extracted_element.unwrap_or_default(),
         },
     ));
 }

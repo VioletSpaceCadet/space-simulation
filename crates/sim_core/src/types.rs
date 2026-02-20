@@ -372,6 +372,7 @@ pub enum Event {
         material_produced_kg: f32,
         material_quality: f32,
         slag_produced_kg: f32,
+        material_element: ElementId,
     },
     /// Only emitted at `EventLevel::Debug`.
     ResearchRoll {

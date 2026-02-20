@@ -187,14 +187,15 @@ function applyEvents(
       }
 
       case 'RefineryRan': {
-        const { station_id, ore_consumed_kg, material_produced_kg, material_quality, slag_produced_kg } = event as {
+        const { station_id, ore_consumed_kg, material_produced_kg, material_quality, slag_produced_kg, material_element } = event as {
           station_id: string
           ore_consumed_kg: number
           material_produced_kg: number
           material_quality: number
           slag_produced_kg: number
+          material_element: string
         }
-        const REFINERY_ELEMENT = 'Fe'
+        const REFINERY_ELEMENT = material_element as string
         if (updatedStations[station_id]) {
           let stationInv = [...updatedStations[station_id].inventory]
 

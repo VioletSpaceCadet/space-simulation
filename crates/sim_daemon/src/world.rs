@@ -3,7 +3,7 @@ use rand::Rng;
 use serde::Deserialize;
 use sim_core::{
     AsteroidTemplateDef, Constants, Counters, ElementDef, FacilitiesState, GameContent, GameState,
-    MetaState, NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId,
+    MetaState, ModuleDef, NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId,
     SolarSystemDef, StationId, StationState, TechDef,
 };
 use std::path::Path;
@@ -48,13 +48,18 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         &std::fs::read_to_string(dir.join("elements.json")).context("reading elements.json")?,
     )
     .context("parsing elements.json")?;
+    let module_defs: Vec<ModuleDef> = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("module_defs.json"))
+            .context("reading module_defs.json")?,
+    )
+    .context("parsing module_defs.json")?;
     Ok(GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
         solar_system,
         asteroid_templates: templates_file.templates,
         elements: elements_file.elements,
-        module_defs: vec![],
+        module_defs,
         constants,
     })
 }
