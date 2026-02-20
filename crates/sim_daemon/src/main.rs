@@ -15,7 +15,7 @@ use clap::{Parser, Subcommand};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use sim_control::AutopilotController;
-use sim_core::{Constants, EventEnvelope, GameContent, NodeId, SolarSystemDef};
+use sim_core::{EventEnvelope};
 use tokio::sync::broadcast;
 
 #[derive(Parser)]
