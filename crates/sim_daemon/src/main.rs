@@ -8,6 +8,8 @@ use state::{AppState, SimState};
 use tick_loop::run_tick_loop;
 use world::{build_initial_state, load_content};
 
+use anyhow::Context;
+
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -28,8 +30,12 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Run {
-        #[arg(long)]
-        seed: u64,
+        /// Generate world procedurally with this seed. Mutually exclusive with --state.
+        #[arg(long, conflicts_with = "state_file")]
+        seed: Option<u64>,
+        /// Load initial GameState from a JSON file. Mutually exclusive with --seed.
+        #[arg(long = "state", conflicts_with = "seed")]
+        state_file: Option<String>,
         #[arg(long, default_value = "./content")]
         content_dir: String,
         #[arg(long, default_value_t = 3001)]
@@ -48,14 +54,26 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Run {
             seed,
+            state_file,
             content_dir,
             port,
             ticks_per_sec,
             max_ticks,
         } => {
             let content = load_content(&content_dir)?;
-            let mut rng = ChaCha8Rng::seed_from_u64(seed);
-            let game_state = build_initial_state(&content, seed, &mut rng);
+            let (game_state, rng) = if let Some(path) = state_file {
+                let json = std::fs::read_to_string(&path)
+                    .with_context(|| format!("reading state file: {path}"))?;
+                let loaded: sim_core::GameState = serde_json::from_str(&json)
+                    .with_context(|| format!("parsing state file: {path}"))?;
+                let rng_seed = loaded.meta.seed;
+                (loaded, ChaCha8Rng::seed_from_u64(rng_seed))
+            } else {
+                let resolved_seed = seed.unwrap_or_else(rand::random);
+                let mut rng = ChaCha8Rng::seed_from_u64(resolved_seed);
+                let new_state = build_initial_state(&content, resolved_seed, &mut rng);
+                (new_state, rng)
+            };
             let (event_tx, _) = broadcast::channel::<Vec<EventEnvelope>>(256);
             let app_state = AppState {
                 sim: Arc::new(Mutex::new(SimState {
