@@ -366,6 +366,7 @@ pub(crate) fn resolve_mine(
         &mut state.counters,
         current_tick,
         Event::OreMined {
+            ship_id: ship_id.clone(),
             asteroid_id: asteroid_id.clone(),
             extracted: extracted.clone(),
             asteroid_remaining_kg: asteroid_remaining_kg.max(0.0),
@@ -420,6 +421,7 @@ pub(crate) fn resolve_deposit(
         &mut state.counters,
         current_tick,
         Event::OreDeposited {
+            ship_id: ship_id.clone(),
             station_id: station_id.clone(),
             deposited: cargo,
         },

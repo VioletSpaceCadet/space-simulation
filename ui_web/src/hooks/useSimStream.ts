@@ -9,6 +9,14 @@ interface State {
   currentTick: number
 }
 
+function addToRecord(base: Record<string, number>, additions: Record<string, number>): Record<string, number> {
+  const result = { ...base }
+  for (const [key, val] of Object.entries(additions)) {
+    result[key] = (result[key] ?? 0) + val
+  }
+  return result
+}
+
 type Action =
   | { type: 'SNAPSHOT_LOADED'; snapshot: SimSnapshot }
   | { type: 'EVENTS_RECEIVED'; events: SimEvent[] }
@@ -19,10 +27,19 @@ type Action =
 
 function applyEvents(
   asteroids: Record<string, AsteroidState>,
+  ships: Record<string, import('../types').ShipState>,
+  stations: Record<string, import('../types').StationState>,
   research: ResearchState,
   events: SimEvent[],
-): { asteroids: Record<string, AsteroidState>; research: ResearchState } {
+): {
+  asteroids: Record<string, AsteroidState>
+  ships: Record<string, import('../types').ShipState>
+  stations: Record<string, import('../types').StationState>
+  research: ResearchState
+} {
   let updatedAsteroids = { ...asteroids }
+  let updatedShips = { ...ships }
+  let updatedStations = { ...stations }
   let updatedResearch = research
 
   for (const evt of events) {
@@ -45,11 +62,52 @@ function applyEvents(
     }
 
     if (e['OreMined']) {
-      const { asteroid_id, asteroid_remaining_kg } = e['OreMined'] as { asteroid_id: string; asteroid_remaining_kg: number }
+      const { ship_id, asteroid_id, extracted, asteroid_remaining_kg } = e['OreMined'] as {
+        ship_id: string
+        asteroid_id: string
+        extracted: Record<string, number>
+        asteroid_remaining_kg: number
+      }
+      // Update asteroid remaining mass
       if (updatedAsteroids[asteroid_id]) {
         updatedAsteroids = {
           ...updatedAsteroids,
           [asteroid_id]: { ...updatedAsteroids[asteroid_id], mass_kg: asteroid_remaining_kg },
+        }
+      }
+      // Add extracted ore to ship cargo
+      if (updatedShips[ship_id]) {
+        updatedShips = {
+          ...updatedShips,
+          [ship_id]: {
+            ...updatedShips[ship_id],
+            cargo: addToRecord(updatedShips[ship_id].cargo, extracted),
+          },
+        }
+      }
+    }
+
+    if (e['OreDeposited']) {
+      const { ship_id, station_id, deposited } = e['OreDeposited'] as {
+        ship_id: string
+        station_id: string
+        deposited: Record<string, number>
+      }
+      // Add deposited ore to station cargo
+      if (updatedStations[station_id]) {
+        updatedStations = {
+          ...updatedStations,
+          [station_id]: {
+            ...updatedStations[station_id],
+            cargo: addToRecord(updatedStations[station_id].cargo, deposited),
+          },
+        }
+      }
+      // Clear ship cargo
+      if (updatedShips[ship_id]) {
+        updatedShips = {
+          ...updatedShips,
+          [ship_id]: { ...updatedShips[ship_id], cargo: {} },
         }
       }
     }
@@ -89,7 +147,7 @@ function applyEvents(
     }
   }
 
-  return { asteroids: updatedAsteroids, research: updatedResearch }
+  return { asteroids: updatedAsteroids, ships: updatedShips, stations: updatedStations, research: updatedResearch }
 }
 
 function reducer(state: State, action: Action): State {
@@ -101,8 +159,10 @@ function reducer(state: State, action: Action): State {
       const newEvents = [...action.events, ...state.events].slice(0, 500)
       const latestTick = action.events.reduce((max, e) => Math.max(max, e.tick), state.currentTick)
       if (!state.snapshot) return { ...state, events: newEvents, currentTick: latestTick }
-      const { asteroids, research } = applyEvents(
+      const { asteroids, ships, stations, research } = applyEvents(
         state.snapshot.asteroids,
+        state.snapshot.ships,
+        state.snapshot.stations,
         state.snapshot.research,
         action.events,
       )
@@ -110,7 +170,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         events: newEvents,
         currentTick: latestTick,
-        snapshot: { ...state.snapshot, asteroids, research },
+        snapshot: { ...state.snapshot, asteroids, ships, stations, research },
       }
     }
 

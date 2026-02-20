@@ -260,12 +260,14 @@ pub enum Event {
         node: NodeId,
     },
     OreMined {
+        ship_id: ShipId,
         asteroid_id: AsteroidId,
         /// kg extracted per element
         extracted: HashMap<ElementId, f32>,
         asteroid_remaining_kg: f32,
     },
     OreDeposited {
+        ship_id: ShipId,
         station_id: StationId,
         deposited: HashMap<ElementId, f32>,
     },
