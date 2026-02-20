@@ -136,6 +136,55 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions: _oreCom
               />
             )
           })}
+
+          {/* Asteroids */}
+          {snapshot && Object.values(snapshot.asteroids).map((asteroid) => {
+            const radius = ringRadiusForNode(asteroid.location_node)
+            const angle = angleFromId(asteroid.id)
+            const { x, y } = polarToCartesian(radius, angle)
+            const massKg = asteroid.mass_kg ?? 1000
+            const size = Math.max(2, Math.min(8, Math.log10(massKg) - 1))
+            const isIronRich = asteroid.anomaly_tags.includes('IronRich')
+
+            return (
+              <circle
+                key={asteroid.id}
+                data-entity-type="asteroid"
+                data-entity-id={asteroid.id}
+                cx={x}
+                cy={y}
+                r={size}
+                fill={isIronRich ? '#a0522d' : 'var(--color-muted)'}
+                opacity={0.8}
+                className="cursor-pointer"
+              />
+            )
+          })}
+
+          {/* Scan sites */}
+          {snapshot && snapshot.scan_sites.map((site) => {
+            const radius = ringRadiusForNode(site.node)
+            const angle = angleFromId(site.id)
+            const { x, y } = polarToCartesian(radius, angle)
+
+            return (
+              <text
+                key={site.id}
+                data-entity-type="scan-site"
+                data-entity-id={site.id}
+                x={x}
+                y={y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="var(--color-faint)"
+                fontSize={8}
+                fontFamily="monospace"
+                className="cursor-pointer"
+              >
+                ?
+              </text>
+            )
+          })}
         </g>
       </svg>
     </div>

@@ -62,6 +62,40 @@ describe('SolarSystemMap', () => {
     expect(shipMarkers.length).toBe(1)
   })
 
+  it('renders asteroid markers', () => {
+    const snapshotWithAsteroids: SimSnapshot = {
+      ...emptySnapshot,
+      asteroids: {
+        asteroid_0001: {
+          id: 'asteroid_0001',
+          location_node: 'node_belt_inner',
+          anomaly_tags: ['IronRich'],
+          mass_kg: 5000,
+          knowledge: { tag_beliefs: [['IronRich', 0.85]], composition: null },
+        },
+      },
+    }
+    const { container } = render(
+      <SolarSystemMap snapshot={snapshotWithAsteroids} currentTick={100} oreCompositions={{}} />
+    )
+    const markers = container.querySelectorAll('[data-entity-type="asteroid"]')
+    expect(markers.length).toBe(1)
+  })
+
+  it('renders scan site markers', () => {
+    const snapshotWithSites: SimSnapshot = {
+      ...emptySnapshot,
+      scan_sites: [
+        { id: 'site_001', node: 'node_belt_mid', template_id: 'tmpl_iron' },
+      ],
+    }
+    const { container } = render(
+      <SolarSystemMap snapshot={snapshotWithSites} currentTick={100} oreCompositions={{}} />
+    )
+    const markers = container.querySelectorAll('[data-entity-type="scan-site"]')
+    expect(markers.length).toBe(1)
+  })
+
   it('renders orbital ring labels', () => {
     render(
       <SolarSystemMap snapshot={emptySnapshot} currentTick={100} oreCompositions={{}} />,
