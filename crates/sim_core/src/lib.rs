@@ -962,9 +962,13 @@ mod tests {
         }
 
         let inv = &state.ships[&ship_id].inventory;
-        assert!(!inv.is_empty(), "ship inventory should not be empty after mining");
         assert!(
-            inv.iter().any(|i| matches!(i, InventoryItem::Ore { kg, .. } if *kg > 0.0)),
+            !inv.is_empty(),
+            "ship inventory should not be empty after mining"
+        );
+        assert!(
+            inv.iter()
+                .any(|i| matches!(i, InventoryItem::Ore { kg, .. } if *kg > 0.0)),
             "extracted mass must be positive"
         );
     }
@@ -1041,15 +1045,20 @@ mod tests {
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        state.ships.get_mut(&ship_id).unwrap().inventory.push(InventoryItem::Ore {
-            lot_id: LotId("lot_test_0001".to_string()),
-            asteroid_id: AsteroidId("asteroid_test".to_string()),
-            kg: 100.0,
-            composition: std::collections::HashMap::from([
-                ("Fe".to_string(), 0.7_f32),
-                ("Si".to_string(), 0.3_f32),
-            ]),
-        });
+        state
+            .ships
+            .get_mut(&ship_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Ore {
+                lot_id: LotId("lot_test_0001".to_string()),
+                asteroid_id: AsteroidId("asteroid_test".to_string()),
+                kg: 100.0,
+                composition: std::collections::HashMap::from([
+                    ("Fe".to_string(), 0.7_f32),
+                    ("Si".to_string(), 0.3_f32),
+                ]),
+            });
 
         let cmd = deposit_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
@@ -1059,7 +1068,7 @@ mod tests {
         let station_has_ore = state.stations[&station_id]
             .inventory
             .iter()
-            .any(|i| matches!(i, InventoryItem::Ore { kg, .. } if *kg > 90.0));
+            .any(|i| matches!(i, InventoryItem::Ore { kg, .. } if *kg == 100.0));
         assert!(station_has_ore, "ore should transfer to station");
     }
 
@@ -1070,15 +1079,20 @@ mod tests {
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        state.ships.get_mut(&ship_id).unwrap().inventory.push(InventoryItem::Ore {
-            lot_id: LotId("lot_test_0001".to_string()),
-            asteroid_id: AsteroidId("asteroid_test".to_string()),
-            kg: 100.0,
-            composition: std::collections::HashMap::from([
-                ("Fe".to_string(), 0.7_f32),
-                ("Si".to_string(), 0.3_f32),
-            ]),
-        });
+        state
+            .ships
+            .get_mut(&ship_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Ore {
+                lot_id: LotId("lot_test_0001".to_string()),
+                asteroid_id: AsteroidId("asteroid_test".to_string()),
+                kg: 100.0,
+                composition: std::collections::HashMap::from([
+                    ("Fe".to_string(), 0.7_f32),
+                    ("Si".to_string(), 0.3_f32),
+                ]),
+            });
 
         let cmd = deposit_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
@@ -1097,12 +1111,17 @@ mod tests {
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        state.ships.get_mut(&ship_id).unwrap().inventory.push(InventoryItem::Ore {
-            lot_id: LotId("lot_test_0001".to_string()),
-            asteroid_id: AsteroidId("asteroid_test".to_string()),
-            kg: 50.0,
-            composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
-        });
+        state
+            .ships
+            .get_mut(&ship_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Ore {
+                lot_id: LotId("lot_test_0001".to_string()),
+                asteroid_id: AsteroidId("asteroid_test".to_string()),
+                kg: 50.0,
+                composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
+            });
 
         let cmd = deposit_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
@@ -1123,7 +1142,10 @@ mod tests {
         let content = test_content();
         let state = test_state(&content);
         let ship = state.ships.values().next().unwrap();
-        assert!(ship.inventory.is_empty(), "ship inventory should be empty at start");
+        assert!(
+            ship.inventory.is_empty(),
+            "ship inventory should be empty at start"
+        );
         assert!(
             (ship.cargo_capacity_m3 - 20.0).abs() < 1e-5,
             "ship capacity should be 20 m³"
