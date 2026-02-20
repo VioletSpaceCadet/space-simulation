@@ -10,7 +10,7 @@ export function StatusBar({ tick, connected }: Props) {
 
   return (
     <div className="flex gap-6 items-center px-4 py-1.5 bg-surface border-b border-edge text-xs shrink-0">
-      <span className="text-bright font-bold">tick {tick}</span>
+      <span className="text-accent font-bold">tick {tick}</span>
       <span className="text-dim">
         day {day} | {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
       </span>

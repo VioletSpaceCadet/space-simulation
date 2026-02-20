@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import * as api from './api'
@@ -14,6 +14,7 @@ const snapshot: SimSnapshot = {
 }
 
 beforeEach(() => {
+  localStorage.clear()
   vi.spyOn(api, 'fetchSnapshot').mockResolvedValue(snapshot)
   vi.spyOn(api, 'createEventSource').mockReturnValue({
     onopen: null,
@@ -34,18 +35,59 @@ describe('App', () => {
     expect(screen.getByText(/tick/i)).toBeInTheDocument()
   })
 
-  it('renders all four panel headings', () => {
+  it('renders nav with Map and all four panel names', () => {
     render(<App />)
-    expect(screen.getByText('Events')).toBeInTheDocument()
-    expect(screen.getByText('Asteroids')).toBeInTheDocument()
-    expect(screen.getByText('Fleet')).toBeInTheDocument()
-    expect(screen.getByText('Research')).toBeInTheDocument()
+    const nav = screen.getByRole('navigation')
+    expect(nav).toBeInTheDocument()
+    const buttons = Array.from(nav.querySelectorAll('button'))
+    const labels = buttons.map((b) => b.textContent)
+    expect(labels).toEqual(['Map', 'Events', 'Asteroids', 'Fleet', 'Research'])
+  })
+
+  it('renders all five panel headings by default', () => {
+    render(<App />)
+    expect(screen.getAllByText('Map')).toHaveLength(2) // nav + panel heading
+    expect(screen.getAllByText('Events')).toHaveLength(2)
+    expect(screen.getAllByText('Asteroids')).toHaveLength(2)
+    expect(screen.getAllByText('Fleet')).toHaveLength(2)
+    expect(screen.getAllByText('Research')).toHaveLength(2)
+  })
+
+  it('hides panel when nav button clicked', () => {
+    render(<App />)
+    const nav = screen.getByRole('navigation')
+    const eventsButton = Array.from(nav.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Events',
+    )!
+    fireEvent.click(eventsButton)
+    // Events should now only appear in nav, not as a panel heading
+    expect(screen.getAllByText('Events')).toHaveLength(1)
   })
 
   it('renders resize handles between panels', () => {
     render(<App />)
-    // react-resizable-panels renders [data-panel-resize-handle-id] attributes
     const handles = document.querySelectorAll('[data-panel-resize-handle-id]')
     expect(handles.length).toBeGreaterThan(0)
+  })
+
+  it('renders solar system map panel with SVG', () => {
+    const { container } = render(<App />)
+    expect(container.querySelector('svg')).toBeInTheDocument()
+    expect(screen.getByText('Earth Orbit')).toBeInTheDocument()
+  })
+
+  it('can toggle map panel off and on', () => {
+    const { container } = render(<App />)
+    expect(container.querySelector('svg')).toBeInTheDocument()
+
+    const nav = screen.getByRole('navigation')
+    const mapButton = Array.from(nav.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Map',
+    )!
+    fireEvent.click(mapButton)
+    expect(container.querySelector('svg')).not.toBeInTheDocument()
+
+    fireEvent.click(mapButton)
+    expect(container.querySelector('svg')).toBeInTheDocument()
   })
 })

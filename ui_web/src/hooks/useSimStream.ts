@@ -2,6 +2,10 @@ import { useEffect, useReducer } from 'react'
 import { createEventSource, fetchSnapshot } from '../api'
 import type { AsteroidState, ModuleKindState, ResearchState, ShipState, SimEvent, SimSnapshot, SlagItem, StationState } from '../types'
 
+// Kept for backward compatibility with SolarSystemMap/DetailCard imports.
+// Composition is now embedded in InventoryItem::Ore; this type is unused in new code.
+export type OreCompositions = Record<string, Record<string, number>>
+
 interface State {
   snapshot: SimSnapshot | null
   events: SimEvent[]
