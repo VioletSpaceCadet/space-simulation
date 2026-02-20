@@ -52,9 +52,11 @@ export function AsteroidTable({ asteroids }: Props) {
               <td className="px-2 py-0.5 border-b border-surface">{tagSummary(asteroid.knowledge.tag_beliefs)}</td>
               <td className="px-2 py-0.5 border-b border-surface">{compositionSummary(asteroid.knowledge.composition)}</td>
               <td className="px-2 py-0.5 border-b border-surface">
-                {asteroid.mass_kg > 0
-                  ? `${asteroid.mass_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`
-                  : <span className="text-faint">depleted</span>}
+                {asteroid.mass_kg === undefined
+                  ? <span className="text-faint">—</span>
+                  : asteroid.mass_kg > 0
+                    ? `${asteroid.mass_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`
+                    : <span className="text-faint">depleted</span>}
               </td>
             </tr>
           ))}

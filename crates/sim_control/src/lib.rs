@@ -13,9 +13,10 @@ pub trait CommandSource {
 }
 
 /// Drives ships automatically:
-/// 1. Survey unscanned sites in order.
-/// 2. Once all sites are surveyed and deep scan is unlocked, deep-scan
-///    `IronRich` asteroids whose composition is still unknown.
+/// 1. Deposit cargo if hold is non-empty.
+/// 2. Mine the best available deep-scanned asteroid.
+/// 3. Deep-scan `IronRich` asteroids to unlock mining targets.
+/// 4. Survey unscanned sites.
 pub struct AutopilotController;
 
 const AUTOPILOT_OWNER: &str = "principal_autopilot";
@@ -137,10 +138,11 @@ impl CommandSource for AutopilotController {
                 continue;
             }
 
-            // Priority 2: unscanned survey sites.
-            if let Some(site) = next_site.next() {
-                let target_node = site.node.clone();
-                let task_kind = TaskKind::Survey { site: SiteId(site.id.0.clone()) };
+            // Priority 2: mine best available asteroid.
+            if let Some(asteroid) = next_mine.next() {
+                let target_node = asteroid.location_node.clone();
+                let duration_ticks = mine_duration(asteroid, ship, content);
+                let task_kind = TaskKind::Mine { asteroid: asteroid.id.clone(), duration_ticks };
                 let final_task = match shortest_hop_count(
                     &ship.location_node,
                     &target_node,
@@ -165,7 +167,7 @@ impl CommandSource for AutopilotController {
                 continue;
             }
 
-            // Priority 3: deep scan.
+            // Priority 3: deep scan (enables future mining).
             if deep_scan_unlocked {
                 if let Some(asteroid_id) = next_deep_scan.next() {
                     let node = state.asteroids[asteroid_id].location_node.clone();
@@ -195,11 +197,10 @@ impl CommandSource for AutopilotController {
                 }
             }
 
-            // Priority 4: mine best available asteroid.
-            if let Some(asteroid) = next_mine.next() {
-                let target_node = asteroid.location_node.clone();
-                let duration_ticks = mine_duration(asteroid, ship, content);
-                let task_kind = TaskKind::Mine { asteroid: asteroid.id.clone(), duration_ticks };
+            // Priority 4: survey unscanned sites.
+            if let Some(site) = next_site.next() {
+                let target_node = site.node.clone();
+                let task_kind = TaskKind::Survey { site: SiteId(site.id.0.clone()) };
                 let final_task = match shortest_hop_count(
                     &ship.location_node,
                     &target_node,
@@ -223,6 +224,7 @@ impl CommandSource for AutopilotController {
                 });
                 continue;
             }
+
             // Nothing to do for this ship.
         }
 

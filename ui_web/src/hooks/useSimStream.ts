@@ -37,9 +37,19 @@ function applyEvents(
             id: asteroid_id,
             location_node,
             anomaly_tags: [],
-            mass_kg: 0,
+            // mass_kg intentionally omitted — unknown until snapshot or OreMined event
             knowledge: { tag_beliefs: [], composition: null },
           },
+        }
+      }
+    }
+
+    if (e['OreMined']) {
+      const { asteroid_id, asteroid_remaining_kg } = e['OreMined'] as { asteroid_id: string; asteroid_remaining_kg: number }
+      if (updatedAsteroids[asteroid_id]) {
+        updatedAsteroids = {
+          ...updatedAsteroids,
+          [asteroid_id]: { ...updatedAsteroids[asteroid_id], mass_kg: asteroid_remaining_kg },
         }
       }
     }

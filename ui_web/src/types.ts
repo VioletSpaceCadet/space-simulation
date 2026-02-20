@@ -50,7 +50,7 @@ export interface AsteroidState {
   id: string
   location_node: string
   anomaly_tags: string[]
-  mass_kg: number
+  mass_kg?: number   // undefined = not yet known (discovered via event before snapshot)
   knowledge: AsteroidKnowledge
 }
 
