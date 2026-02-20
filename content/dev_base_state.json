@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "tick": 0,
+    "seed": 42,
+    "schema_version": 1,
+    "content_version": "0.0.1"
+  },
+  "scan_sites": [
+    { "id": "site_0001", "node": "node_belt_inner",  "template_id": "tmpl_iron_rich" },
+    { "id": "site_0002", "node": "node_belt_inner",  "template_id": "tmpl_iron_rich" },
+    { "id": "site_0003", "node": "node_belt_mid",    "template_id": "tmpl_iron_rich" },
+    { "id": "site_0004", "node": "node_belt_mid",    "template_id": "tmpl_iron_rich" },
+    { "id": "site_0005", "node": "node_belt_outer",  "template_id": "tmpl_iron_rich" },
+    { "id": "site_0006", "node": "node_belt_outer",  "template_id": "tmpl_iron_rich" },
+    { "id": "site_0007", "node": "node_belt_inner",  "template_id": "tmpl_iron_rich" },
+    { "id": "site_0008", "node": "node_belt_mid",    "template_id": "tmpl_iron_rich" },
+    { "id": "site_0009", "node": "node_belt_outer",  "template_id": "tmpl_iron_rich" },
+    { "id": "site_0010", "node": "node_belt_inner",  "template_id": "tmpl_iron_rich" }
+  ],
+  "asteroids": {},
+  "ships": {
+    "ship_0001": {
+      "id": "ship_0001",
+      "location_node": "node_earth_orbit",
+      "owner": "principal_autopilot",
+      "inventory": [],
+      "cargo_capacity_m3": 20.0,
+      "task": null
+    }
+  },
+  "stations": {
+    "station_earth_orbit": {
+      "id": "station_earth_orbit",
+      "location_node": "node_earth_orbit",
+      "inventory": [
+        {
+          "kind": "Module",
+          "item_id": "module_item_0001",
+          "module_def_id": "module_basic_iron_refinery"
+        }
+      ],
+      "cargo_capacity_m3": 10000.0,
+      "power_available_per_tick": 100.0,
+      "facilities": {
+        "compute_units_total": 10,
+        "power_per_compute_unit_per_tick": 1.0,
+        "efficiency": 1.0
+      },
+      "modules": []
+    }
+  },
+  "research": {
+    "unlocked": [],
+    "data_pool": {},
+    "evidence": {}
+  },
+  "counters": {
+    "next_event_id": 0,
+    "next_command_id": 0,
+    "next_asteroid_id": 0,
+    "next_lot_id": 0,
+    "next_module_instance_id": 1
+  }
+}

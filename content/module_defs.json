@@ -1,0 +1,42 @@
+[
+  {
+    "id": "module_basic_iron_refinery",
+    "name": "Basic Iron Refinery",
+    "mass_kg": 5000.0,
+    "volume_m3": 10.0,
+    "power_consumption_per_run": 10.0,
+    "behavior": {
+      "Processor": {
+        "processing_interval_ticks": 60,
+        "recipes": [
+          {
+            "id": "recipe_basic_iron",
+            "inputs": [
+              {
+                "filter": { "ItemKind": "Ore" },
+                "amount": { "Kg": 1000.0 }
+              }
+            ],
+            "outputs": [
+              {
+                "Material": {
+                  "element": "Fe",
+                  "yield_formula": { "ElementFraction": { "element": "Fe" } },
+                  "quality_formula": {
+                    "ElementFractionTimesMultiplier": { "element": "Fe", "multiplier": 1.0 }
+                  }
+                }
+              },
+              {
+                "Slag": {
+                  "yield_formula": { "FixedFraction": 1.0 }
+                }
+              }
+            ],
+            "efficiency": 1.0
+          }
+        ]
+      }
+    }
+  }
+]

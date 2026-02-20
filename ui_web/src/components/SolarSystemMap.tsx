@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
 import { useSvgZoomPan } from '../hooks/useSvgZoomPan'
-import type { OreCompositions } from '../hooks/useSimStream'
 import type { AsteroidState, ScanSite, ShipState, SimSnapshot, StationState } from '../types'
 import { Tooltip } from './solar-system/Tooltip'
 import { DetailCard } from './solar-system/DetailCard'
@@ -9,7 +8,7 @@ import { angleFromId, polarToCartesian, ringRadiusForNode, transitPosition } fro
 interface Props {
   snapshot: SimSnapshot | null
   currentTick: number
-  oreCompositions: OreCompositions
+  oreCompositions: Record<string, unknown>
 }
 
 const RINGS: { nodeId: string; label: string; radius: number; isBelt: boolean }[] = [
@@ -290,7 +289,7 @@ export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props
       {selected && snapshot && (() => {
         const entity = lookupEntity(selected)
         if (!entity) return null
-        return <DetailCard entity={entity} oreCompositions={oreCompositions} onClose={() => setSelected(null)} />
+        return <DetailCard entity={entity} onClose={() => setSelected(null)} />
       })()}
     </div>
   )

@@ -8,8 +8,8 @@ use serde::Deserialize;
 use sim_control::{AutopilotController, CommandSource};
 use sim_core::{
     AsteroidTemplateDef, Constants, Counters, ElementDef, EventLevel, FacilitiesState, GameContent,
-    GameState, MetaState, NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId,
-    SolarSystemDef, StationId, StationState, TechDef,
+    GameState, MetaState, ModuleDef, NodeId, PrincipalId, ResearchState, ScanSite, ShipId,
+    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef,
 };
 
 // ---------------------------------------------------------------------------
@@ -29,8 +29,12 @@ enum Commands {
     Run {
         #[arg(long)]
         ticks: u64,
-        #[arg(long)]
-        seed: u64,
+        /// Generate world procedurally with this seed. Mutually exclusive with --state.
+        #[arg(long, conflicts_with = "state_file")]
+        seed: Option<u64>,
+        /// Load initial GameState from a JSON file. Mutually exclusive with --seed.
+        #[arg(long = "state", conflicts_with = "seed")]
+        state_file: Option<String>,
         #[arg(long, default_value = "./content")]
         content_dir: String,
         #[arg(long, default_value_t = 100)]
@@ -90,12 +94,19 @@ fn load_content(content_dir: &str) -> Result<GameContent> {
     )
     .context("parsing elements.json")?;
 
+    let module_defs: Vec<ModuleDef> = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("module_defs.json"))
+            .context("reading module_defs.json")?,
+    )
+    .context("parsing module_defs.json")?;
+
     Ok(GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
         solar_system,
         asteroid_templates: templates_file.templates,
         elements: elements_file.elements,
+        module_defs,
         constants,
     })
 }
@@ -113,7 +124,7 @@ fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl rand::Rn
     let station = StationState {
         id: station_id.clone(),
         location_node: earth_orbit.clone(),
-        cargo: std::collections::HashMap::new(),
+        inventory: vec![],
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         facilities: FacilitiesState {
@@ -121,6 +132,7 @@ fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl rand::Rn
             power_per_compute_unit_per_tick: c.station_power_per_compute_unit_per_tick,
             efficiency: c.station_efficiency,
         },
+        modules: vec![],
     };
 
     // Ship
@@ -130,7 +142,7 @@ fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl rand::Rn
         id: ship_id.clone(),
         location_node: earth_orbit.clone(),
         owner,
-        cargo: std::collections::HashMap::new(),
+        inventory: vec![],
         cargo_capacity_m3: c.ship_cargo_capacity_m3,
         task: None,
     };
@@ -171,6 +183,8 @@ fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl rand::Rn
             next_event_id: 0,
             next_command_id: 0,
             next_asteroid_id: 0,
+            next_lot_id: 0,
+            next_module_instance_id: 0,
         },
     }
 }
@@ -181,19 +195,34 @@ fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl rand::Rn
 
 fn run(
     ticks: u64,
-    seed: u64,
+    seed: Option<u64>,
+    state_file: Option<String>,
     content_dir: &str,
     print_every: u64,
     event_level: EventLevel,
 ) -> Result<()> {
     let content = load_content(content_dir)?;
-    let mut rng = ChaCha8Rng::seed_from_u64(seed);
-    let mut state = build_initial_state(&content, seed, &mut rng);
+
+    let (mut state, mut rng) = if let Some(path) = state_file {
+        let json = std::fs::read_to_string(&path)
+            .with_context(|| format!("reading state file: {path}"))?;
+        let loaded: sim_core::GameState =
+            serde_json::from_str(&json).with_context(|| format!("parsing state file: {path}"))?;
+        let rng_seed = loaded.meta.seed;
+        (loaded, ChaCha8Rng::seed_from_u64(rng_seed))
+    } else {
+        let resolved_seed = seed.unwrap_or_else(rand::random);
+        let mut new_rng = ChaCha8Rng::seed_from_u64(resolved_seed);
+        let new_state = build_initial_state(&content, resolved_seed, &mut new_rng);
+        (new_state, new_rng)
+    };
+
     let mut autopilot = AutopilotController;
     let mut next_command_id = 0u64;
 
     println!(
-        "Starting simulation: ticks={ticks} seed={seed} sites={} content_version={}",
+        "Starting simulation: ticks={ticks} seed={} sites={} content_version={}",
+        state.meta.seed,
         state.scan_sites.len(),
         content.content_version,
     );
@@ -277,6 +306,7 @@ fn main() -> Result<()> {
         Commands::Run {
             ticks,
             seed,
+            state_file,
             content_dir,
             print_every,
             event_level,
@@ -285,7 +315,7 @@ fn main() -> Result<()> {
                 "debug" => EventLevel::Debug,
                 _ => EventLevel::Normal,
             };
-            run(ticks, seed, &content_dir, print_every, level)?;
+            run(ticks, seed, state_file, &content_dir, print_every, level)?;
         }
     }
     Ok(())

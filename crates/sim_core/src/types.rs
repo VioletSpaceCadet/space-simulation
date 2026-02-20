@@ -39,6 +39,10 @@ string_id!(SiteId);
 string_id!(CommandId);
 string_id!(EventId);
 string_id!(PrincipalId);
+string_id!(LotId);
+string_id!(ModuleItemId);
+string_id!(ModuleInstanceId);
+string_id!(ComponentId);
 
 // ---------------------------------------------------------------------------
 // Core enums
@@ -98,6 +102,57 @@ pub struct Counters {
     pub next_event_id: u64,
     pub next_command_id: u64,
     pub next_asteroid_id: u64,
+    pub next_lot_id: u64,
+    pub next_module_instance_id: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum InventoryItem {
+    Ore {
+        lot_id: LotId,
+        asteroid_id: AsteroidId,
+        kg: f32,
+        composition: CompositionVec,
+    },
+    Slag {
+        kg: f32,
+        composition: CompositionVec,
+    },
+    Material {
+        element: ElementId,
+        kg: f32,
+        quality: f32,
+    },
+    Component {
+        component_id: ComponentId,
+        count: u32,
+        quality: f32,
+    },
+    Module {
+        item_id: ModuleItemId,
+        module_def_id: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleState {
+    pub id: ModuleInstanceId,
+    pub def_id: String,
+    pub enabled: bool,
+    pub kind_state: ModuleKindState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ModuleKindState {
+    Processor(ProcessorState),
+    Storage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessorState {
+    pub threshold_kg: f32,
+    pub ticks_since_last_run: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,7 +178,7 @@ pub struct ShipState {
     pub id: ShipId,
     pub location_node: NodeId,
     pub owner: PrincipalId,
-    pub cargo: HashMap<ElementId, f32>,
+    pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
     pub task: Option<TaskState>,
 }
@@ -132,10 +187,11 @@ pub struct ShipState {
 pub struct StationState {
     pub id: StationId,
     pub location_node: NodeId,
-    pub cargo: HashMap<ElementId, f32>,
+    pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
     pub facilities: FacilitiesState,
+    pub modules: Vec<ModuleState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -206,6 +262,24 @@ pub enum Command {
         ship_id: ShipId,
         task_kind: TaskKind,
     },
+    InstallModule {
+        station_id: StationId,
+        module_item_id: ModuleItemId,
+    },
+    UninstallModule {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+    },
+    SetModuleEnabled {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        enabled: bool,
+    },
+    SetModuleThreshold {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        threshold_kg: f32,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -262,14 +336,43 @@ pub enum Event {
     OreMined {
         ship_id: ShipId,
         asteroid_id: AsteroidId,
-        /// kg extracted per element
-        extracted: HashMap<ElementId, f32>,
+        ore_lot: InventoryItem,
         asteroid_remaining_kg: f32,
     },
     OreDeposited {
         ship_id: ShipId,
         station_id: StationId,
-        deposited: HashMap<ElementId, f32>,
+        items: Vec<InventoryItem>,
+    },
+    ModuleInstalled {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        module_item_id: ModuleItemId,
+        module_def_id: String,
+    },
+    ModuleUninstalled {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        module_item_id: ModuleItemId,
+    },
+    ModuleToggled {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        enabled: bool,
+    },
+    ModuleThresholdSet {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        threshold_kg: f32,
+    },
+    RefineryRan {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        ore_consumed_kg: f32,
+        material_produced_kg: f32,
+        material_quality: f32,
+        slag_produced_kg: f32,
+        material_element: ElementId,
     },
     /// Only emitted at `EventLevel::Debug`.
     ResearchRoll {
@@ -291,6 +394,7 @@ pub struct GameContent {
     pub solar_system: SolarSystemDef,
     pub asteroid_templates: Vec<AsteroidTemplateDef>,
     pub elements: Vec<ElementDef>,
+    pub module_defs: Vec<ModuleDef>,
     pub constants: Constants,
 }
 
@@ -335,6 +439,96 @@ pub struct ElementDef {
     pub id: ElementId,
     pub density_kg_per_m3: f32,
     pub display_name: String,
+    #[serde(default)]
+    pub refined_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleDef {
+    pub id: String,
+    pub name: String,
+    pub mass_kg: f32,
+    pub volume_m3: f32,
+    pub power_consumption_per_run: f32,
+    pub behavior: ModuleBehaviorDef,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ModuleBehaviorDef {
+    Processor(ProcessorDef),
+    Storage { capacity_m3: f32 },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessorDef {
+    pub processing_interval_ticks: u64,
+    pub recipes: Vec<RecipeDef>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecipeDef {
+    pub id: String,
+    pub inputs: Vec<RecipeInput>,
+    pub outputs: Vec<OutputSpec>,
+    pub efficiency: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecipeInput {
+    pub filter: InputFilter,
+    pub amount: InputAmount,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum InputFilter {
+    ItemKind(ItemKind),
+    Element(ElementId),
+    ElementWithMinQuality {
+        element: ElementId,
+        min_quality: f32,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ItemKind {
+    Ore,
+    Slag,
+    Material,
+    Component,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum InputAmount {
+    Kg(f32),
+    Count(u32),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum OutputSpec {
+    Material {
+        element: ElementId,
+        yield_formula: YieldFormula,
+        quality_formula: QualityFormula,
+    },
+    Slag {
+        yield_formula: YieldFormula,
+    },
+    Component {
+        component_id: ComponentId,
+        quality_formula: QualityFormula,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum YieldFormula {
+    ElementFraction { element: ElementId },
+    FixedFraction(f32),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum QualityFormula {
+    ElementFractionTimesMultiplier { element: ElementId, multiplier: f32 },
+    Fixed(f32),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

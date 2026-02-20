@@ -22,11 +22,67 @@ export interface TaskState {
   eta_tick: number
 }
 
+// Inventory item discriminated union (matches Rust InventoryItem #[serde(tag = "kind")])
+export type CompositionVec = Record<string, number>
+
+export interface OreItem {
+  kind: 'Ore'
+  lot_id: string
+  asteroid_id: string
+  kg: number
+  composition: CompositionVec
+}
+
+export interface SlagItem {
+  kind: 'Slag'
+  kg: number
+  composition: CompositionVec
+}
+
+export interface MaterialItem {
+  kind: 'Material'
+  element: string
+  kg: number
+  quality: number
+}
+
+export interface ComponentItem {
+  kind: 'Component'
+  component_id: string
+  count: number
+  quality: number
+}
+
+export interface ModuleItem {
+  kind: 'Module'
+  item_id: string
+  module_def_id: string
+}
+
+export type InventoryItem = OreItem | SlagItem | MaterialItem | ComponentItem | ModuleItem
+
+// Module state
+export interface ProcessorState {
+  threshold_kg: number
+  ticks_since_last_run: number
+}
+
+export type ModuleKindState =
+  | { Processor: ProcessorState }
+  | 'Storage'
+
+export interface ModuleState {
+  id: string
+  def_id: string
+  enabled: boolean
+  kind_state: ModuleKindState
+}
+
 export interface ShipState {
   id: string
   location_node: string
   owner: string
-  cargo: Record<string, number>       // element_id -> kg
+  inventory: InventoryItem[]
   cargo_capacity_m3: number
   task: TaskState | null
 }
@@ -35,9 +91,10 @@ export interface StationState {
   id: string
   location_node: string
   power_available_per_tick: number
-  cargo: Record<string, number>       // element_id -> kg
+  inventory: InventoryItem[]
   cargo_capacity_m3: number
   facilities: FacilitiesState
+  modules: ModuleState[]
 }
 
 export interface AsteroidKnowledge {

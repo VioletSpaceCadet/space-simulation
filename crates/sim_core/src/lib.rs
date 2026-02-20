@@ -5,12 +5,13 @@
 mod engine;
 mod graph;
 mod research;
+mod station;
 mod tasks;
 mod types;
 
 pub use engine::tick;
 pub use graph::shortest_hop_count;
-pub use tasks::{cargo_volume_used, mine_duration};
+pub use tasks::{inventory_volume_m3, mine_duration};
 pub use types::*;
 
 pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnvelope {
@@ -68,18 +69,22 @@ mod tests {
                     id: "ore".to_string(),
                     density_kg_per_m3: 3000.0,
                     display_name: "Raw Ore".to_string(),
+                    refined_name: None,
                 },
                 ElementDef {
                     id: "Fe".to_string(),
                     density_kg_per_m3: 7874.0,
                     display_name: "Iron".to_string(),
+                    refined_name: Some("Iron Ingot".to_string()),
                 },
                 ElementDef {
                     id: "Si".to_string(),
                     density_kg_per_m3: 2329.0,
                     display_name: "Silicon".to_string(),
+                    refined_name: None,
                 },
             ],
+            module_defs: vec![],
             constants: Constants {
                 survey_scan_ticks: 1,
                 deep_scan_ticks: 1,
@@ -100,7 +105,7 @@ mod tests {
                 station_efficiency: 1.0,
                 station_power_available_per_tick: 100.0,
                 mining_rate_kg_per_tick: 50.0,
-                deposit_ticks: 1,   // fast for tests
+                deposit_ticks: 1, // fast for tests
             },
         }
     }
@@ -130,7 +135,7 @@ mod tests {
                     id: ship_id,
                     location_node: node_id.clone(),
                     owner,
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: 20.0,
                     task: None,
                 },
@@ -140,7 +145,7 @@ mod tests {
                 StationState {
                     id: station_id,
                     location_node: node_id,
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: 10_000.0,
                     power_available_per_tick: 100.0,
                     facilities: FacilitiesState {
@@ -148,6 +153,7 @@ mod tests {
                         power_per_compute_unit_per_tick: 1.0,
                         efficiency: 1.0,
                     },
+                    modules: vec![],
                 },
             )]),
             research: ResearchState {
@@ -159,6 +165,8 @@ mod tests {
                 next_event_id: 0,
                 next_command_id: 0,
                 next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 0,
             },
         }
     }
@@ -939,13 +947,13 @@ mod tests {
     }
 
     #[test]
-    fn test_mine_adds_ore_to_ship_cargo() {
+    fn test_mine_adds_ore_to_ship_inventory() {
         let content = test_content();
         let (mut state, asteroid_id) = state_with_asteroid(&content);
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        assert!(state.ships[&ship_id].cargo.is_empty());
+        assert!(state.ships[&ship_id].inventory.is_empty());
 
         let cmd = mine_command(&state, &asteroid_id, &content);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
@@ -954,13 +962,14 @@ mod tests {
             tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
         }
 
-        let cargo = &state.ships[&ship_id].cargo;
+        let inv = &state.ships[&ship_id].inventory;
         assert!(
-            !cargo.is_empty(),
-            "ship cargo should not be empty after mining"
+            !inv.is_empty(),
+            "ship inventory should not be empty after mining"
         );
         assert!(
-            cargo.values().any(|&kg| kg > 0.0),
+            inv.iter()
+                .any(|i| matches!(i, InventoryItem::Ore { kg, .. } if *kg > 0.0)),
             "extracted mass must be positive"
         );
     }
@@ -1023,45 +1032,77 @@ mod tests {
             execute_at_tick: state.meta.tick,
             command: Command::AssignShipTask {
                 ship_id,
-                task_kind: TaskKind::Deposit { station: station_id },
+                task_kind: TaskKind::Deposit {
+                    station: station_id,
+                },
             },
         }
     }
 
     #[test]
-    fn test_deposit_moves_cargo_to_station() {
+    fn test_deposit_moves_inventory_to_station() {
         let content = test_content();
         let mut state = test_state(&content);
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        state.ships.get_mut(&ship_id).unwrap().cargo.insert("Fe".to_string(), 100.0);
+        state
+            .ships
+            .get_mut(&ship_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Ore {
+                lot_id: LotId("lot_test_0001".to_string()),
+                asteroid_id: AsteroidId("asteroid_test".to_string()),
+                kg: 100.0,
+                composition: std::collections::HashMap::from([
+                    ("Fe".to_string(), 0.7_f32),
+                    ("Si".to_string(), 0.3_f32),
+                ]),
+            });
 
         let cmd = deposit_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         let station_id = StationId("station_earth_orbit".to_string());
-        let station_fe = state.stations[&station_id].cargo.get("Fe").copied().unwrap_or(0.0);
-        assert!((station_fe - 100.0).abs() < 1e-3, "Fe should transfer to station");
+        let station_has_ore = state.stations[&station_id]
+            .inventory
+            .iter()
+            .any(|i| matches!(i, InventoryItem::Ore { kg, .. } if *kg == 100.0));
+        assert!(station_has_ore, "ore should transfer to station");
     }
 
     #[test]
-    fn test_deposit_clears_ship_cargo() {
+    fn test_deposit_clears_ship_inventory() {
         let content = test_content();
         let mut state = test_state(&content);
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        state.ships.get_mut(&ship_id).unwrap().cargo.insert("Fe".to_string(), 100.0);
+        state
+            .ships
+            .get_mut(&ship_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Ore {
+                lot_id: LotId("lot_test_0001".to_string()),
+                asteroid_id: AsteroidId("asteroid_test".to_string()),
+                kg: 100.0,
+                composition: std::collections::HashMap::from([
+                    ("Fe".to_string(), 0.7_f32),
+                    ("Si".to_string(), 0.3_f32),
+                ]),
+            });
 
         let cmd = deposit_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
-        let cargo = &state.ships[&ship_id].cargo;
-        let total: f32 = cargo.values().sum();
-        assert!(total < 1e-3, "ship cargo should be empty after deposit");
+        assert!(
+            state.ships[&ship_id].inventory.is_empty(),
+            "ship inventory should be empty after deposit"
+        );
     }
 
     #[test]
@@ -1071,14 +1112,26 @@ mod tests {
         let mut rng = make_rng();
 
         let ship_id = ShipId("ship_0001".to_string());
-        state.ships.get_mut(&ship_id).unwrap().cargo.insert("Fe".to_string(), 50.0);
+        state
+            .ships
+            .get_mut(&ship_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Ore {
+                lot_id: LotId("lot_test_0001".to_string()),
+                asteroid_id: AsteroidId("asteroid_test".to_string()),
+                kg: 50.0,
+                composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
+            });
 
         let cmd = deposit_command(&state);
         tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
         let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
         assert!(
-            events.iter().any(|e| matches!(e.event, Event::OreDeposited { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e.event, Event::OreDeposited { .. })),
             "OreDeposited event should be emitted"
         );
     }
@@ -1086,11 +1139,14 @@ mod tests {
     // --- Cargo holds --------------------------------------------------------
 
     #[test]
-    fn test_ship_starts_with_empty_cargo() {
+    fn test_ship_starts_with_empty_inventory() {
         let content = test_content();
         let state = test_state(&content);
         let ship = state.ships.values().next().unwrap();
-        assert!(ship.cargo.is_empty(), "ship cargo should be empty at start");
+        assert!(
+            ship.inventory.is_empty(),
+            "ship inventory should be empty at start"
+        );
         assert!(
             (ship.cargo_capacity_m3 - 20.0).abs() < 1e-5,
             "ship capacity should be 20 m³"
@@ -1098,13 +1154,13 @@ mod tests {
     }
 
     #[test]
-    fn test_station_starts_with_empty_cargo() {
+    fn test_station_starts_with_empty_inventory() {
         let content = test_content();
         let state = test_state(&content);
         let station = state.stations.values().next().unwrap();
         assert!(
-            station.cargo.is_empty(),
-            "station cargo should be empty at start"
+            station.inventory.is_empty(),
+            "station inventory should be empty at start"
         );
         assert!(
             (station.cargo_capacity_m3 - 10_000.0).abs() < 1e-5,
@@ -1215,6 +1271,191 @@ mod tests {
         );
     }
 
+    // --- Refinery ---
+
+    fn refinery_content() -> GameContent {
+        let mut content = test_content();
+        content.module_defs = vec![ModuleDef {
+            id: "module_basic_iron_refinery".to_string(),
+            name: "Basic Iron Refinery".to_string(),
+            mass_kg: 5000.0,
+            volume_m3: 10.0,
+            power_consumption_per_run: 10.0,
+            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_ticks: 2, // short for tests
+                recipes: vec![RecipeDef {
+                    id: "recipe_basic_iron".to_string(),
+                    inputs: vec![RecipeInput {
+                        filter: InputFilter::ItemKind(ItemKind::Ore),
+                        amount: InputAmount::Kg(500.0),
+                    }],
+                    outputs: vec![
+                        OutputSpec::Material {
+                            element: "Fe".to_string(),
+                            yield_formula: YieldFormula::ElementFraction {
+                                element: "Fe".to_string(),
+                            },
+                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                                element: "Fe".to_string(),
+                                multiplier: 1.0,
+                            },
+                        },
+                        OutputSpec::Slag {
+                            yield_formula: YieldFormula::FixedFraction(1.0),
+                        },
+                    ],
+                    efficiency: 1.0,
+                }],
+            }),
+        }];
+        content
+    }
+
+    fn state_with_refinery(content: &GameContent) -> GameState {
+        let mut state = test_state(content);
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+
+        station.modules.push(ModuleState {
+            id: ModuleInstanceId("module_inst_0001".to_string()),
+            def_id: "module_basic_iron_refinery".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 0,
+            }),
+        });
+
+        station.inventory.push(InventoryItem::Ore {
+            lot_id: LotId("lot_0001".to_string()),
+            asteroid_id: AsteroidId("asteroid_0001".to_string()),
+            kg: 1000.0,
+            composition: std::collections::HashMap::from([
+                ("Fe".to_string(), 0.7f32),
+                ("Si".to_string(), 0.3f32),
+            ]),
+        });
+
+        state
+    }
+
+    #[test]
+    fn test_refinery_produces_material_and_slag() {
+        let content = refinery_content();
+        let mut state = state_with_refinery(&content);
+        let mut rng = make_rng();
+
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = &state.stations[&station_id];
+
+        let has_material = station.inventory.iter().any(|i| {
+            matches!(i, InventoryItem::Material { element, kg, .. } if element == "Fe" && *kg > 0.0)
+        });
+        assert!(
+            has_material,
+            "station should have Fe Material after refinery runs"
+        );
+
+        let has_slag = station
+            .inventory
+            .iter()
+            .any(|i| matches!(i, InventoryItem::Slag { kg, .. } if *kg > 0.0));
+        assert!(has_slag, "station should have Slag after refinery runs");
+    }
+
+    #[test]
+    fn test_refinery_quality_equals_fe_fraction() {
+        let content = refinery_content();
+        let mut state = state_with_refinery(&content);
+        let mut rng = make_rng();
+
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = &state.stations[&station_id];
+
+        let quality = station.inventory.iter().find_map(|i| {
+            if let InventoryItem::Material {
+                element, quality, ..
+            } = i
+            {
+                if element == "Fe" {
+                    Some(*quality)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+        assert!(quality.is_some(), "Fe Material should exist");
+        assert!(
+            (quality.unwrap() - 0.7).abs() < 1e-4,
+            "quality should equal Fe fraction (0.7) with multiplier 1.0"
+        );
+    }
+
+    #[test]
+    fn test_refinery_skips_when_below_threshold() {
+        let content = refinery_content();
+        let mut state = test_state(&content);
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+
+        station.modules.push(ModuleState {
+            id: ModuleInstanceId("module_inst_0001".to_string()),
+            def_id: "module_basic_iron_refinery".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 9999.0,
+                ticks_since_last_run: 0,
+            }),
+        });
+        station.inventory.push(InventoryItem::Ore {
+            lot_id: LotId("lot_0001".to_string()),
+            asteroid_id: AsteroidId("asteroid_0001".to_string()),
+            kg: 1000.0,
+            composition: std::collections::HashMap::from([
+                ("Fe".to_string(), 0.7f32),
+                ("Si".to_string(), 0.3f32),
+            ]),
+        });
+
+        let mut rng = make_rng();
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let station = &state.stations[&station_id];
+        assert!(
+            !station
+                .inventory
+                .iter()
+                .any(|i| matches!(i, InventoryItem::Material { .. })),
+            "refinery should not run when ore is below threshold"
+        );
+    }
+
+    #[test]
+    fn test_refinery_emits_refinery_ran_event() {
+        let content = refinery_content();
+        let mut state = state_with_refinery(&content);
+        let mut rng = make_rng();
+
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e.event, Event::RefineryRan { .. })),
+            "RefineryRan event should be emitted when refinery processes ore"
+        );
+    }
+
     #[test]
     fn transit_moves_ship_and_starts_next_task() {
         // Two-node solar system; ship starts at node_a, site is at node_b.
@@ -1261,7 +1502,7 @@ mod tests {
                     id: ship_id.clone(),
                     location_node: node_a.clone(),
                     owner: owner.clone(),
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: 20.0,
                     task: None,
                 },
@@ -1271,7 +1512,7 @@ mod tests {
                 StationState {
                     id: station_id,
                     location_node: node_a.clone(),
-                    cargo: HashMap::new(),
+                    inventory: vec![],
                     cargo_capacity_m3: 10_000.0,
                     power_available_per_tick: 100.0,
                     facilities: FacilitiesState {
@@ -1279,6 +1520,7 @@ mod tests {
                         power_per_compute_unit_per_tick: 1.0,
                         efficiency: 1.0,
                     },
+                    modules: vec![],
                 },
             )]),
             research: ResearchState {
@@ -1290,6 +1532,8 @@ mod tests {
                 next_event_id: 0,
                 next_command_id: 0,
                 next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 0,
             },
         };
 

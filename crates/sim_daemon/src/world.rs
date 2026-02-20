@@ -3,7 +3,7 @@ use rand::Rng;
 use serde::Deserialize;
 use sim_core::{
     AsteroidTemplateDef, Constants, Counters, ElementDef, FacilitiesState, GameContent, GameState,
-    MetaState, NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId,
+    MetaState, ModuleDef, NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState, SiteId,
     SolarSystemDef, StationId, StationState, TechDef,
 };
 use std::path::Path;
@@ -48,12 +48,18 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         &std::fs::read_to_string(dir.join("elements.json")).context("reading elements.json")?,
     )
     .context("parsing elements.json")?;
+    let module_defs: Vec<ModuleDef> = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("module_defs.json"))
+            .context("reading module_defs.json")?,
+    )
+    .context("parsing module_defs.json")?;
     Ok(GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
         solar_system,
         asteroid_templates: templates_file.templates,
         elements: elements_file.elements,
+        module_defs,
         constants,
     })
 }
@@ -65,7 +71,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     let station = StationState {
         id: station_id.clone(),
         location_node: earth_orbit.clone(),
-        cargo: std::collections::HashMap::new(),
+        inventory: vec![],
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         facilities: FacilitiesState {
@@ -73,6 +79,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             power_per_compute_unit_per_tick: c.station_power_per_compute_unit_per_tick,
             efficiency: c.station_efficiency,
         },
+        modules: vec![],
     };
     let ship_id = ShipId("ship_0001".to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
@@ -80,7 +87,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         id: ship_id.clone(),
         location_node: earth_orbit.clone(),
         owner,
-        cargo: std::collections::HashMap::new(),
+        inventory: vec![],
         cargo_capacity_m3: c.ship_cargo_capacity_m3,
         task: None,
     };
@@ -118,6 +125,8 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             next_event_id: 0,
             next_command_id: 0,
             next_asteroid_id: 0,
+            next_lot_id: 0,
+            next_module_instance_id: 0,
         },
     }
 }

@@ -61,7 +61,7 @@ function useVisiblePanels() {
 }
 
 export default function App() {
-  const { snapshot, events, connected, currentTick, oreCompositions } = useSimStream()
+  const { snapshot, events, connected, currentTick } = useSimStream()
   const { visible, toggle } = useVisiblePanels()
 
   const visiblePanels = ALL_PANELS.filter((id) => visible.has(id))
@@ -69,9 +69,7 @@ export default function App() {
   function renderPanel(id: PanelId) {
     switch (id) {
       case 'map':
-        return (
-          <SolarSystemMap snapshot={snapshot} currentTick={currentTick} oreCompositions={oreCompositions} />
-        )
+        return <SolarSystemMap snapshot={snapshot} currentTick={currentTick} oreCompositions={{}} />
       case 'events':
         return <EventsFeed events={events} />
       case 'asteroids':
@@ -81,7 +79,6 @@ export default function App() {
           <FleetPanel
             ships={snapshot?.ships ?? {}}
             stations={snapshot?.stations ?? {}}
-            oreCompositions={oreCompositions}
           />
         )
       case 'research':
