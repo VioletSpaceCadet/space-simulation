@@ -1,7 +1,7 @@
 use crate::{
     AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, CompositionVec, Constants, DataKind,
     ElementId, Event, EventEnvelope, GameContent, GameState, NodeId, ResearchState, ShipId,
-    ShipState, SiteId, TaskKind, TaskState, TechEffect,
+    ShipState, SiteId, StationId, TaskKind, TaskState, TechEffect,
 };
 use rand::Rng;
 use std::collections::HashMap;
@@ -12,6 +12,7 @@ pub(crate) fn task_duration(kind: &TaskKind, constants: &Constants) -> u64 {
         TaskKind::Survey { .. } => constants.survey_scan_ticks,
         TaskKind::DeepScan { .. } => constants.deep_scan_ticks,
         TaskKind::Mine { duration_ticks, .. } => *duration_ticks,
+        TaskKind::Deposit { .. } => constants.deposit_ticks,
         TaskKind::Idle => 0,
     }
 }
@@ -23,6 +24,7 @@ pub(crate) fn task_kind_label(kind: &TaskKind) -> &'static str {
         TaskKind::Survey { .. } => "Survey",
         TaskKind::DeepScan { .. } => "DeepScan",
         TaskKind::Mine { .. } => "Mine",
+        TaskKind::Deposit { .. } => "Deposit",
     }
 }
 
@@ -33,6 +35,7 @@ pub(crate) fn task_target(kind: &TaskKind) -> Option<String> {
         TaskKind::Survey { site } => Some(site.0.clone()),
         TaskKind::DeepScan { asteroid } => Some(asteroid.0.clone()),
         TaskKind::Mine { asteroid, .. } => Some(asteroid.0.clone()),
+        TaskKind::Deposit { station } => Some(station.0.clone()),
     }
 }
 
@@ -378,6 +381,59 @@ pub(crate) fn resolve_mine(
             ship_id: ship_id.clone(),
             task_kind: "Mine".to_string(),
             target: Some(asteroid_id.0.clone()),
+        },
+    ));
+}
+
+pub(crate) fn resolve_deposit(
+    state: &mut GameState,
+    ship_id: &ShipId,
+    station_id: &StationId,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    let Some(ship) = state.ships.get(ship_id) else { return };
+    let cargo = ship.cargo.clone();
+
+    if cargo.is_empty() {
+        set_ship_idle(state, ship_id, current_tick);
+        return;
+    }
+
+    let Some(station) = state.stations.get_mut(station_id) else {
+        set_ship_idle(state, ship_id, current_tick);
+        return;
+    };
+
+    // Transfer all ship cargo to the station.
+    for (element_id, kg) in &cargo {
+        *station.cargo.entry(element_id.clone()).or_insert(0.0) += kg;
+    }
+
+    // Clear ship cargo.
+    if let Some(ship) = state.ships.get_mut(ship_id) {
+        ship.cargo.clear();
+    }
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::OreDeposited {
+            station_id: station_id.clone(),
+            deposited: cargo,
+        },
+    ));
+
+    set_ship_idle(state, ship_id, current_tick);
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::TaskCompleted {
+            ship_id: ship_id.clone(),
+            task_kind: "Deposit".to_string(),
+            target: Some(station_id.0.clone()),
         },
     ));
 }

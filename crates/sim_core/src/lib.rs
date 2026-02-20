@@ -95,6 +95,7 @@ mod tests {
                 station_efficiency: 1.0,
                 station_power_available_per_tick: 100.0,
                 mining_rate_kg_per_tick: 50.0,
+                deposit_ticks: 1,   // fast for tests
             },
         }
     }
@@ -1001,6 +1002,79 @@ mod tests {
         assert!(
             !state.asteroids.contains_key(&asteroid_id),
             "fully mined asteroid should be removed from state"
+        );
+    }
+
+    // --- Deposit ------------------------------------------------------------
+
+    fn deposit_command(state: &GameState) -> CommandEnvelope {
+        let ship_id = ShipId("ship_0001".to_string());
+        let station_id = StationId("station_earth_orbit".to_string());
+        let ship = &state.ships[&ship_id];
+        CommandEnvelope {
+            id: CommandId("cmd_deposit_001".to_string()),
+            issued_by: ship.owner.clone(),
+            issued_tick: state.meta.tick,
+            execute_at_tick: state.meta.tick,
+            command: Command::AssignShipTask {
+                ship_id,
+                task_kind: TaskKind::Deposit { station: station_id },
+            },
+        }
+    }
+
+    #[test]
+    fn test_deposit_moves_cargo_to_station() {
+        let content = test_content();
+        let mut state = test_state(&content);
+        let mut rng = make_rng();
+
+        let ship_id = ShipId("ship_0001".to_string());
+        state.ships.get_mut(&ship_id).unwrap().cargo.insert("Fe".to_string(), 100.0);
+
+        let cmd = deposit_command(&state);
+        tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station_fe = state.stations[&station_id].cargo.get("Fe").copied().unwrap_or(0.0);
+        assert!((station_fe - 100.0).abs() < 1e-3, "Fe should transfer to station");
+    }
+
+    #[test]
+    fn test_deposit_clears_ship_cargo() {
+        let content = test_content();
+        let mut state = test_state(&content);
+        let mut rng = make_rng();
+
+        let ship_id = ShipId("ship_0001".to_string());
+        state.ships.get_mut(&ship_id).unwrap().cargo.insert("Fe".to_string(), 100.0);
+
+        let cmd = deposit_command(&state);
+        tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        let cargo = &state.ships[&ship_id].cargo;
+        let total: f32 = cargo.values().sum();
+        assert!(total < 1e-3, "ship cargo should be empty after deposit");
+    }
+
+    #[test]
+    fn test_deposit_emits_ore_deposited_event() {
+        let content = test_content();
+        let mut state = test_state(&content);
+        let mut rng = make_rng();
+
+        let ship_id = ShipId("ship_0001".to_string());
+        state.ships.get_mut(&ship_id).unwrap().cargo.insert("Fe".to_string(), 50.0);
+
+        let cmd = deposit_command(&state);
+        tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+        assert!(
+            events.iter().any(|e| matches!(e.event, Event::OreDeposited { .. })),
+            "OreDeposited event should be emitted"
         );
     }
 

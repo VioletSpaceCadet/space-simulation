@@ -182,6 +182,9 @@ pub enum TaskKind {
         /// Pre-computed mining duration (ticks), computed at task assignment.
         duration_ticks: u64,
     },
+    Deposit {
+        station: StationId,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +264,10 @@ pub enum Event {
         /// kg extracted per element
         extracted: HashMap<ElementId, f32>,
         asteroid_remaining_kg: f32,
+    },
+    OreDeposited {
+        station_id: StationId,
+        deposited: HashMap<ElementId, f32>,
     },
     /// Only emitted at `EventLevel::Debug`.
     ResearchRoll {
@@ -346,6 +353,7 @@ pub struct Constants {
     pub station_cargo_capacity_m3: f32,
     /// kg of raw ore extracted per tick of mining
     pub mining_rate_kg_per_tick: f32,
+    pub deposit_ticks: u64,
     pub station_compute_units_total: u32,
     pub station_power_per_compute_unit_per_tick: f32,
     pub station_efficiency: f32,

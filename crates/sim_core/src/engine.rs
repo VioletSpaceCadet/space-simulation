@@ -1,7 +1,7 @@
 use crate::research::advance_research;
 use crate::tasks::{
-    deep_scan_enabled, resolve_deep_scan, resolve_mine, resolve_survey, resolve_transit,
-    task_duration, task_kind_label, task_target,
+    deep_scan_enabled, resolve_deep_scan, resolve_deposit, resolve_mine, resolve_survey,
+    resolve_transit, task_duration, task_kind_label, task_target,
 };
 use crate::{
     Command, CommandEnvelope, EventLevel, GameContent, GameState, ShipId, TaskKind, TaskState,
@@ -140,6 +140,9 @@ fn resolve_ship_tasks(
             }
             TaskKind::Mine { ref asteroid, .. } => {
                 resolve_mine(state, &ship_id, asteroid, content, events);
+            }
+            TaskKind::Deposit { ref station } => {
+                resolve_deposit(state, &ship_id, station, events);
             }
             TaskKind::Idle => {}
         }
