@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import * as api from './api'
@@ -47,5 +48,12 @@ describe('App', () => {
     // react-resizable-panels renders [data-panel-resize-handle-id] attributes
     const handles = document.querySelectorAll('[data-panel-resize-handle-id]')
     expect(handles.length).toBeGreaterThan(0)
+  })
+
+  it('shows map placeholder when toggled to map view', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByText(/System Map/))
+    expect(screen.getByText(/Solar System Map/)).toBeInTheDocument()
+    expect(screen.queryByText('Events')).not.toBeInTheDocument()
   })
 })

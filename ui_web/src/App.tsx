@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { AsteroidTable } from './components/AsteroidTable'
 import { EventsFeed } from './components/EventsFeed'
@@ -8,10 +9,13 @@ import { useSimStream } from './hooks/useSimStream'
 
 export default function App() {
   const { snapshot, events, connected, currentTick, oreCompositions } = useSimStream()
+  const [view, setView] = useState<'dashboard' | 'map'>('dashboard')
+  const toggleView = () => setView(v => v === 'dashboard' ? 'map' : 'dashboard')
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <StatusBar tick={currentTick} connected={connected} />
+      <StatusBar tick={currentTick} connected={connected} view={view} onToggleView={toggleView} />
+      {view === 'dashboard' ? (
       <PanelGroup direction="horizontal" className="flex-1 overflow-hidden">
         <Panel defaultSize={20} minSize={12}>
           <section className="flex flex-col h-full overflow-hidden bg-void p-3">
@@ -41,6 +45,11 @@ export default function App() {
           </section>
         </Panel>
       </PanelGroup>
+      ) : (
+      <div className="flex-1 overflow-hidden bg-void flex items-center justify-center text-dim">
+        Solar System Map (coming soon)
+      </div>
+      )}
     </div>
   )
 }
