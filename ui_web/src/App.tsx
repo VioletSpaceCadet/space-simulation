@@ -30,7 +30,7 @@ export default function App() {
         <Panel defaultSize={20} minSize={12}>
           <section className="flex flex-col h-full overflow-hidden bg-void p-3">
             <h2 className="text-[11px] uppercase tracking-widest text-label mb-2 pb-1.5 border-b border-edge shrink-0">Fleet</h2>
-            <FleetPanel ships={snapshot?.ships ?? {}} />
+            <FleetPanel ships={snapshot?.ships ?? {}} stations={snapshot?.stations ?? {}} />
           </section>
         </Panel>
         <PanelResizeHandle className="w-px bg-edge hover:bg-dim cursor-col-resize transition-colors" />
