@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -15,6 +15,7 @@ const snapshot: SimSnapshot = {
 }
 
 beforeEach(() => {
+  localStorage.clear()
   vi.spyOn(api, 'fetchSnapshot').mockResolvedValue(snapshot)
   vi.spyOn(api, 'createEventSource').mockReturnValue({
     onopen: null,
@@ -35,40 +36,59 @@ describe('App', () => {
     expect(screen.getByText(/tick/i)).toBeInTheDocument()
   })
 
-  it('renders all four panel headings', () => {
+  it('renders nav with all four panel names', () => {
     render(<App />)
-    expect(screen.getByText('Events')).toBeInTheDocument()
-    expect(screen.getByText('Asteroids')).toBeInTheDocument()
-    expect(screen.getByText('Fleet')).toBeInTheDocument()
-    expect(screen.getByText('Research')).toBeInTheDocument()
+    const nav = screen.getByRole('navigation')
+    expect(nav).toBeInTheDocument()
+    const buttons = Array.from(nav.querySelectorAll('button'))
+    const labels = buttons.map((b) => b.textContent)
+    expect(labels).toEqual(['Events', 'Asteroids', 'Fleet', 'Research'])
+  })
+
+  it('renders all four panel headings by default', () => {
+    render(<App />)
+    expect(screen.getAllByText('Events')).toHaveLength(2) // nav + panel heading
+    expect(screen.getAllByText('Asteroids')).toHaveLength(2)
+    expect(screen.getAllByText('Fleet')).toHaveLength(2)
+    expect(screen.getAllByText('Research')).toHaveLength(2)
+  })
+
+  it('hides panel when nav button clicked', () => {
+    render(<App />)
+    const nav = screen.getByRole('navigation')
+    const eventsButton = Array.from(nav.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Events',
+    )!
+    fireEvent.click(eventsButton)
+    // Events should now only appear in nav, not as a panel heading
+    expect(screen.getAllByText('Events')).toHaveLength(1)
   })
 
   it('renders resize handles between panels', () => {
     render(<App />)
-    // react-resizable-panels renders [data-panel-resize-handle-id] attributes
     const handles = document.querySelectorAll('[data-panel-resize-handle-id]')
     expect(handles.length).toBeGreaterThan(0)
   })
 
   it('toggles between dashboard and map views', async () => {
     render(<App />)
-    // Start in dashboard
-    expect(screen.getByText('Events')).toBeInTheDocument()
+    // Start in dashboard — nav sidebar is visible
+    expect(screen.getByRole('navigation')).toBeInTheDocument()
 
     // Switch to map
     await userEvent.click(screen.getByText(/System Map/))
-    expect(screen.queryByText('Events')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
     expect(screen.getByText('Earth Orbit')).toBeInTheDocument()
 
     // Switch back
     await userEvent.click(screen.getByText(/Dashboard/))
-    expect(screen.getByText('Events')).toBeInTheDocument()
+    expect(screen.getByRole('navigation')).toBeInTheDocument()
   })
 
   it('shows solar system map when toggled to map view', async () => {
     const { container } = render(<App />)
     await userEvent.click(screen.getByText(/System Map/))
     expect(container.querySelector('svg')).toBeInTheDocument()
-    expect(screen.queryByText('Events')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
   })
 })

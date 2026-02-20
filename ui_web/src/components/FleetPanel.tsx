@@ -1,5 +1,7 @@
+import { useSortableData } from '../hooks/useSortableData'
 import type { OreCompositions } from '../hooks/useSimStream'
 import type { ShipState, StationState } from '../types'
+import { SortIndicator } from './SortIndicator'
 
 interface Props {
   ships: Record<string, ShipState>
@@ -17,55 +19,173 @@ function totalCargoKg(cargo: Record<string, number>): number {
   return Object.values(cargo).reduce((sum, kg) => sum + kg, 0)
 }
 
+function formatKg(kg: number): string {
+  return kg.toLocaleString(undefined, { maximumFractionDigits: 1 })
+}
+
 function pct(frac: number): string {
   return `${Math.round(frac * 100)}%`
 }
 
-function CargoBreakdown({
+function CargoDetail({
   cargo,
   oreCompositions,
 }: {
   cargo: Record<string, number>
   oreCompositions: OreCompositions
 }) {
-  const totalKg = totalCargoKg(cargo)
-  if (totalKg === 0) return <div className="text-faint mt-0.5">hold empty</div>
-
   const entries = Object.entries(cargo)
+  if (entries.length === 0) return null
 
   return (
-    <div className="mt-0.5">
-      <div className="text-muted mb-0.5">
-        cargo: {totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg
-      </div>
+    <div className="flex flex-wrap gap-x-3 gap-y-0.5">
       {entries.map(([key, kg]) => {
         const isOre = key.startsWith('ore:')
-        const asteroidId = isOre ? key.slice(4) : null
         const composition = isOre ? oreCompositions[key] : null
+        const label = isOre ? 'ore' : key
 
         return (
-          <div key={key} className="mb-0.5">
-            <div className="flex gap-x-2 text-accent">
-              <span>{isOre ? 'ore' : key}</span>
-              <span>{kg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</span>
-              {asteroidId && <span className="text-faint">← {asteroidId}</span>}
-            </div>
+          <span key={key} className="text-cargo">
+            {label} {formatKg(kg)} kg
             {composition && (
-              <div className="flex flex-wrap gap-x-2 text-[10px] text-dim pl-2">
-                {Object.entries(composition)
+              <span className="text-faint ml-1">
+                ({Object.entries(composition)
                   .sort(([, a], [, b]) => b - a)
                   .filter(([, frac]) => frac > 0.001)
-                  .map(([el, frac]) => (
-                    <span key={el}>{el} {pct(frac)}</span>
-                  ))}
-              </div>
+                  .map(([el, frac]) => `${el} ${pct(frac)}`)
+                  .join(', ')})
+              </span>
             )}
-          </div>
+          </span>
         )
       })}
     </div>
   )
 }
+
+// --- Ships table ---
+
+interface SortableShip {
+  id: string
+  location_node: string
+  task: string
+  cargo_kg: number
+  ship: ShipState
+}
+
+function ShipsTable({ ships, oreCompositions }: { ships: ShipState[]; oreCompositions: OreCompositions }) {
+  const sortableRows: SortableShip[] = ships.map((ship) => ({
+    id: ship.id,
+    location_node: ship.location_node,
+    task: taskLabel(ship.task),
+    cargo_kg: totalCargoKg(ship.cargo),
+    ship,
+  }))
+
+  const { sortedData, sortConfig, requestSort } = useSortableData(sortableRows)
+
+  const headerClass = "text-left text-label px-2 py-1 border-b border-edge font-normal cursor-pointer hover:text-dim transition-colors select-none"
+
+  return (
+    <table className="min-w-max w-full border-collapse text-[11px]">
+      <thead>
+        <tr>
+          <th className={headerClass} onClick={() => requestSort('id')}>
+            ID<SortIndicator column="id" sortConfig={sortConfig} />
+          </th>
+          <th className={headerClass} onClick={() => requestSort('location_node')}>
+            Location<SortIndicator column="location_node" sortConfig={sortConfig} />
+          </th>
+          <th className={headerClass} onClick={() => requestSort('task')}>
+            Task<SortIndicator column="task" sortConfig={sortConfig} />
+          </th>
+          <th className={headerClass} onClick={() => requestSort('cargo_kg')}>
+            Cargo<SortIndicator column="cargo_kg" sortConfig={sortConfig} />
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {sortedData.map(({ ship, cargo_kg }) => (
+          <tr key={ship.id}>
+            <td className="px-2 py-0.5 border-b border-surface">{ship.id}</td>
+            <td className="px-2 py-0.5 border-b border-surface">{ship.location_node}</td>
+            <td className="px-2 py-0.5 border-b border-surface">{taskLabel(ship.task)}</td>
+            <td className="px-2 py-0.5 border-b border-surface align-top">
+              {cargo_kg === 0
+                ? <span className="text-faint">empty</span>
+                : (
+                  <div>
+                    <span className="text-cargo">{formatKg(cargo_kg)} kg</span>
+                    <CargoDetail cargo={ship.cargo} oreCompositions={oreCompositions} />
+                  </div>
+                )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+// --- Stations table ---
+
+interface SortableStation {
+  id: string
+  location_node: string
+  cargo_kg: number
+  station: StationState
+}
+
+function StationsTable({ stations, oreCompositions }: { stations: StationState[]; oreCompositions: OreCompositions }) {
+  const sortableRows: SortableStation[] = stations.map((station) => ({
+    id: station.id,
+    location_node: station.location_node,
+    cargo_kg: totalCargoKg(station.cargo),
+    station,
+  }))
+
+  const { sortedData, sortConfig, requestSort } = useSortableData(sortableRows)
+
+  const headerClass = "text-left text-label px-2 py-1 border-b border-edge font-normal cursor-pointer hover:text-dim transition-colors select-none"
+
+  return (
+    <table className="min-w-max w-full border-collapse text-[11px]">
+      <thead>
+        <tr>
+          <th className={headerClass} onClick={() => requestSort('id')}>
+            ID<SortIndicator column="id" sortConfig={sortConfig} />
+          </th>
+          <th className={headerClass} onClick={() => requestSort('location_node')}>
+            Location<SortIndicator column="location_node" sortConfig={sortConfig} />
+          </th>
+          <th className={headerClass} onClick={() => requestSort('cargo_kg')}>
+            Cargo<SortIndicator column="cargo_kg" sortConfig={sortConfig} />
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {sortedData.map(({ station, cargo_kg }) => (
+          <tr key={station.id}>
+            <td className="px-2 py-0.5 border-b border-surface">{station.id}</td>
+            <td className="px-2 py-0.5 border-b border-surface">{station.location_node}</td>
+            <td className="px-2 py-0.5 border-b border-surface align-top">
+              {cargo_kg === 0
+                ? <span className="text-faint">empty</span>
+                : (
+                  <div>
+                    <span className="text-cargo">{formatKg(cargo_kg)} kg</span>
+                    <CargoDetail cargo={station.cargo} oreCompositions={oreCompositions} />
+                  </div>
+                )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+// --- Main panel ---
 
 export function FleetPanel({ ships, stations, oreCompositions }: Props) {
   const shipRows = Object.values(ships)
@@ -76,13 +196,7 @@ export function FleetPanel({ ships, stations, oreCompositions }: Props) {
       {shipRows.length === 0 ? (
         <div className="text-faint italic py-1">no ships</div>
       ) : (
-        shipRows.map((ship) => (
-          <div key={ship.id} className="py-1.5 border-b border-surface text-[11px]">
-            <div className="text-bright mb-0.5">{ship.id}</div>
-            <div className="text-dim">{ship.location_node} · {taskLabel(ship.task)}</div>
-            <CargoBreakdown cargo={ship.cargo} oreCompositions={oreCompositions} />
-          </div>
-        ))
+        <ShipsTable ships={shipRows} oreCompositions={oreCompositions} />
       )}
 
       <div className="text-[10px] uppercase tracking-widest text-label mt-3 mb-1.5 pb-1 border-b border-edge">
@@ -92,13 +206,7 @@ export function FleetPanel({ ships, stations, oreCompositions }: Props) {
       {stationRows.length === 0 ? (
         <div className="text-faint italic py-1">no stations</div>
       ) : (
-        stationRows.map((station) => (
-          <div key={station.id} className="py-1.5 border-b border-surface text-[11px]">
-            <div className="text-bright mb-0.5">{station.id}</div>
-            <div className="text-dim">{station.location_node}</div>
-            <CargoBreakdown cargo={station.cargo} oreCompositions={oreCompositions} />
-          </div>
-        ))
+        <StationsTable stations={stationRows} oreCompositions={oreCompositions} />
       )}
     </div>
   )

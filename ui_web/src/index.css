@@ -1,16 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --color-void: #0a0e1a;
-  --color-surface: #0d1226;
-  --color-edge: #1e2d50;
-  --color-fg: #c8d8f0;
-  --color-bright: #a8c4e8;
-  --color-dim: #7a9cc8;
-  --color-muted: #506080;
-  --color-faint: #3a5070;
-  --color-label: #4a6a9a;
-  --color-accent: #70a0d0;
+  /* Backgrounds */
+  --color-void: #0b0d14;
+  --color-surface: #10131a;
+  --color-edge: #1e2228;
+
+  /* Text hierarchy (cool silver/gray — NOT blue) */
+  --color-fg: #c8ccd4;
+  --color-bright: #e0e2e8;
+  --color-dim: #8a8e98;
+  --color-muted: #5c6070;
+  --color-faint: #3a3e48;
+
+  /* UI labels & headers */
+  --color-label: #6b7080;
+
+  /* Accents — each has a purpose */
+  --color-accent: #5ca0c8;
+  --color-cargo: #c89a4a;
+  --color-active: #d4a040;
+
+  /* Status */
   --color-online: #4caf7d;
-  --color-offline: #e05555;
+  --color-offline: #c85450;
 }

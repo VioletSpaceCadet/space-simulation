@@ -18,7 +18,7 @@ export function StatusBar({ tick, connected, view, onToggleView }: Props) {
       >
         {view === 'dashboard' ? '◈ System Map' : '☰ Dashboard'}
       </button>
-      <span className="text-bright font-bold">tick {tick}</span>
+      <span className="text-accent font-bold">tick {tick}</span>
       <span className="text-dim">
         day {day} | {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
       </span>
