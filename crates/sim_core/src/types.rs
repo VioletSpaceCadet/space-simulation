@@ -308,7 +308,7 @@ pub struct AsteroidTemplateDef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ElementDef {
-    pub id: String,
+    pub id: ElementId,
     pub density_kg_per_m3: f32,
     pub display_name: String,
 }
