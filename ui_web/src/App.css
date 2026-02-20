@@ -8,7 +8,8 @@
   body {
     background-color: var(--color-void);
     color: var(--color-fg);
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     font-size: 13px;
+    -webkit-font-smoothing: antialiased;
   }
 }
