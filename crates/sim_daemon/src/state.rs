@@ -19,4 +19,5 @@ pub type EventTx = broadcast::Sender<Vec<EventEnvelope>>;
 pub struct AppState {
     pub sim: SharedSim,
     pub event_tx: EventTx,
+    pub ticks_per_sec: f64,
 }

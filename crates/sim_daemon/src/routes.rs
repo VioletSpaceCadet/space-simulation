@@ -35,10 +35,12 @@ pub fn make_router(state: AppState) -> Router {
 
 pub async fn meta_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
     let sim = app_state.sim.lock().unwrap();
+    let ticks_per_sec = app_state.ticks_per_sec;
     Json(serde_json::json!({
         "tick": sim.game_state.meta.tick,
         "seed": sim.game_state.meta.seed,
         "content_version": sim.game_state.meta.content_version,
+        "ticks_per_sec": ticks_per_sec,
     }))
 }
 
@@ -62,7 +64,7 @@ pub async fn stream_handler(
     let sim = app_state.sim.clone();
 
     let stream = async_stream::stream! {
-        let mut heartbeat = tokio::time::interval(Duration::from_secs(5));
+        let mut heartbeat = tokio::time::interval(Duration::from_millis(200));
         heartbeat.tick().await; // discard the immediate first tick
         let mut flush = tokio::time::interval(Duration::from_millis(50));
         flush.tick().await; // discard the immediate first tick

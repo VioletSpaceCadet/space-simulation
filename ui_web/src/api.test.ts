@@ -31,4 +31,12 @@ describe('fetchMeta', () => {
     await fetchMeta()
     expect(global.fetch).toHaveBeenCalledWith('/api/v1/meta')
   })
+
+  it('returns parsed meta with ticks_per_sec', async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ tick: 0, seed: 1, content_version: 'test', ticks_per_sec: 50 }))
+    )
+    const result = await fetchMeta()
+    expect(result.ticks_per_sec).toBe(50)
+  })
 })

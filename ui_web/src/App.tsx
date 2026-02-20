@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { AsteroidTable } from './components/AsteroidTable'
 import { EventsFeed } from './components/EventsFeed'
@@ -6,6 +6,8 @@ import { FleetPanel } from './components/FleetPanel'
 import { ResearchPanel } from './components/ResearchPanel'
 import { SolarSystemMap } from './components/SolarSystemMap'
 import { StatusBar } from './components/StatusBar'
+import { fetchMeta } from './api'
+import { useAnimatedTick } from './hooks/useAnimatedTick'
 import { useSimStream } from './hooks/useSimStream'
 
 type PanelId = 'map' | 'events' | 'asteroids' | 'fleet' | 'research'
@@ -64,12 +66,19 @@ export default function App() {
   const { snapshot, events, connected, currentTick } = useSimStream()
   const { visible, toggle } = useVisiblePanels()
 
+  const [ticksPerSec, setTicksPerSec] = useState(10) // default fallback
+  const { displayTick, measuredTickRate } = useAnimatedTick(currentTick, ticksPerSec)
+
+  useEffect(() => {
+    fetchMeta().then((meta) => setTicksPerSec(meta.ticks_per_sec)).catch(() => {})
+  }, [])
+
   const visiblePanels = ALL_PANELS.filter((id) => visible.has(id))
 
   function renderPanel(id: PanelId) {
     switch (id) {
       case 'map':
-        return <SolarSystemMap snapshot={snapshot} currentTick={currentTick} oreCompositions={{}} />
+        return <SolarSystemMap snapshot={snapshot} currentTick={displayTick} oreCompositions={{}} />
       case 'events':
         return <EventsFeed events={events} />
       case 'asteroids':
@@ -79,6 +88,7 @@ export default function App() {
           <FleetPanel
             ships={snapshot?.ships ?? {}}
             stations={snapshot?.stations ?? {}}
+            displayTick={displayTick}
           />
         )
       case 'research':
@@ -88,7 +98,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <StatusBar tick={currentTick} connected={connected} />
+      <StatusBar tick={displayTick} connected={connected} measuredTickRate={measuredTickRate} />
       <div className="flex flex-1 overflow-hidden">
         <nav className="flex flex-col shrink-0 bg-surface border-r border-edge py-2 px-1 gap-0.5">
           {ALL_PANELS.map((id) => (

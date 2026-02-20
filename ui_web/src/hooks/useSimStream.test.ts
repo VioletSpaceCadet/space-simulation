@@ -59,7 +59,7 @@ describe('useSimStream', () => {
     expect(result.current.connected).toBe(true)
 
     // Advance past watchdog timeout with no messages
-    await act(async () => { vi.advanceTimersByTime(11_000) })
+    await act(async () => { vi.advanceTimersByTime(3_100) })
 
     expect(result.current.connected).toBe(false)
     expect(result.current.snapshot).toBeNull()

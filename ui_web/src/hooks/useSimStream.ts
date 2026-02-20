@@ -412,8 +412,8 @@ const initialState: State = {
 }
 
 const RECONNECT_DELAY_MS = 2000
-// Must be longer than heartbeat interval (5s) with margin
-const WATCHDOG_MS = 10_000
+// Must be longer than heartbeat interval (200ms) with generous margin
+const WATCHDOG_MS = 3_000
 
 export function useSimStream() {
   const [state, dispatch] = useReducer(reducer, initialState)

@@ -9,19 +9,17 @@ pub async fn run_tick_loop(
     ticks_per_sec: f64,
     max_ticks: Option<u64>,
 ) {
-    let sleep_duration = if ticks_per_sec > 0.0 {
-        Some(Duration::from_secs_f64(1.0 / ticks_per_sec))
+    let mut interval = if ticks_per_sec > 0.0 {
+        let mut iv = tokio::time::interval(Duration::from_secs_f64(1.0 / ticks_per_sec));
+        iv.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
+        Some(iv)
     } else {
         None
     };
 
     loop {
-        let start = std::time::Instant::now();
-
         let (events, done) = {
             let mut guard = sim.lock().unwrap();
-            // Split borrow: autopilot needs &mut self, plus we need &game_state, &content, &mut next_command_id.
-            // Extract the fields we need as separate borrows to satisfy the borrow checker.
             let SimState {
                 ref game_state,
                 ref content,
@@ -48,11 +46,8 @@ pub async fn run_tick_loop(
             break;
         }
 
-        if let Some(duration) = sleep_duration {
-            let elapsed = start.elapsed();
-            if elapsed < duration {
-                tokio::time::sleep(duration.checked_sub(elapsed).unwrap()).await;
-            }
+        if let Some(ref mut iv) = interval {
+            iv.tick().await;
         } else {
             tokio::task::yield_now().await;
         }

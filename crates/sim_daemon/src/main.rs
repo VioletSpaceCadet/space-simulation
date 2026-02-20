@@ -84,6 +84,7 @@ async fn main() -> Result<()> {
                     next_command_id: 0,
                 })),
                 event_tx: event_tx.clone(),
+                ticks_per_sec,
             };
             let router = make_router(app_state.clone());
             let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
@@ -175,6 +176,7 @@ mod tests {
                 next_command_id: 0,
             })),
             event_tx,
+            ticks_per_sec: 10.0,
         }
     }
 
@@ -223,6 +225,23 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_meta_contains_ticks_per_sec() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/meta")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["ticks_per_sec"], 10.0);
     }
 
     #[tokio::test]
