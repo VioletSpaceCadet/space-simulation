@@ -161,6 +161,8 @@ pub enum ModuleKindState {
 pub struct ProcessorState {
     pub threshold_kg: f32,
     pub ticks_since_last_run: u64,
+    #[serde(default)]
+    pub stalled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,6 +250,8 @@ pub enum TaskKind {
     },
     Deposit {
         station: StationId,
+        #[serde(default)]
+        blocked: bool,
     },
 }
 
@@ -393,6 +397,24 @@ pub enum Event {
         evidence: f32,
         p: f32,
         rolled: f32,
+    },
+    ModuleStalled {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        shortfall_m3: f32,
+    },
+    ModuleResumed {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+    },
+    DepositBlocked {
+        ship_id: ShipId,
+        station_id: StationId,
+        shortfall_m3: f32,
+    },
+    DepositUnblocked {
+        ship_id: ShipId,
+        station_id: StationId,
     },
 }
 

@@ -13,8 +13,8 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `ShipState` | `id`, `location_node`, `owner`, `inventory: Vec<InventoryItem>`, `cargo_capacity_m3`, `task` |
 | `StationState` | `id`, `location_node`, `inventory`, `cargo_capacity_m3`, `power_available_per_tick`, `facilities`, `modules: Vec<ModuleState>` |
 | `InventoryItem` | Enum: `Ore { lot_id, asteroid_id, kg, composition }`, `Material { element, kg, quality }`, `Slag { kg, composition }`, `Component { component_id, count, quality }`, `Module { item_id, module_def_id }` |
-| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor or Storage) |
-| `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station }`, `Transit { destination, total_ticks, then }` |
+| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor or Storage). Processor has `stalled: bool` |
+| `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
 | `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold` |
 | `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, constants |
 | `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor with recipes, or Storage) |
@@ -42,6 +42,11 @@ All in `content/`. Loaded at runtime; never compiled in.
 
 **Refinery:** Station modules with `ModuleBehaviorDef::Processor` tick at their defined interval. A processor: checks enabled + power + ore threshold → FIFO-consumes ore up to rate_kg → produces `Material` (element fraction × kg, quality from formula) + `Slag` (remainder). Materials of same element+quality merge. Slag merges into a single accumulating lot.
 
+**Storage enforcement:** Modules and ships respect station cargo capacity.
+- **Processor stall:** Before running, a processor estimates its output volume. If the output would exceed the station's remaining capacity, the processor sets `stalled = true` and emits `ModuleStalled { station_id, module_id, shortfall_m3 }`. On the next tick where space is available, it clears the stall and emits `ModuleResumed { station_id, module_id }`. Stall events are emitted only on transition (not every tick).
+- **Deposit blocking:** When a ship with a `Deposit` task arrives and there is not enough station capacity for its cargo, the task sets `blocked = true` and emits `DepositBlocked { ship_id, station_id, shortfall_m3 }`. If partial space is available, a partial deposit occurs (FIFO by inventory order). When full space opens, the remaining cargo is deposited and `DepositUnblocked { ship_id, station_id }` is emitted.
+- **Metric:** `refinery_stalled_count` — number of processor modules currently in `stalled = true` state.
+
 **Future direction (not yet built):**
 - Ore keyed by composition hash instead of asteroid ID — compatible ores blend naturally.
 - Blending tolerance as a tech unlock: ±2% basic, ±10% advanced.
@@ -59,3 +64,4 @@ All in `content/`. Loaded at runtime; never compiled in.
 - **Solar System Map (done):** SVG orbital map, d3-zoom, entity markers, tooltips, detail cards.
 - **Smooth Streaming (done):** useAnimatedTick, 200ms heartbeat, measured tick rate.
 - **Procedural Sites (done):** Scan site replenishment with deterministic UUIDs.
+- **Storage Enforcement (done):** Processors stall when output exceeds capacity; ships wait when deposit blocked; partial deposits.

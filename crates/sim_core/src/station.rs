@@ -1,13 +1,59 @@
 use crate::{
     composition::{blend_slag_composition, merge_material_lot, weighted_composition},
+    tasks::element_density,
     Event, EventEnvelope, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
-    ItemKind, ModuleBehaviorDef, ModuleKindState, OutputSpec, QualityFormula, StationId,
+    ItemKind, ModuleBehaviorDef, ModuleKindState, OutputSpec, QualityFormula, RecipeDef, StationId,
     YieldFormula,
 };
 use std::collections::HashMap;
 
 /// Minimum meaningful mass — amounts below this are discarded as rounding noise.
 const MIN_MEANINGFUL_KG: f32 = 1e-3;
+
+/// Estimate the total output volume (m³) a recipe would produce given the
+/// consumed lots and their weighted-average composition.
+fn estimate_output_volume_m3(
+    recipe: &RecipeDef,
+    avg_composition: &HashMap<String, f32>,
+    consumed_kg: f32,
+    content: &GameContent,
+) -> f32 {
+    let mut material_kg = 0.0_f32;
+    let mut total_volume = 0.0_f32;
+
+    for output in &recipe.outputs {
+        match output {
+            OutputSpec::Material {
+                element,
+                yield_formula,
+                ..
+            } => {
+                let yield_frac = match yield_formula {
+                    YieldFormula::ElementFraction { element: el } => {
+                        avg_composition.get(el).copied().unwrap_or(0.0)
+                    }
+                    YieldFormula::FixedFraction(f) => *f,
+                };
+                material_kg = consumed_kg * yield_frac;
+                let density = element_density(content, element);
+                total_volume += material_kg / density;
+            }
+            OutputSpec::Slag { yield_formula } => {
+                let yield_frac = match yield_formula {
+                    YieldFormula::FixedFraction(f) => *f,
+                    YieldFormula::ElementFraction { element } => {
+                        avg_composition.get(element).copied().unwrap_or(0.0)
+                    }
+                };
+                let slag_kg = (consumed_kg - material_kg) * yield_frac;
+                let slag_density = element_density(content, crate::ELEMENT_SLAG);
+                total_volume += slag_kg / slag_density;
+            }
+            OutputSpec::Component { .. } => {}
+        }
+    }
+    total_volume
+}
 
 pub(crate) fn tick_stations(
     state: &mut GameState,
@@ -103,6 +149,108 @@ fn tick_station_modules(
 
         if total_ore_kg < threshold_kg {
             continue;
+        }
+
+        // --- Capacity pre-check: estimate output volume and stall if it won't fit ---
+        {
+            let Some(def) = content.module_defs.iter().find(|d| d.id == def_id) else {
+                continue;
+            };
+            let ModuleBehaviorDef::Processor(processor_def) = &def.behavior else {
+                continue;
+            };
+            let Some(recipe) = processor_def.recipes.first() else {
+                continue;
+            };
+
+            let rate_kg = match recipe.inputs.first().map(|i| &i.amount) {
+                Some(InputAmount::Kg(kg)) => *kg,
+                _ => continue,
+            };
+
+            let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
+            let matches_input = move |item: &InventoryItem| -> bool {
+                match &input_filter {
+                    Some(InputFilter::ItemKind(ItemKind::Ore)) => {
+                        matches!(item, InventoryItem::Ore { .. })
+                    }
+                    Some(InputFilter::ItemKind(ItemKind::Material)) => {
+                        matches!(item, InventoryItem::Material { .. })
+                    }
+                    Some(InputFilter::ItemKind(ItemKind::Slag)) => {
+                        matches!(item, InventoryItem::Slag { .. })
+                    }
+                    Some(InputFilter::Element(el)) => {
+                        matches!(item, InventoryItem::Material { element, .. } if element == el)
+                    }
+                    _ => false,
+                }
+            };
+
+            let station = state.stations.get(station_id).unwrap();
+            let (peeked_kg, lots) =
+                peek_ore_fifo_with_lots(&station.inventory, rate_kg, matches_input);
+
+            if peeked_kg < MIN_MEANINGFUL_KG {
+                continue;
+            }
+
+            let lot_refs: Vec<(&HashMap<String, f32>, f32)> =
+                lots.iter().map(|(comp, kg)| (comp, *kg)).collect();
+            let avg_composition = weighted_composition(&lot_refs);
+            let output_volume =
+                estimate_output_volume_m3(recipe, &avg_composition, peeked_kg, content);
+
+            let current_used = crate::tasks::inventory_volume_m3(&station.inventory, content);
+            let capacity = station.cargo_capacity_m3;
+            let shortfall = (current_used + output_volume) - capacity;
+
+            let was_stalled = match &station.modules[module_idx].kind_state {
+                ModuleKindState::Processor(ps) => ps.stalled,
+                ModuleKindState::Storage => false,
+            };
+            let module_id = station.modules[module_idx].id.clone();
+
+            if shortfall > 0.0 {
+                // Stall: reset timer, emit event on transition only
+                let station_mut = state.stations.get_mut(station_id).unwrap();
+                if let ModuleKindState::Processor(ps) =
+                    &mut station_mut.modules[module_idx].kind_state
+                {
+                    ps.stalled = true;
+                    ps.ticks_since_last_run = 0;
+                }
+                if !was_stalled {
+                    events.push(crate::emit(
+                        &mut state.counters,
+                        state.meta.tick,
+                        Event::ModuleStalled {
+                            station_id: station_id.clone(),
+                            module_id,
+                            shortfall_m3: shortfall,
+                        },
+                    ));
+                }
+                continue;
+            }
+
+            // Space available — resume if previously stalled
+            if was_stalled {
+                let station_mut = state.stations.get_mut(station_id).unwrap();
+                if let ModuleKindState::Processor(ps) =
+                    &mut station_mut.modules[module_idx].kind_state
+                {
+                    ps.stalled = false;
+                }
+                events.push(crate::emit(
+                    &mut state.counters,
+                    state.meta.tick,
+                    Event::ModuleResumed {
+                        station_id: station_id.clone(),
+                        module_id,
+                    },
+                ));
+            }
         }
 
         resolve_processor_run(state, station_id, module_idx, &def_id, content, events);
@@ -330,6 +478,37 @@ fn consume_ore_fifo_with_lots(
     (consumed_kg, lots)
 }
 
+/// Peek at what would be consumed by FIFO without mutating inventory.
+/// Returns `(consumed_kg, Vec<(composition, kg_taken)>)`.
+fn peek_ore_fifo_with_lots(
+    inventory: &[InventoryItem],
+    rate_kg: f32,
+    filter: impl Fn(&InventoryItem) -> bool,
+) -> (f32, Vec<(HashMap<String, f32>, f32)>) {
+    let mut remaining = rate_kg;
+    let mut consumed_kg = 0.0_f32;
+    let mut lots: Vec<(HashMap<String, f32>, f32)> = Vec::new();
+
+    for item in inventory {
+        if remaining <= 0.0 {
+            break;
+        }
+        if matches!(item, InventoryItem::Ore { .. }) && filter(item) {
+            let InventoryItem::Ore {
+                kg, composition, ..
+            } = item
+            else {
+                unreachable!()
+            };
+            let take = kg.min(remaining);
+            remaining -= take;
+            consumed_kg += take;
+            lots.push((composition.clone(), take));
+        }
+    }
+    (consumed_kg, lots)
+}
+
 /// Build slag composition from average composition, excluding the extracted element.
 fn slag_composition_from_avg(
     avg: &HashMap<String, f32>,
@@ -349,4 +528,63 @@ fn slag_composition_from_avg(
         .filter(|(k, _)| Some(k.as_str()) != extracted)
         .map(|(k, v)| (k.clone(), v / non_extracted_total))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{AsteroidId, InventoryItem, LotId};
+
+    #[test]
+    fn peek_ore_fifo_does_not_mutate() {
+        let inventory = vec![
+            InventoryItem::Ore {
+                lot_id: LotId("lot_0001".to_string()),
+                asteroid_id: AsteroidId("ast_0001".to_string()),
+                kg: 600.0,
+                composition: HashMap::from([("Fe".to_string(), 0.7), ("Si".to_string(), 0.3)]),
+            },
+            InventoryItem::Material {
+                element: "Fe".to_string(),
+                kg: 100.0,
+                quality: 0.8,
+            },
+        ];
+
+        let filter = |item: &InventoryItem| matches!(item, InventoryItem::Ore { .. });
+        let (consumed_kg, lots) = peek_ore_fifo_with_lots(&inventory, 500.0, filter);
+
+        assert!((consumed_kg - 500.0).abs() < 1e-3);
+        assert_eq!(lots.len(), 1);
+        assert_eq!(inventory.len(), 2); // unchanged
+        if let InventoryItem::Ore { kg, .. } = &inventory[0] {
+            assert!((kg - 600.0).abs() < 1e-3, "original should be unchanged");
+        }
+    }
+
+    #[test]
+    fn peek_ore_fifo_consumes_multiple_lots() {
+        let inventory = vec![
+            InventoryItem::Ore {
+                lot_id: LotId("lot_0001".to_string()),
+                asteroid_id: AsteroidId("ast_0001".to_string()),
+                kg: 200.0,
+                composition: HashMap::from([("Fe".to_string(), 0.8)]),
+            },
+            InventoryItem::Ore {
+                lot_id: LotId("lot_0002".to_string()),
+                asteroid_id: AsteroidId("ast_0002".to_string()),
+                kg: 400.0,
+                composition: HashMap::from([("Fe".to_string(), 0.6)]),
+            },
+        ];
+
+        let filter = |item: &InventoryItem| matches!(item, InventoryItem::Ore { .. });
+        let (consumed_kg, lots) = peek_ore_fifo_with_lots(&inventory, 500.0, filter);
+
+        assert!((consumed_kg - 500.0).abs() < 1e-3);
+        assert_eq!(lots.len(), 2);
+        assert!((lots[0].1 - 200.0).abs() < 1e-3); // first lot fully consumed
+        assert!((lots[1].1 - 300.0).abs() < 1e-3); // second lot partially consumed
+    }
 }

@@ -876,6 +876,7 @@ fn deposit_command(state: &GameState) -> CommandEnvelope {
             ship_id,
             task_kind: TaskKind::Deposit {
                 station: station_id,
+                blocked: false,
             },
         },
     }
@@ -1055,6 +1056,12 @@ fn test_deposit_respects_station_capacity() {
     assert!(
         !state.ships[&ship_id].inventory.is_empty(),
         "ship should retain ore that did not fit in the station"
+    );
+    // Ship should stay in Deposit task (blocked), not go idle.
+    let ship = &state.ships[&ship_id];
+    assert!(
+        matches!(&ship.task, Some(task) if matches!(task.kind, TaskKind::Deposit { blocked: true, .. })),
+        "ship should stay in blocked Deposit task when station is full"
     );
 }
 
@@ -1282,6 +1289,7 @@ fn state_with_refinery(content: &GameContent) -> GameState {
         kind_state: ModuleKindState::Processor(ProcessorState {
             threshold_kg: 100.0,
             ticks_since_last_run: 0,
+            stalled: false,
         }),
     });
 
@@ -1372,6 +1380,7 @@ fn test_refinery_skips_when_below_threshold() {
         kind_state: ModuleKindState::Processor(ProcessorState {
             threshold_kg: 9999.0,
             ticks_since_last_run: 0,
+            stalled: false,
         }),
     });
     station.inventory.push(InventoryItem::Ore {
@@ -1570,6 +1579,237 @@ fn transit_moves_ship_and_starts_next_task() {
     );
 }
 
+// --- Module stall / resume -----------------------------------------------
+
+#[test]
+fn test_refinery_stalls_when_station_full() {
+    let content = refinery_content();
+    let mut state = state_with_refinery(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Recipe consumes 500 kg ore (70% Fe, 30% Si):
+    // Material: 500 * 0.7 = 350 kg Fe at density 7874 -> ~0.0444 m³
+    // Slag: (500 - 350) * 1.0 = 150 kg at density 2500 -> 0.06 m³
+    // Total output ~0.104 m³
+    // Existing ore: 1000 kg at density 3000 -> ~0.333 m³
+    // Set capacity so there is no room for output (but ore already fits)
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 0.34;
+
+    let mut rng = make_rng();
+    // Tick 1: timer increments to 1 (interval is 2)
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    // Tick 2: timer reaches 2, processor tries to run -> should stall
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = &state.stations[&station_id];
+    if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+        assert!(ps.stalled, "module should be stalled when output won't fit");
+        assert_eq!(ps.ticks_since_last_run, 0, "timer should reset on stall");
+    } else {
+        panic!("expected processor state");
+    }
+
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::ModuleStalled { .. })),
+        "ModuleStalled event should be emitted"
+    );
+
+    // No material or slag should exist (only the original ore)
+    assert!(
+        !station
+            .inventory
+            .iter()
+            .any(|i| matches!(i, InventoryItem::Material { .. })),
+        "no material should be produced when stalled"
+    );
+    assert!(
+        !station
+            .inventory
+            .iter()
+            .any(|i| matches!(i, InventoryItem::Slag { .. })),
+        "no slag should be produced when stalled"
+    );
+}
+
+#[test]
+fn test_refinery_resumes_after_stall_cleared() {
+    let content = refinery_content();
+    let mut state = state_with_refinery(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Cause stall first
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 0.34;
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    // Confirm stalled
+    if let ModuleKindState::Processor(ps) = &state.stations[&station_id].modules[0].kind_state {
+        assert!(ps.stalled);
+    }
+
+    // Increase capacity so output fits
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 10_000.0;
+
+    // Timer was reset to 0 on stall, need another full interval (2 ticks)
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    // Module should have resumed and produced output
+    let station = &state.stations[&station_id];
+    if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+        assert!(!ps.stalled, "module should no longer be stalled");
+    }
+
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::ModuleResumed { .. })),
+        "ModuleResumed event should be emitted"
+    );
+
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::RefineryRan { .. })),
+        "RefineryRan should fire after resuming"
+    );
+}
+
+#[test]
+fn test_stall_event_only_emitted_once() {
+    let content = refinery_content();
+    let mut state = state_with_refinery(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 0.34;
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events1 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    // First stall should emit event
+    let stall_count_1 = events1
+        .iter()
+        .filter(|e| matches!(e.event, Event::ModuleStalled { .. }))
+        .count();
+    assert_eq!(stall_count_1, 1);
+
+    // Tick through another interval while still stalled
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events2 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    // Second stall attempt should NOT emit event (already stalled)
+    let stall_count_2 = events2
+        .iter()
+        .filter(|e| matches!(e.event, Event::ModuleStalled { .. }))
+        .count();
+    assert_eq!(
+        stall_count_2, 0,
+        "ModuleStalled should not be re-emitted while already stalled"
+    );
+}
+
+#[test]
+fn test_storage_pressure_cascade() {
+    let content = refinery_content();
+    let mut state = state_with_refinery(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // The capacity pre-check computes current_used + output_volume (without
+    // subtracting the about-to-be-consumed ore). With 1000 kg ore the first
+    // check sees 0.333 m³ (ore) + 0.104 m³ (output) = 0.437 m³.
+    // After the first run completes, inventory is ~0.271 m³. We then inject
+    // extra material so that the second run's check (current + 0.104) exceeds
+    // capacity, triggering a stall.
+    //
+    // Set capacity to 0.50 m³ — comfortably passes the first run (0.437 < 0.50).
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 0.50;
+
+    let mut rng = make_rng();
+
+    // Tick 1: timer increments (interval=2)
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    // Tick 2: first refinery run should succeed
+    let events_run1 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    assert!(
+        events_run1
+            .iter()
+            .any(|e| matches!(e.event, Event::RefineryRan { .. })),
+        "first refinery run should succeed"
+    );
+
+    let station = &state.stations[&station_id];
+    assert!(
+        station
+            .inventory
+            .iter()
+            .any(|i| matches!(i, InventoryItem::Material { .. })),
+        "material should exist after first run"
+    );
+
+    // After first run, station has ~0.271 m³ used. Add extra material to push
+    // it close to capacity. We need current_used + 0.104 > 0.50, so we need
+    // current_used > 0.396. Currently at ~0.271, add ~0.15 m³ of Fe
+    // (0.15 m³ * 7874 kg/m³ ≈ 1181 kg Fe).
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .inventory
+        .push(InventoryItem::Material {
+            element: "Fe".to_string(),
+            kg: 1200.0,
+            quality: 0.5,
+        });
+
+    // Ticks 3-4: second interval
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events_run2 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    // Second run should STALL
+    assert!(
+        !events_run2
+            .iter()
+            .any(|e| matches!(e.event, Event::RefineryRan { .. })),
+        "second refinery run should NOT happen (stalled)"
+    );
+    assert!(
+        events_run2
+            .iter()
+            .any(|e| matches!(e.event, Event::ModuleStalled { .. })),
+        "ModuleStalled should be emitted"
+    );
+
+    let station = &state.stations[&station_id];
+    if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+        assert!(ps.stalled, "module should be stalled");
+    }
+}
+
 // --- Full gameplay cycle integration test --------------------------------
 
 #[test]
@@ -1738,6 +1978,7 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
             ship_id: ship_id.clone(),
             task_kind: TaskKind::Deposit {
                 station: station_id.clone(),
+                blocked: false,
             },
         },
     };
@@ -1777,4 +2018,149 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
         (station_ore_kg - ship_ore_kg).abs() < 1e-3,
         "station ore ({station_ore_kg} kg) should match what the ship had ({ship_ore_kg} kg)"
     );
+}
+
+// --- Deposit blocking / unblocking ----------------------------------------
+
+#[test]
+fn test_deposit_ship_waits_when_station_full() {
+    let content = test_content();
+    let mut state = test_state(&content);
+
+    let station_id = StationId("station_earth_orbit".to_string());
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 0.001;
+
+    let ship_id = ShipId("ship_0001".to_string());
+    state
+        .ships
+        .get_mut(&ship_id)
+        .unwrap()
+        .inventory
+        .push(InventoryItem::Ore {
+            lot_id: LotId("lot_block_test".to_string()),
+            asteroid_id: AsteroidId("asteroid_test".to_string()),
+            kg: 500.0,
+            composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
+        });
+
+    let mut rng = make_rng();
+    let cmd = deposit_command(&state);
+    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    // Ship should still be in Deposit task, NOT idle.
+    let ship = &state.ships[&ship_id];
+    assert!(
+        matches!(&ship.task, Some(task) if matches!(task.kind, TaskKind::Deposit { .. })),
+        "ship should stay in Deposit task when station is full"
+    );
+    assert!(
+        !ship.inventory.is_empty(),
+        "ship should retain ore when station is full"
+    );
+
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::DepositBlocked { .. })),
+        "DepositBlocked event should be emitted"
+    );
+}
+
+#[test]
+fn test_deposit_unblocks_when_space_opens() {
+    let content = test_content();
+    let mut state = test_state(&content);
+
+    let station_id = StationId("station_earth_orbit".to_string());
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 0.001;
+
+    let ship_id = ShipId("ship_0001".to_string());
+    state
+        .ships
+        .get_mut(&ship_id)
+        .unwrap()
+        .inventory
+        .push(InventoryItem::Ore {
+            lot_id: LotId("lot_unblock_test".to_string()),
+            asteroid_id: AsteroidId("asteroid_test".to_string()),
+            kg: 100.0,
+            composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
+        });
+
+    let mut rng = make_rng();
+    let cmd = deposit_command(&state);
+    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal); // blocked
+
+    // Now open capacity.
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 10_000.0;
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    // Ship should have deposited and gone idle.
+    assert!(
+        state.ships[&ship_id].inventory.is_empty(),
+        "ship should have deposited ore after space opened"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::DepositUnblocked { .. })),
+        "DepositUnblocked event should be emitted"
+    );
+}
+
+#[test]
+fn test_deposit_blocked_event_only_emitted_once() {
+    let content = test_content();
+    let mut state = test_state(&content);
+
+    let station_id = StationId("station_earth_orbit".to_string());
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .cargo_capacity_m3 = 0.001;
+
+    let ship_id = ShipId("ship_0001".to_string());
+    state
+        .ships
+        .get_mut(&ship_id)
+        .unwrap()
+        .inventory
+        .push(InventoryItem::Ore {
+            lot_id: LotId("lot_dedup_test".to_string()),
+            asteroid_id: AsteroidId("asteroid_test".to_string()),
+            kg: 500.0,
+            composition: std::collections::HashMap::from([("Fe".to_string(), 1.0_f32)]),
+        });
+
+    let mut rng = make_rng();
+    let cmd = deposit_command(&state);
+    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events1 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events2 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let count1 = events1
+        .iter()
+        .filter(|e| matches!(e.event, Event::DepositBlocked { .. }))
+        .count();
+    let count2 = events2
+        .iter()
+        .filter(|e| matches!(e.event, Event::DepositBlocked { .. }))
+        .count();
+    assert_eq!(count1, 1, "first tick should emit DepositBlocked");
+    assert_eq!(count2, 0, "second tick should NOT re-emit DepositBlocked");
 }

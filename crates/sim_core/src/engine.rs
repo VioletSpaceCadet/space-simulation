@@ -104,6 +104,7 @@ fn apply_commands(
                             crate::ModuleKindState::Processor(crate::ProcessorState {
                                 threshold_kg: 0.0,
                                 ticks_since_last_run: 0,
+                                stalled: false,
                             })
                         }
                         crate::ModuleBehaviorDef::Storage { .. } => crate::ModuleKindState::Storage,
@@ -286,7 +287,7 @@ fn resolve_ship_tasks(
             TaskKind::Mine { ref asteroid, .. } => {
                 resolve_mine(state, &ship_id, asteroid, content, events);
             }
-            TaskKind::Deposit { ref station } => {
+            TaskKind::Deposit { ref station, .. } => {
                 resolve_deposit(state, &ship_id, station, content, events);
             }
             TaskKind::Idle => {}

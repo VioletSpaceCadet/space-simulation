@@ -178,6 +178,7 @@ fn deposit_priority(
     Some(maybe_transit(
         TaskKind::Deposit {
             station: station.id.clone(),
+            blocked: false,
         },
         &ship.location_node,
         &station.location_node,
@@ -459,6 +460,7 @@ mod tests {
                 kind_state: sim_core::ModuleKindState::Processor(sim_core::ProcessorState {
                     threshold_kg: 0.0,
                     ticks_since_last_run: 0,
+                    stalled: false,
                 }),
             });
 

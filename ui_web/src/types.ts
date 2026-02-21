@@ -17,7 +17,7 @@ export interface TaskState {
     | { Survey: { site: string } }
     | { DeepScan: { asteroid: string } }
     | { Mine: { asteroid: string; duration_ticks: number } }
-    | { Deposit: { station: string } }
+    | { Deposit: { station: string; blocked: boolean } }
     | { Transit: { destination: string; total_ticks: number } }
   started_tick: number
   eta_tick: number
@@ -66,6 +66,7 @@ export type InventoryItem = OreItem | SlagItem | MaterialItem | ComponentItem | 
 export interface ProcessorState {
   threshold_kg: number
   ticks_since_last_run: number
+  stalled: boolean
 }
 
 export type ModuleKindState =

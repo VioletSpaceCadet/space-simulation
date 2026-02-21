@@ -40,6 +40,7 @@ pub struct MetricsSnapshot {
     // Refinery
     pub refinery_active_count: u32,
     pub refinery_starved_count: u32,
+    pub refinery_stalled_count: u32,
 
     // Fleet
     pub fleet_total: u32,
@@ -132,6 +133,7 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
 
     let mut refinery_active_count = 0_u32;
     let mut refinery_starved_count = 0_u32;
+    let mut refinery_stalled_count = 0_u32;
 
     // --- Stations ---
     for station in state.stations.values() {
@@ -169,6 +171,9 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
             refinery_active_count += 1;
 
             if let ModuleKindState::Processor(ps) = &module.kind_state {
+                if ps.stalled {
+                    refinery_stalled_count += 1;
+                }
                 if total_ore_at_station < ps.threshold_kg {
                     refinery_starved_count += 1;
                 }
@@ -283,6 +288,7 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         avg_material_quality,
         refinery_active_count,
         refinery_starved_count,
+        refinery_stalled_count,
         fleet_total,
         fleet_idle,
         fleet_mining,
@@ -307,7 +313,7 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
          station_storage_used_pct,ship_cargo_used_pct,\
          avg_ore_fe_fraction,ore_lot_count,min_ore_fe_fraction,max_ore_fe_fraction,\
          avg_material_quality,\
-         refinery_active_count,refinery_starved_count,\
+         refinery_active_count,refinery_starved_count,refinery_stalled_count,\
          fleet_total,fleet_idle,fleet_mining,fleet_transiting,fleet_surveying,fleet_depositing,\
          scan_sites_remaining,asteroids_discovered,asteroids_depleted,\
          techs_unlocked,total_scan_data,max_tech_evidence"
@@ -321,7 +327,7 @@ pub fn append_metrics_row(
 ) -> std::io::Result<()> {
     writeln!(
         writer,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         snapshot.tick,
         snapshot.metrics_version,
         snapshot.total_ore_kg,
@@ -337,6 +343,7 @@ pub fn append_metrics_row(
         snapshot.avg_material_quality,
         snapshot.refinery_active_count,
         snapshot.refinery_starved_count,
+        snapshot.refinery_stalled_count,
         snapshot.fleet_total,
         snapshot.fleet_idle,
         snapshot.fleet_mining,
@@ -512,6 +519,7 @@ mod tests {
         assert_eq!(snapshot.avg_material_quality, 0.0);
         assert_eq!(snapshot.refinery_active_count, 0);
         assert_eq!(snapshot.refinery_starved_count, 0);
+        assert_eq!(snapshot.refinery_stalled_count, 0);
         assert_eq!(snapshot.fleet_total, 0);
         assert_eq!(snapshot.fleet_idle, 0);
         assert_eq!(snapshot.scan_sites_remaining, 0);
@@ -632,6 +640,7 @@ mod tests {
             ..make_ship(Some(TaskState {
                 kind: TaskKind::Deposit {
                     station: StationId("station_0001".to_string()),
+                    blocked: false,
                 },
                 started_tick: 0,
                 eta_tick: 1,
@@ -685,6 +694,7 @@ mod tests {
                 kind_state: ModuleKindState::Processor(ProcessorState {
                     threshold_kg: 500.0,
                     ticks_since_last_run: 0,
+                    stalled: false,
                 }),
             }],
         );
@@ -803,6 +813,50 @@ mod tests {
         assert_eq!(snapshot.techs_unlocked, 2);
         assert!((snapshot.total_scan_data - 42.5).abs() < 1e-5);
         assert!((snapshot.max_tech_evidence - 30.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_refinery_stalled_metric() {
+        let mut content = empty_content();
+        content.module_defs = vec![crate::ModuleDef {
+            id: "module_basic_iron_refinery".to_string(),
+            name: "Basic Iron Refinery".to_string(),
+            mass_kg: 5000.0,
+            volume_m3: 10.0,
+            power_consumption_per_run: 10.0,
+            behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                processing_interval_ticks: 60,
+                recipes: vec![],
+            }),
+        }];
+
+        let mut state = empty_state();
+        let station = make_station(
+            vec![InventoryItem::Ore {
+                lot_id: LotId("lot_0001".to_string()),
+                asteroid_id: AsteroidId("ast_0001".to_string()),
+                kg: 1000.0,
+                composition: HashMap::from([("Fe".to_string(), 0.7)]),
+            }],
+            vec![ModuleState {
+                id: ModuleInstanceId("mod_0001".to_string()),
+                def_id: "module_basic_iron_refinery".to_string(),
+                enabled: true,
+                kind_state: ModuleKindState::Processor(ProcessorState {
+                    threshold_kg: 500.0,
+                    ticks_since_last_run: 0,
+                    stalled: true,
+                }),
+            }],
+        );
+        state.stations.insert(station.id.clone(), station);
+
+        let snapshot = compute_metrics(&state, &content);
+
+        assert_eq!(snapshot.refinery_active_count, 1);
+        assert_eq!(snapshot.refinery_stalled_count, 1);
+        // Not starved (1000kg ore > 500kg threshold)
+        assert_eq!(snapshot.refinery_starved_count, 0);
     }
 
     #[test]

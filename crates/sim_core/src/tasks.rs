@@ -35,7 +35,7 @@ pub(crate) fn task_target(kind: &TaskKind) -> Option<String> {
         TaskKind::DeepScan { asteroid } | TaskKind::Mine { asteroid, .. } => {
             Some(asteroid.0.clone())
         }
-        TaskKind::Deposit { station } => Some(station.0.clone()),
+        TaskKind::Deposit { station, .. } => Some(station.0.clone()),
     }
 }
 
@@ -66,7 +66,7 @@ fn composition_noise_sigma(research: &ResearchState, content: &GameContent) -> f
 /// Returns the density (kg/m³) for the given element id.
 ///
 /// Panics if the element is not found in content — that is a content authoring error.
-fn element_density(content: &GameContent, element_id: &str) -> f32 {
+pub(crate) fn element_density(content: &GameContent, element_id: &str) -> f32 {
     content
         .elements
         .iter()
@@ -380,6 +380,14 @@ pub(crate) fn resolve_deposit(
 ) {
     let current_tick = state.meta.tick;
 
+    // Check if the task is already in the blocked state before we take inventory.
+    let was_blocked = state
+        .ships
+        .get(ship_id)
+        .and_then(|s| s.task.as_ref())
+        .map(|t| matches!(&t.kind, TaskKind::Deposit { blocked: true, .. }))
+        .unwrap_or(false);
+
     let items = if let Some(ship) = state.ships.get_mut(ship_id) {
         std::mem::take(&mut ship.inventory)
     } else {
@@ -423,7 +431,44 @@ pub(crate) fn resolve_deposit(
     }
 
     if to_deposit.is_empty() {
-        set_ship_idle(state, ship_id, current_tick);
+        // Nothing fits — keep ship in Deposit task, bump eta to retry next tick.
+        if let Some(ship) = state.ships.get_mut(ship_id) {
+            if let Some(task) = &mut ship.task {
+                if let TaskKind::Deposit { blocked, .. } = &mut task.kind {
+                    *blocked = true;
+                }
+                task.eta_tick = current_tick + 1;
+            }
+        }
+
+        if !was_blocked {
+            // Compute shortfall for the event: volume of items on ship minus free space.
+            let ship_volume = state
+                .ships
+                .get(ship_id)
+                .map(|s| inventory_volume_m3(&s.inventory, content))
+                .unwrap_or(0.0);
+            let free_space = (station_capacity
+                - inventory_volume_m3(
+                    &state
+                        .stations
+                        .get(station_id)
+                        .map_or(&[] as &[_], |s| &s.inventory),
+                    content,
+                ))
+            .max(0.0);
+            let shortfall = (ship_volume - free_space).max(0.0);
+
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::DepositBlocked {
+                    ship_id: ship_id.clone(),
+                    station_id: station_id.clone(),
+                    shortfall_m3: shortfall,
+                },
+            ));
+        }
         return;
     }
 
@@ -440,6 +485,17 @@ pub(crate) fn resolve_deposit(
             items: to_deposit,
         },
     ));
+
+    if was_blocked {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::DepositUnblocked {
+                ship_id: ship_id.clone(),
+                station_id: station_id.clone(),
+            },
+        ));
+    }
 
     set_ship_idle(state, ship_id, current_tick);
 
