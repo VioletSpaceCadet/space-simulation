@@ -37,9 +37,20 @@
           "kind": "Module",
           "item_id": "module_item_0001",
           "module_def_id": "module_basic_iron_refinery"
+        },
+        {
+          "kind": "Component",
+          "component_id": "repair_kit",
+          "count": 10,
+          "quality": 1.0
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0002",
+          "module_def_id": "module_maintenance_bay"
         }
       ],
-      "cargo_capacity_m3": 10000.0,
+      "cargo_capacity_m3": 100.0,
       "power_available_per_tick": 100.0,
       "facilities": {
         "compute_units_total": 10,

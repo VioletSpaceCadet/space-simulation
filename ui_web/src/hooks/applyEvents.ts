@@ -1,4 +1,4 @@
-import type { AsteroidState, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState } from '../types'
+import type { AsteroidState, ComponentItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState } from '../types'
 
 function buildTaskStub(taskKind: string, target: string | null, tick: number): TaskState {
   const kindMap: Record<string, Record<string, unknown>> = {
@@ -120,6 +120,9 @@ export function applyEvents(
         }
         if (updatedStations[station_id]) {
           const station = updatedStations[station_id]
+          const kindState: ModuleKindState = module_def_id.includes('maintenance')
+            ? { Maintenance: { ticks_since_last_run: 0 } }
+            : { Processor: { threshold_kg: 0, ticks_since_last_run: 0 } }
           updatedStations = {
             ...updatedStations,
             [station_id]: {
@@ -133,7 +136,8 @@ export function applyEvents(
                   id: module_id,
                   def_id: module_def_id,
                   enabled: false,
-                  kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0 } } as ModuleKindState,
+                  kind_state: kindState,
+                  wear: { wear: 0 },
                 },
               ],
             },
@@ -245,6 +249,73 @@ export function applyEvents(
           updatedStations = {
             ...updatedStations,
             [station_id]: { ...updatedStations[station_id], inventory: stationInv },
+          }
+        }
+        break
+      }
+
+      case 'WearAccumulated': {
+        const { station_id, module_id, wear_after } = event as {
+          station_id: string
+          module_id: string
+          wear_after: number
+        }
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) =>
+                m.id === module_id ? { ...m, wear: { wear: wear_after } } : m
+              ),
+            },
+          }
+        }
+        break
+      }
+
+      case 'ModuleAutoDisabled': {
+        const { station_id, module_id } = event as {
+          station_id: string
+          module_id: string
+        }
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) =>
+                m.id === module_id ? { ...m, enabled: false } : m
+              ),
+            },
+          }
+        }
+        break
+      }
+
+      case 'MaintenanceRan': {
+        const { station_id, target_module_id, wear_after, repair_kits_remaining } = event as {
+          station_id: string
+          target_module_id: string
+          wear_after: number
+          repair_kits_remaining: number
+        }
+        if (updatedStations[station_id]) {
+          const station = updatedStations[station_id]
+          // Update target module's wear
+          const updatedModules = station.modules.map((m) =>
+            m.id === target_module_id ? { ...m, wear: { wear: wear_after } } : m
+          )
+          // Update RepairKit count in inventory
+          const updatedInventory = station.inventory.map((item) => {
+            if (item.kind === 'Component' && (item as ComponentItem).component_id === 'repair_kit') {
+              return { ...item, count: repair_kits_remaining } as ComponentItem
+            }
+            return item
+          })
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: { ...station, modules: updatedModules, inventory: updatedInventory },
           }
         }
         break

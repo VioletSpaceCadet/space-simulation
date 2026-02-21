@@ -69,15 +69,25 @@ export interface ProcessorState {
   stalled: boolean
 }
 
+export interface MaintenanceState {
+  ticks_since_last_run: number
+}
+
 export type ModuleKindState =
   | { Processor: ProcessorState }
+  | { Maintenance: MaintenanceState }
   | 'Storage'
+
+export interface WearState {
+  wear: number
+}
 
 export interface ModuleState {
   id: string
   def_id: string
   enabled: boolean
   kind_state: ModuleKindState
+  wear: WearState
 }
 
 export interface ShipState {

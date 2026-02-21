@@ -1,9 +1,11 @@
 import { useSortableData } from '../hooks/useSortableData'
-import type { InventoryItem, ModuleState, ShipState, StationState } from '../types'
+import type { ComponentItem, InventoryItem, MaterialItem, ModuleItem, ModuleState, OreItem, ShipState, SlagItem, StationState } from '../types'
 import { SortIndicator } from './SortIndicator'
 
 const QUALITY_TIER_EXCELLENT = 0.8
 const QUALITY_TIER_GOOD = 0.5
+const WEAR_TIER_HIGH = 0.8
+const WEAR_TIER_MED = 0.5
 
 function qualityTier(quality: number): string {
   if (quality >= QUALITY_TIER_EXCELLENT) return 'excellent'
@@ -29,55 +31,87 @@ function totalInventoryKg(inventory: InventoryItem[]): number {
   return inventory.reduce((sum, i) => sum + ('kg' in i ? (i as { kg: number }).kg : 0), 0)
 }
 
+interface AggregatedOre {
+  totalKg: number
+  lotCount: number
+  composition: Record<string, number>
+}
+
+function aggregateOre(inventory: InventoryItem[]): AggregatedOre | null {
+  const oreLots = inventory.filter((i): i is OreItem => i.kind === 'Ore')
+  if (oreLots.length === 0) return null
+
+  const totalKg = oreLots.reduce((sum, lot) => sum + lot.kg, 0)
+  // Weighted-average composition
+  const composition: Record<string, number> = {}
+  for (const lot of oreLots) {
+    for (const [el, frac] of Object.entries(lot.composition)) {
+      composition[el] = (composition[el] ?? 0) + frac * lot.kg
+    }
+  }
+  for (const el of Object.keys(composition)) {
+    composition[el] /= totalKg
+  }
+  return { totalKg, lotCount: oreLots.length, composition }
+}
+
 function InventoryDisplay({ inventory }: { inventory: InventoryItem[] }) {
   const hasModules = inventory.some((i) => i.kind === 'Module')
+  const hasComponents = inventory.some((i) => i.kind === 'Component')
   const totalKg = totalInventoryKg(inventory)
 
-  if (totalKg === 0 && !hasModules) return null
+  if (totalKg === 0 && !hasModules && !hasComponents) return null
+
+  const oreAgg = aggregateOre(inventory)
+  const materials = inventory.filter((i) => i.kind === 'Material') as MaterialItem[]
+  const slags = inventory.filter((i) => i.kind === 'Slag') as SlagItem[]
+  const components = inventory.filter((i) => i.kind === 'Component') as ComponentItem[]
+  const modules = inventory.filter((i) => i.kind === 'Module') as ModuleItem[]
 
   return (
     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-      {inventory.map((item, idx) => {
-        if (item.kind === 'Ore') {
-          return (
-            <span key={idx} className="text-cargo">
-              ore {formatKg(item.kg)} kg
-              <span className="text-faint ml-1">
-                ({Object.entries(item.composition)
-                  .sort(([, a], [, b]) => b - a)
-                  .filter(([, f]) => f > 0.001)
-                  .map(([el, f]) => `${el} ${pct(f)}`)
-                  .join(', ')})
-              </span>
-            </span>
-          )
-        }
-        if (item.kind === 'Material') {
-          return (
-            <span key={idx} className="text-cargo">
-              {item.element} {formatKg(item.kg)} kg
-              <span className="text-faint ml-1">({qualityTier(item.quality)})</span>
-            </span>
-          )
-        }
-        if (item.kind === 'Slag') {
-          return (
-            <span key={idx} className="text-dim">
-              slag {formatKg(item.kg)} kg
-            </span>
-          )
-        }
-        if (item.kind === 'Module') {
-          return (
-            <span key={idx} className="text-faint text-[10px]">
-              module: {item.module_def_id}
-            </span>
-          )
-        }
-        return null
-      })}
+      {oreAgg && (
+        <span className="text-cargo">
+          ore {formatKg(oreAgg.totalKg)} kg
+          <span className="text-faint ml-1">
+            ({oreAgg.lotCount} lot{oreAgg.lotCount !== 1 ? 's' : ''},{' '}
+            {Object.entries(oreAgg.composition)
+              .sort(([, a], [, b]) => b - a)
+              .filter(([, f]) => f > 0.001)
+              .map(([el, f]) => `${el} ${pct(f)}`)
+              .join(', ')})
+          </span>
+        </span>
+      )}
+      {materials.map((item, idx) => (
+        <span key={`mat-${idx}`} className="text-cargo">
+          {item.element} {formatKg(item.kg)} kg
+          <span className="text-faint ml-1">({qualityTier(item.quality)})</span>
+        </span>
+      ))}
+      {slags.map((item, idx) => (
+        <span key={`slag-${idx}`} className="text-dim">
+          slag {formatKg(item.kg)} kg
+        </span>
+      ))}
+      {components.map((item, idx) => (
+        <span key={`comp-${idx}`} className="text-cargo">
+          {item.component_id} ×{item.count}
+        </span>
+      ))}
+      {modules.map((item, idx) => (
+        <span key={`mod-${idx}`} className="text-faint text-[10px]">
+          module: {item.module_def_id}
+        </span>
+      ))}
     </div>
   )
+}
+
+function wearColor(wear: number): string {
+  if (wear >= WEAR_TIER_HIGH) return 'text-red-400'
+  if (wear >= WEAR_TIER_MED) return 'text-yellow-400'
+  return 'text-green-400'
 }
 
 function ModulesDisplay({ modules }: { modules: ModuleState[] }) {
@@ -85,13 +119,17 @@ function ModulesDisplay({ modules }: { modules: ModuleState[] }) {
   return (
     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
       {modules.map((m) => {
+        const isMaintenance = typeof m.kind_state === 'object' && 'Maintenance' in m.kind_state
         const threshold =
           typeof m.kind_state === 'object' && 'Processor' in m.kind_state
             ? m.kind_state.Processor.threshold_kg
             : null
+        const wearPct = m.wear ? Math.round((1 - m.wear.wear) * 100) : 100
         return (
           <span key={m.id} className="text-[10px] text-dim">
             {m.def_id} · {m.enabled ? 'on' : 'off'}
+            {' · '}<span className={m.wear ? wearColor(m.wear.wear) : 'text-green-400'}>{wearPct}%</span>
+            {isMaintenance && ' · maintenance'}
             {threshold !== null && ` · threshold ${threshold} kg`}
           </span>
         )
@@ -242,7 +280,7 @@ function StationsTable({ stations }: { stations: StationState[] }) {
           <tr key={station.id}>
             <td className="px-2 py-0.5 border-b border-surface align-top">{station.id}</td>
             <td className="px-2 py-0.5 border-b border-surface align-top">{station.location_node}</td>
-            <td className="px-2 py-0.5 border-b border-surface align-top">
+            <td className="px-2 py-0.5 border-b border-surface align-top max-w-[400px] overflow-hidden">
               {cargo_kg === 0 ? (
                 <span className="text-faint">empty</span>
               ) : (

@@ -20,4 +20,21 @@ echo "--- fmt ---"
 cargo fmt 2>&1
 
 echo "--- test ---"
-cargo test --quiet 2>&1
+# Determine which crate was edited and only test that crate.
+# This avoids slow linking of duckdb-dependent crates (sim_cli, sim_daemon)
+# when editing unrelated code.
+CRATE=""
+case "$FILE_PATH" in
+  */crates/sim_core/*)    CRATE="sim_core" ;;
+  */crates/sim_control/*) CRATE="sim_control" ;;
+  */crates/sim_world/*)   CRATE="sim_world" ;;
+  */crates/sim_cli/*)     CRATE="sim_cli" ;;
+  */crates/sim_daemon/*)  CRATE="sim_daemon" ;;
+esac
+
+if [[ -n "$CRATE" ]]; then
+  cargo test -p "$CRATE" --quiet 2>&1
+else
+  # Fallback: test the fast crates only (no duckdb linking)
+  cargo test -p sim_core -p sim_control -p sim_world --quiet 2>&1
+fi

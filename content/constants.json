@@ -11,7 +11,7 @@
   "asteroid_mass_min_kg": 100.0,
   "asteroid_mass_max_kg": 100000.0,
   "ship_cargo_capacity_m3": 20.0,
-  "station_cargo_capacity_m3": 10000.0,
+  "station_cargo_capacity_m3": 100.0,
   "station_compute_units_total": 10,
   "station_power_per_compute_unit_per_tick": 1.0,
   "station_efficiency": 1.0,
