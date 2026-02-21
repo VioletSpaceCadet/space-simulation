@@ -149,12 +149,14 @@ pub struct ModuleState {
     pub def_id: String,
     pub enabled: bool,
     pub kind_state: ModuleKindState,
+    pub wear: WearState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ModuleKindState {
     Processor(ProcessorState),
     Storage,
+    Maintenance(MaintenanceState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -163,6 +165,11 @@ pub struct ProcessorState {
     pub ticks_since_last_run: u64,
     #[serde(default)]
     pub stalled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaintenanceState {
+    pub ticks_since_last_run: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -398,6 +405,23 @@ pub enum Event {
         p: f32,
         rolled: f32,
     },
+    WearAccumulated {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        wear_before: f32,
+        wear_after: f32,
+    },
+    ModuleAutoDisabled {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+    },
+    MaintenanceRan {
+        station_id: StationId,
+        target_module_id: ModuleInstanceId,
+        wear_before: f32,
+        wear_after: f32,
+        repair_kits_remaining: u32,
+    },
     ModuleStalled {
         station_id: StationId,
         module_id: ModuleInstanceId,
@@ -430,7 +454,16 @@ pub struct GameContent {
     pub asteroid_templates: Vec<AsteroidTemplateDef>,
     pub elements: Vec<ElementDef>,
     pub module_defs: Vec<ModuleDef>,
+    pub component_defs: Vec<ComponentDef>,
     pub constants: Constants,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentDef {
+    pub id: String,
+    pub name: String,
+    pub mass_kg: f32,
+    pub volume_m3: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -485,6 +518,8 @@ pub struct ModuleDef {
     pub mass_kg: f32,
     pub volume_m3: f32,
     pub power_consumption_per_run: f32,
+    #[serde(default)]
+    pub wear_per_run: f32,
     pub behavior: ModuleBehaviorDef,
 }
 
@@ -492,6 +527,14 @@ pub struct ModuleDef {
 pub enum ModuleBehaviorDef {
     Processor(ProcessorDef),
     Storage { capacity_m3: f32 },
+    Maintenance(MaintenanceDef),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaintenanceDef {
+    pub repair_interval_ticks: u64,
+    pub wear_reduction_per_run: f32,
+    pub repair_kit_cost: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -593,4 +636,26 @@ pub struct Constants {
     pub autopilot_iron_rich_confidence_threshold: f32,
     /// Default refinery processing threshold (kg) set by autopilot on newly installed modules.
     pub autopilot_refinery_threshold_kg: f32,
+    // Wear system
+    pub wear_band_degraded_threshold: f32,
+    pub wear_band_critical_threshold: f32,
+    pub wear_band_degraded_efficiency: f32,
+    pub wear_band_critical_efficiency: f32,
+}
+
+// ---------------------------------------------------------------------------
+// Wear system
+// ---------------------------------------------------------------------------
+
+/// Standalone wear state, embedded wherever wear applies.
+/// Generic — used by station modules now, ships later.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WearState {
+    pub wear: f32,
+}
+
+impl Default for WearState {
+    fn default() -> Self {
+        Self { wear: 0.0 }
+    }
 }

@@ -73,6 +73,7 @@ pub fn base_content() -> GameContent {
             },
         ],
         module_defs: vec![],
+        component_defs: vec![],
         constants: Constants {
             survey_scan_ticks: 1,
             deep_scan_ticks: 1,
@@ -96,6 +97,10 @@ pub fn base_content() -> GameContent {
             deposit_ticks: 1, // fast for tests
             autopilot_iron_rich_confidence_threshold: 0.7,
             autopilot_refinery_threshold_kg: 500.0,
+            wear_band_degraded_threshold: 0.5,
+            wear_band_critical_threshold: 0.8,
+            wear_band_degraded_efficiency: 0.75,
+            wear_band_critical_efficiency: 0.5,
         },
     }
 }
@@ -117,6 +122,7 @@ pub fn minimal_content() -> GameContent {
             refined_name: None,
         }],
         module_defs: vec![],
+        component_defs: vec![],
         constants: Constants {
             survey_scan_ticks: 1,
             deep_scan_ticks: 1,
@@ -139,6 +145,10 @@ pub fn minimal_content() -> GameContent {
             deposit_ticks: 1,
             autopilot_iron_rich_confidence_threshold: 0.7,
             autopilot_refinery_threshold_kg: 500.0,
+            wear_band_degraded_threshold: 0.5,
+            wear_band_critical_threshold: 0.8,
+            wear_band_degraded_efficiency: 0.75,
+            wear_band_critical_efficiency: 0.5,
         },
     }
 }

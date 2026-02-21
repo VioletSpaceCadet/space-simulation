@@ -1,0 +1,8 @@
+[
+  {
+    "id": "repair_kit",
+    "name": "Repair Kit",
+    "mass_kg": 50.0,
+    "volume_m3": 0.1
+  }
+]

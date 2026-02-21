@@ -5,6 +5,7 @@
     "mass_kg": 5000.0,
     "volume_m3": 10.0,
     "power_consumption_per_run": 10.0,
+    "wear_per_run": 0.01,
     "behavior": {
       "Processor": {
         "processing_interval_ticks": 60,
@@ -36,6 +37,21 @@
             "efficiency": 1.0
           }
         ]
+      }
+    }
+  },
+  {
+    "id": "module_maintenance_bay",
+    "name": "Maintenance Bay",
+    "mass_kg": 2000.0,
+    "volume_m3": 5.0,
+    "power_consumption_per_run": 5.0,
+    "wear_per_run": 0.0,
+    "behavior": {
+      "Maintenance": {
+        "repair_interval_ticks": 30,
+        "wear_reduction_per_run": 0.2,
+        "repair_kit_cost": 1
       }
     }
   }

@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-const METRICS_VERSION: u32 = 1;
+const METRICS_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
@@ -59,6 +59,11 @@ pub struct MetricsSnapshot {
     pub techs_unlocked: u32,
     pub total_scan_data: f32,
     pub max_tech_evidence: f32,
+
+    // Wear & Maintenance
+    pub avg_module_wear: f32,
+    pub max_module_wear: f32,
+    pub repair_kits_remaining: u32,
 }
 
 #[derive(Default)]
@@ -135,6 +140,11 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
     let mut refinery_starved_count = 0_u32;
     let mut refinery_stalled_count = 0_u32;
 
+    let mut wear_sum = 0.0_f32;
+    let mut wear_count = 0_u32;
+    let mut max_wear = 0.0_f32;
+    let mut total_repair_kits = 0_u32;
+
     // --- Stations ---
     for station in state.stations.values() {
         acc.accumulate(&station.inventory);
@@ -159,12 +169,21 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
             .sum();
 
         for module in &station.modules {
-            if !module.enabled {
-                continue;
-            }
+            // Track wear for all processor modules (enabled or not)
             let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
                 continue;
             };
+            if matches!(def.behavior, ModuleBehaviorDef::Processor(_)) {
+                wear_sum += module.wear.wear;
+                wear_count += 1;
+                if module.wear.wear > max_wear {
+                    max_wear = module.wear.wear;
+                }
+            }
+
+            if !module.enabled {
+                continue;
+            }
             if !matches!(def.behavior, ModuleBehaviorDef::Processor(_)) {
                 continue;
             }
@@ -176,6 +195,20 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
                 }
                 if total_ore_at_station < ps.threshold_kg {
                     refinery_starved_count += 1;
+                }
+            }
+        }
+
+        // Count repair kits
+        for item in &station.inventory {
+            if let InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } = item
+            {
+                if component_id.0 == "repair_kit" {
+                    total_repair_kits += *count;
                 }
             }
         }
@@ -260,6 +293,12 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         0.0
     };
 
+    let avg_module_wear = if wear_count > 0 {
+        wear_sum / wear_count as f32
+    } else {
+        0.0
+    };
+
     // Clamp min/max to 0.0 when no ore lots exist.
     let min_ore_fe_fraction = if acc.ore_lot_count > 0 {
         acc.min_ore_fe
@@ -301,6 +340,9 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         techs_unlocked: state.research.unlocked.len() as u32,
         total_scan_data,
         max_tech_evidence,
+        avg_module_wear,
+        max_module_wear: max_wear,
+        repair_kits_remaining: total_repair_kits,
     }
 }
 
@@ -316,7 +358,8 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
          refinery_active_count,refinery_starved_count,refinery_stalled_count,\
          fleet_total,fleet_idle,fleet_mining,fleet_transiting,fleet_surveying,fleet_depositing,\
          scan_sites_remaining,asteroids_discovered,asteroids_depleted,\
-         techs_unlocked,total_scan_data,max_tech_evidence"
+         techs_unlocked,total_scan_data,max_tech_evidence,\
+         avg_module_wear,max_module_wear,repair_kits_remaining"
     )
 }
 
@@ -327,7 +370,7 @@ pub fn append_metrics_row(
 ) -> std::io::Result<()> {
     writeln!(
         writer,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         snapshot.tick,
         snapshot.metrics_version,
         snapshot.total_ore_kg,
@@ -356,6 +399,9 @@ pub fn append_metrics_row(
         snapshot.techs_unlocked,
         snapshot.total_scan_data,
         snapshot.max_tech_evidence,
+        snapshot.avg_module_wear,
+        snapshot.max_module_wear,
+        snapshot.repair_kits_remaining,
     )
 }
 
@@ -528,6 +574,9 @@ mod tests {
         assert_eq!(snapshot.techs_unlocked, 0);
         assert_eq!(snapshot.total_scan_data, 0.0);
         assert_eq!(snapshot.max_tech_evidence, 0.0);
+        assert_eq!(snapshot.avg_module_wear, 0.0);
+        assert_eq!(snapshot.max_module_wear, 0.0);
+        assert_eq!(snapshot.repair_kits_remaining, 0);
     }
 
     #[test]
@@ -672,6 +721,7 @@ mod tests {
             mass_kg: 5000.0,
             volume_m3: 10.0,
             power_consumption_per_run: 10.0,
+            wear_per_run: 0.01,
             behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
                 processing_interval_ticks: 60,
                 recipes: vec![],
@@ -696,6 +746,7 @@ mod tests {
                     ticks_since_last_run: 0,
                     stalled: false,
                 }),
+                wear: crate::WearState::default(),
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -824,6 +875,7 @@ mod tests {
             mass_kg: 5000.0,
             volume_m3: 10.0,
             power_consumption_per_run: 10.0,
+            wear_per_run: 0.01,
             behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
                 processing_interval_ticks: 60,
                 recipes: vec![],
@@ -847,6 +899,7 @@ mod tests {
                     ticks_since_last_run: 0,
                     stalled: true,
                 }),
+                wear: crate::WearState::default(),
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -910,5 +963,67 @@ mod tests {
         assert_eq!(snapshot.scan_sites_remaining, 2);
         assert_eq!(snapshot.asteroids_discovered, 2);
         assert_eq!(snapshot.asteroids_depleted, 1);
+    }
+
+    #[test]
+    fn test_wear_metrics() {
+        let mut content = empty_content();
+        content.module_defs = vec![crate::ModuleDef {
+            id: "module_basic_iron_refinery".to_string(),
+            name: "Basic Iron Refinery".to_string(),
+            mass_kg: 5000.0,
+            volume_m3: 10.0,
+            power_consumption_per_run: 10.0,
+            wear_per_run: 0.01,
+            behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                processing_interval_ticks: 60,
+                recipes: vec![],
+            }),
+        }];
+
+        let mut state = empty_state();
+        let station = make_station(
+            vec![InventoryItem::Component {
+                component_id: crate::ComponentId("repair_kit".to_string()),
+                count: 3,
+                quality: 1.0,
+            }],
+            vec![
+                ModuleState {
+                    id: ModuleInstanceId("mod_0001".to_string()),
+                    def_id: "module_basic_iron_refinery".to_string(),
+                    enabled: true,
+                    kind_state: ModuleKindState::Processor(ProcessorState {
+                        threshold_kg: 500.0,
+                        ticks_since_last_run: 0,
+                        stalled: false,
+                    }),
+                    wear: crate::WearState { wear: 0.3 },
+                },
+                ModuleState {
+                    id: ModuleInstanceId("mod_0002".to_string()),
+                    def_id: "module_basic_iron_refinery".to_string(),
+                    enabled: true,
+                    kind_state: ModuleKindState::Processor(ProcessorState {
+                        threshold_kg: 500.0,
+                        ticks_since_last_run: 0,
+                        stalled: false,
+                    }),
+                    wear: crate::WearState { wear: 0.7 },
+                },
+            ],
+        );
+        state.stations.insert(station.id.clone(), station);
+
+        let snapshot = compute_metrics(&state, &content);
+        assert!(
+            (snapshot.avg_module_wear - 0.5).abs() < 1e-5,
+            "avg wear should be 0.5"
+        );
+        assert!(
+            (snapshot.max_module_wear - 0.7).abs() < 1e-5,
+            "max wear should be 0.7"
+        );
+        assert_eq!(snapshot.repair_kits_remaining, 3);
     }
 }

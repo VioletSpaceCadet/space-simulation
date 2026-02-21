@@ -108,6 +108,11 @@ fn apply_commands(
                             })
                         }
                         crate::ModuleBehaviorDef::Storage { .. } => crate::ModuleKindState::Storage,
+                        crate::ModuleBehaviorDef::Maintenance(_) => {
+                            crate::ModuleKindState::Maintenance(crate::MaintenanceState {
+                                ticks_since_last_run: 0,
+                            })
+                        }
                     },
                     None => continue,
                 };
@@ -118,6 +123,7 @@ fn apply_commands(
                     def_id: module_def_id.clone(),
                     enabled: false,
                     kind_state,
+                    wear: crate::WearState::default(),
                 });
 
                 events.push(crate::emit(
@@ -371,6 +377,7 @@ mod replenish_tests {
                 refined_name: None,
             }],
             module_defs: vec![],
+            component_defs: vec![],
             constants: Constants {
                 survey_scan_ticks: 1,
                 deep_scan_ticks: 1,
@@ -393,6 +400,10 @@ mod replenish_tests {
                 deposit_ticks: 1,
                 autopilot_iron_rich_confidence_threshold: 0.7,
                 autopilot_refinery_threshold_kg: 500.0,
+                wear_band_degraded_threshold: 0.5,
+                wear_band_critical_threshold: 0.8,
+                wear_band_degraded_efficiency: 0.75,
+                wear_band_critical_efficiency: 0.5,
             },
         }
     }

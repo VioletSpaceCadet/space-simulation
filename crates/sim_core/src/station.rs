@@ -61,8 +61,11 @@ pub(crate) fn tick_stations(
     events: &mut Vec<EventEnvelope>,
 ) {
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
-    for station_id in station_ids {
-        tick_station_modules(state, &station_id, content, events);
+    for station_id in &station_ids {
+        tick_station_modules(state, station_id, content, events);
+    }
+    for station_id in &station_ids {
+        tick_maintenance_modules(state, station_id, content, events);
     }
 }
 
@@ -91,7 +94,7 @@ fn tick_station_modules(
             };
             let interval = match &def.behavior {
                 ModuleBehaviorDef::Processor(p) => p.processing_interval_ticks,
-                ModuleBehaviorDef::Storage { .. } => continue,
+                ModuleBehaviorDef::Storage { .. } | ModuleBehaviorDef::Maintenance(_) => continue,
             };
             (
                 module.def_id.clone(),
@@ -130,7 +133,7 @@ fn tick_station_modules(
             };
             match &station.modules[module_idx].kind_state {
                 ModuleKindState::Processor(ps) => ps.threshold_kg,
-                ModuleKindState::Storage => continue,
+                ModuleKindState::Storage | ModuleKindState::Maintenance(_) => continue,
             }
         };
 
@@ -207,7 +210,7 @@ fn tick_station_modules(
 
             let was_stalled = match &station.modules[module_idx].kind_state {
                 ModuleKindState::Processor(ps) => ps.stalled,
-                ModuleKindState::Storage => false,
+                ModuleKindState::Storage | ModuleKindState::Maintenance(_) => false,
             };
             let module_id = station.modules[module_idx].id.clone();
 
@@ -337,6 +340,13 @@ fn resolve_processor_run(
         }
     });
 
+    // Compute wear efficiency — reduces output, not input (wastes ore)
+    let wear_value = state
+        .stations
+        .get(station_id)
+        .map_or(0.0, |s| s.modules[module_idx].wear.wear);
+    let efficiency = crate::wear::wear_efficiency(wear_value, &content.constants);
+
     let mut material_kg = 0.0_f32;
     let mut material_quality = 0.0_f32;
     let mut slag_kg = 0.0_f32;
@@ -354,7 +364,7 @@ fn resolve_processor_run(
                     }
                     YieldFormula::FixedFraction(f) => *f,
                 };
-                material_kg = consumed_kg * yield_frac;
+                material_kg = consumed_kg * yield_frac * efficiency;
                 material_quality = match quality_formula {
                     QualityFormula::ElementFractionTimesMultiplier {
                         element: el,
@@ -424,7 +434,7 @@ fn resolve_processor_run(
         current_tick,
         Event::RefineryRan {
             station_id: station_id.clone(),
-            module_id,
+            module_id: module_id.clone(),
             ore_consumed_kg: consumed_kg,
             material_produced_kg: material_kg,
             material_quality,
@@ -432,6 +442,46 @@ fn resolve_processor_run(
             material_element: extracted_element.unwrap_or_default(),
         },
     ));
+
+    // Accumulate wear
+    let wear_per_run = content
+        .module_defs
+        .iter()
+        .find(|d| d.id == def_id)
+        .map_or(0.0, |d| d.wear_per_run);
+
+    if wear_per_run > 0.0 {
+        if let Some(station) = state.stations.get_mut(station_id) {
+            let module = &mut station.modules[module_idx];
+            let wear_before = module.wear.wear;
+            module.wear.wear = (module.wear.wear + wear_per_run).min(1.0);
+            let wear_after = module.wear.wear;
+
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::WearAccumulated {
+                    station_id: station_id.clone(),
+                    module_id: module.id.clone(),
+                    wear_before,
+                    wear_after,
+                },
+            ));
+
+            if module.wear.wear >= 1.0 {
+                let mid = module.id.clone();
+                module.enabled = false;
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::ModuleAutoDisabled {
+                        station_id: station_id.clone(),
+                        module_id: mid,
+                    },
+                ));
+            }
+        }
+    }
 }
 
 /// FIFO-consume up to `rate_kg` from matching Ore items.
@@ -476,6 +526,190 @@ fn consume_ore_fifo_with_lots(
     }
     *inventory = new_inventory;
     (consumed_kg, lots)
+}
+
+fn tick_maintenance_modules(
+    state: &mut GameState,
+    station_id: &StationId,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+    let module_count = state
+        .stations
+        .get(station_id)
+        .map_or(0, |s| s.modules.len());
+
+    for module_idx in 0..module_count {
+        let (interval, power_needed, repair_reduction, kit_cost) = {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            let module = &station.modules[module_idx];
+            if !module.enabled {
+                continue;
+            }
+            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+                continue;
+            };
+            let ModuleBehaviorDef::Maintenance(maint_def) = &def.behavior else {
+                continue;
+            };
+            (
+                maint_def.repair_interval_ticks,
+                def.power_consumption_per_run,
+                maint_def.wear_reduction_per_run,
+                maint_def.repair_kit_cost,
+            )
+        };
+
+        // Tick timer
+        {
+            let Some(station) = state.stations.get_mut(station_id) else {
+                return;
+            };
+            if let ModuleKindState::Maintenance(ms) = &mut station.modules[module_idx].kind_state {
+                ms.ticks_since_last_run += 1;
+                if ms.ticks_since_last_run < interval {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+        }
+
+        // Check power
+        {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            if station.power_available_per_tick < power_needed {
+                continue;
+            }
+        }
+
+        // Find most worn module (not self, wear > 0.0), sorted by wear desc then ID asc for determinism
+        let target = {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            let self_id = &station.modules[module_idx].id;
+            let mut candidates: Vec<(usize, f32, String)> = station
+                .modules
+                .iter()
+                .enumerate()
+                .filter(|(_, m)| m.id != *self_id && m.wear.wear > 0.0)
+                .map(|(idx, m)| (idx, m.wear.wear, m.id.0.clone()))
+                .collect();
+            candidates.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+            candidates.first().map(|(idx, _, _)| *idx)
+        };
+
+        let Some(target_idx) = target else {
+            // Nothing worn — reset timer but don't consume kit
+            if let Some(station) = state.stations.get_mut(station_id) {
+                if let ModuleKindState::Maintenance(ms) =
+                    &mut station.modules[module_idx].kind_state
+                {
+                    ms.ticks_since_last_run = 0;
+                }
+            }
+            continue;
+        };
+
+        // Consume repair kit
+        let has_kit = {
+            let Some(station) = state.stations.get_mut(station_id) else {
+                return;
+            };
+            let kit_slot = station.inventory.iter_mut().find(|i| {
+                matches!(i, InventoryItem::Component { component_id, count, .. }
+                    if component_id.0 == "repair_kit" && *count >= kit_cost)
+            });
+            if let Some(InventoryItem::Component { count, .. }) = kit_slot {
+                *count -= kit_cost;
+                true
+            } else {
+                false
+            }
+        };
+
+        if !has_kit {
+            // Reset timer even if no kit
+            if let Some(station) = state.stations.get_mut(station_id) {
+                if let ModuleKindState::Maintenance(ms) =
+                    &mut station.modules[module_idx].kind_state
+                {
+                    ms.ticks_since_last_run = 0;
+                }
+            }
+            continue;
+        }
+
+        // Remove empty component stacks
+        if let Some(station) = state.stations.get_mut(station_id) {
+            station
+                .inventory
+                .retain(|i| !matches!(i, InventoryItem::Component { count, .. } if *count == 0));
+        }
+
+        // Apply repair
+        let (target_module_id, wear_before, wear_after, kits_remaining) = {
+            let Some(station) = state.stations.get_mut(station_id) else {
+                return;
+            };
+            let target_module = &mut station.modules[target_idx];
+            let wear_before = target_module.wear.wear;
+            target_module.wear.wear = (target_module.wear.wear - repair_reduction).max(0.0);
+            let wear_after = target_module.wear.wear;
+            let target_module_id = target_module.id.clone();
+
+            // Re-enable module if it was auto-disabled due to wear
+            if !target_module.enabled && wear_after < 1.0 {
+                target_module.enabled = true;
+            }
+
+            let kits_remaining: u32 = station
+                .inventory
+                .iter()
+                .filter_map(|i| {
+                    if let InventoryItem::Component {
+                        component_id,
+                        count,
+                        ..
+                    } = i
+                    {
+                        if component_id.0 == "repair_kit" {
+                            Some(*count)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .sum();
+
+            // Reset timer
+            if let ModuleKindState::Maintenance(ms) = &mut station.modules[module_idx].kind_state {
+                ms.ticks_since_last_run = 0;
+            }
+
+            (target_module_id, wear_before, wear_after, kits_remaining)
+        };
+
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::MaintenanceRan {
+                station_id: station_id.clone(),
+                target_module_id,
+                wear_before,
+                wear_after,
+                repair_kits_remaining: kits_remaining,
+            },
+        ));
+    }
 }
 
 /// Peek at what would be consumed by FIFO without mutating inventory.

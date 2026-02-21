@@ -34,14 +34,14 @@ cd ui_web && npm test        # vitest
 
 Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus `sim_world` (shared content loading + world gen) and `ui_web/` (React).
 
-- **sim_core** — Pure deterministic sim. No IO. Modules: `types`, `engine`, `tasks`, `research`, `station`, `graph`, `id`, `composition`, `metrics`. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, `shortest_hop_count()`, `generate_uuid()`, `compute_metrics()`, `write_metrics_csv()`, `write_metrics_header()`, `append_metrics_row()`.
-- **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management).
-- **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json` (7 files).
+- **sim_core** — Pure deterministic sim. No IO. Modules: `types`, `engine`, `tasks`, `research`, `station`, `graph`, `id`, `composition`, `metrics`, `wear`. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, `shortest_hop_count()`, `generate_uuid()`, `compute_metrics()`, `write_metrics_csv()`, `write_metrics_header()`, `append_metrics_row()`, `wear_efficiency()`.
+- **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management). Skips re-enabling modules at max wear.
+- **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json` (8 files incl. `component_defs.json`).
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags. Auto-writes to `runs/<run_id>/`.
 - **sim_daemon** — axum 0.7. SSE (50ms flush, 200ms heartbeat). `--metrics-every` flag (default 60), `--no-metrics`. Auto-writes to `runs/<run_id>/`. Endpoints: `/api/v1/meta`, `/api/v1/snapshot`, `/api/v1/metrics`, `/api/v1/stream`, `POST /api/v1/save` (writes state to `runs/<run_id>/saves/`).
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. `useSimStream` (useReducer + applyEvents), `useAnimatedTick` (60fps interpolation), `useSortableData`. Panels: Map, Events, Asteroids, Fleet, Research.
 
-**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
+**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors then maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
 
 **Key design rules:**
 - Asteroids created on discovery (scan_sites → AsteroidState), not pre-populated.
@@ -50,6 +50,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - All collection iteration sorted by ID before RNG use for determinism.
 - Scan sites replenished when count < 5. Deterministic UUIDs from seeded RNG.
 - sim_core takes `&mut impl rand::Rng` — concrete ChaCha8Rng in sim_cli/sim_daemon.
+- **Wear system:** `WearState` (0.0–1.0) on each module. Processors accumulate `wear_per_run` after each run. 3-band efficiency: nominal (1.0), degraded (0.75 at ≥0.5), critical (0.5 at ≥0.8). Auto-disables at 1.0. Maintenance Bay repairs most-worn module, consumes RepairKit. `WearState` is generic — designed for future ship module wear.
 
 ## After Every Change
 

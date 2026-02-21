@@ -1247,6 +1247,7 @@ fn refinery_content() -> GameContent {
         mass_kg: 5000.0,
         volume_m3: 10.0,
         power_consumption_per_run: 10.0,
+        wear_per_run: 0.01,
         behavior: ModuleBehaviorDef::Processor(ProcessorDef {
             processing_interval_ticks: 2, // short for tests
             recipes: vec![RecipeDef {
@@ -1291,6 +1292,7 @@ fn state_with_refinery(content: &GameContent) -> GameState {
             ticks_since_last_run: 0,
             stalled: false,
         }),
+        wear: WearState::default(),
     });
 
     station.inventory.push(InventoryItem::Ore {
@@ -1382,6 +1384,7 @@ fn test_refinery_skips_when_below_threshold() {
             ticks_since_last_run: 0,
             stalled: false,
         }),
+        wear: WearState::default(),
     });
     station.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_0001".to_string()),
@@ -2018,6 +2021,385 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
         (station_ore_kg - ship_ore_kg).abs() < 1e-3,
         "station ore ({station_ore_kg} kg) should match what the ship had ({ship_ore_kg} kg)"
     );
+}
+
+#[test]
+fn test_constants_have_wear_fields() {
+    let content = test_content();
+    assert!((content.constants.wear_band_degraded_threshold - 0.5).abs() < 1e-5);
+    assert!((content.constants.wear_band_critical_threshold - 0.8).abs() < 1e-5);
+    assert!((content.constants.wear_band_degraded_efficiency - 0.75).abs() < 1e-5);
+    assert!((content.constants.wear_band_critical_efficiency - 0.5).abs() < 1e-5);
+}
+
+// --- Wear ---
+
+#[test]
+fn test_refinery_output_reduced_by_wear() {
+    let content = refinery_content();
+    let mut state = state_with_refinery(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Set wear to degraded band (0.6 → 75% efficiency)
+    state.stations.get_mut(&station_id).unwrap().modules[0]
+        .wear
+        .wear = 0.6;
+
+    let mut rng = make_rng();
+    // Tick twice to reach processing_interval_ticks=2
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = &state.stations[&station_id];
+    let material_kg = station
+        .inventory
+        .iter()
+        .find_map(|i| {
+            if let InventoryItem::Material { element, kg, .. } = i {
+                if element == "Fe" {
+                    Some(*kg)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0.0);
+
+    // Without wear: 500 kg input × 0.7 Fe fraction = 350 kg
+    // With 75% efficiency: 350 × 0.75 = 262.5 kg
+    assert!(
+        (material_kg - 262.5).abs() < 1.0,
+        "degraded module should produce ~262.5 kg Fe, got {material_kg}"
+    );
+}
+
+#[test]
+fn test_refinery_accumulates_wear() {
+    let content = refinery_content();
+    let mut state = state_with_refinery(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    let mut rng = make_rng();
+
+    // Tick twice to trigger refinery run
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let wear = state.stations[&station_id].modules[0].wear.wear;
+    let expected_wear = content
+        .module_defs
+        .iter()
+        .find(|d| d.id == "module_basic_iron_refinery")
+        .unwrap()
+        .wear_per_run;
+    assert!(
+        (wear - expected_wear).abs() < 1e-5,
+        "wear should be {expected_wear} after one run, got {wear}"
+    );
+}
+
+#[test]
+fn test_refinery_auto_disables_at_max_wear() {
+    let content = refinery_content();
+    let mut state = state_with_refinery(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Set wear just below 1.0 so next run pushes it over
+    state.stations.get_mut(&station_id).unwrap().modules[0]
+        .wear
+        .wear = 0.995;
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = &state.stations[&station_id];
+    assert!(
+        !station.modules[0].enabled,
+        "module should be auto-disabled at wear >= 1.0"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::ModuleAutoDisabled { .. })),
+        "ModuleAutoDisabled event should be emitted"
+    );
+}
+
+#[test]
+fn test_wear_accumulated_event_emitted() {
+    let content = refinery_content();
+    let mut state = state_with_refinery(&content);
+    let mut rng = make_rng();
+
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::WearAccumulated { .. })),
+        "WearAccumulated event should be emitted when refinery runs"
+    );
+}
+
+// --- Maintenance ---
+
+fn maintenance_content() -> GameContent {
+    let mut content = refinery_content();
+    content.module_defs.push(ModuleDef {
+        id: "module_maintenance_bay".to_string(),
+        name: "Maintenance Bay".to_string(),
+        mass_kg: 2000.0,
+        volume_m3: 5.0,
+        power_consumption_per_run: 5.0,
+        wear_per_run: 0.0,
+        behavior: ModuleBehaviorDef::Maintenance(MaintenanceDef {
+            repair_interval_ticks: 2,
+            wear_reduction_per_run: 0.2,
+            repair_kit_cost: 1,
+        }),
+    });
+    content
+}
+
+fn state_with_maintenance(content: &GameContent) -> GameState {
+    let mut state = state_with_refinery(content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    let station = state.stations.get_mut(&station_id).unwrap();
+
+    // Add maintenance bay module
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("module_inst_0002".to_string()),
+        def_id: "module_maintenance_bay".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Maintenance(MaintenanceState {
+            ticks_since_last_run: 0,
+        }),
+        wear: WearState::default(),
+    });
+
+    // Add repair kits
+    station.inventory.push(InventoryItem::Component {
+        component_id: ComponentId("repair_kit".to_string()),
+        count: 5,
+        quality: 1.0,
+    });
+
+    state
+}
+
+#[test]
+fn test_maintenance_repairs_most_worn_module() {
+    let content = maintenance_content();
+    let mut state = state_with_maintenance(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Set refinery to worn state
+    state.stations.get_mut(&station_id).unwrap().modules[0]
+        .wear
+        .wear = 0.6;
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = &state.stations[&station_id];
+    assert!(
+        (station.modules[0].wear.wear - 0.4).abs() < 0.1,
+        "wear should be reduced by ~0.2, got {}",
+        station.modules[0].wear.wear
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::MaintenanceRan { .. })),
+        "MaintenanceRan event should be emitted"
+    );
+}
+
+#[test]
+fn test_maintenance_consumes_repair_kit() {
+    let content = maintenance_content();
+    let mut state = state_with_maintenance(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    state.stations.get_mut(&station_id).unwrap().modules[0]
+        .wear
+        .wear = 0.6;
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = &state.stations[&station_id];
+    let kits = station
+        .inventory
+        .iter()
+        .find_map(|i| {
+            if let InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } = i
+            {
+                if component_id.0 == "repair_kit" {
+                    Some(*count)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0);
+    assert_eq!(
+        kits, 4,
+        "one repair kit should be consumed, got {kits} remaining"
+    );
+}
+
+#[test]
+fn test_maintenance_skips_when_no_repair_kits() {
+    let content = maintenance_content();
+    let mut state = state_with_maintenance(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    state.stations.get_mut(&station_id).unwrap().modules[0]
+        .wear
+        .wear = 0.6;
+    // Remove all repair kits
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .inventory
+        .retain(|i| {
+            !matches!(i, InventoryItem::Component { component_id, .. } if component_id.0 == "repair_kit")
+        });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = &state.stations[&station_id];
+    // Wear should increase (refinery ran) but not decrease (no kits for maintenance)
+    assert!(
+        station.modules[0].wear.wear > 0.6,
+        "wear should not decrease without repair kits"
+    );
+}
+
+#[test]
+fn test_maintenance_skips_when_no_worn_modules() {
+    let content = maintenance_content();
+    let mut state = state_with_maintenance(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // All modules at wear 0.0 — remove ore so refinery doesn't run and accumulate wear
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .inventory
+        .retain(|i| !matches!(i, InventoryItem::Ore { .. }));
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    // Kits should not be consumed
+    let station = &state.stations[&station_id];
+    let kits = station
+        .inventory
+        .iter()
+        .find_map(|i| {
+            if let InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } = i
+            {
+                if component_id.0 == "repair_kit" {
+                    Some(*count)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0);
+    assert_eq!(kits, 5, "no kits should be consumed when nothing is worn");
+}
+
+// --- Integration: wear + maintenance full cycle ---
+
+#[test]
+fn test_wear_maintenance_full_cycle() {
+    // Use high wear_per_run so wear outpaces maintenance repair
+    let mut content = maintenance_content();
+    for def in &mut content.module_defs {
+        if def.id == "module_basic_iron_refinery" {
+            def.wear_per_run = 0.3; // very high — overwhelms 0.2 repair
+        }
+    }
+    let mut state = state_with_maintenance(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    let mut rng = make_rng();
+
+    // Collect events across ticks
+    let mut all_events = Vec::new();
+    for _ in 0..20 {
+        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        all_events.extend(events);
+    }
+
+    // Verify wear accumulated event was emitted
+    assert!(
+        all_events
+            .iter()
+            .any(|e| matches!(e.event, Event::WearAccumulated { .. })),
+        "WearAccumulated event should be emitted during cycle"
+    );
+
+    // Verify maintenance ran event was emitted
+    assert!(
+        all_events
+            .iter()
+            .any(|e| matches!(e.event, Event::MaintenanceRan { .. })),
+        "MaintenanceRan event should be emitted during cycle"
+    );
+
+    // Some repair kits should have been consumed
+    let station = &state.stations[&station_id];
+    let kits = station
+        .inventory
+        .iter()
+        .find_map(|i| {
+            if let InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } = i
+            {
+                if component_id.0 == "repair_kit" {
+                    Some(*count)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0);
+    assert!(kits < 5, "some repair kits should have been consumed");
+
+    // Refinery ran twice (1000kg ore / 500kg per run), accumulating 0.6 wear total.
+    // Maintenance repaired multiple times, consuming kits. By tick 20 with enough
+    // repairs, wear may be back to 0.0. The key assertions are the events above
+    // and the kit consumption — both systems interacted correctly.
 }
 
 // --- Deposit blocking / unblocking ----------------------------------------

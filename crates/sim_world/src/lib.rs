@@ -4,10 +4,10 @@ use anyhow::{Context, Result};
 use rand::Rng;
 use serde::Deserialize;
 use sim_core::{
-    AsteroidTemplateDef, Constants, Counters, ElementDef, FacilitiesState, GameContent, GameState,
-    InputFilter, MetaState, ModuleBehaviorDef, ModuleDef, NodeId, OutputSpec, PrincipalId,
-    QualityFormula, ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId,
-    StationState, TechDef, TechId, YieldFormula,
+    AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, FacilitiesState,
+    GameContent, GameState, InputFilter, InventoryItem, MetaState, ModuleBehaviorDef, ModuleDef,
+    ModuleItemId, NodeId, OutputSpec, PrincipalId, QualityFormula, ResearchState, ScanSite, ShipId,
+    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId, YieldFormula,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -171,6 +171,11 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
             .context("reading module_defs.json")?,
     )
     .context("parsing module_defs.json")?;
+    let component_defs: Vec<sim_core::ComponentDef> = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("component_defs.json"))
+            .context("reading component_defs.json")?,
+    )
+    .context("parsing component_defs.json")?;
     let content = GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
@@ -178,6 +183,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         asteroid_templates: templates_file.templates,
         elements: elements_file.elements,
         module_defs,
+        component_defs,
         constants,
     };
     validate_content(&content);
@@ -191,7 +197,17 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     let station = StationState {
         id: station_id.clone(),
         location_node: earth_orbit.clone(),
-        inventory: vec![],
+        inventory: vec![
+            InventoryItem::Component {
+                component_id: ComponentId("repair_kit".to_string()),
+                count: 5,
+                quality: 1.0,
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_maint_0001".to_string()),
+                module_def_id: "module_maintenance_bay".to_string(),
+            },
+        ],
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         facilities: FacilitiesState {
@@ -388,6 +404,7 @@ mod tests {
             mass_kg: 1000.0,
             volume_m3: 5.0,
             power_consumption_per_run: 10.0,
+            wear_per_run: 0.0,
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_ticks: 10,
                 recipes: vec![RecipeDef {

@@ -13,11 +13,14 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `ShipState` | `id`, `location_node`, `owner`, `inventory: Vec<InventoryItem>`, `cargo_capacity_m3`, `task` |
 | `StationState` | `id`, `location_node`, `inventory`, `cargo_capacity_m3`, `power_available_per_tick`, `facilities`, `modules: Vec<ModuleState>` |
 | `InventoryItem` | Enum: `Ore { lot_id, asteroid_id, kg, composition }`, `Material { element, kg, quality }`, `Slag { kg, composition }`, `Component { component_id, count, quality }`, `Module { item_id, module_def_id }` |
-| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor or Storage). Processor has `stalled: bool` |
+| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, or Maintenance), `wear: WearState`. Processor has `stalled: bool` |
+| `WearState` | `wear: f32` (0.0–1.0). Embedded on any wearable entity. |
 | `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
 | `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold` |
-| `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, constants |
-| `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor with recipes, or Storage) |
+| `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, component_defs, constants |
+| `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, or Maintenance), `wear_per_run` |
+| `ComponentDef` | Component definition: `id`, `name`, `mass_kg`, `volume_m3` |
+| `MaintenanceDef` | Maintenance module behavior: `repair_interval_ticks`, `wear_reduction_per_run`, `repair_kit_cost` |
 | `TechEffect` | `EnableDeepScan` or `DeepScanCompositionNoise { sigma }` |
 
 ## Content Files
@@ -31,7 +34,8 @@ All in `content/`. Loaded at runtime; never compiled in.
 | `solar_system.json` | 4 nodes (Earth Orbit → Inner Belt → Mid Belt → Outer Belt), linear chain |
 | `asteroid_templates.json` | 2 templates: `tmpl_iron_rich` (IronRich, Fe-heavy) and `tmpl_silicate` (Si-heavy) |
 | `elements.json` | 5 elements: `ore` (3000), `slag` (2500), `Fe` (7874), `Si` (2329), `He` (125) kg/m³ |
-| `module_defs.json` | 1 module: `module_basic_iron_refinery` — Processor, 60-tick interval, consumes 1000kg ore, outputs Fe material + slag |
+| `module_defs.json` | 2 modules: `module_basic_iron_refinery` (Processor, 60-tick interval, wear_per_run=0.01) and `module_maintenance_bay` (Maintenance, 30-tick interval, reduces 0.2 wear, costs 1 RepairKit) |
+| `component_defs.json` | 1 component: `repair_kit` (50kg, 0.1 m³) |
 | `dev_base_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
 
 ## Inventory & Refinery Design
@@ -41,6 +45,22 @@ All in `content/`. Loaded at runtime; never compiled in.
 **Ore:** Mining produces `InventoryItem::Ore` with a `lot_id`, `asteroid_id`, `kg`, and snapshot of the asteroid's composition (deep-scanned if available, else true composition). Each asteroid produces distinct ore lots.
 
 **Refinery:** Station modules with `ModuleBehaviorDef::Processor` tick at their defined interval. A processor: checks enabled + power + ore threshold → FIFO-consumes ore up to rate_kg → produces `Material` (element fraction × kg, quality from formula) + `Slag` (remainder). Materials of same element+quality merge. Slag merges into a single accumulating lot.
+
+## Wear & Maintenance
+
+**Wear model:** Each `ModuleState` has a `WearState { wear: f32 }` field (0.0–1.0). Processor modules accumulate `wear_per_run` after each processing run. Efficiency decreases in 3 bands defined by constants: nominal (1.0), degraded (0.75 at ≥0.5 wear), critical (0.5 at ≥0.8 wear). Modules auto-disable when wear reaches 1.0.
+
+**Efficiency impact:** Wear reduces output quantities only — ore consumption stays constant. This creates economic pressure (wastes ore). Computed via `wear_efficiency(wear, constants)` pure function.
+
+**Maintenance Bay:** `ModuleBehaviorDef::Maintenance` ticks at its `repair_interval_ticks`. Each run: finds most-worn module (highest wear, ID tiebreak), consumes `repair_kit_cost` RepairKits, reduces wear by `wear_reduction_per_run`. Skips if no worn modules or no kits. Re-enables auto-disabled modules when wear drops below 1.0.
+
+**RepairKit:** `InventoryItem::Component { component_id: "repair_kit", count, quality }`. Station starts with 5. Not yet craftable — supply is finite in Phase 1.
+
+**Events:** `WearAccumulated`, `ModuleAutoDisabled`, `MaintenanceRan`.
+
+**Metrics:** `avg_module_wear`, `max_module_wear`, `repair_kits_remaining` (MetricsSnapshot v2).
+
+## Storage Enforcement
 
 **Storage enforcement:** Modules and ships respect station cargo capacity.
 - **Processor stall:** Before running, a processor estimates its output volume. If the output would exceed the station's remaining capacity, the processor sets `stalled = true` and emits `ModuleStalled { station_id, module_id, shortfall_m3 }`. On the next tick where space is available, it clears the stall and emits `ModuleResumed { station_id, module_id }`. Stall events are emitted only on transition (not every tick).
@@ -64,4 +84,5 @@ All in `content/`. Loaded at runtime; never compiled in.
 - **Solar System Map (done):** SVG orbital map, d3-zoom, entity markers, tooltips, detail cards.
 - **Smooth Streaming (done):** useAnimatedTick, 200ms heartbeat, measured tick rate.
 - **Procedural Sites (done):** Scan site replenishment with deterministic UUIDs.
+- **Wear & Maintenance Phase 1 (done):** Module wear accumulation, 3-band efficiency, auto-disable, Maintenance Bay, RepairKit, wear metrics.
 - **Storage Enforcement (done):** Processors stall when output exceeds capacity; ships wait when deposit blocked; partial deposits.

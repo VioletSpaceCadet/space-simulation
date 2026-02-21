@@ -79,7 +79,8 @@ fn station_module_commands(
             }
         }
         for module in &station.modules {
-            if !module.enabled {
+            // Re-enable disabled modules, but not if auto-disabled due to max wear
+            if !module.enabled && module.wear.wear < 1.0 {
                 commands.push(make_cmd(
                     owner,
                     state.meta.tick,
@@ -462,6 +463,7 @@ mod tests {
                     ticks_since_last_run: 0,
                     stalled: false,
                 }),
+                wear: sim_core::WearState::default(),
             });
 
         let mut autopilot = AutopilotController;
@@ -474,6 +476,80 @@ mod tests {
                 sim_core::Command::SetModuleEnabled { enabled: true, .. }
             )),
             "autopilot should enable a disabled installed module"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_installs_maintenance_bay() {
+        let mut content = autopilot_content();
+        content.module_defs.push(sim_core::ModuleDef {
+            id: "module_maintenance_bay".to_string(),
+            name: "Maintenance Bay".to_string(),
+            mass_kg: 2000.0,
+            volume_m3: 5.0,
+            power_consumption_per_run: 5.0,
+            wear_per_run: 0.0,
+            behavior: sim_core::ModuleBehaviorDef::Maintenance(sim_core::MaintenanceDef {
+                repair_interval_ticks: 30,
+                wear_reduction_per_run: 0.2,
+                repair_kit_cost: 1,
+            }),
+        });
+        let mut state = autopilot_state(&content);
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        state.stations.get_mut(&station_id).unwrap().inventory.push(
+            sim_core::InventoryItem::Module {
+                item_id: sim_core::ModuleItemId("module_item_maint".to_string()),
+                module_def_id: "module_maintenance_bay".to_string(),
+            },
+        );
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(&cmd.command, sim_core::Command::InstallModule { .. })),
+            "autopilot should install Maintenance Bay module"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_does_not_reenable_worn_out_module() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .modules
+            .push(sim_core::ModuleState {
+                id: sim_core::ModuleInstanceId("module_inst_0001".to_string()),
+                def_id: "module_basic_iron_refinery".to_string(),
+                enabled: false,
+                kind_state: sim_core::ModuleKindState::Processor(sim_core::ProcessorState {
+                    threshold_kg: 500.0,
+                    ticks_since_last_run: 0,
+                    stalled: false,
+                }),
+                wear: sim_core::WearState { wear: 1.0 },
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                sim_core::Command::SetModuleEnabled { enabled: true, .. }
+            )),
+            "autopilot should NOT re-enable a module at max wear"
         );
     }
 }
