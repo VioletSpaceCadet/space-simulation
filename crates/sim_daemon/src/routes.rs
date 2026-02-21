@@ -10,6 +10,7 @@ use axum::{
     Router,
 };
 use sim_core::EventEnvelope;
+use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::time::Duration;
 use tokio::sync::broadcast;
@@ -60,7 +61,7 @@ pub async fn snapshot_handler(
 
 pub async fn metrics_handler(
     State(app_state): State<AppState>,
-) -> Json<Vec<sim_core::MetricsSnapshot>> {
+) -> Json<VecDeque<sim_core::MetricsSnapshot>> {
     let sim = app_state.sim.lock().unwrap();
     Json(sim.metrics_history.clone())
 }

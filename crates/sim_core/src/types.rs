@@ -14,6 +14,14 @@ pub type ElementId = String;
 pub type CompositionVec = HashMap<ElementId, f32>;
 
 // ---------------------------------------------------------------------------
+// Well-known element IDs
+// ---------------------------------------------------------------------------
+
+pub const ELEMENT_ORE: &str = "ore";
+pub const ELEMENT_SLAG: &str = "slag";
+pub const ELEMENT_FE: &str = "Fe";
+
+// ---------------------------------------------------------------------------
 // ID newtypes
 // ---------------------------------------------------------------------------
 

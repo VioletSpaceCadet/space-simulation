@@ -60,21 +60,72 @@ pub struct MetricsSnapshot {
     pub max_tech_evidence: f32,
 }
 
-#[allow(clippy::cast_possible_truncation, clippy::too_many_lines)]
+#[derive(Default)]
+struct InventoryAccumulator {
+    total_ore_kg: f32,
+    total_material_kg: f32,
+    total_slag_kg: f32,
+    total_iron_material_kg: f32,
+    ore_lot_count: u32,
+    ore_fe_weighted_sum: f32,
+    ore_total_weight: f32,
+    min_ore_fe: f32,
+    max_ore_fe: f32,
+    material_quality_weighted_sum: f32,
+    material_total_weight: f32,
+}
+
+impl InventoryAccumulator {
+    fn new() -> Self {
+        Self {
+            min_ore_fe: f32::MAX,
+            max_ore_fe: f32::MIN,
+            ..Default::default()
+        }
+    }
+
+    fn accumulate(&mut self, inventory: &[InventoryItem]) {
+        for item in inventory {
+            match item {
+                InventoryItem::Ore {
+                    kg, composition, ..
+                } => {
+                    self.total_ore_kg += kg;
+                    self.ore_lot_count += 1;
+                    let fe_frac = composition.get(crate::ELEMENT_FE).copied().unwrap_or(0.0);
+                    self.ore_fe_weighted_sum += fe_frac * kg;
+                    self.ore_total_weight += kg;
+                    if fe_frac < self.min_ore_fe {
+                        self.min_ore_fe = fe_frac;
+                    }
+                    if fe_frac > self.max_ore_fe {
+                        self.max_ore_fe = fe_frac;
+                    }
+                }
+                InventoryItem::Material {
+                    element,
+                    kg,
+                    quality,
+                } => {
+                    self.total_material_kg += kg;
+                    if element == crate::ELEMENT_FE {
+                        self.total_iron_material_kg += kg;
+                    }
+                    self.material_quality_weighted_sum += quality * kg;
+                    self.material_total_weight += kg;
+                }
+                InventoryItem::Slag { kg, .. } => {
+                    self.total_slag_kg += kg;
+                }
+                InventoryItem::Component { .. } | InventoryItem::Module { .. } => {}
+            }
+        }
+    }
+}
+
+#[allow(clippy::cast_possible_truncation)]
 pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnapshot {
-    let mut total_ore_kg = 0.0_f32;
-    let mut total_material_kg = 0.0_f32;
-    let mut total_slag_kg = 0.0_f32;
-    let mut total_iron_material_kg = 0.0_f32;
-
-    let mut ore_lot_count = 0_u32;
-    let mut ore_fe_weighted_sum = 0.0_f32;
-    let mut ore_total_weight = 0.0_f32;
-    let mut min_ore_fe = f32::MAX;
-    let mut max_ore_fe = f32::MIN;
-
-    let mut material_quality_weighted_sum = 0.0_f32;
-    let mut material_total_weight = 0.0_f32;
+    let mut acc = InventoryAccumulator::new();
 
     let mut station_storage_sum = 0.0_f32;
     let mut station_count = 0_u32;
@@ -84,20 +135,7 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
 
     // --- Stations ---
     for station in state.stations.values() {
-        accumulate_inventory(
-            &station.inventory,
-            &mut total_ore_kg,
-            &mut total_material_kg,
-            &mut total_slag_kg,
-            &mut total_iron_material_kg,
-            &mut ore_lot_count,
-            &mut ore_fe_weighted_sum,
-            &mut ore_total_weight,
-            &mut min_ore_fe,
-            &mut max_ore_fe,
-            &mut material_quality_weighted_sum,
-            &mut material_total_weight,
-        );
+        acc.accumulate(&station.inventory);
 
         let volume_used = inventory_volume_m3(&station.inventory, content);
         if station.cargo_capacity_m3 > 0.0 {
@@ -151,20 +189,7 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
     for ship in state.ships.values() {
         fleet_total += 1;
 
-        accumulate_inventory(
-            &ship.inventory,
-            &mut total_ore_kg,
-            &mut total_material_kg,
-            &mut total_slag_kg,
-            &mut total_iron_material_kg,
-            &mut ore_lot_count,
-            &mut ore_fe_weighted_sum,
-            &mut ore_total_weight,
-            &mut min_ore_fe,
-            &mut max_ore_fe,
-            &mut material_quality_weighted_sum,
-            &mut material_total_weight,
-        );
+        acc.accumulate(&ship.inventory);
 
         let volume_used = inventory_volume_m3(&ship.inventory, content);
         if ship.cargo_capacity_m3 > 0.0 {
@@ -206,14 +231,14 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         .fold(0.0_f32, f32::max);
 
     // --- Finalize averages ---
-    let avg_ore_fe_fraction = if ore_total_weight > 0.0 {
-        ore_fe_weighted_sum / ore_total_weight
+    let avg_ore_fe_fraction = if acc.ore_total_weight > 0.0 {
+        acc.ore_fe_weighted_sum / acc.ore_total_weight
     } else {
         0.0
     };
 
-    let avg_material_quality = if material_total_weight > 0.0 {
-        material_quality_weighted_sum / material_total_weight
+    let avg_material_quality = if acc.material_total_weight > 0.0 {
+        acc.material_quality_weighted_sum / acc.material_total_weight
     } else {
         0.0
     };
@@ -231,20 +256,28 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
     };
 
     // Clamp min/max to 0.0 when no ore lots exist.
-    let min_ore_fe_fraction = if ore_lot_count > 0 { min_ore_fe } else { 0.0 };
-    let max_ore_fe_fraction = if ore_lot_count > 0 { max_ore_fe } else { 0.0 };
+    let min_ore_fe_fraction = if acc.ore_lot_count > 0 {
+        acc.min_ore_fe
+    } else {
+        0.0
+    };
+    let max_ore_fe_fraction = if acc.ore_lot_count > 0 {
+        acc.max_ore_fe
+    } else {
+        0.0
+    };
 
     MetricsSnapshot {
         tick: state.meta.tick,
         metrics_version: METRICS_VERSION,
-        total_ore_kg,
-        total_material_kg,
-        total_slag_kg,
-        total_iron_material_kg,
+        total_ore_kg: acc.total_ore_kg,
+        total_material_kg: acc.total_material_kg,
+        total_slag_kg: acc.total_slag_kg,
+        total_iron_material_kg: acc.total_iron_material_kg,
         station_storage_used_pct,
         ship_cargo_used_pct,
         avg_ore_fe_fraction,
-        ore_lot_count,
+        ore_lot_count: acc.ore_lot_count,
         min_ore_fe_fraction,
         max_ore_fe_fraction,
         avg_material_quality,
@@ -262,58 +295,6 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         techs_unlocked: state.research.unlocked.len() as u32,
         total_scan_data,
         max_tech_evidence,
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn accumulate_inventory(
-    inventory: &[InventoryItem],
-    total_ore_kg: &mut f32,
-    total_material_kg: &mut f32,
-    total_slag_kg: &mut f32,
-    total_iron_material_kg: &mut f32,
-    ore_lot_count: &mut u32,
-    ore_fe_weighted_sum: &mut f32,
-    ore_total_weight: &mut f32,
-    min_ore_fe: &mut f32,
-    max_ore_fe: &mut f32,
-    material_quality_weighted_sum: &mut f32,
-    material_total_weight: &mut f32,
-) {
-    for item in inventory {
-        match item {
-            InventoryItem::Ore {
-                kg, composition, ..
-            } => {
-                *total_ore_kg += kg;
-                *ore_lot_count += 1;
-                let fe_frac = composition.get("Fe").copied().unwrap_or(0.0);
-                *ore_fe_weighted_sum += fe_frac * kg;
-                *ore_total_weight += kg;
-                if fe_frac < *min_ore_fe {
-                    *min_ore_fe = fe_frac;
-                }
-                if fe_frac > *max_ore_fe {
-                    *max_ore_fe = fe_frac;
-                }
-            }
-            InventoryItem::Material {
-                element,
-                kg,
-                quality,
-            } => {
-                *total_material_kg += kg;
-                if element == "Fe" {
-                    *total_iron_material_kg += kg;
-                }
-                *material_quality_weighted_sum += quality * kg;
-                *material_total_weight += kg;
-            }
-            InventoryItem::Slag { kg, .. } => {
-                *total_slag_kg += kg;
-            }
-            InventoryItem::Component { .. } | InventoryItem::Module { .. } => {}
-        }
     }
 }
 
@@ -445,70 +426,15 @@ fn open_csv_file(
 mod tests {
     use super::*;
     use crate::{
-        AsteroidId, AsteroidKnowledge, AsteroidState, Counters, DataKind, FacilitiesState,
-        GameContent, GameState, LotId, MetaState, ModuleInstanceId, ModuleState, NodeDef, NodeId,
-        PrincipalId, ProcessorState, ResearchState, ShipId, ShipState, StationId, StationState,
-        TaskState, TechId,
+        test_fixtures::base_content, AsteroidId, AsteroidKnowledge, AsteroidState, Counters,
+        DataKind, FacilitiesState, GameState, LotId, MetaState, ModuleInstanceId, ModuleState,
+        NodeId, PrincipalId, ProcessorState, ResearchState, ShipId, ShipState, StationId,
+        StationState, TaskState, TechId,
     };
     use std::collections::{HashMap, HashSet};
 
-    fn empty_content() -> GameContent {
-        GameContent {
-            content_version: "test".to_string(),
-            techs: vec![],
-            solar_system: crate::SolarSystemDef {
-                nodes: vec![NodeDef {
-                    id: NodeId("node_test".to_string()),
-                    name: "Test".to_string(),
-                }],
-                edges: vec![],
-            },
-            asteroid_templates: vec![],
-            elements: vec![
-                crate::ElementDef {
-                    id: "ore".to_string(),
-                    density_kg_per_m3: 3000.0,
-                    display_name: "Raw Ore".to_string(),
-                    refined_name: None,
-                },
-                crate::ElementDef {
-                    id: "Fe".to_string(),
-                    density_kg_per_m3: 7874.0,
-                    display_name: "Iron".to_string(),
-                    refined_name: Some("Iron Ingot".to_string()),
-                },
-                crate::ElementDef {
-                    id: "slag".to_string(),
-                    density_kg_per_m3: 2500.0,
-                    display_name: "Slag".to_string(),
-                    refined_name: None,
-                },
-            ],
-            module_defs: vec![],
-            constants: crate::Constants {
-                survey_scan_ticks: 1,
-                deep_scan_ticks: 1,
-                travel_ticks_per_hop: 1,
-                survey_scan_data_amount: 5.0,
-                survey_scan_data_quality: 1.0,
-                deep_scan_data_amount: 15.0,
-                deep_scan_data_quality: 1.2,
-                survey_tag_detection_probability: 1.0,
-                asteroid_count_per_template: 1,
-                asteroid_mass_min_kg: 500.0,
-                asteroid_mass_max_kg: 500.0,
-                ship_cargo_capacity_m3: 20.0,
-                station_cargo_capacity_m3: 10_000.0,
-                station_compute_units_total: 10,
-                station_power_per_compute_unit_per_tick: 1.0,
-                station_efficiency: 1.0,
-                station_power_available_per_tick: 100.0,
-                mining_rate_kg_per_tick: 50.0,
-                deposit_ticks: 1,
-                autopilot_iron_rich_confidence_threshold: 0.7,
-                autopilot_refinery_threshold_kg: 500.0,
-            },
-        }
+    fn empty_content() -> crate::GameContent {
+        base_content()
     }
 
     fn empty_state() -> GameState {

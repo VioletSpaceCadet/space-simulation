@@ -23,5 +23,6 @@ clap = { version = "4", features = ["derive"] }
 futures-core = "0.3.32"
 
 [dev-dependencies]
+sim_core = { path = "../sim_core", features = ["test-support"] }
 tower = { version = "0.4", features = ["util"] }
 http-body-util = "0.1"

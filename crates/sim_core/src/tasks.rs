@@ -80,8 +80,8 @@ pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -
     inventory
         .iter()
         .map(|item| match item {
-            InventoryItem::Ore { kg, .. } => kg / element_density(content, "ore"),
-            InventoryItem::Slag { kg, .. } => kg / element_density(content, "slag"),
+            InventoryItem::Ore { kg, .. } => kg / element_density(content, crate::ELEMENT_ORE),
+            InventoryItem::Slag { kg, .. } => kg / element_density(content, crate::ELEMENT_SLAG),
             InventoryItem::Material { element, kg, .. } => kg / element_density(content, element),
             InventoryItem::Component { count, .. } => *count as f32 * 1.0, // 1.0 m³ per unit; replace with ComponentDef.volume_m3 when defs exist
             InventoryItem::Module { module_def_id, .. } => content
@@ -97,7 +97,7 @@ pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -
 ///
 /// Stops when the cargo hold fills OR the asteroid is depleted, whichever comes first.
 pub fn mine_duration(asteroid: &AsteroidState, ship: &ShipState, content: &GameContent) -> u64 {
-    let ore_density = element_density(content, "ore");
+    let ore_density = element_density(content, crate::ELEMENT_ORE);
     let effective_m3_per_kg = 1.0 / ore_density;
 
     let volume_used = inventory_volume_m3(&ship.inventory, content);
@@ -311,7 +311,7 @@ pub(crate) fn resolve_mine(
         return;
     };
 
-    let ore_density = element_density(content, "ore");
+    let ore_density = element_density(content, crate::ELEMENT_ORE);
     let effective_m3_per_kg = 1.0 / ore_density;
 
     let volume_used = inventory_volume_m3(&ship.inventory, content);

@@ -28,5 +28,7 @@ pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnv
     EventEnvelope { id, tick, event }
 }
 
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_fixtures;
 #[cfg(test)]
 mod tests;

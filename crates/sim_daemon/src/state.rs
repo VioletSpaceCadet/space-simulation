@@ -1,6 +1,7 @@
 use rand_chacha::ChaCha8Rng;
 use sim_control::AutopilotController;
 use sim_core::{EventEnvelope, GameContent, GameState, MetricsFileWriter, MetricsSnapshot};
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
@@ -14,19 +15,19 @@ pub struct SimState {
     pub autopilot: AutopilotController,
     pub next_command_id: u64,
     pub metrics_every: u64,
-    pub metrics_history: Vec<MetricsSnapshot>,
+    pub metrics_history: VecDeque<MetricsSnapshot>,
     pub metrics_writer: Option<MetricsFileWriter>,
 }
 
 impl SimState {
     pub fn push_metrics(&mut self, snapshot: MetricsSnapshot) {
         if self.metrics_history.len() >= MAX_METRICS_HISTORY {
-            self.metrics_history.remove(0);
+            self.metrics_history.pop_front();
         }
         if let Some(ref mut writer) = self.metrics_writer {
             let _ = writer.write_row(&snapshot);
         }
-        self.metrics_history.push(snapshot);
+        self.metrics_history.push_back(snapshot);
     }
 }
 

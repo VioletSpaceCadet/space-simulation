@@ -250,57 +250,85 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Run directory utilities
+// ---------------------------------------------------------------------------
+
+/// Generates a timestamped run ID like `20260218_143022_seed42`.
+pub fn generate_run_id(seed: u64) -> String {
+    let now = chrono::Utc::now();
+    now.format(&format!("%Y%m%d_%H%M%S_seed{seed}")).to_string()
+}
+
+/// Creates the `runs/<run_id>/` directory tree, returning the path.
+pub fn create_run_dir(run_id: &str) -> Result<std::path::PathBuf> {
+    let dir = std::path::PathBuf::from("runs").join(run_id);
+    std::fs::create_dir_all(&dir)
+        .with_context(|| format!("creating run directory: {}", dir.display()))?;
+    Ok(dir)
+}
+
+/// Writes `run_info.json` into the run directory.
+///
+/// `runner_args` is an arbitrary JSON value containing runner-specific CLI arguments.
+pub fn write_run_info(
+    dir: &std::path::Path,
+    run_id: &str,
+    seed: u64,
+    content_version: &str,
+    metrics_every: u64,
+    runner_args: serde_json::Value,
+) -> Result<()> {
+    let info = serde_json::json!({
+        "run_id": run_id,
+        "seed": seed,
+        "content_version": content_version,
+        "metrics_every": metrics_every,
+        "args": runner_args,
+    });
+    let path = dir.join("run_info.json");
+    let file =
+        std::fs::File::create(&path).with_context(|| format!("creating {}", path.display()))?;
+    serde_json::to_writer_pretty(file, &info)
+        .with_context(|| format!("writing {}", path.display()))?;
+    Ok(())
+}
+
+/// Loads state from a JSON file or builds initial state from content.
+///
+/// Returns the game state and a seeded RNG.
+pub fn load_or_build_state(
+    content: &GameContent,
+    seed: Option<u64>,
+    state_file: Option<&str>,
+) -> Result<(GameState, rand_chacha::ChaCha8Rng)> {
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    if let Some(path) = state_file {
+        let json =
+            std::fs::read_to_string(path).with_context(|| format!("reading state file: {path}"))?;
+        let loaded: GameState =
+            serde_json::from_str(&json).with_context(|| format!("parsing state file: {path}"))?;
+        let rng = ChaCha8Rng::seed_from_u64(loaded.meta.seed);
+        Ok((loaded, rng))
+    } else {
+        let resolved_seed = seed.unwrap_or_else(rand::random);
+        let mut rng = ChaCha8Rng::seed_from_u64(resolved_seed);
+        let state = build_initial_state(content, resolved_seed, &mut rng);
+        Ok((state, rng))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use sim_core::{
-        AsteroidTemplateDef, Constants, ElementDef, GameContent, InputAmount, InputFilter,
-        ItemKind, ModuleBehaviorDef, ModuleDef, NodeDef, NodeId, OutputSpec, ProcessorDef,
-        QualityFormula, RecipeDef, RecipeInput, SolarSystemDef, TechDef, TechId, YieldFormula,
+        test_fixtures::minimal_content, AsteroidTemplateDef, InputAmount, InputFilter, ItemKind,
+        ModuleBehaviorDef, ModuleDef, NodeDef, NodeId, OutputSpec, ProcessorDef, QualityFormula,
+        RecipeDef, RecipeInput, TechDef, TechId, YieldFormula,
     };
     use std::collections::HashMap;
-
-    fn minimal_content() -> GameContent {
-        GameContent {
-            content_version: "test".to_string(),
-            techs: vec![],
-            solar_system: SolarSystemDef {
-                nodes: vec![],
-                edges: vec![],
-            },
-            asteroid_templates: vec![],
-            elements: vec![ElementDef {
-                id: "Fe".to_string(),
-                density_kg_per_m3: 7874.0,
-                display_name: "Iron".to_string(),
-                refined_name: None,
-            }],
-            module_defs: vec![],
-            constants: Constants {
-                survey_scan_ticks: 1,
-                deep_scan_ticks: 1,
-                travel_ticks_per_hop: 1,
-                survey_scan_data_amount: 1.0,
-                survey_scan_data_quality: 1.0,
-                deep_scan_data_amount: 1.0,
-                deep_scan_data_quality: 1.0,
-                survey_tag_detection_probability: 1.0,
-                asteroid_count_per_template: 0,
-                station_compute_units_total: 0,
-                station_power_per_compute_unit_per_tick: 0.0,
-                station_efficiency: 1.0,
-                station_power_available_per_tick: 0.0,
-                asteroid_mass_min_kg: 100.0,
-                asteroid_mass_max_kg: 100.0,
-                ship_cargo_capacity_m3: 20.0,
-                station_cargo_capacity_m3: 1000.0,
-                mining_rate_kg_per_tick: 50.0,
-                deposit_ticks: 1,
-                autopilot_iron_rich_confidence_threshold: 0.7,
-                autopilot_refinery_threshold_kg: 500.0,
-            },
-        }
-    }
 
     #[test]
     fn test_valid_content_passes_validation() {

@@ -3,18 +3,19 @@ mod state;
 mod tick_loop;
 
 use routes::make_router;
-use sim_world::{build_initial_state, load_content};
+use sim_world::{
+    create_run_dir, generate_run_id, load_content, load_or_build_state, write_run_info,
+};
 use state::{AppState, SimState};
 use tick_loop::run_tick_loop;
 
 use anyhow::Context;
 
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
 use sim_control::AutopilotController;
 use sim_core::EventEnvelope;
 use tokio::sync::broadcast;
@@ -53,69 +54,6 @@ enum Commands {
     },
 }
 
-fn generate_run_id(seed: u64) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    let secs = now.as_secs();
-    let time_of_day = secs % 86400;
-    let hours = time_of_day / 3600;
-    let minutes = (time_of_day % 3600) / 60;
-    let seconds = time_of_day % 60;
-
-    let (year, month, day) = epoch_days_to_date(secs / 86400);
-
-    format!("{year:04}{month:02}{day:02}_{hours:02}{minutes:02}{seconds:02}_seed{seed}")
-}
-
-fn epoch_days_to_date(mut days: u64) -> (u64, u64, u64) {
-    days += 719_468;
-    let era = days / 146_097;
-    let day_of_era = days % 146_097;
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146_096) / 365;
-    let year = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let mp = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = if month <= 2 { year + 1 } else { year };
-    (year, month, day)
-}
-
-fn create_run_dir(run_id: &str) -> Result<std::path::PathBuf> {
-    let dir = std::path::PathBuf::from("runs").join(run_id);
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("creating run directory: {}", dir.display()))?;
-    Ok(dir)
-}
-
-fn write_run_info(
-    dir: &std::path::Path,
-    run_id: &str,
-    seed: u64,
-    content_version: &str,
-    metrics_every: u64,
-    max_ticks: Option<u64>,
-) -> Result<()> {
-    let info = serde_json::json!({
-        "run_id": run_id,
-        "seed": seed,
-        "content_version": content_version,
-        "metrics_every": metrics_every,
-        "runner": "sim_daemon",
-        "args": {
-            "max_ticks": max_ticks,
-        }
-    });
-    let path = dir.join("run_info.json");
-    let file =
-        std::fs::File::create(&path).with_context(|| format!("creating {}", path.display()))?;
-    serde_json::to_writer_pretty(file, &info)
-        .with_context(|| format!("writing {}", path.display()))?;
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -131,19 +69,7 @@ async fn main() -> Result<()> {
             no_metrics,
         } => {
             let content = load_content(&content_dir)?;
-            let (game_state, rng) = if let Some(path) = state_file {
-                let json = std::fs::read_to_string(&path)
-                    .with_context(|| format!("reading state file: {path}"))?;
-                let loaded: sim_core::GameState = serde_json::from_str(&json)
-                    .with_context(|| format!("parsing state file: {path}"))?;
-                let rng_seed = loaded.meta.seed;
-                (loaded, ChaCha8Rng::seed_from_u64(rng_seed))
-            } else {
-                let resolved_seed = seed.unwrap_or_else(rand::random);
-                let mut rng = ChaCha8Rng::seed_from_u64(resolved_seed);
-                let new_state = build_initial_state(&content, resolved_seed, &mut rng);
-                (new_state, rng)
-            };
+            let (game_state, rng) = load_or_build_state(&content, seed, state_file.as_deref())?;
 
             // Set up per-run metrics directory.
             let metrics_writer = if no_metrics {
@@ -157,7 +83,10 @@ async fn main() -> Result<()> {
                     game_state.meta.seed,
                     &content.content_version,
                     metrics_every,
-                    max_ticks,
+                    serde_json::json!({
+                        "runner": "sim_daemon",
+                        "max_ticks": max_ticks,
+                    }),
                 )?;
                 let writer = sim_core::MetricsFileWriter::new(run_dir.clone())
                     .with_context(|| format!("opening metrics CSV in {}", run_dir.display()))?;
@@ -174,7 +103,7 @@ async fn main() -> Result<()> {
                     autopilot: AutopilotController,
                     next_command_id: 0,
                     metrics_every,
-                    metrics_history: Vec::new(),
+                    metrics_history: VecDeque::new(),
                     metrics_writer,
                 })),
                 event_tx: event_tx.clone(),
@@ -206,60 +135,14 @@ mod tests {
     use super::*;
     use axum::{body::Body, http::Request, http::StatusCode};
     use http_body_util::BodyExt;
-    use sim_core::{Constants, ElementDef, GameContent, NodeDef, NodeId, SolarSystemDef};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+    use sim_core::test_fixtures::base_content;
+    use sim_world::build_initial_state;
     use tower::ServiceExt;
 
     fn make_test_state() -> AppState {
-        let content = GameContent {
-            content_version: "test".to_string(),
-            techs: vec![],
-            solar_system: SolarSystemDef {
-                nodes: vec![NodeDef {
-                    id: NodeId("node_test".to_string()),
-                    name: "Test".to_string(),
-                }],
-                edges: vec![],
-            },
-            asteroid_templates: vec![],
-            elements: vec![
-                ElementDef {
-                    id: "Fe".to_string(),
-                    density_kg_per_m3: 7874.0,
-                    display_name: "Iron".to_string(),
-                    refined_name: None,
-                },
-                ElementDef {
-                    id: "Si".to_string(),
-                    density_kg_per_m3: 2329.0,
-                    display_name: "Silicon".to_string(),
-                    refined_name: None,
-                },
-            ],
-            module_defs: vec![],
-            constants: Constants {
-                survey_scan_ticks: 1,
-                deep_scan_ticks: 1,
-                travel_ticks_per_hop: 1,
-                survey_scan_data_amount: 1.0,
-                survey_scan_data_quality: 1.0,
-                deep_scan_data_amount: 1.0,
-                deep_scan_data_quality: 1.0,
-                survey_tag_detection_probability: 0.5,
-                asteroid_count_per_template: 0,
-                asteroid_mass_min_kg: 500.0,
-                asteroid_mass_max_kg: 500.0,
-                ship_cargo_capacity_m3: 20.0,
-                station_cargo_capacity_m3: 10_000.0,
-                station_compute_units_total: 10,
-                station_power_per_compute_unit_per_tick: 1.0,
-                station_efficiency: 1.0,
-                station_power_available_per_tick: 100.0,
-                mining_rate_kg_per_tick: 50.0,
-                deposit_ticks: 1,
-                autopilot_iron_rich_confidence_threshold: 0.7,
-                autopilot_refinery_threshold_kg: 500.0,
-            },
-        };
+        let content = base_content();
         let mut rng = ChaCha8Rng::seed_from_u64(0);
         let game_state = build_initial_state(&content, 0, &mut rng);
         let (event_tx, _) = tokio::sync::broadcast::channel(64);
@@ -271,7 +154,7 @@ mod tests {
                 autopilot: AutopilotController,
                 next_command_id: 0,
                 metrics_every: 60,
-                metrics_history: Vec::new(),
+                metrics_history: VecDeque::new(),
                 metrics_writer: None,
             })),
             event_tx,

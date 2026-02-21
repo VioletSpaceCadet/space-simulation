@@ -6,6 +6,9 @@ use crate::{
 };
 use std::collections::HashMap;
 
+/// Minimum meaningful mass — amounts below this are discarded as rounding noise.
+const MIN_MEANINGFUL_KG: f32 = 1e-3;
+
 pub(crate) fn tick_stations(
     state: &mut GameState,
     content: &GameContent,
@@ -170,7 +173,7 @@ fn resolve_processor_run(
         consume_ore_fifo_with_lots(&mut station.inventory, rate_kg, matches_input)
     };
 
-    if consumed_kg < 1e-3 {
+    if consumed_kg < MIN_MEANINGFUL_KG {
         return;
     }
 
@@ -212,7 +215,7 @@ fn resolve_processor_run(
                         .clamp(0.0, 1.0),
                     QualityFormula::Fixed(q) => *q,
                 };
-                if material_kg > 1e-3 {
+                if material_kg > MIN_MEANINGFUL_KG {
                     if let Some(station) = state.stations.get_mut(station_id) {
                         merge_material_lot(
                             &mut station.inventory,
@@ -236,7 +239,7 @@ fn resolve_processor_run(
                 let slag_composition =
                     slag_composition_from_avg(&avg_composition, extracted_element.as_deref());
 
-                if slag_kg > 1e-3 {
+                if slag_kg > MIN_MEANINGFUL_KG {
                     if let Some(station) = state.stations.get_mut(station_id) {
                         let existing = station
                             .inventory
@@ -311,7 +314,7 @@ fn consume_ore_fifo_with_lots(
             consumed_kg += take;
             lots.push((composition.clone(), take));
             let leftover = kg - take;
-            if leftover > 1e-3 {
+            if leftover > MIN_MEANINGFUL_KG {
                 new_inventory.push(InventoryItem::Ore {
                     lot_id,
                     asteroid_id,

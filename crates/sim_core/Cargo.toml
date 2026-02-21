@@ -3,10 +3,14 @@ name = "sim_core"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+test-support = ["rand_chacha"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 rand = "0.8"
 uuid = { version = "1", features = ["v4", "serde"] }
+rand_chacha = { version = "0.3", optional = true }
 
 [lints]
 workspace = true

@@ -306,147 +306,40 @@ impl CommandSource for AutopilotController {
         commands
     }
 }
-
-/// Replays a scripted sequence of commands from a JSON file.
-pub struct ScenarioSource {
-    // TODO: load tick -> Vec<Command> map from file
-}
-
-impl CommandSource for ScenarioSource {
-    fn generate_commands(
-        &mut self,
-        _state: &GameState,
-        _content: &GameContent,
-        _next_command_id: &mut u64,
-    ) -> Vec<CommandEnvelope> {
-        // TODO: emit commands scheduled for the current tick
-        vec![]
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use sim_core::{
-        AsteroidId, AsteroidKnowledge, AsteroidState, Constants, Counters, ElementDef,
-        FacilitiesState, GameContent, GameState, InventoryItem, LotId, MetaState, NodeDef, NodeId,
-        PrincipalId, ResearchState, ShipId, ShipState, SolarSystemDef, StationId, StationState,
+        test_fixtures::{base_content, base_state},
+        AsteroidId, AsteroidKnowledge, AsteroidState, FacilitiesState, InventoryItem, LotId,
+        NodeId, ShipId, StationId,
     };
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
 
-    fn autopilot_content() -> GameContent {
-        GameContent {
-            content_version: "test".to_string(),
-            techs: vec![],
-            solar_system: SolarSystemDef {
-                nodes: vec![NodeDef {
-                    id: NodeId("node_a".to_string()),
-                    name: "A".to_string(),
-                }],
-                edges: vec![],
-            },
-            asteroid_templates: vec![],
-            elements: vec![
-                ElementDef {
-                    id: "ore".to_string(),
-                    density_kg_per_m3: 3000.0,
-                    display_name: "Raw Ore".to_string(),
-                    refined_name: None,
-                },
-                ElementDef {
-                    id: "slag".to_string(),
-                    density_kg_per_m3: 2500.0,
-                    display_name: "Slag".to_string(),
-                    refined_name: None,
-                },
-                ElementDef {
-                    id: "Fe".to_string(),
-                    density_kg_per_m3: 7874.0,
-                    display_name: "Iron".to_string(),
-                    refined_name: None,
-                },
-            ],
-            module_defs: vec![],
-            constants: Constants {
-                survey_scan_ticks: 1,
-                deep_scan_ticks: 1,
-                travel_ticks_per_hop: 1,
-                survey_scan_data_amount: 1.0,
-                survey_scan_data_quality: 1.0,
-                deep_scan_data_amount: 1.0,
-                deep_scan_data_quality: 1.0,
-                survey_tag_detection_probability: 1.0,
-                asteroid_count_per_template: 0,
-                station_compute_units_total: 0,
-                station_power_per_compute_unit_per_tick: 0.0,
-                station_efficiency: 1.0,
-                station_power_available_per_tick: 0.0,
-                asteroid_mass_min_kg: 500.0,
-                asteroid_mass_max_kg: 500.0,
-                ship_cargo_capacity_m3: 20.0,
-                station_cargo_capacity_m3: 10_000.0,
-                mining_rate_kg_per_tick: 50.0,
-                deposit_ticks: 1,
-                autopilot_iron_rich_confidence_threshold: 0.7,
-                autopilot_refinery_threshold_kg: 500.0,
-            },
-        }
+    /// Autopilot tests disable research (no compute/power) and remove scan sites.
+    fn autopilot_content() -> sim_core::GameContent {
+        let mut content = base_content();
+        content.techs.clear();
+        content.constants.station_compute_units_total = 0;
+        content.constants.station_power_per_compute_unit_per_tick = 0.0;
+        content.constants.station_power_available_per_tick = 0.0;
+        content
     }
 
-    fn autopilot_state(content: &GameContent) -> GameState {
-        let node = NodeId("node_a".to_string());
-        let ship_id = ShipId("ship_0001".to_string());
+    fn autopilot_state(content: &sim_core::GameContent) -> sim_core::GameState {
+        let mut state = base_state(content);
+        state.scan_sites.clear();
+        // Autopilot tests don't need research compute power on the station.
         let station_id = StationId("station_earth_orbit".to_string());
-        let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
-        GameState {
-            meta: MetaState {
-                tick: 0,
-                seed: 0,
-                schema_version: 1,
-                content_version: "test".to_string(),
-            },
-            scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::from([(
-                ship_id.clone(),
-                ShipState {
-                    id: ship_id,
-                    location_node: node.clone(),
-                    owner,
-                    inventory: vec![],
-                    cargo_capacity_m3: content.constants.ship_cargo_capacity_m3,
-                    task: None,
-                },
-            )]),
-            stations: HashMap::from([(
-                station_id.clone(),
-                StationState {
-                    id: station_id,
-                    location_node: node,
-                    power_available_per_tick: 0.0,
-                    inventory: vec![],
-                    cargo_capacity_m3: content.constants.station_cargo_capacity_m3,
-                    facilities: FacilitiesState {
-                        compute_units_total: 0,
-                        power_per_compute_unit_per_tick: 0.0,
-                        efficiency: 1.0,
-                    },
-                    modules: vec![],
-                },
-            )]),
-            research: ResearchState {
-                unlocked: HashSet::new(),
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-            },
-            counters: Counters {
-                next_event_id: 0,
-                next_command_id: 0,
-                next_asteroid_id: 0,
-                next_lot_id: 0,
-                next_module_instance_id: 0,
-            },
+        if let Some(station) = state.stations.get_mut(&station_id) {
+            station.power_available_per_tick = 0.0;
+            station.facilities = FacilitiesState {
+                compute_units_total: 0,
+                power_per_compute_unit_per_tick: 0.0,
+                efficiency: 1.0,
+            };
         }
+        state
     }
 
     #[test]
@@ -459,7 +352,7 @@ mod tests {
             asteroid_id.clone(),
             AsteroidState {
                 id: asteroid_id.clone(),
-                location_node: NodeId("node_a".to_string()),
+                location_node: NodeId("node_test".to_string()),
                 true_composition: HashMap::from([("Fe".to_string(), 1.0)]),
                 anomaly_tags: vec![],
                 mass_kg: 500.0,
