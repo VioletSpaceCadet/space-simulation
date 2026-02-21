@@ -12,6 +12,15 @@ export async function fetchMeta(): Promise<MetaInfo> {
   return response.json()
 }
 
+export async function saveGame(): Promise<{ path: string; tick: number }> {
+  const response = await fetch('/api/v1/save', { method: 'POST' })
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ error: 'unknown error' }))
+    throw new Error(body.error ?? `Save failed: ${response.status}`)
+  }
+  return response.json()
+}
+
 export function createEventSource(): EventSource {
   return new EventSource('/api/v1/stream')
 }

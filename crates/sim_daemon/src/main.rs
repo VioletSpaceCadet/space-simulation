@@ -72,8 +72,8 @@ async fn main() -> Result<()> {
             let (game_state, rng) = load_or_build_state(&content, seed, state_file.as_deref())?;
 
             // Set up per-run metrics directory.
-            let metrics_writer = if no_metrics {
-                None
+            let (metrics_writer, run_dir) = if no_metrics {
+                (None, None)
             } else {
                 let run_id = generate_run_id(game_state.meta.seed);
                 let run_dir = create_run_dir(&run_id)?;
@@ -91,7 +91,7 @@ async fn main() -> Result<()> {
                 let writer = sim_core::MetricsFileWriter::new(run_dir.clone())
                     .with_context(|| format!("opening metrics CSV in {}", run_dir.display()))?;
                 println!("Run directory: {}", run_dir.display());
-                Some(writer)
+                (Some(writer), Some(run_dir))
             };
 
             let (event_tx, _) = broadcast::channel::<Vec<EventEnvelope>>(256);
@@ -108,6 +108,7 @@ async fn main() -> Result<()> {
                 })),
                 event_tx: event_tx.clone(),
                 ticks_per_sec,
+                run_dir,
             };
             let router = make_router(app_state.clone());
             let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
@@ -159,6 +160,7 @@ mod tests {
             })),
             event_tx,
             ticks_per_sec: 10.0,
+            run_dir: None,
         }
     }
 
@@ -224,6 +226,54 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["ticks_per_sec"], 10.0);
+    }
+
+    fn make_test_state_with_run_dir(run_dir: std::path::PathBuf) -> AppState {
+        let mut state = make_test_state();
+        state.run_dir = Some(run_dir);
+        state
+    }
+
+    #[tokio::test]
+    async fn test_save_returns_200_with_run_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = make_router(make_test_state_with_run_dir(tmp.path().to_path_buf()));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/save")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["tick"], 0);
+        assert!(json["path"].as_str().unwrap().contains("save_0.json"));
+
+        // Verify file was actually written and contains valid GameState
+        let save_path = json["path"].as_str().unwrap();
+        let contents = std::fs::read_to_string(save_path).unwrap();
+        let _state: sim_core::GameState = serde_json::from_str(&contents).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_save_returns_503_without_run_dir() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/save")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
     #[tokio::test]

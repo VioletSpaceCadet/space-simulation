@@ -38,7 +38,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management).
 - **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json` (7 files).
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags. Auto-writes to `runs/<run_id>/`.
-- **sim_daemon** — axum 0.7. SSE (50ms flush, 200ms heartbeat). `--metrics-every` flag (default 60), `--no-metrics`. Auto-writes to `runs/<run_id>/`. Endpoints: `/api/v1/meta`, `/api/v1/snapshot`, `/api/v1/metrics`, `/api/v1/stream`.
+- **sim_daemon** — axum 0.7. SSE (50ms flush, 200ms heartbeat). `--metrics-every` flag (default 60), `--no-metrics`. Auto-writes to `runs/<run_id>/`. Endpoints: `/api/v1/meta`, `/api/v1/snapshot`, `/api/v1/metrics`, `/api/v1/stream`, `POST /api/v1/save` (writes state to `runs/<run_id>/saves/`).
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. `useSimStream` (useReducer + applyEvents), `useAnimatedTick` (60fps interpolation), `useSortableData`. Panels: Map, Events, Asteroids, Fleet, Research.
 
 **Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.

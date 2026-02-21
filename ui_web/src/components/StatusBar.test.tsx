@@ -34,4 +34,9 @@ describe('StatusBar', () => {
     // Should not show the fractional part
     expect(screen.queryByText(/1440\.7/)).not.toBeInTheDocument()
   })
+
+  it('renders a save button', () => {
+    render(<StatusBar tick={0} connected={true} measuredTickRate={10} />)
+    expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+  })
 })

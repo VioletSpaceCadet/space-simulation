@@ -6,7 +6,7 @@ use axum::{
         sse::{Event, Sse},
         Json,
     },
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use sim_core::EventEnvelope;
@@ -23,7 +23,7 @@ pub fn make_router(state: AppState) -> Router {
                 .parse::<axum::http::HeaderValue>()
                 .unwrap(),
         )
-        .allow_methods([Method::GET])
+        .allow_methods([Method::GET, Method::POST])
         .allow_headers(Any);
 
     Router::new()
@@ -31,6 +31,7 @@ pub fn make_router(state: AppState) -> Router {
         .route("/api/v1/snapshot", get(snapshot_handler))
         .route("/api/v1/metrics", get(metrics_handler))
         .route("/api/v1/stream", get(stream_handler))
+        .route("/api/v1/save", post(save_handler))
         .layer(cors)
         .with_state(state)
 }
@@ -64,6 +65,47 @@ pub async fn metrics_handler(
 ) -> Json<VecDeque<sim_core::MetricsSnapshot>> {
     let sim = app_state.sim.lock().unwrap();
     Json(sim.metrics_history.clone())
+}
+
+pub async fn save_handler(
+    State(app_state): State<AppState>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let run_dir = match &app_state.run_dir {
+        Some(dir) => dir.clone(),
+        None => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({"error": "no run directory (started with --no-metrics?)"})),
+            );
+        }
+    };
+
+    let sim = app_state.sim.lock().unwrap();
+    let tick = sim.game_state.meta.tick;
+    let body = serde_json::to_string_pretty(&sim.game_state).unwrap_or_default();
+    drop(sim);
+
+    let saves_dir = run_dir.join("saves");
+    if let Err(err) = std::fs::create_dir_all(&saves_dir) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("create saves dir: {err}")})),
+        );
+    }
+
+    let filename = format!("save_{tick}.json");
+    let path = saves_dir.join(&filename);
+    if let Err(err) = std::fs::write(&path, body) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("write save: {err}")})),
+        );
+    }
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"path": path.display().to_string(), "tick": tick})),
+    )
 }
 
 pub async fn stream_handler(
