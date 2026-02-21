@@ -9,6 +9,7 @@ mod deep_scan;
 mod deposit;
 mod integration;
 mod mining;
+mod performance;
 mod refinery;
 mod research;
 mod survey;
