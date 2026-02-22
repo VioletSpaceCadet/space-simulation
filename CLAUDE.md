@@ -38,10 +38,10 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management). Skips re-enabling modules at max wear.
 - **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json` (8 files incl. `component_defs.json`).
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags. Auto-writes to `runs/<run_id>/`.
-- **sim_daemon** — axum 0.7. SSE (50ms flush, 200ms heartbeat). `--metrics-every` flag (default 60), `--no-metrics`. Auto-writes to `runs/<run_id>/`. AlertEngine evaluates 9 pure-Rust rules after each metrics sample, emits `AlertRaised`/`AlertCleared` events on SSE. Endpoints: `/api/v1/meta`, `/api/v1/snapshot`, `/api/v1/metrics`, `/api/v1/stream`, `POST /api/v1/save`, `GET /api/v1/alerts` (active alerts).
-- **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. `useSimStream` (useReducer + applyEvents), `useAnimatedTick` (60fps interpolation), `useSortableData`. Panels: Map, Events, Asteroids, Fleet, Research. Alert badges in status bar (dismissible, color-coded by severity).
+- **sim_daemon** — axum 0.7. SSE (50ms flush, 200ms heartbeat). `--metrics-every` flag (default 60), `--no-metrics`. Auto-writes to `runs/<run_id>/`. AlertEngine evaluates 9 pure-Rust rules after each metrics sample, emits `AlertRaised`/`AlertCleared` events on SSE. `AtomicBool` pause flag checked by tick loop (no Mutex). Endpoints: `/api/v1/meta`, `/api/v1/snapshot`, `/api/v1/metrics`, `/api/v1/stream`, `POST /api/v1/save`, `POST /api/v1/pause`, `POST /api/v1/resume`, `GET /api/v1/alerts` (active alerts).
+- **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. `useSimStream` (useReducer + applyEvents), `useAnimatedTick` (60fps interpolation), `useSortableData`. Draggable panels via @dnd-kit (Map, Events, Asteroids, Fleet, Research). Fleet panel has expandable rows with detail sections. StatusBar: alert badges (dismissible, color-coded), pause/resume toggle, save button. Keyboard shortcuts: spacebar (pause/resume), Cmd/Ctrl+S (save).
 
-**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors then maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
+**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, then maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
 
 **Key design rules:**
 - Asteroids created on discovery (scan_sites → AsteroidState), not pre-populated.

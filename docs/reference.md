@@ -13,14 +13,15 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `ShipState` | `id`, `location_node`, `owner`, `inventory: Vec<InventoryItem>`, `cargo_capacity_m3`, `task` |
 | `StationState` | `id`, `location_node`, `inventory`, `cargo_capacity_m3`, `power_available_per_tick`, `facilities`, `modules: Vec<ModuleState>` |
 | `InventoryItem` | Enum: `Ore { lot_id, asteroid_id, kg, composition }`, `Material { element, kg, quality }`, `Slag { kg, composition }`, `Component { component_id, count, quality }`, `Module { item_id, module_def_id }` |
-| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, or Maintenance), `wear: WearState`. Processor has `stalled: bool` |
+| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, or Assembler), `wear: WearState`. Processor/Assembler have `stalled: bool` |
 | `WearState` | `wear: f32` (0.0–1.0). Embedded on any wearable entity. |
 | `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
 | `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold` |
 | `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, component_defs, constants |
-| `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, or Maintenance), `wear_per_run` |
+| `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, Maintenance, or Assembler), `wear_per_run` |
 | `ComponentDef` | Component definition: `id`, `name`, `mass_kg`, `volume_m3` |
 | `MaintenanceDef` | Maintenance module behavior: `repair_interval_ticks`, `wear_reduction_per_run`, `repair_kit_cost` |
+| `AssemblerDef` | Assembler module behavior: `assembly_interval_ticks`, `recipes` (list of input filters + output component) |
 | `TechEffect` | `EnableDeepScan` or `DeepScanCompositionNoise { sigma }` |
 
 ## Content Files
@@ -34,7 +35,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 | `solar_system.json` | 4 nodes (Earth Orbit → Inner Belt → Mid Belt → Outer Belt), linear chain |
 | `asteroid_templates.json` | 2 templates: `tmpl_iron_rich` (IronRich, Fe-heavy) and `tmpl_silicate` (Si-heavy) |
 | `elements.json` | 5 elements: `ore` (3000), `slag` (2500), `Fe` (7874), `Si` (2329), `He` (125) kg/m³ |
-| `module_defs.json` | 2 modules: `module_basic_iron_refinery` (Processor, 60-tick interval, wear_per_run=0.01) and `module_maintenance_bay` (Maintenance, 30-tick interval, reduces 0.2 wear, costs 1 RepairKit) |
+| `module_defs.json` | 3 modules: `module_basic_iron_refinery` (Processor, 60-tick interval, wear_per_run=0.01), `module_maintenance_bay` (Maintenance, 30-tick interval, reduces 0.2 wear, costs 1 RepairKit), `module_basic_assembler` (Assembler, 120-tick interval, wear_per_run=0.008, 100kg Fe → 1 RepairKit) |
 | `component_defs.json` | 1 component: `repair_kit` (50kg, 0.1 m³) |
 | `dev_base_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
 
@@ -54,11 +55,19 @@ All in `content/`. Loaded at runtime; never compiled in.
 
 **Maintenance Bay:** `ModuleBehaviorDef::Maintenance` ticks at its `repair_interval_ticks`. Each run: finds most-worn module (highest wear, ID tiebreak), consumes `repair_kit_cost` RepairKits, reduces wear by `wear_reduction_per_run`. Skips if no worn modules or no kits. Re-enables auto-disabled modules when wear drops below 1.0.
 
-**RepairKit:** `InventoryItem::Component { component_id: "repair_kit", count, quality }`. Station starts with 5. Not yet craftable — supply is finite in Phase 1.
+**RepairKit:** `InventoryItem::Component { component_id: "repair_kit", count, quality }`. Station starts with 5. Craftable via Assembler (100kg Fe → 1 RepairKit).
 
 **Events:** `WearAccumulated`, `ModuleAutoDisabled`, `MaintenanceRan`.
 
 **Metrics:** `avg_module_wear`, `max_module_wear`, `repair_kits_remaining` (MetricsSnapshot v2).
+
+## Assembler
+
+**Assembler module:** `ModuleBehaviorDef::Assembler` ticks at `assembly_interval_ticks`. Each run: checks enabled + power + wear; matches recipe inputs against station inventory (Element filter by kg, Component filter by count); if all inputs satisfied and output won't exceed station capacity, consumes inputs and produces output Component. Stalls if inputs missing or capacity insufficient (emits `ModuleStalled`/`ModuleResumed` on transition). Wear applies via `wear_per_run`.
+
+**Events:** `AssemblerRan { station_id, module_id, recipe_id, output_component_id, output_count }`.
+
+**Metrics:** `assembler_active_count`, `assembler_stalled_count` (MetricsSnapshot v3).
 
 ## Storage Enforcement
 
@@ -86,3 +95,9 @@ All in `content/`. Loaded at runtime; never compiled in.
 - **Procedural Sites (done):** Scan site replenishment with deterministic UUIDs.
 - **Wear & Maintenance Phase 1 (done):** Module wear accumulation, 3-band efficiency, auto-disable, Maintenance Bay, RepairKit, wear metrics.
 - **Storage Enforcement (done):** Processors stall when output exceeds capacity; ships wait when deposit blocked; partial deposits.
+- **Alerts (done):** Pure-Rust AlertEngine with 9 rules, evaluates after each metrics sample, SSE events, UI badges.
+- **Assembler (done):** Basic assembler module (100kg Fe → 1 RepairKit), recipe system, stall/resume logic, wear.
+- **Fleet Panel Expandable Rows (done):** Clickable fleet rows expand to show detail sections.
+- **Draggable Panels (done):** @dnd-kit panel reordering, persisted to localStorage.
+- **Pause/Resume (done):** AtomicBool tick loop pause, POST pause/resume endpoints, StatusBar toggle, spacebar shortcut.
+- **Keyboard Shortcuts (done):** Spacebar (pause/resume), Cmd/Ctrl+S (save).
