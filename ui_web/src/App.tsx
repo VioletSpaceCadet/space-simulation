@@ -1,74 +1,39 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { AsteroidTable } from './components/AsteroidTable'
 import { EventsFeed } from './components/EventsFeed'
 import { FleetPanel } from './components/FleetPanel'
+import { LayoutRenderer } from './components/LayoutRenderer'
 import { ResearchPanel } from './components/ResearchPanel'
 import { SolarSystemMap } from './components/SolarSystemMap'
 import { StatusBar } from './components/StatusBar'
 import { fetchMeta, pauseGame, resumeGame } from './api'
 import { useAnimatedTick } from './hooks/useAnimatedTick'
+import { useLayoutState } from './hooks/useLayoutState'
 import { useSimStream } from './hooks/useSimStream'
-
-type PanelId = 'map' | 'events' | 'asteroids' | 'fleet' | 'research'
-
-const PANEL_LABELS: Record<PanelId, string> = {
-  map: 'Map',
-  events: 'Events',
-  asteroids: 'Asteroids',
-  fleet: 'Fleet',
-  research: 'Research',
-}
-
-const ALL_PANELS: PanelId[] = ['map', 'events', 'asteroids', 'fleet', 'research']
-
-function readVisiblePanels(): Set<PanelId> {
-  try {
-    const stored = localStorage.getItem('visible-panels')
-    if (stored) {
-      const parsed = JSON.parse(stored) as PanelId[]
-      if (Array.isArray(parsed) && parsed.length > 0) return new Set(parsed)
-    }
-  } catch {
-    // ignore
-  }
-  return new Set(ALL_PANELS)
-}
-
-function writeVisiblePanels(visible: Set<PanelId>) {
-  try {
-    localStorage.setItem('visible-panels', JSON.stringify([...visible]))
-  } catch {
-    // localStorage unavailable
-  }
-}
-
-function useVisiblePanels() {
-  const [visible, setVisible] = useState<Set<PanelId>>(readVisiblePanels)
-
-  const toggle = useCallback((id: PanelId) => {
-    setVisible((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        if (next.size > 1) next.delete(id)
-      } else {
-        next.add(id)
-      }
-      writeVisiblePanels(next)
-      return next
-    })
-  }, [])
-
-  return { visible, toggle }
-}
+import { ALL_PANELS, PANEL_LABELS } from './layout'
+import type { PanelId } from './layout'
 
 export default function App() {
   const { snapshot, events, connected, currentTick, activeAlerts, dismissedAlerts, dismissAlert } = useSimStream()
-  const { visible, toggle } = useVisiblePanels()
+  const { layout, visiblePanels, move, togglePanel } = useLayoutState()
 
   const [ticksPerSec, setTicksPerSec] = useState(10) // default fallback
   const [paused, setPaused] = useState(false)
   const { displayTick, measuredTickRate } = useAnimatedTick(currentTick, ticksPerSec)
+
+  const [activeDragId, setActiveDragId] = useState<PanelId | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  )
 
   useEffect(() => {
     fetchMeta()
@@ -98,27 +63,50 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleTogglePause])
 
-  const visiblePanels = ALL_PANELS.filter((id) => visible.has(id))
+  const renderPanel = useCallback(
+    (id: PanelId) => {
+      switch (id) {
+        case 'map':
+          return <SolarSystemMap snapshot={snapshot} currentTick={displayTick} oreCompositions={{}} />
+        case 'events':
+          return <EventsFeed events={events} />
+        case 'asteroids':
+          return <AsteroidTable asteroids={snapshot?.asteroids ?? {}} />
+        case 'fleet':
+          return (
+            <FleetPanel
+              ships={snapshot?.ships ?? {}}
+              stations={snapshot?.stations ?? {}}
+              displayTick={displayTick}
+            />
+          )
+        case 'research':
+          return snapshot ? <ResearchPanel research={snapshot.research} /> : null
+      }
+    },
+    [snapshot, events, displayTick],
+  )
 
-  function renderPanel(id: PanelId) {
-    switch (id) {
-      case 'map':
-        return <SolarSystemMap snapshot={snapshot} currentTick={displayTick} oreCompositions={{}} />
-      case 'events':
-        return <EventsFeed events={events} />
-      case 'asteroids':
-        return <AsteroidTable asteroids={snapshot?.asteroids ?? {}} />
-      case 'fleet':
-        return (
-          <FleetPanel
-            ships={snapshot?.ships ?? {}}
-            stations={snapshot?.stations ?? {}}
-            displayTick={displayTick}
-          />
-        )
-      case 'research':
-        return snapshot ? <ResearchPanel research={snapshot.research} /> : null
+  function handleDragStart(event: DragStartEvent) {
+    const panelId = event.active.data.current?.panelId as PanelId | undefined
+    if (panelId) setActiveDragId(panelId)
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const sourcePanelId = event.active.data.current?.panelId as PanelId | undefined
+    const targetPanelId = event.over?.data.current?.targetPanelId as PanelId | undefined
+    const position = event.over?.data.current?.position as string | undefined
+
+    if (
+      sourcePanelId &&
+      targetPanelId &&
+      position &&
+      sourcePanelId !== targetPanelId
+    ) {
+      move(sourcePanelId, targetPanelId, position as 'before' | 'after' | 'above' | 'below')
     }
+
+    setActiveDragId(null)
   }
 
   return (
@@ -130,9 +118,9 @@ export default function App() {
             <button
               key={id}
               type="button"
-              onClick={() => toggle(id)}
+              onClick={() => togglePanel(id)}
               className={`text-[10px] uppercase tracking-widest px-2 py-1.5 rounded-sm transition-colors cursor-pointer text-left ${
-                visible.has(id)
+                visiblePanels.includes(id)
                   ? 'text-active bg-edge/40'
                   : 'text-muted hover:text-dim hover:bg-edge/15'
               }`}
@@ -142,23 +130,18 @@ export default function App() {
           ))}
         </nav>
         {visiblePanels.length > 0 && (
-          <PanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-            {visiblePanels.map((id, index) => (
-              <div key={id} className="contents">
-                {index > 0 && (
-                  <PanelResizeHandle className="w-px bg-edge hover:bg-dim cursor-col-resize transition-colors" />
-                )}
-                <Panel defaultSize={100 / visiblePanels.length} minSize={10}>
-                  <section className="flex flex-col h-full overflow-hidden bg-void p-3">
-                    <h2 className="text-[11px] uppercase tracking-widest text-label mb-2 pb-1.5 border-b border-edge shrink-0">
-                      {PANEL_LABELS[id]}
-                    </h2>
-                    {renderPanel(id)}
-                  </section>
-                </Panel>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <LayoutRenderer layout={layout} renderPanel={renderPanel} isDragging={activeDragId !== null} activeDragId={activeDragId} />
+          <DragOverlay>
+            {activeDragId ? (
+              <div className="bg-surface border border-accent/50 rounded px-3 py-1 shadow-lg">
+                <span className="text-[11px] uppercase tracking-widest text-accent">
+                  {PANEL_LABELS[activeDragId]}
+                </span>
               </div>
-            ))}
-          </PanelGroup>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
         )}
       </div>
     </div>
