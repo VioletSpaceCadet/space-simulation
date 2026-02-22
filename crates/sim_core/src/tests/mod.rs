@@ -4,6 +4,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
 
+mod assembler;
 mod commands;
 mod deep_scan;
 mod deposit;
@@ -160,6 +161,65 @@ fn state_with_refinery(content: &GameContent) -> GameState {
             ("Fe".to_string(), 0.7f32),
             ("Si".to_string(), 0.3f32),
         ]),
+    });
+
+    state
+}
+
+fn assembler_content() -> GameContent {
+    let mut content = test_content();
+    content.module_defs = vec![ModuleDef {
+        id: "module_basic_assembler".to_string(),
+        name: "Basic Assembler".to_string(),
+        mass_kg: 3000.0,
+        volume_m3: 8.0,
+        power_consumption_per_run: 8.0,
+        wear_per_run: 0.008,
+        behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+            assembly_interval_ticks: 2,
+            recipes: vec![RecipeDef {
+                id: "recipe_basic_repair_kit".to_string(),
+                inputs: vec![RecipeInput {
+                    filter: InputFilter::Element("Fe".to_string()),
+                    amount: InputAmount::Kg(100.0),
+                }],
+                outputs: vec![OutputSpec::Component {
+                    component_id: ComponentId("repair_kit".to_string()),
+                    quality_formula: QualityFormula::Fixed(1.0),
+                }],
+                efficiency: 1.0,
+            }],
+        }),
+    }];
+    content.component_defs = vec![crate::ComponentDef {
+        id: "repair_kit".to_string(),
+        name: "Repair Kit".to_string(),
+        mass_kg: 5.0,
+        volume_m3: 0.01,
+    }];
+    content
+}
+
+fn state_with_assembler(content: &GameContent) -> GameState {
+    let mut state = test_state(content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    let station = state.stations.get_mut(&station_id).unwrap();
+
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("module_inst_0001".to_string()),
+        def_id: "module_basic_assembler".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Assembler(AssemblerState {
+            ticks_since_last_run: 0,
+            stalled: false,
+        }),
+        wear: WearState::default(),
+    });
+
+    station.inventory.push(InventoryItem::Material {
+        element: "Fe".to_string(),
+        kg: 500.0,
+        quality: 0.7,
     });
 
     state

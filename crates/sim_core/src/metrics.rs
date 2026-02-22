@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-const METRICS_VERSION: u32 = 2;
+const METRICS_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
@@ -41,6 +41,10 @@ pub struct MetricsSnapshot {
     pub refinery_active_count: u32,
     pub refinery_starved_count: u32,
     pub refinery_stalled_count: u32,
+
+    // Assembler
+    pub assembler_active_count: u32,
+    pub assembler_stalled_count: u32,
 
     // Fleet
     pub fleet_total: u32,
@@ -140,6 +144,9 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
     let mut refinery_starved_count = 0_u32;
     let mut refinery_stalled_count = 0_u32;
 
+    let mut assembler_active_count = 0_u32;
+    let mut assembler_stalled_count = 0_u32;
+
     let mut wear_sum = 0.0_f32;
     let mut wear_count = 0_u32;
     let mut max_wear = 0.0_f32;
@@ -173,7 +180,10 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
             let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
                 continue;
             };
-            if matches!(def.behavior, ModuleBehaviorDef::Processor(_)) {
+            if matches!(
+                def.behavior,
+                ModuleBehaviorDef::Processor(_) | ModuleBehaviorDef::Assembler(_)
+            ) {
                 wear_sum += module.wear.wear;
                 wear_count += 1;
                 if module.wear.wear > max_wear {
@@ -184,18 +194,28 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
             if !module.enabled {
                 continue;
             }
-            if !matches!(def.behavior, ModuleBehaviorDef::Processor(_)) {
-                continue;
-            }
-            refinery_active_count += 1;
 
-            if let ModuleKindState::Processor(ps) = &module.kind_state {
-                if ps.stalled {
-                    refinery_stalled_count += 1;
+            match &def.behavior {
+                ModuleBehaviorDef::Processor(_) => {
+                    refinery_active_count += 1;
+                    if let ModuleKindState::Processor(ps) = &module.kind_state {
+                        if ps.stalled {
+                            refinery_stalled_count += 1;
+                        }
+                        if total_ore_at_station < ps.threshold_kg {
+                            refinery_starved_count += 1;
+                        }
+                    }
                 }
-                if total_ore_at_station < ps.threshold_kg {
-                    refinery_starved_count += 1;
+                ModuleBehaviorDef::Assembler(_) => {
+                    assembler_active_count += 1;
+                    if let ModuleKindState::Assembler(asmb) = &module.kind_state {
+                        if asmb.stalled {
+                            assembler_stalled_count += 1;
+                        }
+                    }
                 }
+                _ => {}
             }
         }
 
@@ -328,6 +348,8 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         refinery_active_count,
         refinery_starved_count,
         refinery_stalled_count,
+        assembler_active_count,
+        assembler_stalled_count,
         fleet_total,
         fleet_idle,
         fleet_mining,
@@ -356,6 +378,7 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
          avg_ore_fe_fraction,ore_lot_count,min_ore_fe_fraction,max_ore_fe_fraction,\
          avg_material_quality,\
          refinery_active_count,refinery_starved_count,refinery_stalled_count,\
+         assembler_active_count,assembler_stalled_count,\
          fleet_total,fleet_idle,fleet_mining,fleet_transiting,fleet_surveying,fleet_depositing,\
          scan_sites_remaining,asteroids_discovered,asteroids_depleted,\
          techs_unlocked,total_scan_data,max_tech_evidence,\
@@ -370,7 +393,7 @@ pub fn append_metrics_row(
 ) -> std::io::Result<()> {
     writeln!(
         writer,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         snapshot.tick,
         snapshot.metrics_version,
         snapshot.total_ore_kg,
@@ -387,6 +410,8 @@ pub fn append_metrics_row(
         snapshot.refinery_active_count,
         snapshot.refinery_starved_count,
         snapshot.refinery_stalled_count,
+        snapshot.assembler_active_count,
+        snapshot.assembler_stalled_count,
         snapshot.fleet_total,
         snapshot.fleet_idle,
         snapshot.fleet_mining,

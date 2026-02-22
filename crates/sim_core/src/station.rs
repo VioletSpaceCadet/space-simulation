@@ -65,6 +65,9 @@ pub(crate) fn tick_stations(
         tick_station_modules(state, station_id, content, events);
     }
     for station_id in &station_ids {
+        tick_assembler_modules(state, station_id, content, events);
+    }
+    for station_id in &station_ids {
         tick_maintenance_modules(state, station_id, content, events);
     }
 }
@@ -94,7 +97,9 @@ fn tick_station_modules(
             };
             let interval = match &def.behavior {
                 ModuleBehaviorDef::Processor(p) => p.processing_interval_ticks,
-                ModuleBehaviorDef::Storage { .. } | ModuleBehaviorDef::Maintenance(_) => continue,
+                ModuleBehaviorDef::Storage { .. }
+                | ModuleBehaviorDef::Maintenance(_)
+                | ModuleBehaviorDef::Assembler(_) => continue,
             };
             (
                 module.def_id.clone(),
@@ -133,7 +138,9 @@ fn tick_station_modules(
             };
             match &station.modules[module_idx].kind_state {
                 ModuleKindState::Processor(ps) => ps.threshold_kg,
-                ModuleKindState::Storage | ModuleKindState::Maintenance(_) => continue,
+                ModuleKindState::Storage
+                | ModuleKindState::Maintenance(_)
+                | ModuleKindState::Assembler(_) => continue,
             }
         };
 
@@ -210,7 +217,9 @@ fn tick_station_modules(
 
             let was_stalled = match &station.modules[module_idx].kind_state {
                 ModuleKindState::Processor(ps) => ps.stalled,
-                ModuleKindState::Storage | ModuleKindState::Maintenance(_) => false,
+                ModuleKindState::Storage
+                | ModuleKindState::Maintenance(_)
+                | ModuleKindState::Assembler(_) => false,
             };
             let module_id = station.modules[module_idx].id.clone();
 
@@ -526,6 +535,338 @@ fn consume_ore_fifo_with_lots(
     }
     *inventory = new_inventory;
     (consumed_kg, lots)
+}
+
+fn tick_assembler_modules(
+    state: &mut GameState,
+    station_id: &StationId,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+    let module_count = state
+        .stations
+        .get(station_id)
+        .map_or(0, |s| s.modules.len());
+
+    for module_idx in 0..module_count {
+        // Extract module info and assembler def
+        let (assembler_def, power_needed, wear_per_run) = {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            let module = &station.modules[module_idx];
+            if !module.enabled {
+                continue;
+            }
+            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+                continue;
+            };
+            let ModuleBehaviorDef::Assembler(assembler_def) = &def.behavior else {
+                continue;
+            };
+            (
+                assembler_def.clone(),
+                def.power_consumption_per_run,
+                def.wear_per_run,
+            )
+        };
+
+        // Tick timer; skip if interval not reached
+        {
+            let Some(station) = state.stations.get_mut(station_id) else {
+                return;
+            };
+            if let ModuleKindState::Assembler(asmb) = &mut station.modules[module_idx].kind_state {
+                asmb.ticks_since_last_run += 1;
+                if asmb.ticks_since_last_run < assembler_def.assembly_interval_ticks {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+        }
+
+        // Check power budget
+        {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            if station.power_available_per_tick < power_needed {
+                continue;
+            }
+        }
+
+        let Some(recipe) = assembler_def.recipes.first() else {
+            continue;
+        };
+
+        // Check input availability
+        let input_available = {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            recipe.inputs.iter().all(|input| {
+                let required_kg = match &input.amount {
+                    InputAmount::Kg(kg) => *kg,
+                    InputAmount::Count(_) => return false,
+                };
+                let available_kg: f32 = station
+                    .inventory
+                    .iter()
+                    .filter_map(|item| match (&input.filter, item) {
+                        (InputFilter::Element(el), InventoryItem::Material { element, kg, .. })
+                            if element == el =>
+                        {
+                            Some(*kg)
+                        }
+                        _ => None,
+                    })
+                    .sum();
+                available_kg >= required_kg
+            })
+        };
+
+        if !input_available {
+            // Reset timer so it retries next interval
+            if let Some(station) = state.stations.get_mut(station_id) {
+                if let ModuleKindState::Assembler(asmb) =
+                    &mut station.modules[module_idx].kind_state
+                {
+                    asmb.ticks_since_last_run = 0;
+                }
+            }
+            continue;
+        }
+
+        // Capacity pre-check: estimate output volume
+        let output_volume = {
+            let mut volume = 0.0_f32;
+            for output in &recipe.outputs {
+                if let OutputSpec::Component { component_id, .. } = output {
+                    let comp_volume = content
+                        .component_defs
+                        .iter()
+                        .find(|c| c.id == component_id.0)
+                        .map_or(0.0, |c| c.volume_m3);
+                    volume += comp_volume;
+                }
+            }
+            volume
+        };
+
+        let was_stalled = {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            match &station.modules[module_idx].kind_state {
+                ModuleKindState::Assembler(asmb) => asmb.stalled,
+                _ => false,
+            }
+        };
+
+        let module_id = state.stations.get(station_id).unwrap().modules[module_idx]
+            .id
+            .clone();
+
+        {
+            let station = state.stations.get(station_id).unwrap();
+            let current_used = crate::tasks::inventory_volume_m3(&station.inventory, content);
+            let capacity = station.cargo_capacity_m3;
+            let shortfall = (current_used + output_volume) - capacity;
+
+            if shortfall > 0.0 {
+                let station_mut = state.stations.get_mut(station_id).unwrap();
+                if let ModuleKindState::Assembler(asmb) =
+                    &mut station_mut.modules[module_idx].kind_state
+                {
+                    asmb.stalled = true;
+                    asmb.ticks_since_last_run = 0;
+                }
+                if !was_stalled {
+                    events.push(crate::emit(
+                        &mut state.counters,
+                        current_tick,
+                        Event::ModuleStalled {
+                            station_id: station_id.clone(),
+                            module_id,
+                            shortfall_m3: shortfall,
+                        },
+                    ));
+                }
+                continue;
+            }
+
+            // Space available — resume if previously stalled
+            if was_stalled {
+                let station_mut = state.stations.get_mut(station_id).unwrap();
+                if let ModuleKindState::Assembler(asmb) =
+                    &mut station_mut.modules[module_idx].kind_state
+                {
+                    asmb.stalled = false;
+                }
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::ModuleResumed {
+                        station_id: station_id.clone(),
+                        module_id: module_id.clone(),
+                    },
+                ));
+            }
+        }
+
+        // Execute assembler run
+        resolve_assembler_run(state, station_id, module_idx, recipe, wear_per_run, events);
+
+        // Reset timer
+        if let Some(station) = state.stations.get_mut(station_id) {
+            if let ModuleKindState::Assembler(asmb) = &mut station.modules[module_idx].kind_state {
+                asmb.ticks_since_last_run = 0;
+            }
+        }
+    }
+}
+
+fn resolve_assembler_run(
+    state: &mut GameState,
+    station_id: &StationId,
+    module_idx: usize,
+    recipe: &RecipeDef,
+    wear_per_run: f32,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    let module_id = state
+        .stations
+        .get(station_id)
+        .map(|s| s.modules[module_idx].id.clone())
+        .unwrap();
+
+    // Consume inputs
+    let mut consumed_element = String::new();
+    let mut consumed_kg = 0.0_f32;
+
+    for input in &recipe.inputs {
+        let required_kg = match &input.amount {
+            InputAmount::Kg(kg) => *kg,
+            InputAmount::Count(_) => continue,
+        };
+
+        let element_id = match &input.filter {
+            InputFilter::Element(el) => el.clone(),
+            _ => continue,
+        };
+
+        consumed_element = element_id.clone();
+        let mut remaining = required_kg;
+
+        if let Some(station) = state.stations.get_mut(station_id) {
+            for item in &mut station.inventory {
+                if remaining <= 0.0 {
+                    break;
+                }
+                if let InventoryItem::Material { element, kg, .. } = item {
+                    if *element == element_id {
+                        let take = kg.min(remaining);
+                        *kg -= take;
+                        remaining -= take;
+                        consumed_kg += take;
+                    }
+                }
+            }
+            // Remove empty material lots
+            station.inventory.retain(
+                |i| !matches!(i, InventoryItem::Material { kg, .. } if *kg < MIN_MEANINGFUL_KG),
+            );
+        }
+    }
+
+    if consumed_kg < MIN_MEANINGFUL_KG {
+        return;
+    }
+
+    // Produce outputs
+    for output in &recipe.outputs {
+        if let OutputSpec::Component {
+            component_id,
+            quality_formula,
+        } = output
+        {
+            let quality = match quality_formula {
+                QualityFormula::Fixed(q) => *q,
+                QualityFormula::ElementFractionTimesMultiplier { .. } => 1.0,
+            };
+
+            let produced_count = 1_u32;
+
+            if let Some(station) = state.stations.get_mut(station_id) {
+                let existing = station.inventory.iter_mut().find(|i| {
+                    matches!(i, InventoryItem::Component { component_id: cid, quality: q, .. }
+                        if cid.0 == component_id.0 && (*q - quality).abs() < 1e-3)
+                });
+                if let Some(InventoryItem::Component { count, .. }) = existing {
+                    *count += produced_count;
+                } else {
+                    station.inventory.push(InventoryItem::Component {
+                        component_id: component_id.clone(),
+                        count: produced_count,
+                        quality,
+                    });
+                }
+            }
+
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::AssemblerRan {
+                    station_id: station_id.clone(),
+                    module_id: module_id.clone(),
+                    recipe_id: recipe.id.clone(),
+                    material_consumed_kg: consumed_kg,
+                    material_element: consumed_element.clone(),
+                    component_produced_id: component_id.clone(),
+                    component_produced_count: produced_count,
+                    component_quality: quality,
+                },
+            ));
+        }
+    }
+
+    // Accumulate wear
+    if wear_per_run > 0.0 {
+        if let Some(station) = state.stations.get_mut(station_id) {
+            let module = &mut station.modules[module_idx];
+            let wear_before = module.wear.wear;
+            module.wear.wear = (module.wear.wear + wear_per_run).min(1.0);
+            let wear_after = module.wear.wear;
+
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::WearAccumulated {
+                    station_id: station_id.clone(),
+                    module_id: module.id.clone(),
+                    wear_before,
+                    wear_after,
+                },
+            ));
+
+            if module.wear.wear >= 1.0 {
+                let mid = module.id.clone();
+                module.enabled = false;
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::ModuleAutoDisabled {
+                        station_id: station_id.clone(),
+                        module_id: mid,
+                    },
+                ));
+            }
+        }
+    }
 }
 
 fn tick_maintenance_modules(

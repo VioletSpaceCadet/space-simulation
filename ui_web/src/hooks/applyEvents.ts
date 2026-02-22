@@ -122,7 +122,9 @@ export function applyEvents(
           const station = updatedStations[station_id]
           const kindState: ModuleKindState = module_def_id.includes('maintenance')
             ? { Maintenance: { ticks_since_last_run: 0 } }
-            : { Processor: { threshold_kg: 0, ticks_since_last_run: 0 } }
+            : module_def_id.includes('assembler')
+              ? { Assembler: { ticks_since_last_run: 0, stalled: false } }
+              : { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } }
           updatedStations = {
             ...updatedStations,
             [station_id]: {
@@ -244,6 +246,57 @@ export function applyEvents(
             } else {
               stationInv.push({ kind: 'Slag', kg: slag_produced_kg, composition: {} })
             }
+          }
+
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: { ...updatedStations[station_id], inventory: stationInv },
+          }
+        }
+        break
+      }
+
+      case 'AssemblerRan': {
+        const { station_id, material_consumed_kg, material_element, component_produced_id, component_produced_count, component_quality } = event as {
+          station_id: string
+          material_consumed_kg: number
+          material_element: string
+          component_produced_id: string
+          component_produced_count: number
+          component_quality: number
+        }
+        if (updatedStations[station_id]) {
+          let stationInv = [...updatedStations[station_id].inventory]
+
+          // Consume material
+          let remaining = material_consumed_kg
+          stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
+            if (remaining > 0 && item.kind === 'Material' && item.element === material_element) {
+              const take = Math.min(item.kg, remaining)
+              remaining -= take
+              if (item.kg - take > 0.001) {
+                acc.push({ ...item, kg: item.kg - take })
+              }
+              return acc
+            }
+            acc.push(item)
+            return acc
+          }, [])
+
+          // Merge or create component
+          const compIndex = stationInv.findIndex(
+            (i) => i.kind === 'Component' && (i as ComponentItem).component_id === component_produced_id
+          )
+          if (compIndex >= 0) {
+            const existing = stationInv[compIndex] as ComponentItem
+            stationInv[compIndex] = { ...existing, count: existing.count + component_produced_count }
+          } else {
+            stationInv.push({
+              kind: 'Component',
+              component_id: component_produced_id,
+              count: component_produced_count,
+              quality: component_quality,
+            })
           }
 
           updatedStations = {

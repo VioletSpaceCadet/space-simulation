@@ -243,6 +243,8 @@ mod tests {
             refinery_active_count: 0,
             refinery_starved_count: 0,
             refinery_stalled_count: 0,
+            assembler_active_count: 0,
+            assembler_stalled_count: 0,
             fleet_total: 0,
             fleet_idle: 0,
             fleet_mining: 0,

@@ -73,9 +73,15 @@ export interface MaintenanceState {
   ticks_since_last_run: number
 }
 
+export interface AssemblerState {
+  ticks_since_last_run: number
+  stalled: boolean
+}
+
 export type ModuleKindState =
   | { Processor: ProcessorState }
   | { Maintenance: MaintenanceState }
+  | { Assembler: AssemblerState }
   | 'Storage'
 
 export interface WearState {

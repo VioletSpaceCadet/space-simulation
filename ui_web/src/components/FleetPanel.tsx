@@ -120,6 +120,8 @@ function ModulesDisplay({ modules }: { modules: ModuleState[] }) {
     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
       {modules.map((m) => {
         const isMaintenance = typeof m.kind_state === 'object' && 'Maintenance' in m.kind_state
+        const isAssembler = typeof m.kind_state === 'object' && 'Assembler' in m.kind_state
+        const isAssemblerStalled = isAssembler && m.kind_state.Assembler.stalled
         const threshold =
           typeof m.kind_state === 'object' && 'Processor' in m.kind_state
             ? m.kind_state.Processor.threshold_kg
@@ -130,6 +132,8 @@ function ModulesDisplay({ modules }: { modules: ModuleState[] }) {
             {m.def_id} · {m.enabled ? 'on' : 'off'}
             {' · '}<span className={m.wear ? wearColor(m.wear.wear) : 'text-green-400'}>{wearPct}%</span>
             {isMaintenance && ' · maintenance'}
+            {isAssembler && ' · assembler'}
+            {isAssemblerStalled && ' · stalled'}
             {threshold !== null && ` · threshold ${threshold} kg`}
           </span>
         )

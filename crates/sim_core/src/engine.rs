@@ -113,6 +113,12 @@ fn apply_commands(
                                 ticks_since_last_run: 0,
                             })
                         }
+                        crate::ModuleBehaviorDef::Assembler(_) => {
+                            crate::ModuleKindState::Assembler(crate::AssemblerState {
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                            })
+                        }
                     },
                     None => continue,
                 };

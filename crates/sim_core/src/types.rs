@@ -163,6 +163,7 @@ pub enum ModuleKindState {
     Processor(ProcessorState),
     Storage,
     Maintenance(MaintenanceState),
+    Assembler(AssemblerState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -176,6 +177,13 @@ pub struct ProcessorState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MaintenanceState {
     pub ticks_since_last_run: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssemblerState {
+    pub ticks_since_last_run: u64,
+    #[serde(default)]
+    pub stalled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -430,6 +438,16 @@ pub enum Event {
         station_id: StationId,
         module_id: ModuleInstanceId,
     },
+    AssemblerRan {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        recipe_id: String,
+        material_consumed_kg: f32,
+        material_element: ElementId,
+        component_produced_id: ComponentId,
+        component_produced_count: u32,
+        component_quality: f32,
+    },
     MaintenanceRan {
         station_id: StationId,
         target_module_id: ModuleInstanceId,
@@ -543,6 +561,13 @@ pub enum ModuleBehaviorDef {
     Processor(ProcessorDef),
     Storage { capacity_m3: f32 },
     Maintenance(MaintenanceDef),
+    Assembler(AssemblerDef),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssemblerDef {
+    pub assembly_interval_ticks: u64,
+    pub recipes: Vec<RecipeDef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

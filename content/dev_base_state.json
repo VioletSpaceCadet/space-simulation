@@ -48,6 +48,17 @@
           "kind": "Module",
           "item_id": "module_item_0002",
           "module_def_id": "module_maintenance_bay"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0003",
+          "module_def_id": "module_basic_assembler"
+        },
+        {
+          "kind": "Material",
+          "element": "Fe",
+          "kg": 500.0,
+          "quality": 0.7
         }
       ],
       "cargo_capacity_m3": 100.0,
