@@ -27,7 +27,7 @@ export default function App() {
 
   const [ticksPerSec, setTicksPerSec] = useState(10) // default fallback
   const [paused, setPaused] = useState(false)
-  const { displayTick, measuredTickRate } = useAnimatedTick(currentTick, ticksPerSec)
+  const { displayTick, measuredTickRate } = useAnimatedTick(currentTick, ticksPerSec, paused)
 
   const [activeDragId, setActiveDragId] = useState<PanelId | null>(null)
 

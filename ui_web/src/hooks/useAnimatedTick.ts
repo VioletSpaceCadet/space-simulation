@@ -8,7 +8,7 @@ interface TickSample {
 const MAX_SAMPLES = 10
 const MAX_LOOKAHEAD_MS = 1000
 
-export function useAnimatedTick(serverTick: number, initialTickRate: number) {
+export function useAnimatedTick(serverTick: number, initialTickRate: number, paused = false) {
   const [displayTick, setDisplayTick] = useState(serverTick)
   const [measuredTickRate, setMeasuredTickRate] = useState(initialTickRate)
 
@@ -44,11 +44,19 @@ export function useAnimatedTick(serverTick: number, initialTickRate: number) {
     }
   }, [serverTick])
 
+  const pausedRef = useRef(paused)
+  pausedRef.current = paused
+
   // rAF loop for smooth interpolation
   useEffect(() => {
     let rafHandle: number
 
     function animate() {
+      if (pausedRef.current) {
+        setDisplayTick(anchorRef.current.tick)
+        rafHandle = requestAnimationFrame(animate)
+        return
+      }
       // Don't interpolate until we have at least 2 server samples
       // (proves the server is actually sending data)
       if (samplesRef.current.length < 2) {
