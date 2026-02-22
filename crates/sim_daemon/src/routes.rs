@@ -12,6 +12,7 @@ use axum::{
 use sim_core::EventEnvelope;
 use std::collections::VecDeque;
 use std::convert::Infallible;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::sync::broadcast;
 use tower_http::cors::{Any, CorsLayer};
@@ -32,6 +33,8 @@ pub fn make_router(state: AppState) -> Router {
         .route("/api/v1/metrics", get(metrics_handler))
         .route("/api/v1/stream", get(stream_handler))
         .route("/api/v1/save", post(save_handler))
+        .route("/api/v1/pause", post(pause_handler))
+        .route("/api/v1/resume", post(resume_handler))
         .route("/api/v1/alerts", get(alerts_handler))
         .layer(cors)
         .with_state(state)
@@ -40,11 +43,13 @@ pub fn make_router(state: AppState) -> Router {
 pub async fn meta_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
     let sim = app_state.sim.lock().unwrap();
     let ticks_per_sec = app_state.ticks_per_sec;
+    let paused = app_state.paused.load(Ordering::Relaxed);
     Json(serde_json::json!({
         "tick": sim.game_state.meta.tick,
         "seed": sim.game_state.meta.seed,
         "content_version": sim.game_state.meta.content_version,
         "ticks_per_sec": ticks_per_sec,
+        "paused": paused,
     }))
 }
 
@@ -117,6 +122,16 @@ async fn alerts_handler(State(app_state): State<AppState>) -> Json<serde_json::V
         .map(|e| e.active_alert_ids())
         .unwrap_or_default();
     Json(serde_json::json!({ "active_alerts": active_ids }))
+}
+
+pub async fn pause_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
+    app_state.paused.store(true, Ordering::Relaxed);
+    Json(serde_json::json!({"paused": true}))
+}
+
+pub async fn resume_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
+    app_state.paused.store(false, Ordering::Relaxed);
+    Json(serde_json::json!({"paused": false}))
 }
 
 pub async fn stream_handler(

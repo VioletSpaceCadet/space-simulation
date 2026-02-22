@@ -3,6 +3,7 @@ export interface MetaInfo {
   seed: number
   content_version: string
   ticks_per_sec: number
+  paused: boolean
 }
 
 export interface FacilitiesState {

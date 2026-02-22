@@ -3,6 +3,7 @@ use sim_control::AutopilotController;
 use sim_core::{EventEnvelope, GameContent, GameState, MetricsFileWriter, MetricsSnapshot};
 use std::collections::VecDeque;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
@@ -42,4 +43,5 @@ pub struct AppState {
     pub event_tx: EventTx,
     pub ticks_per_sec: f64,
     pub run_dir: Option<PathBuf>,
+    pub paused: Arc<AtomicBool>,
 }

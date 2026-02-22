@@ -7,6 +7,8 @@ interface Props {
   tick: number
   connected: boolean
   measuredTickRate: number
+  paused: boolean
+  onTogglePause: () => void
   alerts: Map<string, ActiveAlert>
   dismissedAlerts: Set<string>
   onDismissAlert: (alertId: string) => void
@@ -14,7 +16,7 @@ interface Props {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
-export function StatusBar({ tick, connected, measuredTickRate, alerts, dismissedAlerts, onDismissAlert }: Props) {
+export function StatusBar({ tick, connected, measuredTickRate, paused, onTogglePause, alerts, dismissedAlerts, onDismissAlert }: Props) {
   const roundedTick = Math.floor(tick)
   const day = Math.floor(roundedTick / 1440)
   const hour = Math.floor((roundedTick % 1440) / 60)
@@ -56,6 +58,17 @@ export function StatusBar({ tick, connected, measuredTickRate, alerts, dismissed
       </span>
       <div className="ml-auto flex items-center gap-3">
         <AlertBadges alerts={alerts} dismissed={dismissedAlerts} onDismiss={onDismissAlert} />
+        <button
+          type="button"
+          onClick={onTogglePause}
+          className={`px-2.5 py-0.5 rounded-sm text-[10px] uppercase tracking-widest transition-colors cursor-pointer border ${
+            paused
+              ? 'border-accent/40 text-accent'
+              : 'border-edge text-muted hover:text-dim hover:border-dim'
+          }`}
+        >
+          {paused ? 'Paused' : 'Running'}
+        </button>
         <button
           type="button"
           onClick={handleSave}

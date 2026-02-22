@@ -1,6 +1,8 @@
 use crate::state::{EventTx, SharedSim, SimState};
 use sim_control::CommandSource;
 use sim_core::EventLevel;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 pub async fn run_tick_loop(
@@ -8,6 +10,7 @@ pub async fn run_tick_loop(
     event_tx: EventTx,
     ticks_per_sec: f64,
     max_ticks: Option<u64>,
+    paused: Arc<AtomicBool>,
 ) {
     let mut interval = if ticks_per_sec > 0.0 {
         let mut iv = tokio::time::interval(Duration::from_secs_f64(1.0 / ticks_per_sec));
@@ -18,6 +21,10 @@ pub async fn run_tick_loop(
     };
 
     loop {
+        while paused.load(Ordering::Relaxed) {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+
         let (events, done) = {
             let mut guard = sim.lock().unwrap();
             let SimState {

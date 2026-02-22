@@ -16,6 +16,7 @@ use clap::{Parser, Subcommand};
 use sim_control::AutopilotController;
 use sim_core::EventEnvelope;
 use std::collections::VecDeque;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
@@ -115,6 +116,7 @@ async fn main() -> Result<()> {
                 event_tx: event_tx.clone(),
                 ticks_per_sec,
                 run_dir,
+                paused: Arc::new(AtomicBool::new(false)),
             };
             let router = make_router(app_state.clone());
             let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
@@ -129,6 +131,7 @@ async fn main() -> Result<()> {
                 event_tx,
                 ticks_per_sec,
                 max_ticks,
+                app_state.paused.clone(),
             ));
             let listener = tokio::net::TcpListener::bind(addr).await?;
             axum::serve(listener, router).await?;
@@ -168,6 +171,7 @@ mod tests {
             event_tx,
             ticks_per_sec: 10.0,
             run_dir: None,
+            paused: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 
@@ -281,6 +285,116 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn test_meta_contains_paused() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/meta")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["paused"], false);
+    }
+
+    #[tokio::test]
+    async fn test_pause_sets_flag() {
+        let state = make_test_state();
+        let app = make_router(state.clone());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/pause")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["paused"], true);
+
+        // Verify meta reflects paused state
+        let app2 = make_router(state);
+        let meta_response = app2
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/meta")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let meta_body = meta_response
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let meta_json: serde_json::Value = serde_json::from_slice(&meta_body).unwrap();
+        assert_eq!(meta_json["paused"], true);
+    }
+
+    #[tokio::test]
+    async fn test_resume_clears_flag() {
+        let state = make_test_state();
+        // First pause
+        let app = make_router(state.clone());
+        app.oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/pause")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+        // Then resume
+        let app2 = make_router(state.clone());
+        let response = app2
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/resume")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["paused"], false);
+
+        // Verify meta reflects resumed state
+        let app3 = make_router(state);
+        let meta_response = app3
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/meta")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let meta_body = meta_response
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let meta_json: serde_json::Value = serde_json::from_slice(&meta_body).unwrap();
+        assert_eq!(meta_json["paused"], false);
     }
 
     #[tokio::test]

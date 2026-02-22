@@ -21,6 +21,18 @@ export async function saveGame(): Promise<{ path: string; tick: number }> {
   return response.json()
 }
 
+export async function pauseGame(): Promise<{ paused: boolean }> {
+  const response = await fetch('/api/v1/pause', { method: 'POST' })
+  if (!response.ok) throw new Error(`Pause failed: ${response.status}`)
+  return response.json()
+}
+
+export async function resumeGame(): Promise<{ paused: boolean }> {
+  const response = await fetch('/api/v1/resume', { method: 'POST' })
+  if (!response.ok) throw new Error(`Resume failed: ${response.status}`)
+  return response.json()
+}
+
 export function createEventSource(): EventSource {
   return new EventSource('/api/v1/stream')
 }
