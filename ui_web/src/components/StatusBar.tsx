@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { saveGame } from '../api'
 import type { ActiveAlert } from '../types'
 import { AlertBadges } from './AlertBadges'
@@ -36,6 +36,17 @@ export function StatusBar({ tick, connected, measuredTickRate, paused, onToggleP
         setTimeout(() => setSaveStatus('idle'), 3000)
       })
   }, [])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        handleSave()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [handleSave])
 
   const saveLabel =
     saveStatus === 'saving'
