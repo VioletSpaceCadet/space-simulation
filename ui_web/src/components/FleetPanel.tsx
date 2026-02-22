@@ -1,3 +1,4 @@
+import React, { useState } from 'react'
 import { useSortableData } from '../hooks/useSortableData'
 import type { ComponentItem, InventoryItem, MaterialItem, ModuleItem, ModuleState, OreItem, ShipState, SlagItem, StationState } from '../types'
 import { SortIndicator } from './SortIndicator'
@@ -69,9 +70,9 @@ function InventoryDisplay({ inventory }: { inventory: InventoryItem[] }) {
   const modules = inventory.filter((i) => i.kind === 'Module') as ModuleItem[]
 
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+    <div className="space-y-1 mt-0.5">
       {oreAgg && (
-        <span className="text-cargo">
+        <div className="text-cargo">
           ore {formatKg(oreAgg.totalKg)} kg
           <span className="text-faint ml-1">
             ({oreAgg.lotCount} lot{oreAgg.lotCount !== 1 ? 's' : ''},{' '}
@@ -81,28 +82,28 @@ function InventoryDisplay({ inventory }: { inventory: InventoryItem[] }) {
               .map(([el, f]) => `${el} ${pct(f)}`)
               .join(', ')})
           </span>
-        </span>
+        </div>
       )}
       {materials.map((item, idx) => (
-        <span key={`mat-${idx}`} className="text-cargo">
+        <div key={`mat-${idx}`} className="text-cargo">
           {item.element} {formatKg(item.kg)} kg
           <span className="text-faint ml-1">({qualityTier(item.quality)})</span>
-        </span>
+        </div>
       ))}
-      {slags.map((item, idx) => (
-        <span key={`slag-${idx}`} className="text-dim">
-          slag {formatKg(item.kg)} kg
-        </span>
-      ))}
+      {slags.length > 0 && (
+        <div className="text-dim">
+          slag {formatKg(slags.reduce((sum, s) => sum + s.kg, 0))} kg
+        </div>
+      )}
       {components.map((item, idx) => (
-        <span key={`comp-${idx}`} className="text-cargo">
+        <div key={`comp-${idx}`} className="text-cargo">
           {item.component_id} ×{item.count}
-        </span>
+        </div>
       ))}
       {modules.map((item, idx) => (
-        <span key={`mod-${idx}`} className="text-faint text-[10px]">
+        <div key={`mod-${idx}`} className="text-faint text-[10px]">
           module: {item.module_def_id}
-        </span>
+        </div>
       ))}
     </div>
   )
@@ -112,34 +113,6 @@ function wearColor(wear: number): string {
   if (wear >= WEAR_TIER_HIGH) return 'text-red-400'
   if (wear >= WEAR_TIER_MED) return 'text-yellow-400'
   return 'text-green-400'
-}
-
-function ModulesDisplay({ modules }: { modules: ModuleState[] }) {
-  if (modules.length === 0) return null
-  return (
-    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-      {modules.map((m) => {
-        const isMaintenance = typeof m.kind_state === 'object' && 'Maintenance' in m.kind_state
-        const isAssembler = typeof m.kind_state === 'object' && 'Assembler' in m.kind_state
-        const isAssemblerStalled = isAssembler && m.kind_state.Assembler.stalled
-        const threshold =
-          typeof m.kind_state === 'object' && 'Processor' in m.kind_state
-            ? m.kind_state.Processor.threshold_kg
-            : null
-        const wearPct = m.wear ? Math.round((1 - m.wear.wear) * 100) : 100
-        return (
-          <span key={m.id} className="text-[10px] text-dim">
-            {m.def_id} · {m.enabled ? 'on' : 'off'}
-            {' · '}<span className={m.wear ? wearColor(m.wear.wear) : 'text-green-400'}>{wearPct}%</span>
-            {isMaintenance && ' · maintenance'}
-            {isAssembler && ' · assembler'}
-            {isAssemblerStalled && ' · stalled'}
-            {threshold !== null && ` · threshold ${threshold} kg`}
-          </span>
-        )
-      })}
-    </div>
-  )
 }
 
 function TaskProgress({ task, displayTick }: { task: ShipState['task']; displayTick: number }) {
@@ -168,9 +141,147 @@ function TaskProgress({ task, displayTick }: { task: ShipState['task']; displayT
   )
 }
 
-// --- Ships table ---
+// --- Ship detail ---
 
-interface SortableShip {
+function ShipDetail({ ship, displayTick }: { ship: ShipState; displayTick: number }) {
+  const task = ship.task
+  const taskType = task ? Object.keys(task.kind)[0] : null
+
+  return (
+    <div className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2 text-[11px] w-fit">
+      {/* Left: Inventory */}
+      <div>
+        <div className="text-label text-[10px] uppercase tracking-wider mb-1">Cargo</div>
+        {ship.inventory.length === 0 ? (
+          <span className="text-faint">empty</span>
+        ) : (
+          <InventoryDisplay inventory={ship.inventory} />
+        )}
+      </div>
+      {/* Right: Task detail */}
+      <div>
+        <div className="text-label text-[10px] uppercase tracking-wider mb-1">Task</div>
+        {!task ? (
+          <span className="text-faint">idle</span>
+        ) : (
+          <div className="space-y-1">
+            <div className="text-fg">{taskType}</div>
+            <TaskProgress task={task} displayTick={displayTick} />
+            {taskType === 'Transit' && 'Transit' in task.kind && (
+              <div className="text-dim">destination: {task.kind.Transit.destination}</div>
+            )}
+            {taskType === 'Mine' && 'Mine' in task.kind && (
+              <div className="text-dim">asteroid: {task.kind.Mine.asteroid}</div>
+            )}
+            {taskType === 'Deposit' && 'Deposit' in task.kind && (
+              <>
+                <div className="text-dim">station: {task.kind.Deposit.station}</div>
+                {task.kind.Deposit.blocked && (
+                  <span className="text-[9px] px-1 rounded text-red-400 bg-red-400/10">BLOCKED</span>
+                )}
+              </>
+            )}
+            {taskType === 'Survey' && 'Survey' in task.kind && (
+              <div className="text-dim">site: {task.kind.Survey.site}</div>
+            )}
+            {taskType === 'DeepScan' && 'DeepScan' in task.kind && (
+              <div className="text-dim">asteroid: {task.kind.DeepScan.asteroid}</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// --- Expandable table ---
+
+const HEADER_CLASS =
+  'text-left text-label px-2 py-1 border-b border-edge font-normal cursor-pointer hover:text-dim transition-colors select-none'
+const HEADER_CLASS_STATIC =
+  'text-left text-label px-2 py-1 border-b border-edge font-normal select-none'
+const CELL_CLASS = 'px-2 py-0.5 border-b border-surface'
+
+interface ColumnDef<T> {
+  key: string
+  label: string
+  sortable?: boolean
+  render: (row: T) => React.ReactNode
+}
+
+function ExpandableTable<T extends { id: string }>({
+  data,
+  columns,
+  renderDetail,
+}: {
+  data: T[]
+  columns: ColumnDef<T>[]
+  renderDetail: (row: T) => React.ReactNode
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const sortableRows = data.map((row) => {
+    const sortable: Record<string, unknown> = { id: row.id }
+    for (const col of columns) sortable[col.key] = col.key === 'id' ? row.id : (row as Record<string, unknown>)[col.key]
+    return { ...sortable, _row: row }
+  })
+
+  const { sortedData, sortConfig, requestSort } = useSortableData(sortableRows)
+  const colSpan = columns.length
+
+  return (
+    <table className="w-full border-collapse text-[11px]">
+      <thead>
+        <tr>
+          {columns.map((col) => (
+            <th
+              key={col.key}
+              className={col.sortable !== false ? HEADER_CLASS : HEADER_CLASS_STATIC}
+              onClick={col.sortable !== false ? () => requestSort(col.key) : undefined}
+            >
+              {col.label}
+              {col.sortable !== false && <SortIndicator column={col.key} sortConfig={sortConfig} />}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {sortedData.map((sortableRow) => {
+          const row = sortableRow._row as T
+          const isExpanded = expandedId === row.id
+          return (
+            <React.Fragment key={row.id}>
+              <tr
+                className={`cursor-pointer hover:bg-surface/50 ${isExpanded ? 'bg-surface/60' : ''}`}
+                onClick={() => setExpandedId(isExpanded ? null : row.id)}
+              >
+                {columns.map((col, colIndex) => (
+                  <td
+                    key={col.key}
+                    className={`${CELL_CLASS} ${colIndex === 0 && isExpanded ? 'border-l-2 border-l-accent' : ''}`}
+                  >
+                    {col.render(row)}
+                  </td>
+                ))}
+              </tr>
+              {isExpanded && (
+                <tr>
+                  <td colSpan={colSpan} className="px-3 py-3 border-b border-surface border-l-2 border-l-accent bg-void/30">
+                    {renderDetail(row)}
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+// --- Ship table ---
+
+interface ShipRow {
   id: string
   location_node: string
   task: string
@@ -179,7 +290,7 @@ interface SortableShip {
 }
 
 function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: number }) {
-  const sortableRows: SortableShip[] = ships.map((ship) => ({
+  const rows: ShipRow[] = ships.map((ship) => ({
     id: ship.id,
     location_node: ship.location_node,
     task: taskLabel(ship.task),
@@ -187,61 +298,94 @@ function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: n
     ship,
   }))
 
-  const { sortedData, sortConfig, requestSort } = useSortableData(sortableRows)
-
-  const headerClass =
-    'text-left text-label px-2 py-1 border-b border-edge font-normal cursor-pointer hover:text-dim transition-colors select-none'
+  const columns: ColumnDef<ShipRow>[] = [
+    { key: 'id', label: 'ID', render: (r) => r.id },
+    { key: 'location_node', label: 'Location', render: (r) => r.location_node },
+    { key: 'task', label: 'Task', render: (r) => r.task },
+    { key: 'progress', label: 'Progress', sortable: false, render: (r) => <TaskProgress task={r.ship.task} displayTick={displayTick} /> },
+    { key: 'cargo_kg', label: 'Cargo', render: (r) => r.cargo_kg === 0
+      ? <span className="text-faint">empty</span>
+      : <span className="text-cargo">{formatKg(r.cargo_kg)} kg</span>
+    },
+  ]
 
   return (
-    <table className="min-w-max w-full border-collapse text-[11px]">
-      <thead>
-        <tr>
-          <th className={headerClass} onClick={() => requestSort('id')}>
-            ID<SortIndicator column="id" sortConfig={sortConfig} />
-          </th>
-          <th className={headerClass} onClick={() => requestSort('location_node')}>
-            Location<SortIndicator column="location_node" sortConfig={sortConfig} />
-          </th>
-          <th className={headerClass} onClick={() => requestSort('task')}>
-            Task<SortIndicator column="task" sortConfig={sortConfig} />
-          </th>
-          <th className="text-left text-label px-2 py-1 border-b border-edge font-normal select-none">
-            Progress
-          </th>
-          <th className={headerClass} onClick={() => requestSort('cargo_kg')}>
-            Cargo<SortIndicator column="cargo_kg" sortConfig={sortConfig} />
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {sortedData.map(({ ship, cargo_kg }) => (
-          <tr key={ship.id}>
-            <td className="px-2 py-0.5 border-b border-surface">{ship.id}</td>
-            <td className="px-2 py-0.5 border-b border-surface">{ship.location_node}</td>
-            <td className="px-2 py-0.5 border-b border-surface">{taskLabel(ship.task)}</td>
-            <td className="px-2 py-0.5 border-b border-surface">
-              <TaskProgress task={ship.task} displayTick={displayTick} />
-            </td>
-            <td className="px-2 py-0.5 border-b border-surface align-top">
-              {cargo_kg === 0 ? (
-                <span className="text-faint">empty</span>
-              ) : (
-                <div>
-                  <span className="text-cargo">{formatKg(cargo_kg)} kg</span>
-                  <InventoryDisplay inventory={ship.inventory} />
-                </div>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <ExpandableTable
+      data={rows}
+      columns={columns}
+      renderDetail={(r) => <ShipDetail ship={r.ship} displayTick={displayTick} />}
+    />
   )
 }
 
-// --- Stations table ---
+// --- Station detail components ---
 
-interface SortableStation {
+function ModuleCard({ module: m }: { module: ModuleState }) {
+  const name = m.def_id.replace(/^module_/, '')
+  const healthPct = m.wear ? Math.round((1 - m.wear.wear) * 100) : 100
+  const isProcessor = typeof m.kind_state === 'object' && 'Processor' in m.kind_state
+  const isMaintenance = typeof m.kind_state === 'object' && 'Maintenance' in m.kind_state
+  const isAssembler = typeof m.kind_state === 'object' && 'Assembler' in m.kind_state
+  const isStalled = (isProcessor && m.kind_state.Processor.stalled) || (isAssembler && m.kind_state.Assembler.stalled)
+
+  return (
+    <div className="border border-edge rounded px-2 py-1.5 bg-surface/30">
+      <div className="flex items-center gap-2">
+        <span className="text-fg">{name}</span>
+        <span className={`text-[9px] px-1 rounded ${m.enabled ? 'text-online bg-online/10' : 'text-offline bg-offline/10'}`}>
+          {m.enabled ? 'ON' : 'OFF'}
+        </span>
+        {isStalled && (
+          <span className="text-[9px] px-1 rounded text-red-400 bg-red-400/10">STALLED</span>
+        )}
+      </div>
+      <div className="flex items-center gap-2 mt-1 text-[10px]">
+        <span className="text-dim">health</span>
+        <span className={m.wear ? wearColor(m.wear.wear) : 'text-green-400'}>{healthPct}%</span>
+        {isProcessor && (
+          <span className="text-faint ml-2">threshold {m.kind_state.Processor.threshold_kg} kg</span>
+        )}
+        {isMaintenance && (
+          <span className="text-faint ml-2">maintenance bay</span>
+        )}
+        {isAssembler && (
+          <span className="text-faint ml-2">assembler</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function StationDetail({ station }: { station: StationState }) {
+  return (
+    <div className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2 text-[11px] w-fit">
+      <div>
+        <div className="text-label text-[10px] uppercase tracking-wider mb-1">Inventory</div>
+        {station.inventory.length === 0 ? (
+          <span className="text-faint">empty</span>
+        ) : (
+          <InventoryDisplay inventory={station.inventory} />
+        )}
+      </div>
+      <div>
+        <div className="text-label text-[10px] uppercase tracking-wider mb-1">Modules</div>
+        {station.modules.length === 0 ? (
+          <span className="text-faint">none installed</span>
+        ) : (
+          <div className="space-y-2">
+            {station.modules.map((m) => (
+              <ModuleCard key={m.id} module={m} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// --- Station table ---
+
+interface StationRow {
   id: string
   location_node: string
   cargo_kg: number
@@ -249,62 +393,28 @@ interface SortableStation {
 }
 
 function StationsTable({ stations }: { stations: StationState[] }) {
-  const sortableRows: SortableStation[] = stations.map((station) => ({
+  const rows: StationRow[] = stations.map((station) => ({
     id: station.id,
     location_node: station.location_node,
     cargo_kg: totalInventoryKg(station.inventory),
     station,
   }))
 
-  const { sortedData, sortConfig, requestSort } = useSortableData(sortableRows)
-
-  const headerClass =
-    'text-left text-label px-2 py-1 border-b border-edge font-normal cursor-pointer hover:text-dim transition-colors select-none'
+  const columns: ColumnDef<StationRow>[] = [
+    { key: 'id', label: 'ID', render: (r) => r.id },
+    { key: 'location_node', label: 'Location', render: (r) => r.location_node },
+    { key: 'cargo_kg', label: 'Storage', render: (r) => r.cargo_kg === 0
+      ? <span className="text-faint">empty</span>
+      : <span className="text-cargo">{formatKg(r.cargo_kg)} kg</span>
+    },
+  ]
 
   return (
-    <table className="min-w-max w-full border-collapse text-[11px]">
-      <thead>
-        <tr>
-          <th className={headerClass} onClick={() => requestSort('id')}>
-            ID<SortIndicator column="id" sortConfig={sortConfig} />
-          </th>
-          <th className={headerClass} onClick={() => requestSort('location_node')}>
-            Location<SortIndicator column="location_node" sortConfig={sortConfig} />
-          </th>
-          <th className={headerClass} onClick={() => requestSort('cargo_kg')}>
-            Cargo<SortIndicator column="cargo_kg" sortConfig={sortConfig} />
-          </th>
-          <th className={headerClass}>
-            Modules
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {sortedData.map(({ station, cargo_kg }) => (
-          <tr key={station.id}>
-            <td className="px-2 py-0.5 border-b border-surface align-top">{station.id}</td>
-            <td className="px-2 py-0.5 border-b border-surface align-top">{station.location_node}</td>
-            <td className="px-2 py-0.5 border-b border-surface align-top max-w-[400px] overflow-hidden">
-              {cargo_kg === 0 ? (
-                <span className="text-faint">empty</span>
-              ) : (
-                <div>
-                  <span className="text-cargo">{formatKg(cargo_kg)} kg</span>
-                  <InventoryDisplay inventory={station.inventory} />
-                </div>
-              )}
-            </td>
-            <td className="px-2 py-0.5 border-b border-surface align-top">
-              {station.modules.length === 0 ? (
-                <span className="text-faint">none</span>
-              ) : (
-                <ModulesDisplay modules={station.modules} />
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <ExpandableTable
+      data={rows}
+      columns={columns}
+      renderDetail={(r) => <StationDetail station={r.station} />}
+    />
   )
 }
 
