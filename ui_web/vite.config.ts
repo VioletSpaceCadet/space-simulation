@@ -12,7 +12,14 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:3001',
+      '/api': {
+        target: 'http://localhost:3001',
+        configure: (proxy) => {
+          proxy.on('error', () => {
+            // Silently swallow proxy errors (ECONNREFUSED when backend is down)
+          })
+        },
+      },
     },
   },
 })
