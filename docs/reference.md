@@ -101,3 +101,5 @@ All in `content/`. Loaded at runtime; never compiled in.
 - **Draggable Panels (done):** @dnd-kit panel reordering, persisted to localStorage.
 - **Pause/Resume (done):** AtomicBool tick loop pause, POST pause/resume endpoints, StatusBar toggle, spacebar shortcut.
 - **Keyboard Shortcuts (done):** Spacebar (pause/resume), Cmd/Ctrl+S (save).
+- **Sound Effects (done):** Web Audio synthesis (`sounds.ts`) — noise-burst click for pause/resume, two-tone beep for save.
+- **Pause Tick Freeze (done):** `useAnimatedTick` freezes `displayTick` immediately when paused (no drift).
