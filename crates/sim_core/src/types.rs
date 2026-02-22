@@ -72,6 +72,12 @@ pub enum EventLevel {
     Debug,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AlertSeverity {
+    Warning,
+    Critical,
+}
+
 // ---------------------------------------------------------------------------
 // State types
 // ---------------------------------------------------------------------------
@@ -404,6 +410,15 @@ pub enum Event {
         evidence: f32,
         p: f32,
         rolled: f32,
+    },
+    AlertRaised {
+        alert_id: String,
+        severity: AlertSeverity,
+        message: String,
+        suggested_action: String,
+    },
+    AlertCleared {
+        alert_id: String,
     },
     WearAccumulated {
         station_id: StationId,

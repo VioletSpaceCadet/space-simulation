@@ -1,6 +1,6 @@
-import { useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer } from 'react'
 import { createEventSource, fetchSnapshot } from '../api'
-import type { ResearchState, SimEvent, SimSnapshot } from '../types'
+import type { ActiveAlert, AlertSeverity, SimEvent, SimSnapshot } from '../types'
 import { applyEvents } from './applyEvents'
 
 // Kept for backward compatibility with SolarSystemMap/DetailCard imports.
@@ -12,6 +12,8 @@ interface State {
   events: SimEvent[]
   connected: boolean
   currentTick: number
+  activeAlerts: Map<string, ActiveAlert>
+  dismissedAlerts: Set<string>
 }
 
 type Action =
@@ -21,12 +23,15 @@ type Action =
   | { type: 'CONNECTED' }
   | { type: 'DISCONNECTED' }
   | { type: 'RESET' }
+  | { type: 'DISMISS_ALERT'; alertId: string }
 
 const initialState: State = {
   snapshot: null,
   events: [],
   connected: false,
   currentTick: 0,
+  activeAlerts: new Map(),
+  dismissedAlerts: new Set(),
 }
 
 function reducer(state: State, action: Action): State {
@@ -37,7 +42,32 @@ function reducer(state: State, action: Action): State {
     case 'EVENTS_RECEIVED': {
       const newEvents = [...action.events, ...state.events].slice(0, 500)
       const latestTick = action.events.reduce((max, e) => Math.max(max, e.tick), state.currentTick)
-      if (!state.snapshot) return { ...state, events: newEvents, currentTick: latestTick }
+
+      // Process alert events
+      const newAlerts = new Map(state.activeAlerts)
+      let newDismissed = state.dismissedAlerts
+      for (const e of action.events) {
+        const eventKey = Object.keys(e.event)[0]
+        const data = e.event[eventKey] as Record<string, unknown>
+        if (eventKey === 'AlertRaised') {
+          newAlerts.set(data.alert_id as string, {
+            alert_id: data.alert_id as string,
+            severity: data.severity as AlertSeverity,
+            message: data.message as string,
+            suggested_action: data.suggested_action as string,
+            tick: e.tick,
+          })
+          // Re-raised after dismiss? Un-dismiss it.
+          if (newDismissed.has(data.alert_id as string)) {
+            newDismissed = new Set([...newDismissed].filter(id => id !== data.alert_id))
+          }
+        } else if (eventKey === 'AlertCleared') {
+          newAlerts.delete(data.alert_id as string)
+          newDismissed = new Set([...newDismissed].filter(id => id !== data.alert_id))
+        }
+      }
+
+      if (!state.snapshot) return { ...state, events: newEvents, currentTick: latestTick, activeAlerts: newAlerts, dismissedAlerts: newDismissed }
       const { asteroids, ships, stations, research, scanSites } = applyEvents(
         state.snapshot.asteroids,
         state.snapshot.ships,
@@ -50,6 +80,8 @@ function reducer(state: State, action: Action): State {
         ...state,
         events: newEvents,
         currentTick: latestTick,
+        activeAlerts: newAlerts,
+        dismissedAlerts: newDismissed,
         snapshot: { ...state.snapshot, asteroids, ships, stations, research, scan_sites: scanSites },
       }
     }
@@ -62,6 +94,12 @@ function reducer(state: State, action: Action): State {
 
     case 'DISCONNECTED':
       return { ...state, connected: false }
+
+    case 'DISMISS_ALERT':
+      return {
+        ...state,
+        dismissedAlerts: new Set([...state.dismissedAlerts, action.alertId]),
+      }
 
     case 'RESET':
       return initialState
@@ -159,10 +197,17 @@ export function useSimStream() {
     }
   }, [])
 
+  const dismissAlert = useCallback((alertId: string) => {
+    dispatch({ type: 'DISMISS_ALERT', alertId })
+  }, [])
+
   return {
     snapshot: state.snapshot,
     events: state.events,
     connected: state.connected,
     currentTick: state.currentTick,
+    activeAlerts: state.activeAlerts,
+    dismissedAlerts: state.dismissedAlerts,
+    dismissAlert,
   }
 }

@@ -151,3 +151,13 @@ export interface SimEvent {
 }
 
 export type StreamMessage = SimEvent[] | { heartbeat: true; tick: number }
+
+export type AlertSeverity = 'Warning' | 'Critical'
+
+export interface ActiveAlert {
+  alert_id: string
+  severity: AlertSeverity
+  message: string
+  suggested_action: string
+  tick: number
+}

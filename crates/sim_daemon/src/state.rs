@@ -18,6 +18,7 @@ pub struct SimState {
     pub metrics_every: u64,
     pub metrics_history: VecDeque<MetricsSnapshot>,
     pub metrics_writer: Option<MetricsFileWriter>,
+    pub alert_engine: Option<crate::alerts::AlertEngine>,
 }
 
 impl SimState {

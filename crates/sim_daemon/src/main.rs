@@ -1,3 +1,4 @@
+mod alerts;
 mod routes;
 mod state;
 mod tick_loop;
@@ -9,15 +10,13 @@ use sim_world::{
 use state::{AppState, SimState};
 use tick_loop::run_tick_loop;
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
-
-use anyhow::Result;
 use clap::{Parser, Subcommand};
 use sim_control::AutopilotController;
 use sim_core::EventEnvelope;
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
 #[derive(Parser)]
@@ -94,6 +93,12 @@ async fn main() -> Result<()> {
                 (Some(writer), Some(run_dir))
             };
 
+            let alert_engine = if no_metrics {
+                None
+            } else {
+                Some(alerts::AlertEngine::new(content.techs.len()))
+            };
+
             let (event_tx, _) = broadcast::channel::<Vec<EventEnvelope>>(256);
             let app_state = AppState {
                 sim: Arc::new(Mutex::new(SimState {
@@ -105,6 +110,7 @@ async fn main() -> Result<()> {
                     metrics_every,
                     metrics_history: VecDeque::new(),
                     metrics_writer,
+                    alert_engine,
                 })),
                 event_tx: event_tx.clone(),
                 ticks_per_sec,
@@ -157,6 +163,7 @@ mod tests {
                 metrics_every: 60,
                 metrics_history: VecDeque::new(),
                 metrics_writer: None,
+                alert_engine: None,
             })),
             event_tx,
             ticks_per_sec: 10.0,

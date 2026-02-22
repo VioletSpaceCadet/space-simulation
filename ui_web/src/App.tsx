@@ -63,7 +63,7 @@ function useVisiblePanels() {
 }
 
 export default function App() {
-  const { snapshot, events, connected, currentTick } = useSimStream()
+  const { snapshot, events, connected, currentTick, activeAlerts, dismissedAlerts, dismissAlert } = useSimStream()
   const { visible, toggle } = useVisiblePanels()
 
   const [ticksPerSec, setTicksPerSec] = useState(10) // default fallback
@@ -98,7 +98,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <StatusBar tick={displayTick} connected={connected} measuredTickRate={measuredTickRate} />
+      <StatusBar tick={displayTick} connected={connected} measuredTickRate={measuredTickRate} alerts={activeAlerts} dismissedAlerts={dismissedAlerts} onDismissAlert={dismissAlert} />
       <div className="flex flex-1 overflow-hidden">
         <nav className="flex flex-col shrink-0 bg-surface border-r border-edge py-2 px-1 gap-0.5">
           {ALL_PANELS.map((id) => (

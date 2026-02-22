@@ -32,6 +32,7 @@ pub fn make_router(state: AppState) -> Router {
         .route("/api/v1/metrics", get(metrics_handler))
         .route("/api/v1/stream", get(stream_handler))
         .route("/api/v1/save", post(save_handler))
+        .route("/api/v1/alerts", get(alerts_handler))
         .layer(cors)
         .with_state(state)
 }
@@ -106,6 +107,16 @@ pub async fn save_handler(
         StatusCode::OK,
         Json(serde_json::json!({"path": path.display().to_string(), "tick": tick})),
     )
+}
+
+async fn alerts_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
+    let sim = app_state.sim.lock().unwrap();
+    let active_ids: Vec<String> = sim
+        .alert_engine
+        .as_ref()
+        .map(|e| e.active_alert_ids())
+        .unwrap_or_default();
+    Json(serde_json::json!({ "active_alerts": active_ids }))
 }
 
 pub async fn stream_handler(

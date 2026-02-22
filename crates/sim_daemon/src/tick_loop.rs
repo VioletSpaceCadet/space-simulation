@@ -35,12 +35,24 @@ pub async fn run_tick_loop(
                 ref mut rng,
                 ..
             } = *guard;
-            let events = sim_core::tick(game_state, &commands, content, rng, EventLevel::Normal);
+            let mut events =
+                sim_core::tick(game_state, &commands, content, rng, EventLevel::Normal);
 
             let metrics_every = guard.metrics_every;
             if metrics_every > 0 && guard.game_state.meta.tick.is_multiple_of(metrics_every) {
                 let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
                 guard.push_metrics(snapshot);
+
+                // Evaluate alert rules against the in-memory metrics history.
+                // Clone history to avoid simultaneous immutable + mutable borrows on guard.
+                if let Some(mut engine) = guard.alert_engine.take() {
+                    let tick = guard.game_state.meta.tick;
+                    let history_clone = guard.metrics_history.clone();
+                    let alert_events =
+                        engine.evaluate(&history_clone, tick, &mut guard.game_state.counters);
+                    events.extend(alert_events);
+                    guard.alert_engine = Some(engine);
+                }
             }
 
             let done = max_ticks.is_some_and(|max| guard.game_state.meta.tick >= max);
