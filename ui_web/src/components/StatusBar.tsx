@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { saveGame } from '../api'
+import { playSave } from '../sounds'
 import type { ActiveAlert } from '../types'
 import { AlertBadges } from './AlertBadges'
 
@@ -29,6 +30,7 @@ export function StatusBar({ tick, connected, measuredTickRate, paused, onToggleP
     saveGame()
       .then(() => {
         setSaveStatus('saved')
+        playSave()
         setTimeout(() => setSaveStatus('idle'), 2000)
       })
       .catch(() => {

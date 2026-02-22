@@ -15,6 +15,7 @@ import { ResearchPanel } from './components/ResearchPanel'
 import { SolarSystemMap } from './components/SolarSystemMap'
 import { StatusBar } from './components/StatusBar'
 import { fetchMeta, pauseGame, resumeGame } from './api'
+import { playPause, playResume } from './sounds'
 import { useAnimatedTick } from './hooks/useAnimatedTick'
 import { useLayoutState } from './hooks/useLayoutState'
 import { useSimStream } from './hooks/useSimStream'
@@ -46,6 +47,7 @@ export default function App() {
 
   const handleTogglePause = useCallback(() => {
     const nextPaused = !paused
+    nextPaused ? playPause() : playResume()
     setPaused(nextPaused)
     ;(nextPaused ? pauseGame() : resumeGame()).catch(() => setPaused(!nextPaused))
   }, [paused])
