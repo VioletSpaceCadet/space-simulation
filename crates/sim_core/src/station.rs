@@ -605,6 +605,101 @@ fn tick_assembler_modules(
             continue;
         }
 
+        // Stock cap check: skip if any output component is at or above its cap
+        let (is_capped, was_capped) = {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            let was_capped = match &station.modules[module_idx].kind_state {
+                ModuleKindState::Assembler(asmb) => asmb.capped,
+                _ => false,
+            };
+
+            let cap_override = match &station.modules[module_idx].kind_state {
+                ModuleKindState::Assembler(asmb) => asmb.cap_override.clone(),
+                _ => std::collections::HashMap::new(),
+            };
+
+            let is_capped = recipe.outputs.iter().any(|output| {
+                if let OutputSpec::Component { component_id, .. } = output {
+                    // Check cap_override first, then fall back to max_stock on def
+                    let effective_cap = cap_override
+                        .get(component_id)
+                        .copied()
+                        .or_else(|| assembler_def.max_stock.get(component_id).copied());
+
+                    if let Some(cap) = effective_cap {
+                        let current_count: u32 = station
+                            .inventory
+                            .iter()
+                            .filter_map(|item| match item {
+                                InventoryItem::Component {
+                                    component_id: cid,
+                                    count,
+                                    ..
+                                } if cid == component_id => Some(*count),
+                                _ => None,
+                            })
+                            .sum();
+                        current_count >= cap
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            });
+
+            (is_capped, was_capped)
+        };
+
+        if is_capped {
+            // Do NOT reset the timer so it re-checks next tick
+            if !was_capped {
+                let module_id = state.stations.get(station_id).unwrap().modules[module_idx]
+                    .id
+                    .clone();
+                if let Some(station) = state.stations.get_mut(station_id) {
+                    if let ModuleKindState::Assembler(asmb) =
+                        &mut station.modules[module_idx].kind_state
+                    {
+                        asmb.capped = true;
+                    }
+                }
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::AssemblerCapped {
+                        station_id: station_id.clone(),
+                        module_id,
+                    },
+                ));
+            }
+            continue;
+        }
+
+        // If was capped but no longer, emit uncapped event
+        if was_capped {
+            let module_id = state.stations.get(station_id).unwrap().modules[module_idx]
+                .id
+                .clone();
+            if let Some(station) = state.stations.get_mut(station_id) {
+                if let ModuleKindState::Assembler(asmb) =
+                    &mut station.modules[module_idx].kind_state
+                {
+                    asmb.capped = false;
+                }
+            }
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::AssemblerUncapped {
+                    station_id: station_id.clone(),
+                    module_id,
+                },
+            ));
+        }
+
         // Capacity pre-check: estimate output volume
         let output_volume = {
             let mut volume = 0.0_f32;

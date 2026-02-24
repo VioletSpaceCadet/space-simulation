@@ -264,3 +264,150 @@ fn test_assembler_merges_component_stacks() {
         "repair kits should merge into a single stack"
     );
 }
+
+#[test]
+fn test_assembler_stops_at_max_stock() {
+    let mut content = assembler_content();
+    if let ModuleBehaviorDef::Assembler(ref mut asm_def) = content.module_defs[0].behavior {
+        asm_def
+            .max_stock
+            .insert(ComponentId("repair_kit".to_string()), 2);
+    }
+    let mut state = state_with_assembler(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Pre-seed station with 2 repair kits (at cap)
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .inventory
+        .push(InventoryItem::Component {
+            component_id: ComponentId("repair_kit".to_string()),
+            count: 2,
+            quality: 1.0,
+        });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e.event, Event::AssemblerRan { .. })),
+        "assembler should NOT run when at max stock"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::AssemblerCapped { .. })),
+        "AssemblerCapped event should be emitted"
+    );
+
+    let station = &state.stations[&station_id];
+    let kit_count: u32 = station
+        .inventory
+        .iter()
+        .filter_map(|item| match item {
+            InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } if component_id.0 == "repair_kit" => Some(*count),
+            _ => None,
+        })
+        .sum();
+    assert_eq!(kit_count, 2, "kit count should remain 2, got {kit_count}");
+}
+
+#[test]
+fn test_assembler_resumes_below_max_stock() {
+    let mut content = assembler_content();
+    if let ModuleBehaviorDef::Assembler(ref mut asm_def) = content.module_defs[0].behavior {
+        asm_def
+            .max_stock
+            .insert(ComponentId("repair_kit".to_string()), 3);
+    }
+    let mut state = state_with_assembler(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Pre-seed station with 2 kits (below cap of 3)
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .inventory
+        .push(InventoryItem::Component {
+            component_id: ComponentId("repair_kit".to_string()),
+            count: 2,
+            quality: 1.0,
+        });
+
+    // Set capped = true on assembler state (simulating previously capped)
+    if let ModuleKindState::Assembler(ref mut asmb) =
+        state.stations.get_mut(&station_id).unwrap().modules[0].kind_state
+    {
+        asmb.capped = true;
+    }
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::AssemblerRan { .. })),
+        "assembler should run when below cap"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e.event, Event::AssemblerUncapped { .. })),
+        "AssemblerUncapped event should be emitted"
+    );
+}
+
+#[test]
+fn test_assembler_cap_override_takes_priority() {
+    let mut content = assembler_content();
+    if let ModuleBehaviorDef::Assembler(ref mut asm_def) = content.module_defs[0].behavior {
+        asm_def
+            .max_stock
+            .insert(ComponentId("repair_kit".to_string()), 10);
+    }
+    let mut state = state_with_assembler(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Set cap_override = 2 on assembler state (lower than content cap of 10)
+    if let ModuleKindState::Assembler(ref mut asmb) =
+        state.stations.get_mut(&station_id).unwrap().modules[0].kind_state
+    {
+        asmb.cap_override
+            .insert(ComponentId("repair_kit".to_string()), 2);
+    }
+
+    // Pre-seed station with 2 kits (at override cap, below content cap)
+    state
+        .stations
+        .get_mut(&station_id)
+        .unwrap()
+        .inventory
+        .push(InventoryItem::Component {
+            component_id: ComponentId("repair_kit".to_string()),
+            count: 2,
+            quality: 1.0,
+        });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e.event, Event::AssemblerRan { .. })),
+        "assembler should NOT run when at override cap (2), even though content cap is 10"
+    );
+}
