@@ -1,0 +1,11 @@
+{
+  "name": "cargo_sweep",
+  "ticks": 10000,
+  "metrics_every": 60,
+  "seeds": [1, 2, 3, 4, 5],
+  "content_dir": "./content",
+  "overrides": {
+    "station_cargo_capacity_m3": 200.0,
+    "wear_band_degraded_threshold": 0.6
+  }
+}

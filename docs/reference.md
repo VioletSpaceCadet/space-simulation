@@ -117,6 +117,42 @@ All in `content/`. Loaded at runtime; never compiled in.
 - Component output from processors (type defined but no-op).
 - Storage modules (type defined but tick loop skips them).
 
+## Benchmark Runner (sim_bench)
+
+Automated scenario runner for testing simulation behavior across multiple seeds. Runs seeds in parallel with rayon, computes cross-seed summary statistics.
+
+**Scenario file format** (JSON):
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | required | Scenario name (used in output directory) |
+| `ticks` | u64 | required | Number of ticks to simulate per seed |
+| `metrics_every` | u64 | `60` | Metrics snapshot interval (ticks) |
+| `seeds` | list or range | required | `[1, 2, 3]` or `{"range": [1, 100]}` |
+| `content_dir` | string | `"./content"` | Path to content directory |
+| `overrides` | object | `{}` | Constants overrides (key → value) |
+
+**Override keys:** All fields on `Constants` struct — `survey_scan_ticks`, `deep_scan_ticks`, `travel_ticks_per_hop`, `survey_tag_detection_probability`, `asteroid_count_per_template`, `asteroid_mass_min_kg`, `asteroid_mass_max_kg`, `ship_cargo_capacity_m3`, `station_cargo_capacity_m3`, `mining_rate_kg_per_tick`, `deposit_ticks`, `station_power_available_per_tick`, `autopilot_iron_rich_confidence_threshold`, `autopilot_refinery_threshold_kg`, `research_roll_interval_ticks`, `data_generation_peak`, `data_generation_floor`, `data_generation_decay_rate`, `wear_band_degraded_threshold`, `wear_band_critical_threshold`, `wear_band_degraded_efficiency`, `wear_band_critical_efficiency`.
+
+**Output structure:**
+
+```
+runs/<name>_<timestamp>/
+  scenario.json          # Copy of input scenario
+  summary.json           # Cross-seed summary statistics
+  seed_1/
+    run_info.json
+    metrics_000.csv
+  seed_2/
+    ...
+```
+
+**Summary metrics:** `storage_saturation_pct`, `fleet_idle_pct`, `refinery_starved_count`, `techs_unlocked`, `avg_module_wear`, `repair_kits_remaining`. Each reports mean, min, max, stddev across seeds.
+
+**Collapse detection:** A seed is "collapsed" if the final snapshot has `refinery_starved_count > 0` AND `fleet_idle == fleet_total`.
+
+**Example scenario:** `scenarios/cargo_sweep.json` — 5 seeds × 10k ticks with storage capacity and wear threshold overrides.
+
 ## MVP Scope
 
 - **MVP-0 (done):** sim_core tick + tests, sim_control autopilot, sim_cli run loop.
@@ -137,3 +173,4 @@ All in `content/`. Loaded at runtime; never compiled in.
 - **Keyboard Shortcuts (done):** Spacebar (pause/resume), Cmd/Ctrl+S (save).
 - **Sound Effects (done):** Web Audio synthesis (`sounds.ts`) — noise-burst click for pause/resume, two-tone beep for save.
 - **Pause Tick Freeze (done):** `useAnimatedTick` freezes `displayTick` immediately when paused (no drift).
+- **Benchmark Runner (done):** `sim_bench` crate — JSON scenario files, constant overrides, parallel seed execution (rayon), per-seed CSV metrics, cross-seed summary statistics, collapse detection.

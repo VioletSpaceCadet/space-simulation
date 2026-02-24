@@ -5,6 +5,7 @@ members = [
     "crates/sim_world",
     "crates/sim_cli",
     "crates/sim_daemon",
+    "crates/sim_bench",
 ]
 resolver = "2"
 
