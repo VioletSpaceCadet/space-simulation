@@ -115,12 +115,26 @@ pub fn minimal_content() -> GameContent {
             edges: vec![],
         },
         asteroid_templates: vec![],
-        elements: vec![ElementDef {
-            id: "Fe".to_string(),
-            density_kg_per_m3: 7874.0,
-            display_name: "Iron".to_string(),
-            refined_name: None,
-        }],
+        elements: vec![
+            ElementDef {
+                id: "ore".to_string(),
+                density_kg_per_m3: 3000.0,
+                display_name: "Raw Ore".to_string(),
+                refined_name: None,
+            },
+            ElementDef {
+                id: "Fe".to_string(),
+                density_kg_per_m3: 7874.0,
+                display_name: "Iron".to_string(),
+                refined_name: None,
+            },
+            ElementDef {
+                id: "slag".to_string(),
+                density_kg_per_m3: 2500.0,
+                display_name: "Slag".to_string(),
+                refined_name: None,
+            },
+        ],
         module_defs: vec![],
         component_defs: vec![],
         constants: Constants {

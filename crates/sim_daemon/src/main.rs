@@ -3,12 +3,13 @@ mod routes;
 mod state;
 mod tick_loop;
 
-use routes::make_router;
+use routes::make_router_with_cors;
 use sim_world::{
     create_run_dir, generate_run_id, load_content, load_or_build_state, write_run_info,
 };
 use state::{AppState, SimState};
 use tick_loop::run_tick_loop;
+use tracing::info;
 
 use anyhow::{Context, Result};
 
@@ -52,6 +53,9 @@ enum Commands {
         /// Disable automatic metrics collection to runs/ directory.
         #[arg(long)]
         no_metrics: bool,
+        /// CORS allowed origin (default: `http://localhost:5173`).
+        #[arg(long, default_value = "http://localhost:5173")]
+        cors_origin: String,
     },
 }
 
@@ -68,7 +72,15 @@ async fn main() -> Result<()> {
             max_ticks,
             metrics_every,
             no_metrics,
+            cors_origin,
         } => {
+            tracing_subscriber::fmt()
+                .with_env_filter(
+                    tracing_subscriber::EnvFilter::from_default_env()
+                        .add_directive("sim_daemon=info".parse().unwrap()),
+                )
+                .init();
+
             let content = load_content(&content_dir)?;
             let (game_state, rng) = load_or_build_state(&content, seed, state_file.as_deref())?;
 
@@ -91,7 +103,7 @@ async fn main() -> Result<()> {
                 )?;
                 let writer = sim_core::MetricsFileWriter::new(run_dir.clone())
                     .with_context(|| format!("opening metrics CSV in {}", run_dir.display()))?;
-                println!("Run directory: {}", run_dir.display());
+                info!("Run directory: {}", run_dir.display());
                 (Some(writer), Some(run_dir))
             };
 
@@ -119,14 +131,14 @@ async fn main() -> Result<()> {
                 run_dir,
                 paused: Arc::new(AtomicBool::new(false)),
             };
-            let router = make_router(app_state.clone());
+            let router = make_router_with_cors(app_state.clone(), &cors_origin);
             let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
             let speed = if ticks_per_sec == 0.0 {
                 "max".to_string()
             } else {
                 format!("{ticks_per_sec} ticks/sec")
             };
-            println!("sim_daemon listening on http://localhost:{port}  speed={speed}");
+            info!("sim_daemon listening on http://localhost:{port}  speed={speed}");
             tokio::spawn(run_tick_loop(
                 app_state.sim,
                 event_tx,
@@ -148,6 +160,7 @@ mod tests {
     use http_body_util::BodyExt;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
+    use routes::make_router;
     use sim_core::test_fixtures::base_content;
     use sim_world::build_initial_state;
     use tower::ServiceExt;

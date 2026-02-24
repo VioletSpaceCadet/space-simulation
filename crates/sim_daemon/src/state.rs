@@ -29,7 +29,9 @@ impl SimState {
             self.metrics_history.pop_front();
         }
         if let Some(ref mut writer) = self.metrics_writer {
-            let _ = writer.write_row(&snapshot);
+            if let Err(err) = writer.write_row(&snapshot) {
+                tracing::warn!("metrics CSV write failed: {err}");
+            }
         }
         self.metrics_history.push_back(snapshot);
     }

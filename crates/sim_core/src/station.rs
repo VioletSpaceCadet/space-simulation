@@ -55,6 +55,20 @@ fn estimate_output_volume_m3(
     total_volume
 }
 
+fn matches_input_filter(item: &InventoryItem, filter: Option<&InputFilter>) -> bool {
+    match filter {
+        Some(InputFilter::ItemKind(ItemKind::Ore)) => matches!(item, InventoryItem::Ore { .. }),
+        Some(InputFilter::ItemKind(ItemKind::Material)) => {
+            matches!(item, InventoryItem::Material { .. })
+        }
+        Some(InputFilter::ItemKind(ItemKind::Slag)) => matches!(item, InventoryItem::Slag { .. }),
+        Some(InputFilter::Element(el)) => {
+            matches!(item, InventoryItem::Material { element, .. } if element == el)
+        }
+        _ => false,
+    }
+}
+
 pub(crate) fn tick_stations(
     state: &mut GameState,
     content: &GameContent,
@@ -179,27 +193,11 @@ fn tick_station_modules(
             };
 
             let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
-            let matches_input = move |item: &InventoryItem| -> bool {
-                match &input_filter {
-                    Some(InputFilter::ItemKind(ItemKind::Ore)) => {
-                        matches!(item, InventoryItem::Ore { .. })
-                    }
-                    Some(InputFilter::ItemKind(ItemKind::Material)) => {
-                        matches!(item, InventoryItem::Material { .. })
-                    }
-                    Some(InputFilter::ItemKind(ItemKind::Slag)) => {
-                        matches!(item, InventoryItem::Slag { .. })
-                    }
-                    Some(InputFilter::Element(el)) => {
-                        matches!(item, InventoryItem::Material { element, .. } if element == el)
-                    }
-                    _ => false,
-                }
-            };
 
             let station = state.stations.get(station_id).unwrap();
-            let (peeked_kg, lots) =
-                peek_ore_fifo_with_lots(&station.inventory, rate_kg, matches_input);
+            let (peeked_kg, lots) = peek_ore_fifo_with_lots(&station.inventory, rate_kg, |item| {
+                matches_input_filter(item, input_filter.as_ref())
+            });
 
             if peeked_kg < MIN_MEANINGFUL_KG {
                 continue;
@@ -309,28 +307,15 @@ fn resolve_processor_run(
     };
 
     let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
-    let matches_input = move |item: &InventoryItem| -> bool {
-        match &input_filter {
-            Some(InputFilter::ItemKind(ItemKind::Ore)) => matches!(item, InventoryItem::Ore { .. }),
-            Some(InputFilter::ItemKind(ItemKind::Material)) => {
-                matches!(item, InventoryItem::Material { .. })
-            }
-            Some(InputFilter::ItemKind(ItemKind::Slag)) => {
-                matches!(item, InventoryItem::Slag { .. })
-            }
-            Some(InputFilter::Element(el)) => {
-                matches!(item, InventoryItem::Material { element, .. } if element == el)
-            }
-            _ => false,
-        }
-    };
 
     // FIFO-consume ore and compute weighted average composition.
     let (consumed_kg, lots) = {
         let Some(station) = state.stations.get_mut(station_id) else {
             return;
         };
-        consume_ore_fifo_with_lots(&mut station.inventory, rate_kg, matches_input)
+        consume_ore_fifo_with_lots(&mut station.inventory, rate_kg, |item| {
+            matches_input_filter(item, input_filter.as_ref())
+        })
     };
 
     if consumed_kg < MIN_MEANINGFUL_KG {
@@ -458,39 +443,7 @@ fn resolve_processor_run(
         .iter()
         .find(|d| d.id == def_id)
         .map_or(0.0, |d| d.wear_per_run);
-
-    if wear_per_run > 0.0 {
-        if let Some(station) = state.stations.get_mut(station_id) {
-            let module = &mut station.modules[module_idx];
-            let wear_before = module.wear.wear;
-            module.wear.wear = (module.wear.wear + wear_per_run).min(1.0);
-            let wear_after = module.wear.wear;
-
-            events.push(crate::emit(
-                &mut state.counters,
-                current_tick,
-                Event::WearAccumulated {
-                    station_id: station_id.clone(),
-                    module_id: module.id.clone(),
-                    wear_before,
-                    wear_after,
-                },
-            ));
-
-            if module.wear.wear >= 1.0 {
-                let mid = module.id.clone();
-                module.enabled = false;
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    Event::ModuleAutoDisabled {
-                        station_id: station_id.clone(),
-                        module_id: mid,
-                    },
-                ));
-            }
-        }
-    }
+    apply_wear(state, station_id, module_idx, wear_per_run, events);
 }
 
 /// FIFO-consume up to `rate_kg` from matching Ore items.
@@ -835,38 +788,7 @@ fn resolve_assembler_run(
     }
 
     // Accumulate wear
-    if wear_per_run > 0.0 {
-        if let Some(station) = state.stations.get_mut(station_id) {
-            let module = &mut station.modules[module_idx];
-            let wear_before = module.wear.wear;
-            module.wear.wear = (module.wear.wear + wear_per_run).min(1.0);
-            let wear_after = module.wear.wear;
-
-            events.push(crate::emit(
-                &mut state.counters,
-                current_tick,
-                Event::WearAccumulated {
-                    station_id: station_id.clone(),
-                    module_id: module.id.clone(),
-                    wear_before,
-                    wear_after,
-                },
-            ));
-
-            if module.wear.wear >= 1.0 {
-                let mid = module.id.clone();
-                module.enabled = false;
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    Event::ModuleAutoDisabled {
-                        station_id: station_id.clone(),
-                        module_id: mid,
-                    },
-                ));
-            }
-        }
-    }
+    apply_wear(state, station_id, module_idx, wear_per_run, events);
 }
 
 fn tick_maintenance_modules(
@@ -1103,6 +1025,48 @@ fn slag_composition_from_avg(
         .filter(|(k, _)| Some(k.as_str()) != extracted)
         .map(|(k, v)| (k.clone(), v / non_extracted_total))
         .collect()
+}
+
+fn apply_wear(
+    state: &mut GameState,
+    station_id: &StationId,
+    module_idx: usize,
+    wear_per_run: f32,
+    events: &mut Vec<EventEnvelope>,
+) {
+    if wear_per_run <= 0.0 {
+        return;
+    }
+    let current_tick = state.meta.tick;
+    if let Some(station) = state.stations.get_mut(station_id) {
+        let module = &mut station.modules[module_idx];
+        let wear_before = module.wear.wear;
+        module.wear.wear = (module.wear.wear + wear_per_run).min(1.0);
+        let wear_after = module.wear.wear;
+
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::WearAccumulated {
+                station_id: station_id.clone(),
+                module_id: module.id.clone(),
+                wear_before,
+                wear_after,
+            },
+        ));
+        if module.wear.wear >= 1.0 {
+            let mid = module.id.clone();
+            module.enabled = false;
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::ModuleAutoDisabled {
+                    station_id: station_id.clone(),
+                    module_id: mid,
+                },
+            ));
+        }
+    }
 }
 
 #[cfg(test)]

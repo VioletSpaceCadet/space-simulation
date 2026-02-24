@@ -34,6 +34,14 @@ struct ElementsFile {
 /// prereq that doesn't exist, or a solar-system edge pointing at an unknown node.
 pub fn validate_content(content: &GameContent) {
     let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
+    assert!(
+        element_ids.contains("ore"),
+        "required element 'ore' is missing from content.elements"
+    );
+    assert!(
+        element_ids.contains("slag"),
+        "required element 'slag' is missing from content.elements"
+    );
     let tech_ids: HashSet<&TechId> = content.techs.iter().map(|t| &t.id).collect();
     let node_ids: HashSet<&str> = content
         .solar_system
@@ -137,6 +145,48 @@ pub fn validate_content(content: &GameContent) {
                         OutputSpec::Slag { .. } | OutputSpec::Component { .. } => {}
                     }
                 }
+            }
+        }
+
+        if let ModuleBehaviorDef::Assembler(assembler) = &module_def.behavior {
+            for recipe in &assembler.recipes {
+                for input in &recipe.inputs {
+                    if let InputFilter::Element(element_id) = &input.filter {
+                        assert!(
+                            element_ids.contains(element_id.as_str()),
+                            "module '{}' assembler recipe '{}' input element '{}' is not a known element",
+                            module_def.id, recipe.id, element_id,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn validate_state(state: &GameState, content: &GameContent) {
+    let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
+    for station in state.stations.values() {
+        for item in &station.inventory {
+            if let InventoryItem::Material { element, .. } = item {
+                assert!(
+                    element_ids.contains(element.as_str()),
+                    "station '{}' inventory material element '{}' is not a known element",
+                    station.id.0,
+                    element
+                );
+            }
+        }
+    }
+    for ship in state.ships.values() {
+        for item in &ship.inventory {
+            if let InventoryItem::Material { element, .. } = item {
+                assert!(
+                    element_ids.contains(element.as_str()),
+                    "ship '{}' inventory material element '{}' is not a known element",
+                    ship.id.0,
+                    element
+                );
             }
         }
     }
@@ -327,6 +377,7 @@ pub fn load_or_build_state(
         let loaded: GameState =
             serde_json::from_str(&json).with_context(|| format!("parsing state file: {path}"))?;
         let rng = ChaCha8Rng::seed_from_u64(loaded.meta.seed);
+        validate_state(&loaded, content);
         Ok((loaded, rng))
     } else {
         let resolved_seed = seed.unwrap_or_else(rand::random);
@@ -343,9 +394,10 @@ mod tests {
     use rand_chacha::ChaCha8Rng;
     use sim_core::{
         test_fixtures::{base_content, minimal_content},
-        AsteroidTemplateDef, InputAmount, InputFilter, ItemKind, ModuleBehaviorDef, ModuleDef,
-        NodeDef, NodeId, OutputSpec, ProcessorDef, QualityFormula, RecipeDef, RecipeInput, TechDef,
-        TechId, YieldFormula,
+        AssemblerDef, AsteroidTemplateDef, Counters, FacilitiesState, GameState, InputAmount,
+        InputFilter, InventoryItem, ItemKind, MetaState, ModuleBehaviorDef, ModuleDef, NodeDef,
+        NodeId, OutputSpec, ProcessorDef, QualityFormula, RecipeDef, RecipeInput, ResearchState,
+        StationId, StationState, TechDef, TechId, YieldFormula,
     };
     use std::collections::HashMap;
 
@@ -460,5 +512,99 @@ mod tests {
             ship.location_node, station.location_node,
             "ship and station should be at the same node"
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "required element 'ore' is missing")]
+    fn test_missing_ore_element_panics() {
+        let mut content = minimal_content();
+        content.elements.retain(|e| e.id != "ore");
+        validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "required element 'slag' is missing")]
+    fn test_missing_slag_element_panics() {
+        let mut content = minimal_content();
+        content.elements.retain(|e| e.id != "slag");
+        validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "not a known element")]
+    fn test_assembler_recipe_unknown_element_panics() {
+        let mut content = minimal_content();
+        content.module_defs.push(ModuleDef {
+            id: "mod_assembler_test".to_string(),
+            name: "Test Assembler".to_string(),
+            mass_kg: 1000.0,
+            volume_m3: 5.0,
+            power_consumption_per_run: 10.0,
+            wear_per_run: 0.0,
+            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                assembly_interval_ticks: 10,
+                recipes: vec![RecipeDef {
+                    id: "recipe_asm_test".to_string(),
+                    inputs: vec![RecipeInput {
+                        filter: InputFilter::Element("Unobtanium".to_string()),
+                        amount: InputAmount::Kg(50.0),
+                    }],
+                    outputs: vec![],
+                    efficiency: 1.0,
+                }],
+            }),
+        });
+        validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "not a known element")]
+    fn test_state_with_unknown_material_element_panics() {
+        let content = minimal_content();
+        let station_id = StationId("station_test".to_string());
+        let state = GameState {
+            meta: MetaState {
+                tick: 0,
+                seed: 42,
+                schema_version: 1,
+                content_version: "test".to_string(),
+            },
+            scan_sites: vec![],
+            asteroids: HashMap::new(),
+            ships: HashMap::new(),
+            stations: HashMap::from([(
+                station_id.clone(),
+                StationState {
+                    id: station_id,
+                    location_node: NodeId("node_test".to_string()),
+                    inventory: vec![InventoryItem::Material {
+                        element: "Unobtanium".to_string(),
+                        kg: 100.0,
+                        quality: 1.0,
+                    }],
+                    cargo_capacity_m3: 1000.0,
+                    power_available_per_tick: 100.0,
+                    facilities: FacilitiesState {
+                        compute_units_total: 0,
+                        power_per_compute_unit_per_tick: 0.0,
+                        efficiency: 1.0,
+                    },
+                    modules: vec![],
+                },
+            )]),
+            research: ResearchState {
+                unlocked: std::collections::HashSet::new(),
+                data_pool: HashMap::new(),
+                evidence: HashMap::new(),
+            },
+            counters: Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 0,
+            },
+        };
+        validate_state(&state, &content);
     }
 }

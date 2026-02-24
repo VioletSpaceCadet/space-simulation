@@ -12,7 +12,9 @@ sim_control = { path = "../sim_control" }
 sim_world = { path = "../sim_world" }
 tokio = { version = "1", features = ["full"] }
 axum = "0.7"
-tower-http = { version = "0.5", features = ["cors"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 async-stream = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

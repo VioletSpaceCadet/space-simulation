@@ -16,14 +16,16 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::sync::broadcast;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::TraceLayer;
 
+#[cfg(test)]
 pub fn make_router(state: AppState) -> Router {
+    make_router_with_cors(state, "http://localhost:5173")
+}
+
+pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> Router {
     let cors = CorsLayer::new()
-        .allow_origin(
-            "http://localhost:5173"
-                .parse::<axum::http::HeaderValue>()
-                .unwrap(),
-        )
+        .allow_origin(cors_origin.parse::<axum::http::HeaderValue>().unwrap())
         .allow_methods([Method::GET, Method::POST])
         .allow_headers(Any);
 
@@ -37,6 +39,7 @@ pub fn make_router(state: AppState) -> Router {
         .route("/api/v1/resume", post(resume_handler))
         .route("/api/v1/alerts", get(alerts_handler))
         .layer(cors)
+        .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 
@@ -57,13 +60,25 @@ pub async fn snapshot_handler(
     State(app_state): State<AppState>,
 ) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
     let sim = app_state.sim.lock();
-    let body = serde_json::to_string(&sim.game_state).unwrap_or_default();
-    drop(sim);
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "application/json")],
-        body,
-    )
+    match serde_json::to_string(&sim.game_state) {
+        Ok(json) => {
+            drop(sim);
+            (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "application/json")],
+                json,
+            )
+        }
+        Err(err) => {
+            tracing::error!("snapshot serialization failed: {err}");
+            drop(sim);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(header::CONTENT_TYPE, "application/json")],
+                r#"{"error":"serialization failed"}"#.to_string(),
+            )
+        }
+    }
 }
 
 pub async fn metrics_handler(
@@ -88,7 +103,17 @@ pub async fn save_handler(
 
     let sim = app_state.sim.lock();
     let tick = sim.game_state.meta.tick;
-    let body = serde_json::to_string_pretty(&sim.game_state).unwrap_or_default();
+    let body = match serde_json::to_string_pretty(&sim.game_state) {
+        Ok(json) => json,
+        Err(err) => {
+            tracing::error!("save serialization failed: {err}");
+            drop(sim);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "serialization failed"})),
+            );
+        }
+    };
     drop(sim);
 
     let saves_dir = run_dir.join("saves");
