@@ -413,4 +413,150 @@ mod tests {
         let result: Result<serde_json::Value, _> = serde_json::from_slice(&body);
         assert!(result.is_ok(), "snapshot was not valid JSON: {:?}", body);
     }
+
+    #[tokio::test]
+    async fn test_metrics_returns_200_with_empty_history() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/metrics")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json, serde_json::json!([]));
+    }
+
+    #[tokio::test]
+    async fn test_metrics_returns_populated_history() {
+        let state = make_test_state();
+        {
+            let mut sim = state.sim.lock().unwrap();
+            let snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
+            sim.metrics_history.push_back(snapshot);
+        }
+        let app = make_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/metrics")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json.len(), 1);
+        assert_eq!(json[0]["tick"], 0);
+    }
+
+    #[tokio::test]
+    async fn test_alerts_returns_200_with_no_engine() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/alerts")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json, serde_json::json!({"active_alerts": []}));
+    }
+
+    #[tokio::test]
+    async fn test_alerts_returns_active_alerts() {
+        let state = make_test_state();
+        {
+            let mut sim = state.sim.lock().unwrap();
+            let mut engine = alerts::AlertEngine::new(sim.content.techs.len());
+            let snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
+            // ORE_STARVATION fires when 3+ consecutive snapshots have refinery_starved_count > 0.
+            // The test state has no refineries, so starved_count is 0. Instead use STORAGE_SATURATION
+            // which only needs the latest snapshot to have storage > 95%.
+            // But compute_metrics on base state has 0 storage used. So manually create a snapshot.
+            let mut history = VecDeque::new();
+            let mut modified = snapshot;
+            modified.station_storage_used_pct = 0.97;
+            history.push_back(modified);
+            let mut counters = sim.game_state.counters.clone();
+            engine.evaluate(&history, sim.game_state.meta.tick, &mut counters);
+            sim.alert_engine = Some(engine);
+        }
+        let app = make_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/alerts")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let alerts = json["active_alerts"].as_array().unwrap();
+        assert!(
+            !alerts.is_empty(),
+            "expected at least one active alert, got none"
+        );
+        assert!(
+            alerts.contains(&serde_json::json!("STORAGE_SATURATION")),
+            "expected STORAGE_SATURATION in active alerts: {:?}",
+            alerts
+        );
+    }
+
+    #[test]
+    fn test_push_metrics_caps_at_max_history() {
+        use state::MAX_METRICS_HISTORY;
+
+        let content = base_content();
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        let game_state = build_initial_state(&content, 0, &mut rng);
+        let snapshot = sim_core::compute_metrics(&game_state, &content);
+
+        let mut sim = SimState {
+            game_state,
+            content,
+            rng,
+            autopilot: AutopilotController,
+            next_command_id: 0,
+            metrics_every: 60,
+            metrics_history: VecDeque::new(),
+            metrics_writer: None,
+            alert_engine: None,
+        };
+
+        let total_pushes = MAX_METRICS_HISTORY + 10;
+        for tick in 0..total_pushes {
+            let mut snap = snapshot.clone();
+            snap.tick = tick as u64;
+            sim.push_metrics(snap);
+        }
+
+        assert_eq!(
+            sim.metrics_history.len(),
+            MAX_METRICS_HISTORY,
+            "history should be capped at MAX_METRICS_HISTORY"
+        );
+        // Oldest entries should have been dropped — first remaining tick should be 10
+        assert_eq!(
+            sim.metrics_history.front().unwrap().tick,
+            10,
+            "oldest snapshot should be tick 10 after dropping first 10"
+        );
+    }
 }

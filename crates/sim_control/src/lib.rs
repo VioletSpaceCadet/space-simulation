@@ -518,6 +518,143 @@ mod tests {
     }
 
     #[test]
+    fn test_autopilot_surveys_when_no_asteroids_known() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        // Restore scan sites (autopilot_state clears them).
+        state.scan_sites = vec![sim_core::ScanSite {
+            id: SiteId("site_0001".to_string()),
+            node: NodeId("node_test".to_string()),
+            template_id: "tmpl_iron_rich".to_string(),
+        }];
+        // No asteroids (default), no cargo on ship → should fall through to Survey.
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                sim_core::Command::AssignShipTask {
+                    task_kind: TaskKind::Survey { .. },
+                    ..
+                }
+            )),
+            "autopilot should assign Survey when no asteroids are known"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_handles_no_stations() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        // Give ship some cargo so deposit would normally fire.
+        let ship_id = ShipId("ship_0001".to_string());
+        state
+            .ships
+            .get_mut(&ship_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Ore {
+                lot_id: LotId("lot_test_0001".to_string()),
+                asteroid_id: AsteroidId("asteroid_test".to_string()),
+                kg: 100.0,
+                composition: HashMap::from([("Fe".to_string(), 1.0_f32)]),
+            });
+
+        // Remove all stations — deposit is impossible.
+        state.stations.clear();
+
+        // Add a scan site so ship has something to do.
+        state.scan_sites = vec![sim_core::ScanSite {
+            id: SiteId("site_0001".to_string()),
+            node: NodeId("node_test".to_string()),
+            template_id: "tmpl_iron_rich".to_string(),
+        }];
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        // Should NOT crash, and should NOT issue a Deposit command.
+        assert!(
+            !commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                sim_core::Command::AssignShipTask {
+                    task_kind: TaskKind::Deposit { .. },
+                    ..
+                }
+            )),
+            "autopilot should not issue Deposit when no stations exist"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_multiple_ships_get_different_assignments() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        let owner = PrincipalId("principal_autopilot".to_string());
+
+        // Add a second idle ship.
+        let ship_2 = ShipId("ship_0002".to_string());
+        state.ships.insert(
+            ship_2.clone(),
+            ShipState {
+                id: ship_2,
+                location_node: NodeId("node_test".to_string()),
+                owner,
+                inventory: vec![],
+                cargo_capacity_m3: 20.0,
+                task: None,
+            },
+        );
+
+        // Provide two scan sites so each ship can get a different one.
+        state.scan_sites = vec![
+            sim_core::ScanSite {
+                id: SiteId("site_0001".to_string()),
+                node: NodeId("node_test".to_string()),
+                template_id: "tmpl_iron_rich".to_string(),
+            },
+            sim_core::ScanSite {
+                id: SiteId("site_0002".to_string()),
+                node: NodeId("node_test".to_string()),
+                template_id: "tmpl_iron_rich".to_string(),
+            },
+        ];
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        // Collect survey site targets from the commands.
+        let survey_targets: Vec<&SiteId> = commands
+            .iter()
+            .filter_map(|cmd| match &cmd.command {
+                sim_core::Command::AssignShipTask {
+                    task_kind: TaskKind::Survey { site, .. },
+                    ..
+                } => Some(site),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            survey_targets.len(),
+            2,
+            "both idle ships should receive Survey tasks"
+        );
+        assert_ne!(
+            survey_targets[0], survey_targets[1],
+            "each ship should survey a different site"
+        );
+    }
+
+    #[test]
     fn test_autopilot_does_not_reenable_worn_out_module() {
         let content = autopilot_content();
         let mut state = autopilot_state(&content);

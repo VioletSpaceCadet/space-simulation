@@ -339,10 +339,13 @@ pub fn load_or_build_state(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
     use sim_core::{
-        test_fixtures::minimal_content, AsteroidTemplateDef, InputAmount, InputFilter, ItemKind,
-        ModuleBehaviorDef, ModuleDef, NodeDef, NodeId, OutputSpec, ProcessorDef, QualityFormula,
-        RecipeDef, RecipeInput, TechDef, TechId, YieldFormula,
+        test_fixtures::{base_content, minimal_content},
+        AsteroidTemplateDef, InputAmount, InputFilter, ItemKind, ModuleBehaviorDef, ModuleDef,
+        NodeDef, NodeId, OutputSpec, ProcessorDef, QualityFormula, RecipeDef, RecipeInput, TechDef,
+        TechId, YieldFormula,
     };
     use std::collections::HashMap;
 
@@ -423,5 +426,39 @@ mod tests {
             }),
         });
         validate_content(&content);
+    }
+
+    #[test]
+    fn test_build_initial_state_determinism() {
+        let content = base_content();
+        let mut rng1 = ChaCha8Rng::seed_from_u64(42);
+        let mut rng2 = ChaCha8Rng::seed_from_u64(42);
+        let state1 = build_initial_state(&content, 42, &mut rng1);
+        let state2 = build_initial_state(&content, 42, &mut rng2);
+        assert_eq!(
+            serde_json::to_string(&state1).unwrap(),
+            serde_json::to_string(&state2).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_load_content_missing_file() {
+        let result = load_content("/tmp/nonexistent_dir_12345");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_initial_state_has_ship_and_station() {
+        let content = base_content();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let state = build_initial_state(&content, 42, &mut rng);
+        assert_eq!(state.ships.len(), 1, "expected exactly 1 ship");
+        assert_eq!(state.stations.len(), 1, "expected exactly 1 station");
+        let ship = state.ships.values().next().unwrap();
+        let station = state.stations.values().next().unwrap();
+        assert_eq!(
+            ship.location_node, station.location_node,
+            "ship and station should be at the same node"
+        );
     }
 }

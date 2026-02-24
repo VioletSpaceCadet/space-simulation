@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
 /// Maximum number of metrics snapshots kept in memory.
-const MAX_METRICS_HISTORY: usize = 10_000;
+pub(crate) const MAX_METRICS_HISTORY: usize = 10_000;
 
 pub struct SimState {
     pub game_state: GameState,
