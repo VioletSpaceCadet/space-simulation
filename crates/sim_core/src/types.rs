@@ -344,6 +344,12 @@ pub enum Command {
         module_id: ModuleInstanceId,
         tech_id: Option<TechId>,
     },
+    SetAssemblerCap {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        component_id: ComponentId,
+        max_stock: u32,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -477,6 +483,14 @@ pub enum Event {
         component_produced_id: ComponentId,
         component_produced_count: u32,
         component_quality: f32,
+    },
+    AssemblerCapped {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+    },
+    AssemblerUncapped {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
     },
     LabRan {
         station_id: StationId,

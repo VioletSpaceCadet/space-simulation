@@ -249,6 +249,22 @@ fn apply_commands(
                     ls.assigned_tech = tech_id.clone();
                 }
             }
+            Command::SetAssemblerCap {
+                station_id,
+                module_id,
+                component_id,
+                max_stock,
+            } => {
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
+                let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+                    continue;
+                };
+                if let crate::ModuleKindState::Assembler(asmb) = &mut module.kind_state {
+                    asmb.cap_override.insert(component_id.clone(), *max_stock);
+                }
+            }
         }
     }
 
