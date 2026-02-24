@@ -21,6 +21,7 @@ rand_chacha = "0.3"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 futures-core = "0.3.32"
+parking_lot = { workspace = true }
 
 [dev-dependencies]
 sim_core = { path = "../sim_core", features = ["test-support"] }

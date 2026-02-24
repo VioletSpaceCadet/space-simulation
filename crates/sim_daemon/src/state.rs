@@ -1,10 +1,11 @@
+use parking_lot::Mutex;
 use rand_chacha::ChaCha8Rng;
 use sim_control::AutopilotController;
 use sim_core::{EventEnvelope, GameContent, GameState, MetricsFileWriter, MetricsSnapshot};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::sync::broadcast;
 
 /// Maximum number of metrics snapshots kept in memory.

@@ -41,7 +41,7 @@ pub fn make_router(state: AppState) -> Router {
 }
 
 pub async fn meta_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
-    let sim = app_state.sim.lock().unwrap();
+    let sim = app_state.sim.lock();
     let ticks_per_sec = app_state.ticks_per_sec;
     let paused = app_state.paused.load(Ordering::Relaxed);
     Json(serde_json::json!({
@@ -56,7 +56,7 @@ pub async fn meta_handler(State(app_state): State<AppState>) -> Json<serde_json:
 pub async fn snapshot_handler(
     State(app_state): State<AppState>,
 ) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
-    let sim = app_state.sim.lock().unwrap();
+    let sim = app_state.sim.lock();
     let body = serde_json::to_string(&sim.game_state).unwrap_or_default();
     drop(sim);
     (
@@ -69,7 +69,7 @@ pub async fn snapshot_handler(
 pub async fn metrics_handler(
     State(app_state): State<AppState>,
 ) -> Json<VecDeque<sim_core::MetricsSnapshot>> {
-    let sim = app_state.sim.lock().unwrap();
+    let sim = app_state.sim.lock();
     Json(sim.metrics_history.clone())
 }
 
@@ -86,7 +86,7 @@ pub async fn save_handler(
         }
     };
 
-    let sim = app_state.sim.lock().unwrap();
+    let sim = app_state.sim.lock();
     let tick = sim.game_state.meta.tick;
     let body = serde_json::to_string_pretty(&sim.game_state).unwrap_or_default();
     drop(sim);
@@ -115,7 +115,7 @@ pub async fn save_handler(
 }
 
 async fn alerts_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
-    let sim = app_state.sim.lock().unwrap();
+    let sim = app_state.sim.lock();
     let active_ids: Vec<String> = sim
         .alert_engine
         .as_ref()
@@ -163,7 +163,7 @@ pub async fn stream_handler(
                     }
                 }
                 _ = heartbeat.tick() => {
-                    let tick = sim.lock().unwrap().game_state.meta.tick;
+                    let tick = sim.lock().game_state.meta.tick;
                     let hb = serde_json::json!({"heartbeat": true, "tick": tick});
                     yield Ok(Event::default().data(hb.to_string()));
                 }

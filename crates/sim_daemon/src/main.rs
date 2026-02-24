@@ -13,11 +13,12 @@ use tick_loop::run_tick_loop;
 use anyhow::{Context, Result};
 
 use clap::{Parser, Subcommand};
+use parking_lot::Mutex;
 use sim_control::AutopilotController;
 use sim_core::EventEnvelope;
 use std::collections::VecDeque;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::sync::broadcast;
 
 #[derive(Parser)]
@@ -157,7 +158,7 @@ mod tests {
         let game_state = build_initial_state(&content, 0, &mut rng);
         let (event_tx, _) = tokio::sync::broadcast::channel(64);
         AppState {
-            sim: std::sync::Arc::new(std::sync::Mutex::new(SimState {
+            sim: Arc::new(Mutex::new(SimState {
                 game_state,
                 content,
                 rng,
@@ -171,7 +172,7 @@ mod tests {
             event_tx,
             ticks_per_sec: 10.0,
             run_dir: None,
-            paused: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            paused: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -436,7 +437,7 @@ mod tests {
     async fn test_metrics_returns_populated_history() {
         let state = make_test_state();
         {
-            let mut sim = state.sim.lock().unwrap();
+            let mut sim = state.sim.lock();
             let snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
             sim.metrics_history.push_back(snapshot);
         }
@@ -479,7 +480,7 @@ mod tests {
     async fn test_alerts_returns_active_alerts() {
         let state = make_test_state();
         {
-            let mut sim = state.sim.lock().unwrap();
+            let mut sim = state.sim.lock();
             let mut engine = alerts::AlertEngine::new(sim.content.techs.len());
             let snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
             // ORE_STARVATION fires when 3+ consecutive snapshots have refinery_starved_count > 0.

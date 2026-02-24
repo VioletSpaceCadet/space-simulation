@@ -20,3 +20,6 @@ missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 # f32 precision loss from u32/usize is acceptable in a game sim
 cast_precision_loss = "allow"
+
+[workspace.dependencies]
+parking_lot = "0.12"
