@@ -2,7 +2,7 @@
 
 Space industry simulation game. Deterministic Rust sim core, HTTP daemon with SSE event streaming, React mission control UI.
 
-`docs/DESIGN_SPINE.md` — authoritative design philosophy. `docs/reference.md` — detailed types, content files, inventory/refinery design. `docs/BALANCE.md` — living balance analysis with sim results and pacing targets. `base-project.md` — original design doc.
+`docs/DESIGN_SPINE.md` — authoritative design philosophy. `docs/reference.md` — detailed types, content files, inventory/refinery design. `base-project.md` — original design doc. Balance analysis and tuning tracked in Linear ("Balance & Tuning" project, VioletSpaceCadet workspace).
 
 ## Common Commands
 
@@ -95,6 +95,8 @@ For larger features (new modules, new systems, sim_core changes):
 |---|---|---|
 | `scenarios/baseline.json` | 20,160 (2 weeks) | Current defaults with `dev_base_state.json` |
 | `scenarios/balance_v1.json` | 20,160 (2 weeks) | Module tuning proposals (lab/refinery/assembler overrides) |
+| `scenarios/month.json` | 43,200 (30 days) | Medium-term sustainability (refinery throughput, kit economy) |
+| `scenarios/quarter.json` | 129,600 (90 days) | Long-term sustainability (slag buildup, research progress) |
 | `scenarios/cargo_sweep.json` | 10,000 | Cargo capacity stress test |
 
 Scenarios support: `"state"` (path to initial state JSON), `"overrides"` (constants + `module.*` keys), `"seeds"` (list or `{"range": [1, 5]}`).

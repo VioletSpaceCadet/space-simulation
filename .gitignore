@@ -21,6 +21,7 @@ saves/
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
