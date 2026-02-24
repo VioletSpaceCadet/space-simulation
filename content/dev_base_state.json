@@ -24,7 +24,7 @@
       "location_node": "node_earth_orbit",
       "owner": "principal_autopilot",
       "inventory": [],
-      "cargo_capacity_m3": 20.0,
+      "cargo_capacity_m3": 50.0,
       "task": null
     }
   },
@@ -71,7 +71,7 @@
           "quality": 0.7
         }
       ],
-      "cargo_capacity_m3": 100.0,
+      "cargo_capacity_m3": 2000.0,
       "power_available_per_tick": 100.0,
       "modules": []
     }
