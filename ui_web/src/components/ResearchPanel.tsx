@@ -1,7 +1,12 @@
-import type { ResearchState } from '../types'
+import type { DomainProgress, ResearchState } from '../types'
 
 interface Props {
   research: ResearchState
+}
+
+function totalEvidence(dp: DomainProgress | undefined): number {
+  if (!dp) return 0
+  return Object.values(dp.points).reduce((sum, v) => sum + v, 0)
 }
 
 function unlockProbability(evidence: number, difficulty = 200): number {
@@ -26,7 +31,7 @@ export function ResearchPanel({ research }: Props) {
       </div>
       <div>
         {[...allTechIds].map((techId) => {
-          const evidence = research.evidence[techId] ?? 0
+          const evidence = totalEvidence(research.evidence[techId])
           const isUnlocked = research.unlocked.includes(techId)
           const prob = unlockProbability(evidence)
           return (

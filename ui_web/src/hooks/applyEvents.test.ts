@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { applyEvents } from './applyEvents'
 import type { AsteroidState, OreItem, ResearchState, ShipState, StationState } from '../types'
 
-const emptyResearch: ResearchState = { unlocked: [], data_pool: {}, evidence: {} }
+const emptyResearch: ResearchState = { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} }
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {

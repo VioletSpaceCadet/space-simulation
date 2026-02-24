@@ -4,10 +4,10 @@ use anyhow::{Context, Result};
 use rand::Rng;
 use serde::Deserialize;
 use sim_core::{
-    AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, FacilitiesState,
-    GameContent, GameState, InputFilter, InventoryItem, MetaState, ModuleBehaviorDef, ModuleDef,
-    ModuleItemId, NodeId, OutputSpec, PrincipalId, QualityFormula, ResearchState, ScanSite, ShipId,
-    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId, YieldFormula,
+    AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, GameContent, GameState,
+    InputFilter, InventoryItem, MetaState, ModuleBehaviorDef, ModuleDef, ModuleItemId, NodeId,
+    OutputSpec, PrincipalId, QualityFormula, ResearchState, ScanSite, ShipId, ShipState, SiteId,
+    SolarSystemDef, StationId, StationState, TechDef, TechId, YieldFormula,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -260,11 +260,6 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         ],
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
-        facilities: FacilitiesState {
-            compute_units_total: c.station_compute_units_total,
-            power_per_compute_unit_per_tick: c.station_power_per_compute_unit_per_tick,
-            efficiency: c.station_efficiency,
-        },
         modules: vec![],
     };
     let ship_id = ShipId("ship_0001".to_string());
@@ -305,6 +300,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             unlocked: std::collections::HashSet::new(),
             data_pool: std::collections::HashMap::new(),
             evidence: std::collections::HashMap::new(),
+            action_counts: std::collections::HashMap::new(),
         },
         counters: Counters {
             next_event_id: 0,
@@ -394,10 +390,10 @@ mod tests {
     use rand_chacha::ChaCha8Rng;
     use sim_core::{
         test_fixtures::{base_content, minimal_content},
-        AssemblerDef, AsteroidTemplateDef, Counters, FacilitiesState, GameState, InputAmount,
-        InputFilter, InventoryItem, ItemKind, MetaState, ModuleBehaviorDef, ModuleDef, NodeDef,
-        NodeId, OutputSpec, ProcessorDef, QualityFormula, RecipeDef, RecipeInput, ResearchState,
-        StationId, StationState, TechDef, TechId, YieldFormula,
+        AssemblerDef, AsteroidTemplateDef, Counters, GameState, InputAmount, InputFilter,
+        InventoryItem, ItemKind, MetaState, ModuleBehaviorDef, ModuleDef, NodeDef, NodeId,
+        OutputSpec, ProcessorDef, QualityFormula, RecipeDef, RecipeInput, ResearchState, StationId,
+        StationState, TechDef, TechId, YieldFormula,
     };
     use std::collections::HashMap;
 
@@ -415,6 +411,7 @@ mod tests {
             id: TechId("tech_a".to_string()),
             name: "A".to_string(),
             prereqs: vec![TechId("tech_nonexistent".to_string())],
+            domain_requirements: HashMap::new(),
             accepted_data: vec![],
             difficulty: 1.0,
             effects: vec![],
@@ -584,11 +581,6 @@ mod tests {
                     }],
                     cargo_capacity_m3: 1000.0,
                     power_available_per_tick: 100.0,
-                    facilities: FacilitiesState {
-                        compute_units_total: 0,
-                        power_per_compute_unit_per_tick: 0.0,
-                        efficiency: 1.0,
-                    },
                     modules: vec![],
                 },
             )]),
@@ -596,6 +588,7 @@ mod tests {
                 unlocked: std::collections::HashSet::new(),
                 data_pool: HashMap::new(),
                 evidence: HashMap::new(),
+                action_counts: HashMap::new(),
             },
             counters: Counters {
                 next_event_id: 0,

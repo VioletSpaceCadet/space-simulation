@@ -262,21 +262,19 @@ pub(crate) fn resolve_survey(
         },
     ));
 
-    let amount = content.constants.survey_scan_data_amount;
-    let quality = content.constants.survey_scan_data_quality;
-    *state
-        .research
-        .data_pool
-        .entry(DataKind::ScanData)
-        .or_insert(0.0) += amount * quality;
+    let data_amount = crate::research::generate_data(
+        &mut state.research,
+        DataKind::ScanData,
+        "survey",
+        &content.constants,
+    );
 
     events.push(crate::emit(
         &mut state.counters,
         current_tick,
         Event::DataGenerated {
             kind: DataKind::ScanData,
-            amount,
-            quality,
+            amount: data_amount,
         },
     ));
 
@@ -357,6 +355,13 @@ pub(crate) fn resolve_mine(
             asteroid_remaining_kg: asteroid_remaining_kg.max(0.0),
         },
     ));
+
+    crate::research::generate_data(
+        &mut state.research,
+        DataKind::MiningData,
+        "mine",
+        &content.constants,
+    );
 
     set_ship_idle(state, ship_id, current_tick);
 
@@ -557,21 +562,19 @@ pub(crate) fn resolve_deep_scan(
         },
     ));
 
-    let amount = content.constants.deep_scan_data_amount;
-    let quality = content.constants.deep_scan_data_quality;
-    *state
-        .research
-        .data_pool
-        .entry(DataKind::ScanData)
-        .or_insert(0.0) += amount * quality;
+    let data_amount = crate::research::generate_data(
+        &mut state.research,
+        DataKind::ScanData,
+        "deep_scan",
+        &content.constants,
+    );
 
     events.push(crate::emit(
         &mut state.counters,
         current_tick,
         Event::DataGenerated {
             kind: DataKind::ScanData,
-            amount,
-            quality,
+            amount: data_amount,
         },
     ));
 

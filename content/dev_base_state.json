@@ -63,18 +63,14 @@
       ],
       "cargo_capacity_m3": 100.0,
       "power_available_per_tick": 100.0,
-      "facilities": {
-        "compute_units_total": 10,
-        "power_per_compute_unit_per_tick": 1.0,
-        "efficiency": 1.0
-      },
       "modules": []
     }
   },
   "research": {
     "unlocked": [],
     "data_pool": {},
-    "evidence": {}
+    "evidence": {},
+    "action_counts": {}
   },
   "counters": {
     "next_event_id": 0,

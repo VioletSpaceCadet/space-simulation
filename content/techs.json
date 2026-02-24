@@ -5,12 +5,22 @@
       "id": "tech_deep_scan_v1",
       "name": "Deep Scan v1",
       "prereqs": [],
+      "domain_requirements": { "Exploration": 100.0 },
       "accepted_data": ["ScanData"],
       "difficulty": 200.0,
       "effects": [
         { "type": "EnableDeepScan" },
         { "type": "DeepScanCompositionNoise", "sigma": 0.02 }
       ]
+    },
+    {
+      "id": "tech_advanced_refining",
+      "name": "Advanced Refining",
+      "prereqs": [],
+      "domain_requirements": { "Materials": 150.0, "Engineering": 50.0 },
+      "accepted_data": ["MiningData", "EngineeringData"],
+      "difficulty": 400.0,
+      "effects": []
     }
   ]
 }

@@ -158,11 +158,6 @@ fn transit_moves_ship_and_starts_next_task() {
                 inventory: vec![],
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
-                facilities: FacilitiesState {
-                    compute_units_total: 10,
-                    power_per_compute_unit_per_tick: 1.0,
-                    efficiency: 1.0,
-                },
                 modules: vec![],
             },
         )]),
@@ -170,6 +165,7 @@ fn transit_moves_ship_and_starts_next_task() {
             unlocked: std::collections::HashSet::new(),
             data_pool: HashMap::new(),
             evidence: HashMap::new(),
+            action_counts: HashMap::new(),
         },
         counters: Counters {
             next_event_id: 0,

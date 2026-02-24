@@ -35,17 +35,19 @@ cd ui_web && npm test        # vitest
 Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus `sim_world` (shared content loading + world gen) and `ui_web/` (React).
 
 - **sim_core** — Pure deterministic sim. No IO. Modules: `types`, `engine`, `tasks`, `research`, `station`, `graph`, `id`, `composition`, `metrics`, `wear`. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, `shortest_hop_count()`, `generate_uuid()`, `compute_metrics()`, `write_metrics_csv()`, `write_metrics_header()`, `append_metrics_row()`, `wear_efficiency()`.
-- **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management). Skips re-enabling modules at max wear.
+- **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management). Skips re-enabling modules at max wear. Auto-assigns labs to eligible techs.
 - **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json` (8 files incl. `component_defs.json`).
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags. Auto-writes to `runs/<run_id>/`.
 - **sim_daemon** — axum 0.7. SSE (50ms flush, 200ms heartbeat). `--metrics-every` flag (default 60), `--no-metrics`. Auto-writes to `runs/<run_id>/`. AlertEngine evaluates 9 pure-Rust rules after each metrics sample, emits `AlertRaised`/`AlertCleared` events on SSE. `AtomicBool` pause flag checked by tick loop (no Mutex). Endpoints: `/api/v1/meta`, `/api/v1/snapshot`, `/api/v1/metrics`, `/api/v1/stream`, `POST /api/v1/save`, `POST /api/v1/pause`, `POST /api/v1/resume`, `GET /api/v1/alerts` (active alerts).
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. `useSimStream` (useReducer + applyEvents), `useAnimatedTick` (60fps interpolation), `useSortableData`. Draggable panels via @dnd-kit (Map, Events, Asteroids, Fleet, Research). Fleet panel has expandable rows with detail sections. StatusBar: alert badges (dismissible, color-coded), pause/resume toggle, save button. Keyboard shortcuts: spacebar (pause/resume), Cmd/Ctrl+S (save). Web Audio sound effects (`sounds.ts`) for pause, resume, and save. `useAnimatedTick` freezes display tick immediately when paused.
 
-**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, then maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
+**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (3a processors, 3b assemblers, 3c labs, 3d maintenance) → 4. Advance research (batch roll every N ticks) → 5. Replenish scan sites → 6. Increment tick.
 
 **Key design rules:**
 - Asteroids created on discovery (scan_sites → AsteroidState), not pre-populated.
-- Research fully automatic — compute splits across eligible techs. No player allocation.
+- Research uses lab-based domain system. Labs consume raw data, produce domain-specific points. Tech unlock is probabilistic with domain sufficiency.
+- Raw data is sim-wide (on ResearchState), not station inventory.
+- Research rolls every N ticks (configurable), not every tick.
 - DeepScan commands dropped if no unlocked tech has EnableDeepScan effect.
 - All collection iteration sorted by ID before RNG use for determinism.
 - Scan sites replenished when count < 5. Deterministic UUIDs from seeded RNG.

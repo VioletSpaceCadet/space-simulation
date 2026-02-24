@@ -6,13 +6,15 @@ import type { ResearchState } from '../types'
 const research: ResearchState = {
   unlocked: [],
   data_pool: { ScanData: 42.5 },
-  evidence: { tech_deep_scan_v1: 120.0 },
+  evidence: { tech_deep_scan_v1: { points: { Exploration: 120.0 } } },
+  action_counts: {},
 }
 
 const researchUnlocked: ResearchState = {
   unlocked: ['tech_deep_scan_v1'],
   data_pool: { ScanData: 200.0 },
-  evidence: { tech_deep_scan_v1: 300.0 },
+  evidence: { tech_deep_scan_v1: { points: { Exploration: 300.0 } } },
+  action_counts: {},
 }
 
 describe('ResearchPanel', () => {

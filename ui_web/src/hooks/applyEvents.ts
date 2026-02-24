@@ -124,7 +124,9 @@ export function applyEvents(
             ? { Maintenance: { ticks_since_last_run: 0 } }
             : module_def_id.includes('assembler')
               ? { Assembler: { ticks_since_last_run: 0, stalled: false } }
-              : { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } }
+              : module_def_id.includes('lab')
+                ? { Lab: { ticks_since_last_run: 0, assigned_tech: null, starved: false } }
+                : { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } }
           updatedStations = {
             ...updatedStations,
             [station_id]: {

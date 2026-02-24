@@ -1,7 +1,8 @@
 use sim_core::{
     mine_duration, shortest_hop_count, AnomalyTag, AsteroidId, AsteroidState, Command,
-    CommandEnvelope, CommandId, GameContent, GameState, InventoryItem, ModuleKindState, NodeId,
-    PrincipalId, ShipId, ShipState, SiteId, TaskKind, TechId,
+    CommandEnvelope, CommandId, DomainProgress, GameContent, GameState, InventoryItem,
+    ModuleBehaviorDef, ModuleKindState, NodeId, PrincipalId, ShipId, ShipState, SiteId, TaskKind,
+    TechDef, TechId,
 };
 
 pub trait CommandSource {
@@ -187,6 +188,92 @@ fn deposit_priority(
     ))
 }
 
+/// Geometric mean of per-domain ratios (accumulated / required), clamped to [0, 1].
+fn compute_sufficiency(tech: &TechDef, progress: Option<&DomainProgress>) -> f32 {
+    if tech.domain_requirements.is_empty() {
+        return 1.0;
+    }
+    let ratios: Vec<f32> = tech
+        .domain_requirements
+        .iter()
+        .map(|(domain, required)| {
+            let accumulated = progress
+                .map(|p| p.points.get(domain).copied().unwrap_or(0.0))
+                .unwrap_or(0.0);
+            (accumulated / required).min(1.0)
+        })
+        .collect();
+    let product: f32 = ratios.iter().product();
+    product.powf(1.0 / ratios.len() as f32)
+}
+
+/// Auto-assigns unassigned labs to the highest-priority eligible tech.
+fn lab_assignment_commands(
+    state: &GameState,
+    content: &GameContent,
+    owner: &PrincipalId,
+    next_id: &mut u64,
+) -> Vec<CommandEnvelope> {
+    let mut commands = Vec::new();
+
+    for station in state.stations.values() {
+        for module in &station.modules {
+            let ModuleKindState::Lab(lab_state) = &module.kind_state else {
+                continue;
+            };
+            // Skip labs that are already assigned to an eligible (non-unlocked) tech
+            if let Some(ref tech_id) = lab_state.assigned_tech {
+                if !state.research.unlocked.contains(tech_id) {
+                    continue;
+                }
+            }
+
+            // Find lab's domain from def
+            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+                continue;
+            };
+            let ModuleBehaviorDef::Lab(lab_def) = &def.behavior else {
+                continue;
+            };
+
+            // Find eligible techs that need this lab's domain
+            let mut candidates: Vec<(TechId, f32)> = content
+                .techs
+                .iter()
+                .filter(|tech| {
+                    !state.research.unlocked.contains(&tech.id)
+                        && tech
+                            .prereqs
+                            .iter()
+                            .all(|p| state.research.unlocked.contains(p))
+                        && tech.domain_requirements.contains_key(&lab_def.domain)
+                })
+                .map(|tech| {
+                    let sufficiency =
+                        compute_sufficiency(tech, state.research.evidence.get(&tech.id));
+                    (tech.id.clone(), sufficiency)
+                })
+                .collect();
+            // Highest sufficiency first (closest to unlock), then by ID for determinism
+            candidates.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0 .0.cmp(&b.0 .0)));
+
+            if let Some((tech_id, _)) = candidates.first() {
+                commands.push(make_cmd(
+                    owner,
+                    state.meta.tick,
+                    next_id,
+                    Command::AssignLabTech {
+                        station_id: station.id.clone(),
+                        module_id: module.id.clone(),
+                        tech_id: Some(tech_id.clone()),
+                    },
+                ));
+            }
+        }
+    }
+    commands
+}
+
 // ---------------------------------------------------------------------------
 // AutopilotController
 // ---------------------------------------------------------------------------
@@ -200,6 +287,12 @@ impl CommandSource for AutopilotController {
     ) -> Vec<CommandEnvelope> {
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut commands = station_module_commands(state, content, &owner, next_command_id);
+        commands.extend(lab_assignment_commands(
+            state,
+            content,
+            &owner,
+            next_command_id,
+        ));
 
         let idle_ships = collect_idle_ships(state, &owner);
         let deep_scan_unlocked = state
@@ -313,8 +406,8 @@ mod tests {
     use super::*;
     use sim_core::{
         test_fixtures::{base_content, base_state},
-        AsteroidId, AsteroidKnowledge, AsteroidState, FacilitiesState, InventoryItem, LotId,
-        NodeId, ShipId, StationId,
+        AsteroidId, AsteroidKnowledge, AsteroidState, InventoryItem, LotId, NodeId, ShipId,
+        StationId,
     };
     use std::collections::HashMap;
 
@@ -322,8 +415,6 @@ mod tests {
     fn autopilot_content() -> sim_core::GameContent {
         let mut content = base_content();
         content.techs.clear();
-        content.constants.station_compute_units_total = 0;
-        content.constants.station_power_per_compute_unit_per_tick = 0.0;
         content.constants.station_power_available_per_tick = 0.0;
         content
     }
@@ -335,11 +426,6 @@ mod tests {
         let station_id = StationId("station_earth_orbit".to_string());
         if let Some(station) = state.stations.get_mut(&station_id) {
             station.power_available_per_tick = 0.0;
-            station.facilities = FacilitiesState {
-                compute_units_total: 0,
-                power_per_compute_unit_per_tick: 0.0,
-                efficiency: 1.0,
-            };
         }
         state
     }
@@ -687,6 +773,199 @@ mod tests {
                 sim_core::Command::SetModuleEnabled { enabled: true, .. }
             )),
             "autopilot should NOT re-enable a module at max wear"
+        );
+    }
+
+    // --- Lab assignment tests ---
+
+    fn lab_content_and_state() -> (sim_core::GameContent, sim_core::GameState) {
+        let mut content = base_content();
+        // Clear default techs and add one with domain requirement
+        content.techs.clear();
+        content.techs.push(sim_core::TechDef {
+            id: TechId("tech_materials_v1".to_string()),
+            name: "Materials Research".to_string(),
+            prereqs: vec![],
+            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Materials, 100.0)]),
+            accepted_data: vec![sim_core::DataKind::MiningData],
+            difficulty: 10.0,
+            effects: vec![],
+        });
+        // Add lab module def
+        content.module_defs.push(sim_core::ModuleDef {
+            id: "module_materials_lab".to_string(),
+            name: "Materials Lab".to_string(),
+            mass_kg: 1000.0,
+            volume_m3: 3.0,
+            power_consumption_per_run: 2.0,
+            wear_per_run: 0.01,
+            behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
+                domain: sim_core::ResearchDomain::Materials,
+                data_consumption_per_run: 5.0,
+                research_points_per_run: 10.0,
+                accepted_data: vec![sim_core::DataKind::MiningData],
+                research_interval_ticks: 10,
+            }),
+        });
+        content.constants.station_power_available_per_tick = 0.0;
+        let mut state = base_state(&content);
+        state.scan_sites.clear();
+        let station_id = StationId("station_earth_orbit".to_string());
+        if let Some(station) = state.stations.get_mut(&station_id) {
+            station.power_available_per_tick = 0.0;
+        }
+        (content, state)
+    }
+
+    #[test]
+    fn test_autopilot_installs_lab_module() {
+        let (content, mut state) = lab_content_and_state();
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        state.stations.get_mut(&station_id).unwrap().inventory.push(
+            sim_core::InventoryItem::Module {
+                item_id: sim_core::ModuleItemId("module_item_lab_001".to_string()),
+                module_def_id: "module_materials_lab".to_string(),
+            },
+        );
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(&cmd.command, sim_core::Command::InstallModule { .. })),
+            "autopilot should issue InstallModule for lab module in station inventory"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_assigns_lab_to_eligible_tech() {
+        let (content, mut state) = lab_content_and_state();
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .modules
+            .push(sim_core::ModuleState {
+                id: sim_core::ModuleInstanceId("module_inst_lab_001".to_string()),
+                def_id: "module_materials_lab".to_string(),
+                enabled: true,
+                kind_state: sim_core::ModuleKindState::Lab(sim_core::LabState {
+                    ticks_since_last_run: 0,
+                    assigned_tech: None,
+                    starved: false,
+                }),
+                wear: sim_core::WearState::default(),
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                sim_core::Command::AssignLabTech {
+                    tech_id: Some(ref t),
+                    ..
+                } if t.0 == "tech_materials_v1"
+            )),
+            "autopilot should assign unassigned lab to eligible tech"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_skips_assigned_lab() {
+        let (content, mut state) = lab_content_and_state();
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .modules
+            .push(sim_core::ModuleState {
+                id: sim_core::ModuleInstanceId("module_inst_lab_001".to_string()),
+                def_id: "module_materials_lab".to_string(),
+                enabled: true,
+                kind_state: sim_core::ModuleKindState::Lab(sim_core::LabState {
+                    ticks_since_last_run: 0,
+                    assigned_tech: Some(TechId("tech_materials_v1".to_string())),
+                    starved: false,
+                }),
+                wear: sim_core::WearState::default(),
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands
+                .iter()
+                .any(|cmd| matches!(&cmd.command, sim_core::Command::AssignLabTech { .. })),
+            "autopilot should NOT issue AssignLabTech for already-assigned lab"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_reassigns_lab_from_unlocked_tech() {
+        let (mut content, mut state) = lab_content_and_state();
+
+        // Add a second tech so there's something to reassign to
+        content.techs.push(sim_core::TechDef {
+            id: TechId("tech_materials_v2".to_string()),
+            name: "Materials Research v2".to_string(),
+            prereqs: vec![TechId("tech_materials_v1".to_string())],
+            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Materials, 200.0)]),
+            accepted_data: vec![sim_core::DataKind::MiningData],
+            difficulty: 10.0,
+            effects: vec![],
+        });
+
+        // Mark tech_materials_v1 as unlocked (its prereq for v2)
+        state
+            .research
+            .unlocked
+            .insert(TechId("tech_materials_v1".to_string()));
+
+        // Lab is assigned to the already-unlocked tech
+        let station_id = StationId("station_earth_orbit".to_string());
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .modules
+            .push(sim_core::ModuleState {
+                id: sim_core::ModuleInstanceId("module_inst_lab_001".to_string()),
+                def_id: "module_materials_lab".to_string(),
+                enabled: true,
+                kind_state: sim_core::ModuleKindState::Lab(sim_core::LabState {
+                    ticks_since_last_run: 0,
+                    assigned_tech: Some(TechId("tech_materials_v1".to_string())),
+                    starved: false,
+                }),
+                wear: sim_core::WearState::default(),
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                sim_core::Command::AssignLabTech {
+                    tech_id: Some(ref t),
+                    ..
+                } if t.0 == "tech_materials_v2"
+            )),
+            "autopilot should reassign lab from unlocked tech to next eligible tech"
         );
     }
 }

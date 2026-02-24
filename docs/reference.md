@@ -23,6 +23,40 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `MaintenanceDef` | Maintenance module behavior: `repair_interval_ticks`, `wear_reduction_per_run`, `repair_kit_cost` |
 | `AssemblerDef` | Assembler module behavior: `assembly_interval_ticks`, `recipes` (list of input filters + output component) |
 | `TechEffect` | `EnableDeepScan` or `DeepScanCompositionNoise { sigma }` |
+| `ResearchDomain` | Enum: `Materials`, `Exploration`, `Engineering` — categorises techs and lab output |
+| `DomainProgress` | Per-tech domain point tracking: `{ materials: f64, exploration: f64, engineering: f64 }` |
+| `DataKind` | Enum: `ScanData`, `MiningData`, `EngineeringData` — type of raw data a lab consumes |
+| `LabDef` | Lab module behavior definition: `data_kind`, `domain`, `throughput_per_tick` |
+| `LabState` | Lab runtime state (embedded in `ModuleState::kind_state`): `assigned_tech: Option<TechId>` |
+
+Note: `FacilitiesState` has been removed. Research state is fully contained in `ResearchState`.
+
+## Research System
+
+**Lab-based domain model:** Labs are station modules (`ModuleBehaviorDef::Lab`) that consume raw data from the sim-wide `ResearchState.data_pool` each tick and produce domain-specific research points toward an assigned tech.
+
+**`ResearchState` fields:** `unlocked: HashSet<TechId>`, `data_pool: HashMap<DataKind, f64>`, `domain_progress: HashMap<TechId, DomainProgress>`.
+
+**Raw data generation:** Ships generate raw data as a side-effect of tasks. `data_yield(task, content)` computes yield for a completed task. `generate_data(state, task, content)` applies the yield to `ResearchState.data_pool`. Data is sim-wide — not stored in ship or station inventory.
+
+**Research roll:** Occurs every `research_roll_interval_ticks` ticks (not every tick). For each tech with an assigned lab:
+1. Lab consumes data from `data_pool` (up to `throughput_per_tick × interval`).
+2. Domain points accumulate in `DomainProgress` for that tech.
+3. Unlock probability: `p = 1 - e^(-effective / difficulty)` where `effective = sufficiency × total_points` and `sufficiency = geometric_mean(per-domain ratios)`.
+4. If roll succeeds, tech is added to `ResearchState.unlocked`.
+
+**Domain sufficiency:** `geometric_mean` of the per-domain ratios (actual / required). Techs that require only one domain have sufficiency = that domain's ratio (clamped to 1.0 max).
+
+**`geometric_mean(values: &[f64]) -> f64`:** Product of values raised to `1/n`. Returns 0.0 for empty slice.
+
+**Constants (in `constants.json`):**
+
+| Constant | Purpose |
+|---|---|
+| `research_roll_interval_ticks` | How many ticks between research unlock rolls |
+| `data_generation_peak` | Peak raw data yield per ship task |
+| `data_generation_floor` | Minimum raw data yield per ship task |
+| `data_generation_decay_rate` | Exponential decay rate for data yield over repeated tasks |
 
 ## Content Files
 

@@ -64,6 +64,20 @@ pub enum AnomalyTag {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DataKind {
     ScanData,
+    MiningData,
+    EngineeringData,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ResearchDomain {
+    Materials,
+    Exploration,
+    Engineering,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DomainProgress {
+    pub points: HashMap<ResearchDomain, f32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -164,6 +178,7 @@ pub enum ModuleKindState {
     Storage,
     Maintenance(MaintenanceState),
     Assembler(AssemblerState),
+    Lab(LabState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +199,14 @@ pub struct AssemblerState {
     pub ticks_since_last_run: u64,
     #[serde(default)]
     pub stalled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LabState {
+    pub ticks_since_last_run: u64,
+    pub assigned_tech: Option<TechId>,
+    #[serde(default)]
+    pub starved: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -221,16 +244,7 @@ pub struct StationState {
     pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
-    pub facilities: FacilitiesState,
     pub modules: Vec<ModuleState>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FacilitiesState {
-    pub compute_units_total: u32,
-    pub power_per_compute_unit_per_tick: f32,
-    /// Evidence produced per compute-unit per tick. Baseline 1.0.
-    pub efficiency: f32,
 }
 
 /// Research distributes automatically to all eligible techs — no player allocation.
@@ -238,7 +252,9 @@ pub struct FacilitiesState {
 pub struct ResearchState {
     pub unlocked: HashSet<TechId>,
     pub data_pool: HashMap<DataKind, f32>,
-    pub evidence: HashMap<TechId, f32>,
+    pub evidence: HashMap<TechId, DomainProgress>,
+    #[serde(default)]
+    pub action_counts: HashMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -313,6 +329,11 @@ pub enum Command {
         module_id: ModuleInstanceId,
         threshold_kg: f32,
     },
+    AssignLabTech {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        tech_id: Option<TechId>,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +374,6 @@ pub enum Event {
     DataGenerated {
         kind: DataKind,
         amount: f32,
-        quality: f32,
     },
     PowerConsumed {
         station_id: StationId,
@@ -448,6 +468,22 @@ pub enum Event {
         component_produced_count: u32,
         component_quality: f32,
     },
+    LabRan {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        tech_id: TechId,
+        data_consumed: f32,
+        points_produced: f32,
+        domain: ResearchDomain,
+    },
+    LabStarved {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+    },
+    LabResumed {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+    },
     MaintenanceRan {
         station_id: StationId,
         target_module_id: ModuleInstanceId,
@@ -504,6 +540,8 @@ pub struct TechDef {
     pub id: TechId,
     pub name: String,
     pub prereqs: Vec<TechId>,
+    #[serde(default)]
+    pub domain_requirements: HashMap<ResearchDomain, f32>,
     pub accepted_data: Vec<DataKind>,
     pub difficulty: f32,
     pub effects: Vec<TechEffect>,
@@ -562,6 +600,7 @@ pub enum ModuleBehaviorDef {
     Storage { capacity_m3: f32 },
     Maintenance(MaintenanceDef),
     Assembler(AssemblerDef),
+    Lab(LabDef),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -575,6 +614,15 @@ pub struct MaintenanceDef {
     pub repair_interval_ticks: u64,
     pub wear_reduction_per_run: f32,
     pub repair_kit_cost: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LabDef {
+    pub domain: ResearchDomain,
+    pub data_consumption_per_run: f32,
+    pub research_points_per_run: f32,
+    pub accepted_data: Vec<DataKind>,
+    pub research_interval_ticks: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -655,10 +703,6 @@ pub struct Constants {
     pub deep_scan_ticks: u64,
     /// Ticks to travel one hop on the solar system graph.
     pub travel_ticks_per_hop: u64,
-    pub survey_scan_data_amount: f32,
-    pub survey_scan_data_quality: f32,
-    pub deep_scan_data_amount: f32,
-    pub deep_scan_data_quality: f32,
     pub survey_tag_detection_probability: f32,
     pub asteroid_count_per_template: u32,
     pub asteroid_mass_min_kg: f32,
@@ -668,14 +712,16 @@ pub struct Constants {
     /// kg of raw ore extracted per tick of mining
     pub mining_rate_kg_per_tick: f32,
     pub deposit_ticks: u64,
-    pub station_compute_units_total: u32,
-    pub station_power_per_compute_unit_per_tick: f32,
-    pub station_efficiency: f32,
     pub station_power_available_per_tick: f32,
     /// Minimum IronRich tag confidence for autopilot to queue a deep scan.
     pub autopilot_iron_rich_confidence_threshold: f32,
     /// Default refinery processing threshold (kg) set by autopilot on newly installed modules.
     pub autopilot_refinery_threshold_kg: f32,
+    // Research system
+    pub research_roll_interval_ticks: u64,
+    pub data_generation_peak: f32,
+    pub data_generation_floor: f32,
+    pub data_generation_decay_rate: f32,
     // Wear system
     pub wear_band_degraded_threshold: f32,
     pub wear_band_critical_threshold: f32,

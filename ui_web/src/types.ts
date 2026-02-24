@@ -79,10 +79,17 @@ export interface AssemblerState {
   stalled: boolean
 }
 
+export interface LabState {
+  ticks_since_last_run: number
+  assigned_tech: string | null
+  starved: boolean
+}
+
 export type ModuleKindState =
   | { Processor: ProcessorState }
   | { Maintenance: MaintenanceState }
   | { Assembler: AssemblerState }
+  | { Lab: LabState }
   | 'Storage'
 
 export interface WearState {
@@ -136,10 +143,15 @@ export interface ScanSite {
   template_id: string
 }
 
+export interface DomainProgress {
+  points: Record<string, number>
+}
+
 export interface ResearchState {
   unlocked: string[]
   data_pool: Record<string, number>
-  evidence: Record<string, number>
+  evidence: Record<string, DomainProgress>
+  action_counts: Record<string, number>
 }
 
 export interface SimSnapshot {

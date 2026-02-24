@@ -32,31 +32,6 @@ fn test_identical_seeds_produce_identical_event_logs() {
 }
 
 #[test]
-fn test_different_seeds_produce_different_results() {
-    let content = test_content();
-
-    let unlock_tick = |seed: u64| -> Option<u64> {
-        let mut state = test_state(&content);
-        let mut rng = ChaCha8Rng::seed_from_u64(seed);
-        let tech_id = TechId("tech_deep_scan_v1".to_string());
-        for _ in 0..500 {
-            tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-            if state.research.unlocked.contains(&tech_id) {
-                return Some(state.meta.tick);
-            }
-        }
-        None
-    };
-
-    let tick_42 = unlock_tick(42);
-    let tick_1234 = unlock_tick(1234);
-    assert_ne!(
-        tick_42, tick_1234,
-        "different seeds should generally produce different results"
-    );
-}
-
-#[test]
 fn test_full_survey_deepscan_mine_deposit_cycle() {
     let content = test_content();
     let mut state = test_state(&content);
@@ -94,17 +69,9 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
         "ship should be idle after survey"
     );
 
-    // --- Phase 2: Research unlocks deep scan ---
+    // --- Phase 2: Pre-unlock deep scan tech (research is stubbed) ---
     let tech_id = TechId("tech_deep_scan_v1".to_string());
-    let mut unlocked = false;
-    for _ in 0..100 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
-        if state.research.unlocked.contains(&tech_id) {
-            unlocked = true;
-            break;
-        }
-    }
-    assert!(unlocked, "tech_deep_scan_v1 should unlock within 100 ticks");
+    state.research.unlocked.insert(tech_id);
 
     // --- Phase 3: Deep Scan ---
     assert!(

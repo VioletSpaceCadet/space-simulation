@@ -87,5 +87,39 @@
         ]
       }
     }
+  },
+  {
+    "id": "module_materials_lab",
+    "name": "Materials Lab",
+    "mass_kg": 4000.0,
+    "volume_m3": 8.0,
+    "power_consumption_per_run": 12.0,
+    "wear_per_run": 0.005,
+    "behavior": {
+      "Lab": {
+        "domain": "Materials",
+        "data_consumption_per_run": 10.0,
+        "research_points_per_run": 5.0,
+        "accepted_data": ["MiningData", "EngineeringData"],
+        "research_interval_ticks": 1
+      }
+    }
+  },
+  {
+    "id": "module_exploration_lab",
+    "name": "Exploration Lab",
+    "mass_kg": 3500.0,
+    "volume_m3": 7.0,
+    "power_consumption_per_run": 10.0,
+    "wear_per_run": 0.005,
+    "behavior": {
+      "Lab": {
+        "domain": "Exploration",
+        "data_consumption_per_run": 8.0,
+        "research_points_per_run": 4.0,
+        "accepted_data": ["ScanData"],
+        "research_interval_ticks": 1
+      }
+    }
   }
 ]

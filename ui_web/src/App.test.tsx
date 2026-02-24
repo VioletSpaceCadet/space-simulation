@@ -10,7 +10,7 @@ const snapshot: SimSnapshot = {
   asteroids: {},
   ships: {},
   stations: {},
-  research: { unlocked: [], data_pool: {}, evidence: {} },
+  research: { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} },
 }
 
 beforeEach(() => {

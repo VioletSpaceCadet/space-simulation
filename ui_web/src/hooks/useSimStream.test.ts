@@ -19,7 +19,7 @@ const baseSnapshot: SimSnapshot = {
     },
   },
   stations: {},
-  research: { unlocked: [], data_pool: {}, evidence: {} },
+  research: { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} },
 }
 
 class MockEventSource {
@@ -196,8 +196,8 @@ describe('useSimStream', () => {
     await act(async () => { await Promise.resolve() })
 
     const events = [
-      { id: 'evt_d1', tick: 10, event: { DataGenerated: { kind: 'ScanData', amount: 5.0, quality: 1.0 } } },
-      { id: 'evt_d2', tick: 11, event: { DataGenerated: { kind: 'ScanData', amount: 3.0, quality: 1.0 } } },
+      { id: 'evt_d1', tick: 10, event: { DataGenerated: { kind: 'ScanData', amount: 5.0 } } },
+      { id: 'evt_d2', tick: 11, event: { DataGenerated: { kind: 'ScanData', amount: 3.0 } } },
     ]
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }))

@@ -285,6 +285,7 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         .research
         .evidence
         .values()
+        .flat_map(|dp| dp.points.values())
         .copied()
         .fold(0.0_f32, f32::max);
 
@@ -505,9 +506,9 @@ mod tests {
     use super::*;
     use crate::{
         test_fixtures::base_content, AsteroidId, AsteroidKnowledge, AsteroidState, Counters,
-        DataKind, FacilitiesState, GameState, LotId, MetaState, ModuleInstanceId, ModuleState,
-        NodeId, PrincipalId, ProcessorState, ResearchState, ShipId, ShipState, StationId,
-        StationState, TaskState, TechId,
+        DataKind, DomainProgress, GameState, LotId, MetaState, ModuleInstanceId, ModuleState,
+        NodeId, PrincipalId, ProcessorState, ResearchDomain, ResearchState, ShipId, ShipState,
+        StationId, StationState, TaskState, TechId,
     };
     use std::collections::{HashMap, HashSet};
 
@@ -531,6 +532,7 @@ mod tests {
                 unlocked: HashSet::new(),
                 data_pool: HashMap::new(),
                 evidence: HashMap::new(),
+                action_counts: HashMap::new(),
             },
             counters: Counters {
                 next_event_id: 0,
@@ -549,11 +551,6 @@ mod tests {
             inventory,
             cargo_capacity_m3: 10_000.0,
             power_available_per_tick: 100.0,
-            facilities: FacilitiesState {
-                compute_units_total: 10,
-                power_per_compute_unit_per_tick: 1.0,
-                efficiency: 1.0,
-            },
             modules,
         }
     }
@@ -875,14 +872,18 @@ mod tests {
         state.research.unlocked.insert(TechId("tech_a".to_string()));
         state.research.unlocked.insert(TechId("tech_b".to_string()));
         state.research.data_pool.insert(DataKind::ScanData, 42.5);
-        state
-            .research
-            .evidence
-            .insert(TechId("tech_c".to_string()), 15.0);
-        state
-            .research
-            .evidence
-            .insert(TechId("tech_d".to_string()), 30.0);
+        state.research.evidence.insert(
+            TechId("tech_c".to_string()),
+            DomainProgress {
+                points: HashMap::from([(ResearchDomain::Exploration, 15.0)]),
+            },
+        );
+        state.research.evidence.insert(
+            TechId("tech_d".to_string()),
+            DomainProgress {
+                points: HashMap::from([(ResearchDomain::Materials, 30.0)]),
+            },
+        );
 
         let snapshot = compute_metrics(&state, &content);
 

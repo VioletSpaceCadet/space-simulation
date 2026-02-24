@@ -17,3 +17,7 @@ workspace = true
 
 [dev-dependencies]
 rand_chacha = "0.3"
+
+[[test]]
+name = "research_lifecycle"
+required-features = ["test-support"]

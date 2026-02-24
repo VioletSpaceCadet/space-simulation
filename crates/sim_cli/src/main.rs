@@ -160,12 +160,11 @@ fn print_status(state: &GameState) {
         .unwrap_or(0.0);
 
     let tech_id = sim_core::TechId("tech_deep_scan_v1".to_string());
-    let evidence = state
+    let evidence: f32 = state
         .research
         .evidence
         .get(&tech_id)
-        .copied()
-        .unwrap_or(0.0);
+        .map_or(0.0, |dp| dp.points.values().sum());
 
     println!(
         "[tick={tick:04}  day={day}  hour={hour:02}]  \
