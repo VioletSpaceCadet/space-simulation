@@ -248,14 +248,35 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         id: station_id.clone(),
         location_node: earth_orbit.clone(),
         inventory: vec![
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0001".to_string()),
+                module_def_id: "module_basic_iron_refinery".to_string(),
+            },
             InventoryItem::Component {
                 component_id: ComponentId("repair_kit".to_string()),
-                count: 5,
+                count: 10,
                 quality: 1.0,
             },
             InventoryItem::Module {
-                item_id: ModuleItemId("module_item_maint_0001".to_string()),
+                item_id: ModuleItemId("module_item_0002".to_string()),
                 module_def_id: "module_maintenance_bay".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0003".to_string()),
+                module_def_id: "module_basic_assembler".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0004".to_string()),
+                module_def_id: "module_exploration_lab".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0005".to_string()),
+                module_def_id: "module_materials_lab".to_string(),
+            },
+            InventoryItem::Material {
+                element: "Fe".to_string(),
+                kg: 500.0,
+                quality: 0.7,
             },
         ],
         cargo_capacity_m3: c.station_cargo_capacity_m3,
