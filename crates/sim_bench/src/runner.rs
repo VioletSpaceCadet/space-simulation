@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use sim_control::{AutopilotController, CommandSource};
-use sim_core::{EventLevel, GameContent, MetricsSnapshot};
+use sim_core::{EventLevel, GameContent, GameState, MetricsSnapshot};
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
@@ -25,12 +25,19 @@ pub fn run_seed(
     seed_dir: &Path,
     scenario_name: &str,
     scenario_params: &serde_json::Value,
+    base_state: Option<&GameState>,
 ) -> Result<SeedResult> {
     let run_id = Uuid::new_v4().to_string();
     let start = Instant::now();
 
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
-    let mut state = sim_world::build_initial_state(content, seed, &mut rng);
+    let mut state = if let Some(loaded) = base_state {
+        let mut cloned = loaded.clone();
+        cloned.meta.seed = seed;
+        cloned
+    } else {
+        sim_world::build_initial_state(content, seed, &mut rng)
+    };
     let mut autopilot = AutopilotController;
     let mut next_command_id = 0u64;
 
@@ -139,7 +146,17 @@ mod tests {
         let seed_dir = temp_dir.path().join("seed_42");
         let params = serde_json::json!({"ticks": 120});
 
-        let result = run_seed(&content, 42, 120, 60, &seed_dir, "test_scenario", &params).unwrap();
+        let result = run_seed(
+            &content,
+            42,
+            120,
+            60,
+            &seed_dir,
+            "test_scenario",
+            &params,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(result.seed, 42);
         assert_eq!(result.final_snapshot.tick, 120);
@@ -173,6 +190,7 @@ mod tests {
             &dir1.path().join("seed_42"),
             "test",
             &params,
+            None,
         )
         .unwrap();
         let result2 = run_seed(
@@ -183,6 +201,7 @@ mod tests {
             &dir2.path().join("seed_42"),
             "test",
             &params,
+            None,
         )
         .unwrap();
 
@@ -195,5 +214,32 @@ mod tests {
             result1.final_snapshot.fleet_total,
             result2.final_snapshot.fleet_total
         );
+    }
+
+    #[test]
+    fn test_run_seed_with_base_state() {
+        let content = sim_world::load_content("../../content").unwrap();
+        let json = std::fs::read_to_string("../../content/dev_base_state.json").unwrap();
+        let base_state: GameState = serde_json::from_str(&json).unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let seed_dir = temp_dir.path().join("seed_99");
+        let params = serde_json::json!({"ticks": 120});
+
+        let result = run_seed(
+            &content,
+            99,
+            120,
+            60,
+            &seed_dir,
+            "state_test",
+            &params,
+            Some(&base_state),
+        )
+        .unwrap();
+
+        assert_eq!(result.seed, 99);
+        assert_eq!(result.final_snapshot.tick, 120);
+        // The loaded state has a ship, so fleet_total should be > 0.
+        assert!(result.final_snapshot.fleet_total > 0);
     }
 }

@@ -12,6 +12,10 @@ pub struct Scenario {
     pub seeds: SeedSpec,
     #[serde(default = "default_content_dir")]
     pub content_dir: String,
+    /// Optional path to a state JSON file. If set, this state is loaded instead
+    /// of calling `build_initial_state()`.
+    #[serde(default)]
+    pub state: Option<String>,
     #[serde(default)]
     pub overrides: HashMap<String, serde_json::Value>,
 }
@@ -115,6 +119,36 @@ mod tests {
         );
         let scenario = load_scenario(file.path()).unwrap();
         assert_eq!(scenario.overrides.len(), 2);
+    }
+
+    #[test]
+    fn test_load_scenario_with_state_file() {
+        let file = write_temp_scenario(
+            r#"{
+            "name": "with_state",
+            "ticks": 500,
+            "seeds": [1, 2],
+            "state": "./content/dev_base_state.json"
+        }"#,
+        );
+        let scenario = load_scenario(file.path()).unwrap();
+        assert_eq!(
+            scenario.state.as_deref(),
+            Some("./content/dev_base_state.json")
+        );
+    }
+
+    #[test]
+    fn test_load_scenario_without_state_defaults_to_none() {
+        let file = write_temp_scenario(
+            r#"{
+            "name": "no_state",
+            "ticks": 100,
+            "seeds": [1]
+        }"#,
+        );
+        let scenario = load_scenario(file.path()).unwrap();
+        assert!(scenario.state.is_none());
     }
 
     #[test]

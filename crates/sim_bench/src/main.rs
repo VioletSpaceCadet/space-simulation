@@ -49,11 +49,24 @@ fn run(scenario_path: &str, output_dir: &str) -> Result<()> {
     let mut content = sim_world::load_content(&scenario.content_dir)?;
     overrides::apply_overrides(&mut content.constants, &scenario.overrides)?;
 
+    // Load base state file if specified.
+    let base_state = if let Some(ref state_path) = scenario.state {
+        let json = std::fs::read_to_string(state_path)
+            .with_context(|| format!("reading state file: {state_path}"))?;
+        let loaded: sim_core::GameState = serde_json::from_str(&json)
+            .with_context(|| format!("parsing state file: {state_path}"))?;
+        println!("Using state file: {state_path}");
+        Some(loaded)
+    } else {
+        None
+    };
+
     // Build scenario_params for run_result metadata.
     let scenario_params = serde_json::json!({
         "ticks": scenario.ticks,
         "metrics_every": scenario.metrics_every,
         "content_dir": scenario.content_dir,
+        "state": scenario.state,
         "overrides": scenario.overrides,
     });
 
@@ -82,6 +95,7 @@ fn run(scenario_path: &str, output_dir: &str) -> Result<()> {
                 &seed_dir,
                 &scenario.name,
                 &scenario_params,
+                base_state.as_ref(),
             )
         })
         .collect();
