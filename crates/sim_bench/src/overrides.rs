@@ -66,12 +66,20 @@ fn apply_module_override(
                 }
                 matched = true;
             }
+            (ModuleBehaviorDef::SensorArray(ref mut sensor_def), "sensor_array") => {
+                match field {
+                    "scan_interval_ticks" => sensor_def.scan_interval_ticks = as_u64(full_key, value)?,
+                    "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
+                    _ => bail!("unknown sensor_array field '{field}' in override key '{full_key}'. Valid fields: scan_interval_ticks, wear_per_run"),
+                }
+                matched = true;
+            }
             _ => {}
         }
     }
 
     if !matched {
-        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance");
+        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance, sensor_array");
     }
 
     Ok(())

@@ -1,5 +1,6 @@
 use crate::{
     composition::{blend_slag_composition, merge_material_lot, weighted_composition},
+    research::generate_data,
     tasks::element_density,
     Event, EventEnvelope, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
     ItemKind, ModuleBehaviorDef, ModuleKindState, OutputSpec, QualityFormula, RecipeDef, StationId,
@@ -82,6 +83,9 @@ pub(crate) fn tick_stations(
         tick_assembler_modules(state, station_id, content, events);
     }
     for station_id in &station_ids {
+        tick_sensor_array_modules(state, station_id, content, events);
+    }
+    for station_id in &station_ids {
         tick_lab_modules(state, station_id, content, events);
     }
     for station_id in &station_ids {
@@ -117,7 +121,8 @@ fn tick_station_modules(
                 ModuleBehaviorDef::Storage { .. }
                 | ModuleBehaviorDef::Maintenance(_)
                 | ModuleBehaviorDef::Assembler(_)
-                | ModuleBehaviorDef::Lab(_) => continue,
+                | ModuleBehaviorDef::Lab(_)
+                | ModuleBehaviorDef::SensorArray(_) => continue,
             };
             (
                 module.def_id.clone(),
@@ -159,7 +164,8 @@ fn tick_station_modules(
                 ModuleKindState::Storage
                 | ModuleKindState::Maintenance(_)
                 | ModuleKindState::Assembler(_)
-                | ModuleKindState::Lab(_) => continue,
+                | ModuleKindState::Lab(_)
+                | ModuleKindState::SensorArray(_) => continue,
             }
         };
 
@@ -223,7 +229,8 @@ fn tick_station_modules(
                 ModuleKindState::Storage
                 | ModuleKindState::Maintenance(_)
                 | ModuleKindState::Assembler(_)
-                | ModuleKindState::Lab(_) => false,
+                | ModuleKindState::Lab(_)
+                | ModuleKindState::SensorArray(_) => false,
             };
             let module_id = station.modules[module_idx].id.clone();
 
@@ -814,6 +821,98 @@ fn resolve_assembler_run(
     apply_wear(state, station_id, module_idx, wear_per_run, events);
 }
 
+fn tick_sensor_array_modules(
+    state: &mut GameState,
+    station_id: &StationId,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+    let module_count = state
+        .stations
+        .get(station_id)
+        .map_or(0, |s| s.modules.len());
+
+    for module_idx in 0..module_count {
+        // Extract sensor array def and module info
+        let (sensor_def, power_needed, wear_per_run) = {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            let module = &station.modules[module_idx];
+            if !module.enabled {
+                continue;
+            }
+            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+                continue;
+            };
+            let ModuleBehaviorDef::SensorArray(sensor_def) = &def.behavior else {
+                continue;
+            };
+            (
+                sensor_def.clone(),
+                def.power_consumption_per_run,
+                def.wear_per_run,
+            )
+        };
+
+        // Tick timer; skip if interval not reached
+        {
+            let Some(station) = state.stations.get_mut(station_id) else {
+                return;
+            };
+            if let ModuleKindState::SensorArray(ss) = &mut station.modules[module_idx].kind_state {
+                ss.ticks_since_last_run += 1;
+                if ss.ticks_since_last_run < sensor_def.scan_interval_ticks {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+        }
+
+        // Check power budget
+        {
+            let Some(station) = state.stations.get(station_id) else {
+                return;
+            };
+            if station.power_available_per_tick < power_needed {
+                continue;
+            }
+        }
+
+        // Reset timer
+        {
+            let Some(station) = state.stations.get_mut(station_id) else {
+                return;
+            };
+            if let ModuleKindState::SensorArray(ss) = &mut station.modules[module_idx].kind_state {
+                ss.ticks_since_last_run = 0;
+            }
+        }
+
+        // Generate data using diminishing returns
+        let amount = generate_data(
+            &mut state.research,
+            sensor_def.data_kind.clone(),
+            &sensor_def.action_key,
+            &content.constants,
+        );
+
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::DataGenerated {
+                kind: sensor_def.data_kind.clone(),
+                amount,
+            },
+        ));
+
+        // Accumulate wear
+        apply_wear(state, station_id, module_idx, wear_per_run, events);
+    }
+}
+
 fn tick_lab_modules(
     state: &mut GameState,
     station_id: &StationId,
@@ -1102,7 +1201,9 @@ fn tick_maintenance_modules(
                 .modules
                 .iter()
                 .enumerate()
-                .filter(|(_, m)| m.id != *self_id && m.wear.wear >= repair_threshold && m.wear.wear > 0.0)
+                .filter(|(_, m)| {
+                    m.id != *self_id && m.wear.wear >= repair_threshold && m.wear.wear > 0.0
+                })
                 .map(|(idx, m)| (idx, m.wear.wear, m.id.0.clone()))
                 .collect();
             candidates.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
@@ -1585,5 +1686,171 @@ mod lab_tests {
             .iter()
             .any(|e| matches!(&e.event, Event::LabRan { .. }));
         assert!(!lab_ran, "should not run lab without assigned tech");
+    }
+
+    // --- Sensor Array tests ---
+
+    fn sensor_content() -> crate::GameContent {
+        let mut content = crate::test_fixtures::base_content();
+        content.module_defs.push(crate::ModuleDef {
+            id: "module_sensor_array".to_string(),
+            name: "Sensor Array".to_string(),
+            mass_kg: 2500.0,
+            volume_m3: 6.0,
+            power_consumption_per_run: 8.0,
+            wear_per_run: 0.003,
+            behavior: ModuleBehaviorDef::SensorArray(crate::SensorArrayDef {
+                data_kind: crate::DataKind::ScanData,
+                action_key: "sensor_scan".to_string(),
+                scan_interval_ticks: 5,
+            }),
+        });
+        content
+    }
+
+    fn sensor_state(content: &crate::GameContent) -> GameState {
+        let station_id = StationId("station_test".to_string());
+        GameState {
+            meta: crate::MetaState {
+                tick: 0,
+                seed: 42,
+                schema_version: 1,
+                content_version: content.content_version.clone(),
+            },
+            scan_sites: vec![],
+            asteroids: HashMap::new(),
+            ships: HashMap::new(),
+            stations: HashMap::from([(
+                station_id.clone(),
+                StationState {
+                    id: station_id,
+                    location_node: crate::NodeId("node_test".to_string()),
+                    inventory: vec![],
+                    cargo_capacity_m3: 2000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![crate::ModuleState {
+                        id: crate::ModuleInstanceId("sensor_inst_0001".to_string()),
+                        def_id: "module_sensor_array".to_string(),
+                        enabled: true,
+                        kind_state: ModuleKindState::SensorArray(crate::SensorArrayState {
+                            ticks_since_last_run: 0,
+                        }),
+                        wear: crate::WearState::default(),
+                    }],
+                },
+            )]),
+            research: crate::ResearchState {
+                unlocked: std::collections::HashSet::new(),
+                data_pool: HashMap::new(),
+                evidence: HashMap::new(),
+                action_counts: HashMap::new(),
+            },
+            counters: crate::Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 2,
+            },
+        }
+    }
+
+    #[test]
+    fn sensor_array_generates_scan_data_after_interval() {
+        let content = sensor_content();
+        let mut state = sensor_state(&content);
+        let station_id = StationId("station_test".to_string());
+
+        // Tick 4 times — interval is 5, should not fire yet
+        for _ in 0..4 {
+            let mut events = Vec::new();
+            super::tick_sensor_array_modules(&mut state, &station_id, &content, &mut events);
+            let generated = events
+                .iter()
+                .any(|e| matches!(&e.event, Event::DataGenerated { .. }));
+            assert!(!generated, "should not generate data before interval");
+        }
+
+        // Tick once more — should fire
+        let mut events = Vec::new();
+        super::tick_sensor_array_modules(&mut state, &station_id, &content, &mut events);
+        let generated = events
+            .iter()
+            .any(|e| matches!(&e.event, Event::DataGenerated { .. }));
+        assert!(generated, "should generate data at interval");
+
+        // Check data pool has ScanData
+        let scan_data = state
+            .research
+            .data_pool
+            .get(&crate::DataKind::ScanData)
+            .copied()
+            .unwrap_or(0.0);
+        assert!(scan_data > 0.0, "ScanData should be > 0 after sensor run");
+    }
+
+    #[test]
+    fn sensor_array_uses_diminishing_returns() {
+        let content = sensor_content();
+        let mut state = sensor_state(&content);
+        let station_id = StationId("station_test".to_string());
+
+        // Run through two complete intervals and capture amounts
+        let mut amounts = Vec::new();
+        for run in 0..2 {
+            // Tick through interval
+            for tick in 0..5 {
+                let mut events = Vec::new();
+                super::tick_sensor_array_modules(&mut state, &station_id, &content, &mut events);
+                if tick == 4 {
+                    // Last tick of interval — should fire
+                    for event in &events {
+                        if let Event::DataGenerated { amount, .. } = &event.event {
+                            amounts.push(*amount);
+                        }
+                    }
+                }
+            }
+            let _ = run;
+        }
+
+        assert_eq!(amounts.len(), 2, "should have fired twice");
+        assert!(
+            amounts[1] < amounts[0],
+            "second run should yield less due to diminishing returns (got {} then {})",
+            amounts[0],
+            amounts[1]
+        );
+    }
+
+    #[test]
+    fn sensor_array_disabled_does_not_generate() {
+        let content = sensor_content();
+        let mut state = sensor_state(&content);
+        let station_id = StationId("station_test".to_string());
+
+        // Disable the module
+        state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
+
+        // Tick through full interval
+        for _ in 0..10 {
+            let mut events = Vec::new();
+            super::tick_sensor_array_modules(&mut state, &station_id, &content, &mut events);
+            let generated = events
+                .iter()
+                .any(|e| matches!(&e.event, Event::DataGenerated { .. }));
+            assert!(!generated, "disabled sensor should not generate data");
+        }
+
+        let scan_data = state
+            .research
+            .data_pool
+            .get(&crate::DataKind::ScanData)
+            .copied()
+            .unwrap_or(0.0);
+        assert!(
+            scan_data == 0.0,
+            "no ScanData should exist when sensor is disabled"
+        );
     }
 }

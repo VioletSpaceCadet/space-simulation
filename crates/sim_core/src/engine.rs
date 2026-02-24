@@ -128,6 +128,9 @@ fn apply_commands(
                                 starved: false,
                             })
                         }
+                        crate::ModuleBehaviorDef::SensorArray(_) => {
+                            crate::ModuleKindState::SensorArray(crate::SensorArrayState::default())
+                        }
                     },
                     None => continue,
                 };

@@ -18,7 +18,7 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
 | `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold` |
 | `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, component_defs, constants |
-| `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, Maintenance, or Assembler), `wear_per_run` |
+| `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, Maintenance, Assembler, Lab, or SensorArray), `wear_per_run` |
 | `ComponentDef` | Component definition: `id`, `name`, `mass_kg`, `volume_m3` |
 | `MaintenanceDef` | Maintenance module behavior: `repair_interval_ticks`, `wear_reduction_per_run`, `repair_kit_cost` |
 | `AssemblerDef` | Assembler module behavior: `assembly_interval_ticks`, `recipes` (list of input filters + output component) |
@@ -102,6 +102,12 @@ All in `content/`. Loaded at runtime; never compiled in.
 **Events:** `AssemblerRan { station_id, module_id, recipe_id, output_component_id, output_count }`.
 
 **Metrics:** `assembler_active_count`, `assembler_stalled_count` (MetricsSnapshot v3).
+
+## Sensor Array
+
+**Sensor Array module:** `ModuleBehaviorDef::SensorArray` ticks at `scan_interval_ticks`. Each run: checks enabled + power + wear; generates raw data of `data_kind` into the sim-wide `ResearchState.data_pool` using `generate_data()` with diminishing returns (keyed by `action_key`). This provides passive data generation for labs without requiring ship surveys.
+
+**Events:** `DataGenerated { kind, amount }`.
 
 ## Storage Enforcement
 

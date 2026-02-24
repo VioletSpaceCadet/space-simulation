@@ -179,6 +179,12 @@ pub enum ModuleKindState {
     Maintenance(MaintenanceState),
     Assembler(AssemblerState),
     Lab(LabState),
+    SensorArray(SensorArrayState),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SensorArrayState {
+    pub ticks_since_last_run: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -606,6 +612,7 @@ pub enum ModuleBehaviorDef {
     Maintenance(MaintenanceDef),
     Assembler(AssemblerDef),
     Lab(LabDef),
+    SensorArray(SensorArrayDef),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -633,6 +640,13 @@ pub struct LabDef {
     pub research_points_per_run: f32,
     pub accepted_data: Vec<DataKind>,
     pub research_interval_ticks: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SensorArrayDef {
+    pub data_kind: DataKind,
+    pub action_key: String,
+    pub scan_interval_ticks: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

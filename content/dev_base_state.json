@@ -65,6 +65,16 @@
           "module_def_id": "module_materials_lab"
         },
         {
+          "kind": "Module",
+          "item_id": "module_item_0006",
+          "module_def_id": "module_engineering_lab"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0007",
+          "module_def_id": "module_sensor_array"
+        },
+        {
           "kind": "Material",
           "element": "Fe",
           "kg": 500.0,

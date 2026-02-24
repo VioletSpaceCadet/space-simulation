@@ -122,5 +122,37 @@
         "research_interval_ticks": 1
       }
     }
+  },
+  {
+    "id": "module_engineering_lab",
+    "name": "Engineering Lab",
+    "mass_kg": 4000.0,
+    "volume_m3": 8.0,
+    "power_consumption_per_run": 12.0,
+    "wear_per_run": 0.005,
+    "behavior": {
+      "Lab": {
+        "domain": "Engineering",
+        "data_consumption_per_run": 10.0,
+        "research_points_per_run": 5.0,
+        "accepted_data": ["EngineeringData"],
+        "research_interval_ticks": 1
+      }
+    }
+  },
+  {
+    "id": "module_sensor_array",
+    "name": "Sensor Array",
+    "mass_kg": 2500.0,
+    "volume_m3": 6.0,
+    "power_consumption_per_run": 8.0,
+    "wear_per_run": 0.003,
+    "behavior": {
+      "SensorArray": {
+        "data_kind": "ScanData",
+        "action_key": "sensor_scan",
+        "scan_interval_ticks": 120
+      }
+    }
   }
 ]
