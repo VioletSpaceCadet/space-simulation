@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use sim_core::{Constants, GameContent, ModuleBehaviorDef};
 use std::collections::HashMap;
 
@@ -42,7 +42,15 @@ fn apply_module_override(
                 match field {
                     "assembly_interval_ticks" => asm_def.assembly_interval_ticks = as_u64(full_key, value)?,
                     "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
-                    _ => bail!("unknown assembler field '{field}' in override key '{full_key}'. Valid fields: assembly_interval_ticks, wear_per_run"),
+                    "max_stock" => {
+                        let map: std::collections::HashMap<String, u32> = serde_json::from_value(value.clone())
+                            .with_context(|| format!("invalid max_stock value for '{full_key}'"))?;
+                        asm_def.max_stock = map
+                            .into_iter()
+                            .map(|(k, v)| (sim_core::ComponentId(k), v))
+                            .collect();
+                    }
+                    _ => bail!("unknown assembler field '{field}' in override key '{full_key}'. Valid fields: assembly_interval_ticks, wear_per_run, max_stock"),
                 }
                 matched = true;
             }
@@ -292,6 +300,27 @@ mod tests {
         for module_def in &content.module_defs {
             if let ModuleBehaviorDef::Assembler(ref asm_def) = module_def.behavior {
                 assert_eq!(asm_def.assembly_interval_ticks, 240);
+            }
+        }
+    }
+
+    #[test]
+    fn test_module_assembler_max_stock_override() {
+        let mut content = test_content();
+        let overrides = HashMap::from([(
+            "module.assembler.max_stock".to_string(),
+            serde_json::json!({"repair_kit": 25}),
+        )]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        for module_def in &content.module_defs {
+            if let ModuleBehaviorDef::Assembler(ref asm_def) = module_def.behavior {
+                assert_eq!(
+                    asm_def
+                        .max_stock
+                        .get(&sim_core::ComponentId("repair_kit".to_string())),
+                    Some(&25)
+                );
             }
         }
     }
