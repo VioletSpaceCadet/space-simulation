@@ -199,6 +199,10 @@ pub struct AssemblerState {
     pub ticks_since_last_run: u64,
     #[serde(default)]
     pub stalled: bool,
+    #[serde(default)]
+    pub capped: bool,
+    #[serde(default)]
+    pub cap_override: HashMap<ComponentId, u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -608,6 +612,8 @@ pub enum ModuleBehaviorDef {
 pub struct AssemblerDef {
     pub assembly_interval_ticks: u64,
     pub recipes: Vec<RecipeDef>,
+    #[serde(default)]
+    pub max_stock: HashMap<ComponentId, u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

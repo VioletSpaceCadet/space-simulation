@@ -566,6 +566,7 @@ mod tests {
             wear_per_run: 0.0,
             behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
                 assembly_interval_ticks: 10,
+                max_stock: std::collections::HashMap::new(),
                 recipes: vec![RecipeDef {
                     id: "recipe_asm_test".to_string(),
                     inputs: vec![RecipeInput {

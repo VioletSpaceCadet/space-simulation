@@ -117,6 +117,8 @@ fn apply_commands(
                             crate::ModuleKindState::Assembler(crate::AssemblerState {
                                 ticks_since_last_run: 0,
                                 stalled: false,
+                                capped: false,
+                                cap_override: std::collections::HashMap::new(),
                             })
                         }
                         crate::ModuleBehaviorDef::Lab(_) => {

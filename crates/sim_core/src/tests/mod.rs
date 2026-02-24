@@ -177,6 +177,7 @@ fn assembler_content() -> GameContent {
         wear_per_run: 0.008,
         behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
             assembly_interval_ticks: 2,
+            max_stock: HashMap::new(),
             recipes: vec![RecipeDef {
                 id: "recipe_basic_repair_kit".to_string(),
                 inputs: vec![RecipeInput {
@@ -212,6 +213,8 @@ fn state_with_assembler(content: &GameContent) -> GameState {
         kind_state: ModuleKindState::Assembler(AssemblerState {
             ticks_since_last_run: 0,
             stalled: false,
+            capped: false,
+            cap_override: HashMap::new(),
         }),
         wear: WearState::default(),
     });
