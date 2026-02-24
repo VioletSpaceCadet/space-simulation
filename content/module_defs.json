@@ -65,14 +65,14 @@
     "wear_per_run": 0.008,
     "behavior": {
       "Assembler": {
-        "assembly_interval_ticks": 120,
+        "assembly_interval_ticks": 360,
         "recipes": [
           {
             "id": "recipe_basic_repair_kit",
             "inputs": [
               {
                 "filter": { "Element": "Fe" },
-                "amount": { "Kg": 100.0 }
+                "amount": { "Kg": 200.0 }
               }
             ],
             "outputs": [
@@ -85,7 +85,8 @@
             ],
             "efficiency": 1.0
           }
-        ]
+        ],
+        "max_stock": { "repair_kit": 50 }
       }
     }
   },
