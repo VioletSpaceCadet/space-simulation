@@ -1,0 +1,7 @@
+{
+  "name": "month",
+  "ticks": 43200,
+  "metrics_every": 60,
+  "seeds": [1, 2, 3, 4, 5],
+  "state": "./content/dev_base_state.json"
+}
