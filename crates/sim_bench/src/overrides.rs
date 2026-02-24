@@ -1,89 +1,136 @@
 use anyhow::{bail, Result};
-use sim_core::Constants;
+use sim_core::{Constants, GameContent, ModuleBehaviorDef};
 use std::collections::HashMap;
 
-const VALID_KEYS: &[&str] = &[
-    "survey_scan_ticks",
-    "deep_scan_ticks",
-    "travel_ticks_per_hop",
-    "survey_tag_detection_probability",
-    "asteroid_count_per_template",
-    "asteroid_mass_min_kg",
-    "asteroid_mass_max_kg",
-    "ship_cargo_capacity_m3",
-    "station_cargo_capacity_m3",
-    "mining_rate_kg_per_tick",
-    "deposit_ticks",
-    "station_power_available_per_tick",
-    "autopilot_iron_rich_confidence_threshold",
-    "autopilot_refinery_threshold_kg",
-    "research_roll_interval_ticks",
-    "data_generation_peak",
-    "data_generation_floor",
-    "data_generation_decay_rate",
-    "wear_band_degraded_threshold",
-    "wear_band_critical_threshold",
-    "wear_band_degraded_efficiency",
-    "wear_band_critical_efficiency",
-];
-
 pub fn apply_overrides(
-    constants: &mut Constants,
+    content: &mut GameContent,
     overrides: &HashMap<String, serde_json::Value>,
 ) -> Result<()> {
     for (key, value) in overrides {
-        match key.as_str() {
-            "survey_scan_ticks" => constants.survey_scan_ticks = as_u64(key, value)?,
-            "deep_scan_ticks" => constants.deep_scan_ticks = as_u64(key, value)?,
-            "travel_ticks_per_hop" => constants.travel_ticks_per_hop = as_u64(key, value)?,
-            "survey_tag_detection_probability" => {
-                constants.survey_tag_detection_probability = as_f32(key, value)?;
-            }
-            "asteroid_count_per_template" => {
-                constants.asteroid_count_per_template = as_u32(key, value)?;
-            }
-            "asteroid_mass_min_kg" => constants.asteroid_mass_min_kg = as_f32(key, value)?,
-            "asteroid_mass_max_kg" => constants.asteroid_mass_max_kg = as_f32(key, value)?,
-            "ship_cargo_capacity_m3" => constants.ship_cargo_capacity_m3 = as_f32(key, value)?,
-            "station_cargo_capacity_m3" => {
-                constants.station_cargo_capacity_m3 = as_f32(key, value)?;
-            }
-            "mining_rate_kg_per_tick" => constants.mining_rate_kg_per_tick = as_f32(key, value)?,
-            "deposit_ticks" => constants.deposit_ticks = as_u64(key, value)?,
-            "station_power_available_per_tick" => {
-                constants.station_power_available_per_tick = as_f32(key, value)?;
-            }
-            "autopilot_iron_rich_confidence_threshold" => {
-                constants.autopilot_iron_rich_confidence_threshold = as_f32(key, value)?;
-            }
-            "autopilot_refinery_threshold_kg" => {
-                constants.autopilot_refinery_threshold_kg = as_f32(key, value)?;
-            }
-            "research_roll_interval_ticks" => {
-                constants.research_roll_interval_ticks = as_u64(key, value)?;
-            }
-            "data_generation_peak" => constants.data_generation_peak = as_f32(key, value)?,
-            "data_generation_floor" => constants.data_generation_floor = as_f32(key, value)?,
-            "data_generation_decay_rate" => {
-                constants.data_generation_decay_rate = as_f32(key, value)?;
-            }
-            "wear_band_degraded_threshold" => {
-                constants.wear_band_degraded_threshold = as_f32(key, value)?;
-            }
-            "wear_band_critical_threshold" => {
-                constants.wear_band_critical_threshold = as_f32(key, value)?;
-            }
-            "wear_band_degraded_efficiency" => {
-                constants.wear_band_degraded_efficiency = as_f32(key, value)?;
-            }
-            "wear_band_critical_efficiency" => {
-                constants.wear_band_critical_efficiency = as_f32(key, value)?;
-            }
-            _ => bail!(
-                "unknown override key '{key}'. Valid keys: {}",
-                VALID_KEYS.join(", ")
-            ),
+        if let Some(rest) = key.strip_prefix("module.") {
+            apply_module_override(&mut content.module_defs, rest, key, value)?;
+        } else {
+            apply_constant_override(&mut content.constants, key, value)?;
         }
+    }
+    Ok(())
+}
+
+fn apply_module_override(
+    module_defs: &mut [sim_core::ModuleDef],
+    dotted: &str,
+    full_key: &str,
+    value: &serde_json::Value,
+) -> Result<()> {
+    let (behavior_type, field) = dotted.split_once('.').ok_or_else(|| {
+        anyhow::anyhow!("invalid module override key '{full_key}': expected module.<type>.<field>")
+    })?;
+
+    let mut matched = false;
+
+    for module_def in module_defs.iter_mut() {
+        match (&mut module_def.behavior, behavior_type) {
+            (ModuleBehaviorDef::Processor(ref mut proc_def), "processor") => {
+                match field {
+                    "processing_interval_ticks" => proc_def.processing_interval_ticks = as_u64(full_key, value)?,
+                    "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
+                    _ => bail!("unknown processor field '{field}' in override key '{full_key}'. Valid fields: processing_interval_ticks, wear_per_run"),
+                }
+                matched = true;
+            }
+            (ModuleBehaviorDef::Assembler(ref mut asm_def), "assembler") => {
+                match field {
+                    "assembly_interval_ticks" => asm_def.assembly_interval_ticks = as_u64(full_key, value)?,
+                    "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
+                    _ => bail!("unknown assembler field '{field}' in override key '{full_key}'. Valid fields: assembly_interval_ticks, wear_per_run"),
+                }
+                matched = true;
+            }
+            (ModuleBehaviorDef::Lab(ref mut lab_def), "lab") => {
+                match field {
+                    "research_interval_ticks" => lab_def.research_interval_ticks = as_u64(full_key, value)?,
+                    "data_consumption_per_run" => lab_def.data_consumption_per_run = as_f32(full_key, value)?,
+                    "research_points_per_run" => lab_def.research_points_per_run = as_f32(full_key, value)?,
+                    "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
+                    _ => bail!("unknown lab field '{field}' in override key '{full_key}'. Valid fields: research_interval_ticks, data_consumption_per_run, research_points_per_run, wear_per_run"),
+                }
+                matched = true;
+            }
+            (ModuleBehaviorDef::Maintenance(ref mut maint_def), "maintenance") => {
+                match field {
+                    "repair_interval_ticks" => maint_def.repair_interval_ticks = as_u64(full_key, value)?,
+                    "wear_reduction_per_run" => maint_def.wear_reduction_per_run = as_f32(full_key, value)?,
+                    "repair_kit_cost" => maint_def.repair_kit_cost = as_u32(full_key, value)?,
+                    _ => bail!("unknown maintenance field '{field}' in override key '{full_key}'. Valid fields: repair_interval_ticks, wear_reduction_per_run, repair_kit_cost"),
+                }
+                matched = true;
+            }
+            _ => {}
+        }
+    }
+
+    if !matched {
+        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance");
+    }
+
+    Ok(())
+}
+
+fn apply_constant_override(
+    constants: &mut Constants,
+    key: &str,
+    value: &serde_json::Value,
+) -> Result<()> {
+    match key {
+        "survey_scan_ticks" => constants.survey_scan_ticks = as_u64(key, value)?,
+        "deep_scan_ticks" => constants.deep_scan_ticks = as_u64(key, value)?,
+        "travel_ticks_per_hop" => constants.travel_ticks_per_hop = as_u64(key, value)?,
+        "survey_tag_detection_probability" => {
+            constants.survey_tag_detection_probability = as_f32(key, value)?;
+        }
+        "asteroid_count_per_template" => {
+            constants.asteroid_count_per_template = as_u32(key, value)?;
+        }
+        "asteroid_mass_min_kg" => constants.asteroid_mass_min_kg = as_f32(key, value)?,
+        "asteroid_mass_max_kg" => constants.asteroid_mass_max_kg = as_f32(key, value)?,
+        "ship_cargo_capacity_m3" => constants.ship_cargo_capacity_m3 = as_f32(key, value)?,
+        "station_cargo_capacity_m3" => {
+            constants.station_cargo_capacity_m3 = as_f32(key, value)?;
+        }
+        "mining_rate_kg_per_tick" => constants.mining_rate_kg_per_tick = as_f32(key, value)?,
+        "deposit_ticks" => constants.deposit_ticks = as_u64(key, value)?,
+        "station_power_available_per_tick" => {
+            constants.station_power_available_per_tick = as_f32(key, value)?;
+        }
+        "autopilot_iron_rich_confidence_threshold" => {
+            constants.autopilot_iron_rich_confidence_threshold = as_f32(key, value)?;
+        }
+        "autopilot_refinery_threshold_kg" => {
+            constants.autopilot_refinery_threshold_kg = as_f32(key, value)?;
+        }
+        "research_roll_interval_ticks" => {
+            constants.research_roll_interval_ticks = as_u64(key, value)?;
+        }
+        "data_generation_peak" => constants.data_generation_peak = as_f32(key, value)?,
+        "data_generation_floor" => constants.data_generation_floor = as_f32(key, value)?,
+        "data_generation_decay_rate" => {
+            constants.data_generation_decay_rate = as_f32(key, value)?;
+        }
+        "wear_band_degraded_threshold" => {
+            constants.wear_band_degraded_threshold = as_f32(key, value)?;
+        }
+        "wear_band_critical_threshold" => {
+            constants.wear_band_critical_threshold = as_f32(key, value)?;
+        }
+        "wear_band_degraded_efficiency" => {
+            constants.wear_band_degraded_efficiency = as_f32(key, value)?;
+        }
+        "wear_band_critical_efficiency" => {
+            constants.wear_band_critical_efficiency = as_f32(key, value)?;
+        }
+        _ => bail!(
+            "unknown override key '{key}'. Constant keys or module.<type>.<field> keys are supported."
+        ),
     }
     Ok(())
 }
@@ -112,45 +159,45 @@ fn as_u32(key: &str, value: &serde_json::Value) -> Result<u32> {
 mod tests {
     use super::*;
 
-    fn default_constants() -> Constants {
-        serde_json::from_str(include_str!("../../../content/constants.json")).unwrap()
+    fn test_content() -> GameContent {
+        sim_world::load_content("../../content").unwrap()
     }
 
     #[test]
-    fn test_apply_f32_override() {
-        let mut constants = default_constants();
+    fn test_apply_constant_override() {
+        let mut content = test_content();
         let overrides = HashMap::from([(
             "station_cargo_capacity_m3".to_string(),
             serde_json::json!(200.0),
         )]);
-        apply_overrides(&mut constants, &overrides).unwrap();
-        assert!((constants.station_cargo_capacity_m3 - 200.0).abs() < f32::EPSILON);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert!((content.constants.station_cargo_capacity_m3 - 200.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn test_apply_u64_override() {
-        let mut constants = default_constants();
+        let mut content = test_content();
         let overrides = HashMap::from([("survey_scan_ticks".to_string(), serde_json::json!(99))]);
-        apply_overrides(&mut constants, &overrides).unwrap();
-        assert_eq!(constants.survey_scan_ticks, 99);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert_eq!(content.constants.survey_scan_ticks, 99);
     }
 
     #[test]
     fn test_apply_research_override() {
-        let mut constants = default_constants();
+        let mut content = test_content();
         let overrides = HashMap::from([(
             "research_roll_interval_ticks".to_string(),
             serde_json::json!(120),
         )]);
-        apply_overrides(&mut constants, &overrides).unwrap();
-        assert_eq!(constants.research_roll_interval_ticks, 120);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert_eq!(content.constants.research_roll_interval_ticks, 120);
     }
 
     #[test]
     fn test_unknown_key_errors() {
-        let mut constants = default_constants();
+        let mut content = test_content();
         let overrides = HashMap::from([("nonexistent_field".to_string(), serde_json::json!(1.0))]);
-        let result = apply_overrides(&mut constants, &overrides);
+        let result = apply_overrides(&mut content, &overrides);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("unknown override key"));
@@ -159,12 +206,145 @@ mod tests {
 
     #[test]
     fn test_type_mismatch_errors() {
-        let mut constants = default_constants();
+        let mut content = test_content();
         let overrides = HashMap::from([(
             "survey_scan_ticks".to_string(),
             serde_json::json!("not_a_number"),
         )]);
-        let result = apply_overrides(&mut constants, &overrides);
+        let result = apply_overrides(&mut content, &overrides);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_module_processor_override() {
+        let mut content = test_content();
+        let overrides = HashMap::from([
+            (
+                "module.processor.processing_interval_ticks".to_string(),
+                serde_json::json!(180),
+            ),
+            (
+                "module.processor.wear_per_run".to_string(),
+                serde_json::json!(0.02),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        for module_def in &content.module_defs {
+            if let ModuleBehaviorDef::Processor(ref proc_def) = module_def.behavior {
+                assert_eq!(proc_def.processing_interval_ticks, 180);
+                assert!((module_def.wear_per_run - 0.02).abs() < f32::EPSILON);
+            }
+        }
+    }
+
+    #[test]
+    fn test_module_lab_override() {
+        let mut content = test_content();
+        let overrides = HashMap::from([
+            (
+                "module.lab.research_interval_ticks".to_string(),
+                serde_json::json!(10),
+            ),
+            (
+                "module.lab.data_consumption_per_run".to_string(),
+                serde_json::json!(5.0),
+            ),
+            (
+                "module.lab.research_points_per_run".to_string(),
+                serde_json::json!(2.5),
+            ),
+            (
+                "module.lab.wear_per_run".to_string(),
+                serde_json::json!(0.002),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        for module_def in &content.module_defs {
+            if let ModuleBehaviorDef::Lab(ref lab_def) = module_def.behavior {
+                assert_eq!(lab_def.research_interval_ticks, 10);
+                assert!((lab_def.data_consumption_per_run - 5.0).abs() < f32::EPSILON);
+                assert!((lab_def.research_points_per_run - 2.5).abs() < f32::EPSILON);
+                assert!((module_def.wear_per_run - 0.002).abs() < f32::EPSILON);
+            }
+        }
+    }
+
+    #[test]
+    fn test_module_assembler_override() {
+        let mut content = test_content();
+        let overrides = HashMap::from([(
+            "module.assembler.assembly_interval_ticks".to_string(),
+            serde_json::json!(240),
+        )]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        for module_def in &content.module_defs {
+            if let ModuleBehaviorDef::Assembler(ref asm_def) = module_def.behavior {
+                assert_eq!(asm_def.assembly_interval_ticks, 240);
+            }
+        }
+    }
+
+    #[test]
+    fn test_module_maintenance_override() {
+        let mut content = test_content();
+        let overrides = HashMap::from([(
+            "module.maintenance.wear_reduction_per_run".to_string(),
+            serde_json::json!(0.3),
+        )]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        for module_def in &content.module_defs {
+            if let ModuleBehaviorDef::Maintenance(ref maint_def) = module_def.behavior {
+                assert!((maint_def.wear_reduction_per_run - 0.3).abs() < f32::EPSILON);
+            }
+        }
+    }
+
+    #[test]
+    fn test_module_unknown_type_errors() {
+        let mut content = test_content();
+        let overrides =
+            HashMap::from([("module.turret.fire_rate".to_string(), serde_json::json!(10))]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("turret"));
+    }
+
+    #[test]
+    fn test_module_unknown_field_errors() {
+        let mut content = test_content();
+        let overrides = HashMap::from([(
+            "module.processor.nonexistent".to_string(),
+            serde_json::json!(10),
+        )]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("nonexistent"));
+    }
+
+    #[test]
+    fn test_mixed_constant_and_module_overrides() {
+        let mut content = test_content();
+        let overrides = HashMap::from([
+            (
+                "station_cargo_capacity_m3".to_string(),
+                serde_json::json!(500.0),
+            ),
+            (
+                "module.processor.processing_interval_ticks".to_string(),
+                serde_json::json!(90),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        assert!((content.constants.station_cargo_capacity_m3 - 500.0).abs() < f32::EPSILON);
+        for module_def in &content.module_defs {
+            if let ModuleBehaviorDef::Processor(ref proc_def) = module_def.behavior {
+                assert_eq!(proc_def.processing_interval_ticks, 90);
+            }
+        }
     }
 }
