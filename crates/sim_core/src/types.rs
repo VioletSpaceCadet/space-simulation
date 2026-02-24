@@ -614,6 +614,9 @@ pub struct MaintenanceDef {
     pub repair_interval_ticks: u64,
     pub wear_reduction_per_run: f32,
     pub repair_kit_cost: u32,
+    /// Minimum wear level before the bay will consume a kit. Defaults to 0.0 (no threshold).
+    #[serde(default)]
+    pub repair_threshold: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

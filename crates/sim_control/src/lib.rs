@@ -579,6 +579,7 @@ mod tests {
                 repair_interval_ticks: 30,
                 wear_reduction_per_run: 0.2,
                 repair_kit_cost: 1,
+                repair_threshold: 0.0,
             }),
         });
         let mut state = autopilot_state(&content);

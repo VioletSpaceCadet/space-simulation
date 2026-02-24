@@ -307,3 +307,113 @@ fn test_wear_maintenance_full_cycle() {
         .unwrap_or(0);
     assert!(kits < 5, "some repair kits should have been consumed");
 }
+
+#[test]
+fn test_maintenance_skips_below_repair_threshold() {
+    let mut content = maintenance_content();
+    // Set a high threshold so trivial wear is ignored
+    for def in &mut content.module_defs {
+        if let ModuleBehaviorDef::Maintenance(ref mut maint_def) = def.behavior {
+            maint_def.repair_threshold = 0.5;
+        }
+    }
+    let mut state = state_with_maintenance(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Give the refinery some wear below the threshold
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules[0].wear.wear = 0.3;
+
+    // Remove ore so the refinery won't run
+    station
+        .inventory
+        .retain(|i| !matches!(i, InventoryItem::Ore { .. }));
+
+    let mut rng = make_rng();
+    // Tick enough for maintenance to fire (interval=2)
+    for _ in 0..4 {
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    }
+
+    let station = &state.stations[&station_id];
+    let kits = station
+        .inventory
+        .iter()
+        .find_map(|i| {
+            if let InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } = i
+            {
+                if component_id.0 == "repair_kit" {
+                    Some(*count)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0);
+    assert_eq!(
+        kits, 5,
+        "no kits should be consumed when wear is below repair_threshold"
+    );
+}
+
+#[test]
+fn test_maintenance_repairs_above_threshold() {
+    let mut content = maintenance_content();
+    for def in &mut content.module_defs {
+        if let ModuleBehaviorDef::Maintenance(ref mut maint_def) = def.behavior {
+            maint_def.repair_threshold = 0.2;
+        }
+    }
+    let mut state = state_with_maintenance(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Give the refinery wear above the threshold
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules[0].wear.wear = 0.5;
+
+    // Remove ore so the refinery won't run
+    station
+        .inventory
+        .retain(|i| !matches!(i, InventoryItem::Ore { .. }));
+
+    let mut rng = make_rng();
+    for _ in 0..4 {
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    }
+
+    let station = &state.stations[&station_id];
+    assert!(
+        station.modules[0].wear.wear < 0.5,
+        "wear should decrease when above threshold"
+    );
+    let kits = station
+        .inventory
+        .iter()
+        .find_map(|i| {
+            if let InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } = i
+            {
+                if component_id.0 == "repair_kit" {
+                    Some(*count)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0);
+    assert!(
+        kits < 5,
+        "kits should be consumed when wear exceeds threshold"
+    );
+}

@@ -1044,7 +1044,7 @@ fn tick_maintenance_modules(
         .map_or(0, |s| s.modules.len());
 
     for module_idx in 0..module_count {
-        let (interval, power_needed, repair_reduction, kit_cost) = {
+        let (interval, power_needed, repair_reduction, kit_cost, repair_threshold) = {
             let Some(station) = state.stations.get(station_id) else {
                 return;
             };
@@ -1063,6 +1063,7 @@ fn tick_maintenance_modules(
                 def.power_consumption_per_run,
                 maint_def.wear_reduction_per_run,
                 maint_def.repair_kit_cost,
+                maint_def.repair_threshold,
             )
         };
 
@@ -1091,7 +1092,7 @@ fn tick_maintenance_modules(
             }
         }
 
-        // Find most worn module (not self, wear > 0.0), sorted by wear desc then ID asc for determinism
+        // Find most worn module (not self, wear >= threshold), sorted by wear desc then ID asc for determinism
         let target = {
             let Some(station) = state.stations.get(station_id) else {
                 return;
@@ -1101,7 +1102,7 @@ fn tick_maintenance_modules(
                 .modules
                 .iter()
                 .enumerate()
-                .filter(|(_, m)| m.id != *self_id && m.wear.wear > 0.0)
+                .filter(|(_, m)| m.id != *self_id && m.wear.wear >= repair_threshold && m.wear.wear > 0.0)
                 .map(|(idx, m)| (idx, m.wear.wear, m.id.0.clone()))
                 .collect();
             candidates.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.2.cmp(&b.2)));

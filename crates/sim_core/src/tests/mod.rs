@@ -238,6 +238,7 @@ fn maintenance_content() -> GameContent {
             repair_interval_ticks: 2,
             wear_reduction_per_run: 0.2,
             repair_kit_cost: 1,
+            repair_threshold: 0.0,
         }),
     });
     content

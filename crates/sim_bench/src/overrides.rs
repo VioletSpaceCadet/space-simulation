@@ -61,7 +61,8 @@ fn apply_module_override(
                     "repair_interval_ticks" => maint_def.repair_interval_ticks = as_u64(full_key, value)?,
                     "wear_reduction_per_run" => maint_def.wear_reduction_per_run = as_f32(full_key, value)?,
                     "repair_kit_cost" => maint_def.repair_kit_cost = as_u32(full_key, value)?,
-                    _ => bail!("unknown maintenance field '{field}' in override key '{full_key}'. Valid fields: repair_interval_ticks, wear_reduction_per_run, repair_kit_cost"),
+                    "repair_threshold" => maint_def.repair_threshold = as_f32(full_key, value)?,
+                    _ => bail!("unknown maintenance field '{field}' in override key '{full_key}'. Valid fields: repair_interval_ticks, wear_reduction_per_run, repair_kit_cost, repair_threshold"),
                 }
                 matched = true;
             }
