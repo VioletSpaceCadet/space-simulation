@@ -1,9 +1,12 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use rayon::prelude::*;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use uuid::Uuid;
 
 mod overrides;
+mod run_result;
 mod runner;
 mod scenario;
 mod summary;
@@ -46,6 +49,14 @@ fn run(scenario_path: &str, output_dir: &str) -> Result<()> {
     let mut content = sim_world::load_content(&scenario.content_dir)?;
     overrides::apply_overrides(&mut content.constants, &scenario.overrides)?;
 
+    // Build scenario_params for run_result metadata.
+    let scenario_params = serde_json::json!({
+        "ticks": scenario.ticks,
+        "metrics_every": scenario.metrics_every,
+        "content_dir": scenario.content_dir,
+        "overrides": scenario.overrides,
+    });
+
     // Create timestamped output directory.
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let run_dir = PathBuf::from(output_dir).join(format!("{}_{}", scenario.name, timestamp));
@@ -69,6 +80,8 @@ fn run(scenario_path: &str, output_dir: &str) -> Result<()> {
                 scenario.ticks,
                 scenario.metrics_every,
                 &seed_dir,
+                &scenario.name,
+                &scenario_params,
             )
         })
         .collect();
@@ -95,13 +108,52 @@ fn run(scenario_path: &str, output_dir: &str) -> Result<()> {
     let stats = summary::compute_summary(&snapshot_refs);
     summary::print_summary(&scenario.name, scenario.ticks, &stats);
 
-    // Write summary.json
+    // Write summary.json (legacy format, backward compat)
     let summary_path = run_dir.join("summary.json");
     let summary_json = serde_json::to_string_pretty(&stats).context("serializing summary")?;
     std::fs::write(&summary_path, summary_json)
         .with_context(|| format!("writing {}", summary_path.display()))?;
 
-    println!("\nSummary written to {}", summary_path.display());
+    // Write batch_summary.json (contract v1 format)
+    let batch_id = Uuid::new_v4().to_string();
+    let run_ids: Vec<&str> = seed_results.iter().map(|r| r.run_id.as_str()).collect();
+    let collapsed_count = seed_results
+        .iter()
+        .filter(|r| {
+            let (collapsed, _) = run_result::detect_collapse(&r.final_snapshot);
+            collapsed
+        })
+        .count();
+
+    let snapshot_only_refs: Vec<&sim_core::MetricsSnapshot> =
+        seed_results.iter().map(|r| &r.final_snapshot).collect();
+    let aggregated_metrics = summary::build_aggregated_metrics(&snapshot_only_refs);
+
+    let batch_summary = serde_json::json!({
+        "batch_schema_version": 1,
+        "batch_id": batch_id,
+        "scenario_name": scenario.name,
+        "scenario_params": scenario_params,
+        "seed_count": seed_results.len(),
+        "run_ids": run_ids,
+        "collapsed_count": collapsed_count,
+        "aggregated_metrics": aggregated_metrics,
+    });
+
+    let batch_path = run_dir.join("batch_summary.json");
+    let batch_tmp = batch_path.with_extension("json.tmp");
+    let batch_json =
+        serde_json::to_string_pretty(&batch_summary).context("serializing batch summary")?;
+    let mut batch_file = std::fs::File::create(&batch_tmp)
+        .with_context(|| format!("creating {}", batch_tmp.display()))?;
+    batch_file
+        .write_all(batch_json.as_bytes())
+        .context("writing batch summary")?;
+    batch_file.sync_all()?;
+    std::fs::rename(&batch_tmp, &batch_path).context("renaming batch summary")?;
+
+    println!("Summary written to {}", summary_path.display());
+    println!("Batch summary written to {}", batch_path.display());
     Ok(())
 }
 

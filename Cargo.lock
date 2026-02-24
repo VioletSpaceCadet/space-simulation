@@ -1002,6 +1002,8 @@ dependencies = [
  "sim_control",
  "sim_core",
  "sim_world",
+ "tempfile",
+ "uuid",
 ]
 
 [[package]]

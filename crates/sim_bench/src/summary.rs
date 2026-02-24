@@ -90,6 +90,87 @@ fn compute_metric_summary(name: &str, values: &[f64]) -> MetricSummary {
     }
 }
 
+/// Build aggregated metrics in the contract format:
+/// `{ "key": { "mean": ..., "min": ..., "max": ..., "stddev": ... }, ... }`
+/// Covers all 18 `SummaryMetrics` keys.
+pub fn build_aggregated_metrics(snapshots: &[&MetricsSnapshot]) -> serde_json::Value {
+    let contract_extractors: Vec<Extractor> = vec![
+        ("total_ore_kg", Box::new(|s| f64::from(s.total_ore_kg))),
+        (
+            "total_material_kg",
+            Box::new(|s| f64::from(s.total_material_kg)),
+        ),
+        ("total_slag_kg", Box::new(|s| f64::from(s.total_slag_kg))),
+        (
+            "station_storage_used_pct",
+            Box::new(|s| f64::from(s.station_storage_used_pct)),
+        ),
+        ("fleet_total", Box::new(|s| f64::from(s.fleet_total))),
+        ("fleet_idle", Box::new(|s| f64::from(s.fleet_idle))),
+        (
+            "refinery_active_count",
+            Box::new(|s| f64::from(s.refinery_active_count)),
+        ),
+        (
+            "refinery_starved_count",
+            Box::new(|s| f64::from(s.refinery_starved_count)),
+        ),
+        (
+            "refinery_stalled_count",
+            Box::new(|s| f64::from(s.refinery_stalled_count)),
+        ),
+        (
+            "assembler_active_count",
+            Box::new(|s| f64::from(s.assembler_active_count)),
+        ),
+        (
+            "assembler_stalled_count",
+            Box::new(|s| f64::from(s.assembler_stalled_count)),
+        ),
+        (
+            "avg_module_wear",
+            Box::new(|s| f64::from(s.avg_module_wear)),
+        ),
+        (
+            "max_module_wear",
+            Box::new(|s| f64::from(s.max_module_wear)),
+        ),
+        (
+            "repair_kits_remaining",
+            Box::new(|s| f64::from(s.repair_kits_remaining)),
+        ),
+        ("techs_unlocked", Box::new(|s| f64::from(s.techs_unlocked))),
+        (
+            "asteroids_discovered",
+            Box::new(|s| f64::from(s.asteroids_discovered)),
+        ),
+        (
+            "asteroids_depleted",
+            Box::new(|s| f64::from(s.asteroids_depleted)),
+        ),
+        (
+            "scan_sites_remaining",
+            Box::new(|s| f64::from(s.scan_sites_remaining)),
+        ),
+    ];
+
+    let mut map = serde_json::Map::new();
+    for (name, extract) in &contract_extractors {
+        let values: Vec<f64> = snapshots.iter().map(|s| extract(s)).collect();
+        let summary = compute_metric_summary(name, &values);
+        map.insert(
+            name.to_string(),
+            serde_json::json!({
+                "mean": summary.mean,
+                "min": summary.min,
+                "max": summary.max,
+                "stddev": summary.stddev,
+            }),
+        );
+    }
+    serde_json::Value::Object(map)
+}
+
 pub fn print_summary(scenario_name: &str, ticks: u64, stats: &SummaryStats) {
     let tick_display = if ticks >= 1000 {
         format!("{}k", ticks / 1000)
@@ -211,5 +292,58 @@ mod tests {
                 metric.stddev
             );
         }
+    }
+
+    #[test]
+    fn test_build_aggregated_metrics_has_all_18_keys() {
+        let s1 = make_snapshot(100, 0.5, 2, 0, 0, 3, 0.2, 5);
+        let s2 = make_snapshot(100, 0.7, 2, 1, 1, 5, 0.4, 3);
+        let snapshots: Vec<&MetricsSnapshot> = vec![&s1, &s2];
+        let agg = build_aggregated_metrics(&snapshots);
+
+        let obj = agg.as_object().unwrap();
+        let expected_keys = [
+            "total_ore_kg",
+            "total_material_kg",
+            "total_slag_kg",
+            "station_storage_used_pct",
+            "fleet_total",
+            "fleet_idle",
+            "refinery_active_count",
+            "refinery_starved_count",
+            "refinery_stalled_count",
+            "assembler_active_count",
+            "assembler_stalled_count",
+            "avg_module_wear",
+            "max_module_wear",
+            "repair_kits_remaining",
+            "techs_unlocked",
+            "asteroids_discovered",
+            "asteroids_depleted",
+            "scan_sites_remaining",
+        ];
+        assert_eq!(obj.len(), 18);
+        for key in &expected_keys {
+            let entry = obj
+                .get(*key)
+                .unwrap_or_else(|| panic!("missing key: {key}"));
+            assert!(entry.get("mean").is_some(), "missing mean for {key}");
+            assert!(entry.get("min").is_some(), "missing min for {key}");
+            assert!(entry.get("max").is_some(), "missing max for {key}");
+            assert!(entry.get("stddev").is_some(), "missing stddev for {key}");
+        }
+    }
+
+    #[test]
+    fn test_build_aggregated_metrics_values() {
+        let s1 = make_snapshot(100, 0.5, 4, 1, 0, 3, 0.2, 5);
+        let s2 = make_snapshot(100, 0.7, 6, 3, 0, 5, 0.4, 3);
+        let snapshots: Vec<&MetricsSnapshot> = vec![&s1, &s2];
+        let agg = build_aggregated_metrics(&snapshots);
+
+        let fleet_total = &agg["fleet_total"];
+        assert!((fleet_total["mean"].as_f64().unwrap() - 5.0).abs() < 1e-5);
+        assert!((fleet_total["min"].as_f64().unwrap() - 4.0).abs() < 1e-5);
+        assert!((fleet_total["max"].as_f64().unwrap() - 6.0).abs() < 1e-5);
     }
 }
