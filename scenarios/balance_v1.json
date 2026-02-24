@@ -1,15 +1,13 @@
 {
-  "name": "balance_v1",
+  "name": "balance_v1_tuned",
   "ticks": 20160,
   "metrics_every": 60,
   "seeds": [1, 2, 3, 4, 5],
+  "state": "./content/dev_base_state.json",
   "overrides": {
-    "asteroid_mass_min_kg": 500000.0,
-    "asteroid_mass_max_kg": 10000000.0,
-    "station_cargo_capacity_m3": 2000.0,
-    "ship_cargo_capacity_m3": 50.0,
-    "mining_rate_kg_per_tick": 15.0,
-    "deposit_ticks": 120,
-    "autopilot_refinery_threshold_kg": 2000.0
+    "module.lab.research_interval_ticks": 10,
+    "module.lab.wear_per_run": 0.002,
+    "module.processor.processing_interval_ticks": 180,
+    "module.assembler.assembly_interval_ticks": 240
   }
 }
