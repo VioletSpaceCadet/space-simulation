@@ -406,6 +406,11 @@ mod replenish_tests {
             }],
             module_defs: vec![],
             component_defs: vec![],
+            pricing: PricingTable {
+                import_surcharge_per_kg: 100.0,
+                export_surcharge_per_kg: 50.0,
+                items: HashMap::new(),
+            },
             constants: Constants {
                 survey_scan_ticks: 1,
                 deep_scan_ticks: 1,

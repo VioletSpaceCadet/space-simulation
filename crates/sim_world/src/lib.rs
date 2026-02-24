@@ -6,8 +6,8 @@ use serde::Deserialize;
 use sim_core::{
     AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, GameContent, GameState,
     InputFilter, InventoryItem, MetaState, ModuleBehaviorDef, ModuleDef, ModuleItemId, NodeId,
-    OutputSpec, PrincipalId, QualityFormula, ResearchState, ScanSite, ShipId, ShipState, SiteId,
-    SolarSystemDef, StationId, StationState, TechDef, TechId, YieldFormula,
+    OutputSpec, PricingTable, PrincipalId, QualityFormula, ResearchState, ScanSite, ShipId,
+    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId, YieldFormula,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -226,6 +226,10 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
             .context("reading component_defs.json")?,
     )
     .context("parsing component_defs.json")?;
+    let pricing: PricingTable = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("pricing.json")).context("reading pricing.json")?,
+    )
+    .context("parsing pricing.json")?;
     let content = GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
@@ -234,6 +238,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         elements: elements_file.elements,
         module_defs,
         component_defs,
+        pricing,
         constants,
     };
     validate_content(&content);

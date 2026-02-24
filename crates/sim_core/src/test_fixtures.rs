@@ -6,8 +6,9 @@
 
 use crate::{
     AnomalyTag, AsteroidTemplateDef, Constants, Counters, DataKind, ElementDef, GameContent,
-    GameState, MetaState, NodeDef, NodeId, PrincipalId, ResearchState, ScanSite, ShipId, ShipState,
-    SiteId, SolarSystemDef, StationId, StationState, TechDef, TechEffect, TechId,
+    GameState, MetaState, NodeDef, NodeId, PricingTable, PrincipalId, ResearchState, ScanSite,
+    ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechEffect,
+    TechId,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -75,6 +76,11 @@ pub fn base_content() -> GameContent {
         ],
         module_defs: vec![],
         component_defs: vec![],
+        pricing: PricingTable {
+            import_surcharge_per_kg: 100.0,
+            export_surcharge_per_kg: 50.0,
+            items: HashMap::new(),
+        },
         constants: Constants {
             survey_scan_ticks: 1,
             deep_scan_ticks: 1,
@@ -135,6 +141,11 @@ pub fn minimal_content() -> GameContent {
         ],
         module_defs: vec![],
         component_defs: vec![],
+        pricing: PricingTable {
+            import_surcharge_per_kg: 100.0,
+            export_surcharge_per_kg: 50.0,
+            items: HashMap::new(),
+        },
         constants: Constants {
             survey_scan_ticks: 1,
             deep_scan_ticks: 1,

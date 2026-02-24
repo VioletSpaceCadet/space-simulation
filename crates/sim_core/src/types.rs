@@ -524,6 +524,7 @@ pub struct GameContent {
     pub elements: Vec<ElementDef>,
     pub module_defs: Vec<ModuleDef>,
     pub component_defs: Vec<ComponentDef>,
+    pub pricing: PricingTable,
     pub constants: Constants,
 }
 
@@ -698,6 +699,20 @@ pub enum YieldFormula {
 pub enum QualityFormula {
     ElementFractionTimesMultiplier { element: ElementId, multiplier: f32 },
     Fixed(f32),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PricingEntry {
+    pub base_price_per_unit: f64,
+    pub importable: bool,
+    pub exportable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PricingTable {
+    pub import_surcharge_per_kg: f64,
+    pub export_surcharge_per_kg: f64,
+    pub items: HashMap<String, PricingEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
