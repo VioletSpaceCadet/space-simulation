@@ -125,6 +125,9 @@ fn apply_constant_override(
         "autopilot_refinery_threshold_kg" => {
             constants.autopilot_refinery_threshold_kg = as_f32(key, value)?;
         }
+        "autopilot_slag_jettison_pct" => {
+            constants.autopilot_slag_jettison_pct = as_f32(key, value)?;
+        }
         "research_roll_interval_ticks" => {
             constants.research_roll_interval_ticks = as_u64(key, value)?;
         }

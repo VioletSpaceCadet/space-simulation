@@ -16,7 +16,7 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, or Assembler), `wear: WearState`. Processor/Assembler have `stalled: bool`. Assembler also has `capped: bool`, `cap_override: HashMap<ComponentId, u32>` |
 | `WearState` | `wear: f32` (0.0–1.0). Embedded on any wearable entity. |
 | `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
-| `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold`, `AssignLabTech`, `SetAssemblerCap` |
+| `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold`, `AssignLabTech`, `SetAssemblerCap`, `JettisonSlag` |
 | `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, component_defs, constants |
 | `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, Maintenance, Assembler, Lab, or SensorArray), `wear_per_run` |
 | `ComponentDef` | Component definition: `id`, `name`, `mass_kg`, `volume_m3` |
@@ -123,6 +123,12 @@ All in `content/`. Loaded at runtime; never compiled in.
 - Component output from processors (type defined but no-op).
 - Storage modules (type defined but tick loop skips them).
 
+## Slag Jettison
+
+**Command:** `JettisonSlag { station_id }` — removes all `InventoryItem::Slag` from the station's inventory. Emits `SlagJettisoned { station_id, kg }` with the total mass jettisoned. No event if no slag is present.
+
+**Autopilot:** Auto-jettisons when `inventory_volume_m3(station) / cargo_capacity_m3 >= constants.autopilot_slag_jettison_pct` (default 0.75). Set to 1.0+ to disable. Checked each tick after station module and lab assignment commands.
+
 ## Benchmark Runner (sim_bench)
 
 Automated scenario runner for testing simulation behavior across multiple seeds. Runs seeds in parallel with rayon, computes cross-seed summary statistics.
@@ -138,7 +144,7 @@ Automated scenario runner for testing simulation behavior across multiple seeds.
 | `content_dir` | string | `"./content"` | Path to content directory |
 | `overrides` | object | `{}` | Constants overrides (key → value) |
 
-**Override keys:** All fields on `Constants` struct — `survey_scan_ticks`, `deep_scan_ticks`, `travel_ticks_per_hop`, `survey_tag_detection_probability`, `asteroid_count_per_template`, `asteroid_mass_min_kg`, `asteroid_mass_max_kg`, `ship_cargo_capacity_m3`, `station_cargo_capacity_m3`, `mining_rate_kg_per_tick`, `deposit_ticks`, `station_power_available_per_tick`, `autopilot_iron_rich_confidence_threshold`, `autopilot_refinery_threshold_kg`, `research_roll_interval_ticks`, `data_generation_peak`, `data_generation_floor`, `data_generation_decay_rate`, `wear_band_degraded_threshold`, `wear_band_critical_threshold`, `wear_band_degraded_efficiency`, `wear_band_critical_efficiency`.
+**Override keys:** All fields on `Constants` struct — `survey_scan_ticks`, `deep_scan_ticks`, `travel_ticks_per_hop`, `survey_tag_detection_probability`, `asteroid_count_per_template`, `asteroid_mass_min_kg`, `asteroid_mass_max_kg`, `ship_cargo_capacity_m3`, `station_cargo_capacity_m3`, `mining_rate_kg_per_tick`, `deposit_ticks`, `station_power_available_per_tick`, `autopilot_iron_rich_confidence_threshold`, `autopilot_refinery_threshold_kg`, `autopilot_slag_jettison_pct`, `research_roll_interval_ticks`, `data_generation_peak`, `data_generation_floor`, `data_generation_decay_rate`, `wear_band_degraded_threshold`, `wear_band_critical_threshold`, `wear_band_degraded_efficiency`, `wear_band_critical_efficiency`.
 
 **Output structure:**
 

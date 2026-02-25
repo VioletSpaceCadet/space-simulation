@@ -1,6 +1,6 @@
 use sim_core::{
-    mine_duration, shortest_hop_count, AnomalyTag, AsteroidId, AsteroidState, Command,
-    CommandEnvelope, CommandId, DomainProgress, GameContent, GameState, InventoryItem,
+    inventory_volume_m3, mine_duration, shortest_hop_count, AnomalyTag, AsteroidId, AsteroidState,
+    Command, CommandEnvelope, CommandId, DomainProgress, GameContent, GameState, InventoryItem,
     ModuleBehaviorDef, ModuleKindState, NodeId, PrincipalId, ShipId, ShipState, SiteId, TaskKind,
     TechDef, TechId,
 };
@@ -274,6 +274,39 @@ fn lab_assignment_commands(
     commands
 }
 
+/// Jettisons all slag from stations whose storage usage exceeds the threshold.
+fn slag_jettison_commands(
+    state: &GameState,
+    content: &GameContent,
+    owner: &PrincipalId,
+    next_id: &mut u64,
+) -> Vec<CommandEnvelope> {
+    let mut commands = Vec::new();
+    let threshold = content.constants.autopilot_slag_jettison_pct;
+
+    for station in state.stations.values() {
+        let used_m3 = inventory_volume_m3(&station.inventory, content);
+        let used_pct = used_m3 / station.cargo_capacity_m3;
+
+        if used_pct >= threshold
+            && station
+                .inventory
+                .iter()
+                .any(|i| matches!(i, InventoryItem::Slag { .. }))
+        {
+            commands.push(make_cmd(
+                owner,
+                state.meta.tick,
+                next_id,
+                Command::JettisonSlag {
+                    station_id: station.id.clone(),
+                },
+            ));
+        }
+    }
+    commands
+}
+
 // ---------------------------------------------------------------------------
 // AutopilotController
 // ---------------------------------------------------------------------------
@@ -288,6 +321,12 @@ impl CommandSource for AutopilotController {
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut commands = station_module_commands(state, content, &owner, next_command_id);
         commands.extend(lab_assignment_commands(
+            state,
+            content,
+            &owner,
+            next_command_id,
+        ));
+        commands.extend(slag_jettison_commands(
             state,
             content,
             &owner,
@@ -774,6 +813,62 @@ mod tests {
                 sim_core::Command::SetModuleEnabled { enabled: true, .. }
             )),
             "autopilot should NOT re-enable a module at max wear"
+        );
+    }
+
+    // --- Slag jettison tests ---
+
+    #[test]
+    fn test_autopilot_jettisons_slag_above_threshold() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        // Set small capacity so slag easily exceeds 75% threshold
+        station.cargo_capacity_m3 = 100.0;
+        // Add slag that takes up ~80% of capacity (slag density = 2500 kg/m3, 200kg = 0.08 m3)
+        // Actually, let's use a volume that makes sense. We need volume > 75 m3.
+        // Slag density is 2500 kg/m3. So 200_000 kg = 80 m3
+        station.inventory.push(sim_core::InventoryItem::Slag {
+            kg: 200_000.0,
+            composition: HashMap::from([("slag".to_string(), 1.0)]),
+        });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(&cmd.command, sim_core::Command::JettisonSlag { .. })),
+            "autopilot should issue JettisonSlag when storage usage exceeds threshold"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_does_not_jettison_below_threshold() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        // Small amount of slag, well below 75% of 10,000 m3
+        station.inventory.push(sim_core::InventoryItem::Slag {
+            kg: 10.0,
+            composition: HashMap::from([("slag".to_string(), 1.0)]),
+        });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands
+                .iter()
+                .any(|cmd| matches!(&cmd.command, sim_core::Command::JettisonSlag { .. })),
+            "autopilot should NOT jettison slag when storage usage is below threshold"
         );
     }
 

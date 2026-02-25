@@ -350,6 +350,9 @@ pub enum Command {
         component_id: ComponentId,
         max_stock: u32,
     },
+    JettisonSlag {
+        station_id: StationId,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -532,6 +535,10 @@ pub enum Event {
     DepositUnblocked {
         ship_id: ShipId,
         station_id: StationId,
+    },
+    SlagJettisoned {
+        station_id: StationId,
+        kg: f32,
     },
 }
 
@@ -774,6 +781,11 @@ pub struct Constants {
     pub data_generation_peak: f32,
     pub data_generation_floor: f32,
     pub data_generation_decay_rate: f32,
+    // Autopilot slag management
+    /// Station storage usage % at which autopilot jettisons all slag.
+    /// Default 0.75 (75%). Set to 1.0+ to disable auto-jettison.
+    #[serde(default = "default_slag_jettison_pct")]
+    pub autopilot_slag_jettison_pct: f32,
     // Wear system
     pub wear_band_degraded_threshold: f32,
     pub wear_band_critical_threshold: f32,
@@ -796,4 +808,8 @@ impl Default for WearState {
     fn default() -> Self {
         Self { wear: 0.0 }
     }
+}
+
+fn default_slag_jettison_pct() -> f32 {
+    0.75
 }

@@ -265,6 +265,35 @@ fn apply_commands(
                     asmb.cap_override.insert(component_id.clone(), *max_stock);
                 }
             }
+            Command::JettisonSlag { station_id } => {
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
+                let jettisoned_kg: f32 = station
+                    .inventory
+                    .iter()
+                    .filter_map(|i| {
+                        if let InventoryItem::Slag { kg, .. } = i {
+                            Some(*kg)
+                        } else {
+                            None
+                        }
+                    })
+                    .sum();
+                station
+                    .inventory
+                    .retain(|i| !matches!(i, InventoryItem::Slag { .. }));
+                if jettisoned_kg > 0.0 {
+                    events.push(crate::emit(
+                        &mut state.counters,
+                        current_tick,
+                        crate::Event::SlagJettisoned {
+                            station_id: station_id.clone(),
+                            kg: jettisoned_kg,
+                        },
+                    ));
+                }
+            }
         }
     }
 
@@ -451,6 +480,7 @@ mod replenish_tests {
                 data_generation_peak: 100.0,
                 data_generation_floor: 5.0,
                 data_generation_decay_rate: 0.7,
+                autopilot_slag_jettison_pct: 0.75,
                 wear_band_degraded_threshold: 0.5,
                 wear_band_critical_threshold: 0.8,
                 wear_band_degraded_efficiency: 0.75,
@@ -550,6 +580,108 @@ mod replenish_tests {
         // All unique
         let unique: std::collections::HashSet<_> = ids.iter().collect();
         assert_eq!(unique.len(), ids.len(), "Site IDs should be unique");
+    }
+
+    #[test]
+    fn jettison_slag_removes_all_slag_and_emits_event() {
+        let content = replenish_test_content();
+        let mut state = empty_sites_state(&content);
+        // Pre-fill scan sites so replenish doesn't fire
+        for i in 0..5 {
+            state.scan_sites.push(ScanSite {
+                id: SiteId(format!("site_existing_{i}")),
+                node: NodeId("node_test".to_string()),
+                template_id: "tmpl_iron_rich".to_string(),
+            });
+        }
+
+        let station_id = StationId("station_test".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.inventory.push(InventoryItem::Slag {
+            kg: 100.0,
+            composition: HashMap::from([("slag".to_string(), 1.0)]),
+        });
+        station.inventory.push(InventoryItem::Slag {
+            kg: 50.0,
+            composition: HashMap::from([("slag".to_string(), 1.0)]),
+        });
+        station.inventory.push(InventoryItem::Material {
+            element: "Fe".to_string(),
+            kg: 200.0,
+            quality: 0.8,
+        });
+
+        let cmd = CommandEnvelope {
+            id: crate::CommandId("cmd_000001".to_string()),
+            issued_by: crate::PrincipalId("test".to_string()),
+            issued_tick: 0,
+            execute_at_tick: 0,
+            command: Command::JettisonSlag {
+                station_id: station_id.clone(),
+            },
+        };
+
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+
+        // Slag should be gone, material should remain
+        let station = &state.stations[&station_id];
+        assert!(
+            !station
+                .inventory
+                .iter()
+                .any(|i| matches!(i, InventoryItem::Slag { .. })),
+            "all slag should be removed"
+        );
+        assert_eq!(station.inventory.len(), 1, "material should remain");
+
+        // Should have emitted SlagJettisoned event with total kg
+        let jettison_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e.event, Event::SlagJettisoned { .. }))
+            .collect();
+        assert_eq!(jettison_events.len(), 1);
+        if let Event::SlagJettisoned { kg, .. } = &jettison_events[0].event {
+            assert!(
+                (kg - 150.0).abs() < f32::EPSILON,
+                "should jettison 150 kg total"
+            );
+        }
+    }
+
+    #[test]
+    fn jettison_slag_no_event_when_no_slag() {
+        let content = replenish_test_content();
+        let mut state = empty_sites_state(&content);
+        for i in 0..5 {
+            state.scan_sites.push(ScanSite {
+                id: SiteId(format!("site_existing_{i}")),
+                node: NodeId("node_test".to_string()),
+                template_id: "tmpl_iron_rich".to_string(),
+            });
+        }
+
+        let station_id = StationId("station_test".to_string());
+
+        let cmd = CommandEnvelope {
+            id: crate::CommandId("cmd_000001".to_string()),
+            issued_by: crate::PrincipalId("test".to_string()),
+            issued_tick: 0,
+            execute_at_tick: 0,
+            command: Command::JettisonSlag {
+                station_id: station_id.clone(),
+            },
+        };
+
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e.event, Event::SlagJettisoned { .. })),
+            "no event should be emitted when there is no slag"
+        );
     }
 
     #[test]
