@@ -12,9 +12,32 @@ pub async fn run_tick_loop(
     max_ticks: Option<u64>,
     paused: Arc<AtomicBool>,
 ) {
+    let mut next_tick_at: Option<std::time::Instant> = None;
+
     loop {
         while paused.load(Ordering::Relaxed) {
             tokio::time::sleep(Duration::from_millis(50)).await;
+            next_tick_at = None; // Reset pacing after unpause
+        }
+
+        // Pace: sleep only if there's time remaining before the next tick is due.
+        let rate = f64::from_bits(ticks_per_sec.load(Ordering::Relaxed));
+        if rate > 0.0 {
+            let now = std::time::Instant::now();
+            let target = next_tick_at.unwrap_or(now);
+            if now < target {
+                tokio::time::sleep(target - now).await;
+            }
+            next_tick_at = Some(
+                next_tick_at
+                    .unwrap_or(now)
+                    .checked_add(Duration::from_secs_f64(1.0 / rate))
+                    .unwrap_or(now),
+            );
+        } else {
+            // Unlimited: yield once per tick to let the tokio runtime service SSE etc.
+            tokio::task::yield_now().await;
+            next_tick_at = None;
         }
 
         let (events, done) = {
@@ -42,10 +65,6 @@ pub async fn run_tick_loop(
                 let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
                 guard.push_metrics(snapshot);
 
-                // Evaluate alert rules against the in-memory metrics history.
-                // Reborrow through &mut *guard so the compiler can split borrows
-                // across alert_engine, metrics_history, and game_state.counters.
-                // Using as_mut() instead of take()/put so the engine isn't lost if evaluate() panics.
                 let state = &mut *guard;
                 let history_clone = state.metrics_history.clone();
                 if let Some(engine) = state.alert_engine.as_mut() {
@@ -64,13 +83,6 @@ pub async fn run_tick_loop(
 
         if done {
             break;
-        }
-
-        let rate = f64::from_bits(ticks_per_sec.load(Ordering::Relaxed));
-        if rate > 0.0 {
-            tokio::time::sleep(Duration::from_secs_f64(1.0 / rate)).await;
-        } else {
-            tokio::task::yield_now().await;
         }
     }
 }
