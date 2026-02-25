@@ -30,7 +30,7 @@ SKIP_HOOKS=1 git push
 
 ### CI Jobs
 
-**ci.yml** triggers on `push` (main) and `pull_request` (main):
+**ci.yml** triggers on `push` (main) and `pull_request` (all branches):
 
 1. **rust** — `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`
 2. **web** — `npm ci`, `npm run lint`, `npx tsc -b --noEmit`, `npm test`
@@ -152,9 +152,29 @@ Use sparingly. CI will still catch issues.
 | `month.json` | 43,200 | 3 | 30-day sustainability |
 | `quarter.json` | 129,600 | 3 | 90-day long-term |
 
+## Balance & Tuning Loop
+
+1. **Run sim_bench scenarios** — `scenarios/baseline.json` (current defaults) or custom scenario with overrides
+2. **Analyze results** — inspect `batch_summary.json` aggregated metrics, per-seed `run_result.json`, and `metrics_000.csv` time series
+3. **File Linear tickets** — create issues with sim data, proposed changes, and rationale
+4. **Test via overrides** — use `module.*` dotted keys in scenario overrides to test changes without editing content files
+5. **Apply to content** — once validated, update `content/constants.json` or `content/module_defs.json`
+6. **Re-run and verify** — confirm metrics improve, no regressions
+
+## Content & Starting State
+
+- `content/dev_base_state.json` — canonical starting state for gameplay testing (refinery, assembler, maintenance bay, 2 labs, 500 kg Fe, 10 repair kits, 50 m³ ship cargo, 2,000 m³ station cargo)
+- `content/constants.json` — game constants (already rebalanced for hard sci-fi pacing)
+- `content/module_defs.json` — module behavior parameters (intervals, wear, recipes)
+- `build_initial_state()` in sim_world should stay in sync with `dev_base_state.json`
+
+Scenarios support: `"state"` (path to initial state JSON), `"overrides"` (constants + `module.*` keys), `"seeds"` (list or `{"range": [1, 5]}`).
+
 ---
 
 ## Claude Code: GitHub MCP Setup
+
+> **Note:** The `gh` CLI (already configured) is sufficient for all GitHub operations in Claude Code. The MCP server below is optional and provides additional tool-based integration.
 
 ### Prerequisites
 
