@@ -107,13 +107,15 @@ For larger features (new modules, new systems, sim_core changes):
 - Stale reviews dismissed on new pushes
 - Force pushes and branch deletion blocked
 
-**Mandatory Claude Code PR review:**
-- Before any PR is merged, Claude Code MUST do a fresh review of the full diff
-- Read the diff with "gh pr diff N", cross-reference against codebase conventions and design rules
-- Post a review comment via "gh pr review N --comment" with findings or confirmation
-- The review comment MUST start with: "Claude Code Review -- No issues found." (if clean) or "Claude Code Review -- Issues found:" (if not)
-- Do NOT use backticks in review comment bodies (causes permission prompts)
-- This review is mandatory even if Claude Code authored the PR — fresh eyes catch things
+**Mandatory Claude Code PR review (full process):**
+1. After pushing, watch CI with "gh pr checks N --watch" until all checks resolve
+2. If any check fails, read logs with "gh run view RUN_ID --log-failed", fix the issue, commit, push, and watch again
+3. Once all checks pass, do a fresh review: read the full diff with "gh pr diff N"
+4. Cross-reference against codebase conventions, design rules, and architecture
+5. Post a review comment via "gh pr review N --comment" with findings or confirmation
+6. The review comment MUST start with: "Claude Code Review -- No issues found." (if clean) or "Claude Code Review -- Issues found:" (if not)
+7. Do NOT use backticks in review comment bodies (causes permission prompts)
+8. This review is mandatory even if Claude Code authored the PR — fresh eyes catch things
 
 **Creating a PR:**
 Push branch, then open with "gh pr create". Include a Summary section and Test plan section in the body.
