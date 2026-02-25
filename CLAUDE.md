@@ -94,8 +94,31 @@ For larger features (new modules, new systems, sim_core changes):
 1. **Create Linear issues** — scope the work, set priorities and dependencies
 2. **Work in a git worktree** — `git worktree add .worktrees/<name> -b feat/<name>` for isolation
 3. **Implement and test** — iterate in the worktree, run `cargo test`, run sim_bench scenarios
-4. **Squash merge to main** — `git merge --squash <branch>`, clean commit message
-5. **Clean up** — `git worktree remove .worktrees/<name>` + `git branch -D feat/<name>`
+4. **Open a PR** — push branch, create PR via `gh pr create`, CI must pass
+5. **Review and merge** — owner reviews and merges via GitHub (squash merge)
+6. **Clean up** — `git worktree remove .worktrees/<name>` + `git branch -D feat/<name>`
+
+### Pull Request Workflow
+
+**Branch protection is enforced on `main`:**
+- Direct pushes to main are blocked — all changes go through PRs
+- Required CI checks: `rust`, `web`, `bench-smoke` (must pass before merge)
+- CODEOWNERS (`@VioletSpaceCadet`) review required on all PRs
+- Stale reviews dismissed on new pushes
+- Force pushes and branch deletion blocked
+
+**PR review by Claude Code:**
+- Claude Code can review PRs when asked (e.g., "review PR #N")
+- Reviews read the full diff via `gh pr diff`, cross-reference codebase conventions, and post line-level comments via `gh pr review`
+- Use `gh` CLI for all GitHub operations (creating PRs, reading comments, posting reviews)
+
+**Creating a PR:**
+```bash
+git push -u origin <branch>
+gh pr create --title "feat(scope): summary" --body "## Summary\n- ...\n## Test plan\n- ..."
+```
+
+**NEVER push directly to main.** Always branch → PR → CI green → review → squash merge.
 
 ### Scenario Files
 
@@ -125,14 +148,13 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 ## Merging Branches to Main
 
-**Always squash merge.** Never fast-forward or merge commits.
+**Always squash merge via GitHub PR.** Never push directly to main.
 
-```bash
-git merge --squash <branch-name>
-git commit  # subject: feat(scope): summary, body: bullet list, Co-Authored-By trailer
-```
-
-After merging: `git worktree remove .worktrees/<name>` + `git branch -D <branch-name>`
+1. Push branch and open PR (`gh pr create`)
+2. CI must pass (rust, web, bench-smoke)
+3. Owner (`@VioletSpaceCadet`) approves
+4. Squash merge on GitHub
+5. Clean up: `git worktree remove .worktrees/<name>` + `git branch -D <branch-name>`
 
 ## Notes
 
