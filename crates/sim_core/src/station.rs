@@ -1049,7 +1049,7 @@ fn resolve_assembler_run(
                         station_id: station_id.clone(),
                         ship_id,
                         location_node,
-                        cargo_capacity_m3: *cargo_capacity_m3 as f64,
+                        cargo_capacity_m3: f64::from(*cargo_capacity_m3),
                     },
                 ));
             }
