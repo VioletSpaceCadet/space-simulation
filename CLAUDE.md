@@ -102,7 +102,7 @@ For larger features (new modules, new systems, sim_core changes):
 
 **Branch protection is enforced on `main`:**
 - Direct pushes to main are blocked — all changes go through PRs
-- Required CI checks: `rust`, `web`, `bench-smoke` (must pass before merge)
+- Required CI checks: "Rust (fmt + clippy + test)", "Web (lint + typecheck + test)", "Bench smoke" (must pass before merge)
 - CODEOWNERS (`@VioletSpaceCadet`) review required on all PRs
 - Stale reviews dismissed on new pushes
 - Force pushes and branch deletion blocked
