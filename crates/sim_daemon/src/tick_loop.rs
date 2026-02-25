@@ -27,6 +27,9 @@ pub async fn run_tick_loop(
             let target = next_tick_at.unwrap_or(now);
             if now < target {
                 tokio::time::sleep(target - now).await;
+            } else {
+                // Behind schedule — yield so tokio can service HTTP/SSE handlers.
+                tokio::task::yield_now().await;
             }
             next_tick_at = Some(
                 next_tick_at
