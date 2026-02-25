@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Pre-push hook: run Rust and frontend tests.
+# Pre-push hook: run Rust and frontend test suites.
+# Bypass: SKIP_HOOKS=1 git push ... (or --no-verify)
 set -euo pipefail
+
+if [ "${SKIP_HOOKS:-0}" = "1" ]; then
+  echo "pre-push: skipped (SKIP_HOOKS=1)"
+  exit 0
+fi
 
 echo "=== pre-push: running tests ==="
 

@@ -2,7 +2,7 @@
 
 Space industry simulation game. Deterministic Rust sim core, HTTP daemon with SSE event streaming, React mission control UI.
 
-`docs/DESIGN_SPINE.md` — authoritative design philosophy. `docs/reference.md` — detailed types, content files, inventory/refinery design. `base-project.md` — original design doc. Balance analysis and tuning tracked in Linear ("Balance & Tuning" project, VioletSpaceCadet workspace).
+`docs/DESIGN_SPINE.md` — authoritative design philosophy. `docs/reference.md` — detailed types, content files, inventory/refinery design. `docs/workflow.md` — CI, hooks, PR conventions, GitHub MCP setup. `base-project.md` — original design doc. Balance analysis and tuning tracked in Linear ("Balance & Tuning" project, VioletSpaceCadet workspace).
 
 ## Common Commands
 
@@ -33,6 +33,13 @@ cd ui_web && npm test        # vitest
 cargo run -p sim_bench -- run --scenario scenarios/baseline.json
 cargo run -p sim_bench -- run --scenario scenarios/balance_v1.json
 cargo run -p sim_bench -- run --scenario scenarios/cargo_sweep.json --output-dir /tmp/bench
+
+# CI scripts (same checks as GitHub Actions)
+./scripts/ci_rust.sh                                      # fmt + clippy + test
+./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest
+./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
+./scripts/ci_check_summary.sh artifacts                   # Gate check on batch_summary.json
+./scripts/install_hooks.sh                                # One-time: install git hooks
 ```
 
 ## Architecture

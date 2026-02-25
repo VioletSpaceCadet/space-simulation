@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Pre-commit hook: lint Rust and frontend code.
+# Pre-commit hook: fast lint checks (Rust fmt/clippy + FE eslint/tsc).
+# Bypass: SKIP_HOOKS=1 git commit ... (or --no-verify)
 set -euo pipefail
+
+if [ "${SKIP_HOOKS:-0}" = "1" ]; then
+  echo "pre-commit: skipped (SKIP_HOOKS=1)"
+  exit 0
+fi
 
 echo "=== pre-commit: linting ==="
 
