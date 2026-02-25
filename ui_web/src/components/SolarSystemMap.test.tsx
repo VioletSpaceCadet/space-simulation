@@ -15,7 +15,7 @@ const emptySnapshot: SimSnapshot = {
 describe('SolarSystemMap', () => {
   it('renders an SVG element', () => {
     const { container } = render(
-      <SolarSystemMap snapshot={emptySnapshot} currentTick={100} oreCompositions={{}} />,
+      <SolarSystemMap snapshot={emptySnapshot} currentTick={100} />,
     )
     expect(container.querySelector('svg')).toBeInTheDocument()
   })
@@ -35,7 +35,7 @@ describe('SolarSystemMap', () => {
       },
     }
     const { container } = render(
-      <SolarSystemMap snapshot={snapshotWithEntities} currentTick={100} oreCompositions={{}} />
+      <SolarSystemMap snapshot={snapshotWithEntities} currentTick={100} />
     )
     const stationMarkers = container.querySelectorAll('[data-entity-type="station"]')
     expect(stationMarkers.length).toBe(1)
@@ -56,7 +56,7 @@ describe('SolarSystemMap', () => {
       },
     }
     const { container } = render(
-      <SolarSystemMap snapshot={snapshotWithShip} currentTick={100} oreCompositions={{}} />
+      <SolarSystemMap snapshot={snapshotWithShip} currentTick={100} />
     )
     const shipMarkers = container.querySelectorAll('[data-entity-type="ship"]')
     expect(shipMarkers.length).toBe(1)
@@ -76,7 +76,7 @@ describe('SolarSystemMap', () => {
       },
     }
     const { container } = render(
-      <SolarSystemMap snapshot={snapshotWithAsteroids} currentTick={100} oreCompositions={{}} />
+      <SolarSystemMap snapshot={snapshotWithAsteroids} currentTick={100} />
     )
     const markers = container.querySelectorAll('[data-entity-type="asteroid"]')
     expect(markers.length).toBe(1)
@@ -90,7 +90,7 @@ describe('SolarSystemMap', () => {
       ],
     }
     const { container } = render(
-      <SolarSystemMap snapshot={snapshotWithSites} currentTick={100} oreCompositions={{}} />
+      <SolarSystemMap snapshot={snapshotWithSites} currentTick={100} />
     )
     const markers = container.querySelectorAll('[data-entity-type="scan-site"]')
     expect(markers.length).toBe(1)
@@ -98,7 +98,7 @@ describe('SolarSystemMap', () => {
 
   it('renders orbital ring labels', () => {
     render(
-      <SolarSystemMap snapshot={emptySnapshot} currentTick={100} oreCompositions={{}} />,
+      <SolarSystemMap snapshot={emptySnapshot} currentTick={100} />,
     )
     expect(screen.getByText('Earth Orbit')).toBeInTheDocument()
     expect(screen.getByText('Inner Belt')).toBeInTheDocument()

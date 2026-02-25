@@ -10,15 +10,13 @@ import {
   wouldMoveChange,
   serializeLayout,
   deserializeLayout,
-  type PanelId,
-  type LayoutNode,
   type GroupNode,
   type LeafNode,
 } from './layout'
 
 describe('constants', () => {
-  it('ALL_PANELS contains all 5 panel ids', () => {
-    expect(ALL_PANELS).toEqual(['map', 'events', 'asteroids', 'fleet', 'research'])
+  it('ALL_PANELS contains all 6 panel ids', () => {
+    expect(ALL_PANELS).toEqual(['map', 'events', 'asteroids', 'fleet', 'research', 'economy'])
   })
 
   it('PANEL_LABELS maps each panel id to a label', () => {
@@ -28,6 +26,7 @@ describe('constants', () => {
       asteroids: 'Asteroids',
       fleet: 'Fleet',
       research: 'Research',
+      economy: 'Economy',
     })
   })
 })
@@ -45,7 +44,7 @@ describe('buildDefaultLayout', () => {
 
   it('creates layout for all panels by default', () => {
     const layout = buildDefaultLayout(ALL_PANELS)
-    expect(layout.children).toHaveLength(5)
+    expect(layout.children).toHaveLength(6)
   })
 
   it('creates layout with single panel', () => {

@@ -33,7 +33,7 @@ export function applyEvents(
   let updatedShips = { ...ships }
   let updatedStations = { ...stations }
   let updatedResearch = research
-  let updatedScanSites = [...scanSites]
+  const updatedScanSites = [...scanSites]
 
   for (const evt of events) {
     const e = evt.event

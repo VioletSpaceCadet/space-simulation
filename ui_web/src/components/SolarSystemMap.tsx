@@ -8,7 +8,7 @@ import { angleFromId, polarToCartesian, ringRadiusForNode, transitPosition } fro
 interface Props {
   snapshot: SimSnapshot | null
   currentTick: number
-  oreCompositions: Record<string, unknown>
+
 }
 
 const RINGS: { nodeId: string; label: string; radius: number; isBelt: boolean }[] = [
@@ -31,7 +31,7 @@ function shipColor(task: ShipState['task']): string {
   }
 }
 
-export function SolarSystemMap({ snapshot, currentTick, oreCompositions }: Props) {
+export function SolarSystemMap({ snapshot, currentTick }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const groupRef = useRef<SVGGElement>(null)
 

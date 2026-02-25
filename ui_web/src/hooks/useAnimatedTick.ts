@@ -14,13 +14,14 @@ export function useAnimatedTick(serverTick: number, initialTickRate: number, pau
 
   const samplesRef = useRef<TickSample[]>([])
   const rateRef = useRef(initialTickRate)
-  const anchorRef = useRef<{ tick: number; wallTime: number }>({
-    tick: serverTick,
-    wallTime: performance.now(),
-  })
+  const anchorRef = useRef<{ tick: number; wallTime: number }>({ tick: serverTick, wallTime: 0 })
 
   // Record server tick samples and compute measured rate
   useEffect(() => {
+    // Lazy-init wallTime on first effect run (avoids impure call during render)
+    if (anchorRef.current.wallTime === 0) {
+      anchorRef.current = { tick: serverTick, wallTime: performance.now() }
+    }
     const now = performance.now()
     const samples = samplesRef.current
 
@@ -45,7 +46,9 @@ export function useAnimatedTick(serverTick: number, initialTickRate: number, pau
   }, [serverTick])
 
   const pausedRef = useRef(paused)
-  pausedRef.current = paused
+  useEffect(() => {
+    pausedRef.current = paused
+  }, [paused])
 
   // rAF loop for smooth interpolation
   useEffect(() => {

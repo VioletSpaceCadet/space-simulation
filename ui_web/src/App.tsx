@@ -8,6 +8,7 @@ import {
 } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { AsteroidTable } from './components/AsteroidTable'
+import { EconomyPanel } from './components/EconomyPanel'
 import { EventsFeed } from './components/EventsFeed'
 import { FleetPanel } from './components/FleetPanel'
 import { LayoutRenderer } from './components/LayoutRenderer'
@@ -47,7 +48,7 @@ export default function App() {
 
   const handleTogglePause = useCallback(() => {
     const nextPaused = !paused
-    nextPaused ? playPause() : playResume()
+    if (nextPaused) { playPause() } else { playResume() }
     setPaused(nextPaused)
     ;(nextPaused ? pauseGame() : resumeGame()).catch(() => setPaused(!nextPaused))
   }, [paused])
@@ -95,7 +96,7 @@ export default function App() {
     (id: PanelId) => {
       switch (id) {
         case 'map':
-          return <SolarSystemMap snapshot={snapshot} currentTick={displayTick} oreCompositions={{}} />
+          return <SolarSystemMap snapshot={snapshot} currentTick={displayTick} />
         case 'events':
           return <EventsFeed events={events} />
         case 'asteroids':
@@ -110,6 +111,8 @@ export default function App() {
           )
         case 'research':
           return snapshot ? <ResearchPanel research={snapshot.research} /> : null
+        case 'economy':
+          return <EconomyPanel snapshot={snapshot} events={events} />
       }
     },
     [snapshot, events, displayTick],
@@ -139,7 +142,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <StatusBar tick={displayTick} connected={connected} measuredTickRate={measuredTickRate} paused={paused} onTogglePause={handleTogglePause} alerts={activeAlerts} dismissedAlerts={dismissedAlerts} onDismissAlert={dismissAlert} activeSpeed={ticksPerSec} onSetSpeed={handleSetSpeed} />
+      <StatusBar tick={displayTick} connected={connected} measuredTickRate={measuredTickRate} paused={paused} balance={snapshot?.balance} onTogglePause={handleTogglePause} alerts={activeAlerts} dismissedAlerts={dismissedAlerts} onDismissAlert={dismissAlert} activeSpeed={ticksPerSec} onSetSpeed={handleSetSpeed} />
       <div className="flex flex-1 overflow-hidden">
         <nav className="flex flex-col shrink-0 bg-surface border-r border-edge py-2 px-1 gap-0.5">
           {ALL_PANELS.map((id) => (
