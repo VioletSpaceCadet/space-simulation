@@ -17,6 +17,10 @@ mod survey;
 mod transit;
 mod wear;
 
+mod replenish;
+mod trade;
+mod trade_integration;
+
 // --- Shared test helpers ------------------------------------------------
 
 fn test_content() -> GameContent {
