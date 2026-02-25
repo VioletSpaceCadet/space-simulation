@@ -1019,7 +1019,7 @@ fn resolve_assembler_run(
                     .clone();
                 let ship = ShipState {
                     id: ship_id.clone(),
-                    location_node,
+                    location_node: location_node.clone(),
                     owner: PrincipalId("principal_autopilot".to_string()),
                     inventory: vec![],
                     cargo_capacity_m3: *cargo_capacity_m3,
@@ -1032,6 +1032,8 @@ fn resolve_assembler_run(
                     Event::ShipConstructed {
                         station_id: station_id.clone(),
                         ship_id,
+                        location_node,
+                        cargo_capacity_m3: *cargo_capacity_m3 as f64,
                     },
                 ));
             }

@@ -418,6 +418,26 @@ export function applyEvents(
         updatedScanSites.push({ id: site_id, node, template_id })
         break
       }
+
+      case 'ShipConstructed': {
+        const { ship_id, location_node, cargo_capacity_m3 } = event as {
+          ship_id: string
+          location_node: string
+          cargo_capacity_m3: number
+        }
+        updatedShips = {
+          ...updatedShips,
+          [ship_id]: {
+            id: ship_id,
+            location_node,
+            owner: 'principal_autopilot',
+            inventory: [],
+            cargo_capacity_m3,
+            task: null,
+          },
+        }
+        break
+      }
     }
 
     if (e['TaskStarted']) {

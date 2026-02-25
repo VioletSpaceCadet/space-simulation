@@ -604,6 +604,8 @@ pub enum Event {
     ShipConstructed {
         station_id: StationId,
         ship_id: ShipId,
+        location_node: NodeId,
+        cargo_capacity_m3: f64,
     },
     InsufficientFunds {
         station_id: StationId,
