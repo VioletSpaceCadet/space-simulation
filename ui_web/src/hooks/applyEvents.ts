@@ -1,4 +1,4 @@
-import type { AsteroidState, ComponentItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState } from '../types'
+import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types'
 
 function buildTaskStub(taskKind: string, target: string | null, tick: number): TaskState {
   const kindMap: Record<string, Record<string, unknown>> = {
@@ -15,12 +15,27 @@ function buildTaskStub(taskKind: string, target: string | null, tick: number): T
   }
 }
 
+/** Convert a TradeItemSpec (serde-tagged union) into an InventoryItem for the UI. */
+function tradeItemToInventory(itemSpec: TradeItemSpec): InventoryItem {
+  if ('Material' in itemSpec) {
+    const { element, kg } = itemSpec.Material
+    return { kind: 'Material', element, kg, quality: 1.0 }
+  }
+  if ('Component' in itemSpec) {
+    const { component_id, count } = itemSpec.Component
+    return { kind: 'Component', component_id, count, quality: 1.0 }
+  }
+  const { module_def_id } = itemSpec.Module
+  return { kind: 'Module', item_id: `imported_${module_def_id}_${Date.now()}`, module_def_id }
+}
+
 export function applyEvents(
   asteroids: Record<string, AsteroidState>,
   ships: Record<string, ShipState>,
   stations: Record<string, StationState>,
   research: ResearchState,
   scanSites: ScanSite[],
+  balance: number,
   events: SimEvent[],
 ): {
   asteroids: Record<string, AsteroidState>
@@ -28,12 +43,14 @@ export function applyEvents(
   stations: Record<string, StationState>
   research: ResearchState
   scanSites: ScanSite[]
+  balance: number
 } {
   let updatedAsteroids = { ...asteroids }
   let updatedShips = { ...ships }
   let updatedStations = { ...stations }
   let updatedResearch = research
   const updatedScanSites = [...scanSites]
+  let updatedBalance = balance
 
   for (const evt of events) {
     const e = evt.event
@@ -438,6 +455,123 @@ export function applyEvents(
         }
         break
       }
+
+      case 'ItemImported': {
+        const { station_id, item_spec, balance_after } = event as {
+          station_id: string
+          item_spec: TradeItemSpec
+          cost: number
+          balance_after: number
+        }
+        updatedBalance = balance_after
+        if (updatedStations[station_id]) {
+          const station = updatedStations[station_id]
+          const newItem = tradeItemToInventory(item_spec)
+          // Merge with existing material/component if possible
+          const stationInv = [...station.inventory]
+          let merged = false
+          if (newItem.kind === 'Material') {
+            const existingIndex = stationInv.findIndex(
+              (i) => i.kind === 'Material' && i.element === newItem.element
+            )
+            if (existingIndex >= 0) {
+              const existing = stationInv[existingIndex] as MaterialItem
+              stationInv[existingIndex] = { ...existing, kg: existing.kg + newItem.kg }
+              merged = true
+            }
+          } else if (newItem.kind === 'Component') {
+            const existingIndex = stationInv.findIndex(
+              (i) => i.kind === 'Component' && (i as ComponentItem).component_id === newItem.component_id
+            )
+            if (existingIndex >= 0) {
+              const existing = stationInv[existingIndex] as ComponentItem
+              stationInv[existingIndex] = { ...existing, count: existing.count + newItem.count }
+              merged = true
+            }
+          }
+          if (!merged) stationInv.push(newItem)
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: { ...station, inventory: stationInv },
+          }
+        }
+        break
+      }
+
+      case 'ItemExported': {
+        const { station_id, item_spec, balance_after } = event as {
+          station_id: string
+          item_spec: TradeItemSpec
+          revenue: number
+          balance_after: number
+        }
+        updatedBalance = balance_after
+        if (updatedStations[station_id]) {
+          const station = updatedStations[station_id]
+          let stationInv = [...station.inventory]
+          if ('Material' in item_spec) {
+            const { element, kg } = item_spec.Material
+            let remaining = kg
+            stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
+              if (remaining > 0 && item.kind === 'Material' && item.element === element) {
+                const take = Math.min(item.kg, remaining)
+                remaining -= take
+                if (item.kg - take > 0.001) {
+                  acc.push({ ...item, kg: item.kg - take })
+                }
+                return acc
+              }
+              acc.push(item)
+              return acc
+            }, [])
+          } else if ('Component' in item_spec) {
+            const { component_id, count } = item_spec.Component
+            let remaining = count
+            stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
+              if (remaining > 0 && item.kind === 'Component' && (item as ComponentItem).component_id === component_id) {
+                const take = Math.min((item as ComponentItem).count, remaining)
+                remaining -= take
+                if ((item as ComponentItem).count - take > 0) {
+                  acc.push({ ...item, count: (item as ComponentItem).count - take } as ComponentItem)
+                }
+                return acc
+              }
+              acc.push(item)
+              return acc
+            }, [])
+          } else if ('Module' in item_spec) {
+            const { module_def_id } = item_spec.Module
+            const moduleIndex = stationInv.findIndex(
+              (i) => i.kind === 'Module' && i.module_def_id === module_def_id
+            )
+            if (moduleIndex >= 0) stationInv.splice(moduleIndex, 1)
+          }
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: { ...station, inventory: stationInv },
+          }
+        }
+        break
+      }
+
+      case 'SlagJettisoned': {
+        const { station_id } = event as { station_id: string; kg: number }
+        if (updatedStations[station_id]) {
+          const station = updatedStations[station_id]
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...station,
+              inventory: station.inventory.filter((i) => i.kind !== 'Slag'),
+            },
+          }
+        }
+        break
+      }
+
+      case 'InsufficientFunds':
+        // No state change — event appears in the event feed for visibility
+        break;
     }
 
     if (e['TaskStarted']) {
@@ -495,5 +629,6 @@ export function applyEvents(
     stations: updatedStations,
     research: updatedResearch,
     scanSites: updatedScanSites,
+    balance: updatedBalance,
   }
 }
