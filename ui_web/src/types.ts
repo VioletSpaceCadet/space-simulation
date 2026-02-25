@@ -156,6 +156,7 @@ export interface ResearchState {
 
 export interface SimSnapshot {
   meta: MetaInfo
+  balance: number
   scan_sites: ScanSite[]
   asteroids: Record<string, AsteroidState>
   ships: Record<string, ShipState>
@@ -170,6 +171,23 @@ export interface SimEvent {
 }
 
 export type StreamMessage = SimEvent[] | { heartbeat: true; tick: number }
+
+export interface PricingEntry {
+  base_price_per_unit: number
+  importable: boolean
+  exportable: boolean
+}
+
+export interface PricingTable {
+  import_surcharge_per_kg: number
+  export_surcharge_per_kg: number
+  items: Record<string, PricingEntry>
+}
+
+export type TradeItemSpec =
+  | { Material: { element: string; kg: number } }
+  | { Component: { component_id: string; count: number } }
+  | { Module: { module_def_id: string } }
 
 export type AlertSeverity = 'Warning' | 'Critical'
 

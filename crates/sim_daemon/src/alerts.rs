@@ -263,6 +263,8 @@ mod tests {
             avg_module_wear: 0.0,
             max_module_wear: 0.0,
             repair_kits_remaining: 0,
+            balance: 0.0,
+            thruster_count: 0,
         }
     }
 

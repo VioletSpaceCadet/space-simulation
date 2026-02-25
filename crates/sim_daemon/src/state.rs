@@ -1,7 +1,9 @@
 use parking_lot::Mutex;
 use rand_chacha::ChaCha8Rng;
 use sim_control::AutopilotController;
-use sim_core::{EventEnvelope, GameContent, GameState, MetricsFileWriter, MetricsSnapshot};
+use sim_core::{
+    CommandEnvelope, EventEnvelope, GameContent, GameState, MetricsFileWriter, MetricsSnapshot,
+};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64};
@@ -38,11 +40,13 @@ impl SimState {
 }
 
 pub type SharedSim = Arc<Mutex<SimState>>;
+pub type CommandQueue = Arc<Mutex<Vec<CommandEnvelope>>>;
 pub type EventTx = broadcast::Sender<Vec<EventEnvelope>>;
 
 #[derive(Clone)]
 pub struct AppState {
     pub sim: SharedSim,
+    pub command_queue: CommandQueue,
     pub event_tx: EventTx,
     pub ticks_per_sec: Arc<AtomicU64>,
     pub run_dir: Option<PathBuf>,

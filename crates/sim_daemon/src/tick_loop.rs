@@ -1,4 +1,4 @@
-use crate::state::{EventTx, SharedSim, SimState};
+use crate::state::{CommandQueue, EventTx, SharedSim, SimState};
 use sim_control::CommandSource;
 use sim_core::EventLevel;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -14,6 +14,7 @@ const PERF_LOG_INTERVAL: Duration = Duration::from_secs(5);
 
 pub async fn run_tick_loop(
     sim: SharedSim,
+    command_queue: CommandQueue,
     event_tx: EventTx,
     ticks_per_sec: Arc<AtomicU64>,
     max_ticks: Option<u64>,
@@ -75,7 +76,12 @@ pub async fn run_tick_loop(
                 ref mut next_command_id,
                 ..
             } = *guard;
-            let commands = autopilot.generate_commands(game_state, content, next_command_id);
+            let mut player_commands: Vec<sim_core::CommandEnvelope> =
+                command_queue.lock().drain(..).collect();
+            let autopilot_commands =
+                autopilot.generate_commands(game_state, content, next_command_id);
+            player_commands.extend(autopilot_commands);
+            let commands = player_commands;
             let SimState {
                 ref mut game_state,
                 ref content,
@@ -129,7 +135,7 @@ pub async fn run_tick_loop(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::SimState;
+    use crate::state::{CommandQueue, SimState};
     use parking_lot::Mutex;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
@@ -139,7 +145,7 @@ mod tests {
     use std::collections::VecDeque;
     use tokio::sync::broadcast;
 
-    fn make_test_sim() -> (SharedSim, EventTx, Arc<AtomicBool>) {
+    fn make_test_sim() -> (SharedSim, CommandQueue, EventTx, Arc<AtomicBool>) {
         let content = base_content();
         let mut rng = ChaCha8Rng::seed_from_u64(0);
         let game_state = build_initial_state(&content, 0, &mut rng);
@@ -155,15 +161,17 @@ mod tests {
             metrics_writer: None,
             alert_engine: None,
         }));
+        let command_queue = Arc::new(Mutex::new(Vec::new()));
         let paused = Arc::new(AtomicBool::new(false));
-        (sim, event_tx, paused)
+        (sim, command_queue, event_tx, paused)
     }
 
     #[tokio::test]
     async fn test_tick_loop_advances_tick() {
-        let (sim, event_tx, paused) = make_test_sim();
+        let (sim, command_queue, event_tx, paused) = make_test_sim();
         run_tick_loop(
             sim.clone(),
+            command_queue,
             event_tx,
             Arc::new(AtomicU64::new(0.0_f64.to_bits())),
             Some(5),
@@ -176,10 +184,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_tick_loop_broadcasts_events() {
-        let (sim, event_tx, paused) = make_test_sim();
+        let (sim, command_queue, event_tx, paused) = make_test_sim();
         let mut rx = event_tx.subscribe();
         run_tick_loop(
             sim,
+            command_queue,
             event_tx,
             Arc::new(AtomicU64::new(0.0_f64.to_bits())),
             Some(3),
@@ -199,7 +208,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tick_loop_respects_pause() {
-        let (sim, event_tx, paused) = make_test_sim();
+        let (sim, command_queue, event_tx, paused) = make_test_sim();
         paused.store(true, Ordering::Relaxed);
 
         let sim_clone = sim.clone();
@@ -207,6 +216,7 @@ mod tests {
         let handle = tokio::spawn(async move {
             run_tick_loop(
                 sim_clone,
+                command_queue,
                 event_tx,
                 Arc::new(AtomicU64::new(0.0_f64.to_bits())),
                 Some(5),
@@ -231,11 +241,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_tick_loop_collects_metrics() {
-        let (sim, event_tx, paused) = make_test_sim();
+        let (sim, command_queue, event_tx, paused) = make_test_sim();
         sim.lock().metrics_every = 1;
 
         run_tick_loop(
             sim.clone(),
+            command_queue,
             event_tx,
             Arc::new(AtomicU64::new(0.0_f64.to_bits())),
             Some(5),

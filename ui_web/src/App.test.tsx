@@ -5,7 +5,8 @@ import * as api from './api'
 import type { SimSnapshot } from './types'
 
 const snapshot: SimSnapshot = {
-  meta: { tick: 0, seed: 42, content_version: '0.0.1' },
+  meta: { tick: 0, seed: 42, content_version: '0.0.1', ticks_per_sec: 10, paused: false },
+  balance: 10_000_000,
   scan_sites: [],
   asteroids: {},
   ships: {},
@@ -41,16 +42,17 @@ describe('App', () => {
     expect(nav).toBeInTheDocument()
     const buttons = Array.from(nav.querySelectorAll('button'))
     const labels = buttons.map((b) => b.textContent)
-    expect(labels).toEqual(['Map', 'Events', 'Asteroids', 'Fleet', 'Research'])
+    expect(labels).toEqual(['Map', 'Events', 'Asteroids', 'Fleet', 'Research', 'Economy'])
   })
 
-  it('renders all five panel headings by default', () => {
+  it('renders all six panel headings by default', () => {
     render(<App />)
     expect(screen.getAllByText('Map')).toHaveLength(2) // nav + panel heading
     expect(screen.getAllByText('Events')).toHaveLength(2)
     expect(screen.getAllByText('Asteroids')).toHaveLength(2)
     expect(screen.getAllByText('Fleet')).toHaveLength(2)
     expect(screen.getAllByText('Research')).toHaveLength(2)
+    expect(screen.getAllByText('Economy')).toHaveLength(2)
   })
 
   it('hides panel when nav button clicked', () => {

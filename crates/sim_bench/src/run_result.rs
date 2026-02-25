@@ -52,6 +52,8 @@ pub struct SummaryMetrics {
     pub asteroids_discovered: u32,
     pub asteroids_depleted: u32,
     pub scan_sites_remaining: u32,
+    pub balance: f64,
+    pub thruster_count: u32,
 }
 
 impl SummaryMetrics {
@@ -75,6 +77,8 @@ impl SummaryMetrics {
             asteroids_discovered: snapshot.asteroids_discovered,
             asteroids_depleted: snapshot.asteroids_depleted,
             scan_sites_remaining: snapshot.scan_sites_remaining,
+            balance: snapshot.balance,
+            thruster_count: snapshot.thruster_count,
         }
     }
 }
@@ -150,6 +154,8 @@ mod tests {
             avg_module_wear: 0.3,
             max_module_wear: 0.6,
             repair_kits_remaining: 5,
+            balance: 0.0,
+            thruster_count: 0,
         }
     }
 

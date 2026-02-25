@@ -16,12 +16,16 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, or Assembler), `wear: WearState`. Processor/Assembler have `stalled: bool`. Assembler also has `capped: bool`, `cap_override: HashMap<ComponentId, u32>` |
 | `WearState` | `wear: f32` (0.0–1.0). Embedded on any wearable entity. |
 | `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
-| `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold`, `AssignLabTech`, `SetAssemblerCap`, `JettisonSlag` |
+| `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold`, `AssignLabTech`, `SetAssemblerCap`, `Import`, `Export`, `JettisonSlag` |
 | `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, component_defs, constants |
 | `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, Maintenance, Assembler, Lab, or SensorArray), `wear_per_run` |
 | `ComponentDef` | Component definition: `id`, `name`, `mass_kg`, `volume_m3` |
 | `MaintenanceDef` | Maintenance module behavior: `repair_interval_ticks`, `wear_reduction_per_run`, `repair_kit_cost` |
 | `AssemblerDef` | Assembler module behavior: `assembly_interval_ticks`, `recipes` (list of input filters + output component), `max_stock: HashMap<ComponentId, u32>` (optional stock cap per output component) |
+| `PricingTable` | `import_surcharge_per_kg`, `export_surcharge_per_kg`, `items: HashMap<String, PricingEntry>` |
+| `PricingEntry` | `base_price_per_unit`, `importable`, `exportable` |
+| `TradeItemSpec` | Enum: `Material { element, kg }`, `Component { component_id, count }`, `Module { module_def_id }` |
+| `OutputSpec` | Enum: `Material { ... }`, `Slag { ... }`, `Component { ... }`, `Ship { cargo_capacity_m3 }` |
 | `TechEffect` | `EnableDeepScan` or `DeepScanCompositionNoise { sigma }` |
 | `ResearchDomain` | Enum: `Materials`, `Exploration`, `Engineering` — categorises techs and lab output |
 | `DomainProgress` | Per-tech domain point tracking: `{ materials: f64, exploration: f64, engineering: f64 }` |
@@ -71,6 +75,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 | `elements.json` | 5 elements: `ore` (3000), `slag` (2500), `Fe` (7874), `Si` (2329), `He` (125) kg/m³ |
 | `module_defs.json` | 3 modules: `module_basic_iron_refinery` (Processor, 60-tick interval, wear_per_run=0.01), `module_maintenance_bay` (Maintenance, 30-tick interval, reduces 0.2 wear, costs 1 RepairKit), `module_basic_assembler` (Assembler, 360-tick interval, wear_per_run=0.008, 200kg Fe → 1 RepairKit, max_stock: repair_kit=50) |
 | `component_defs.json` | 1 component: `repair_kit` (50kg, 0.1 m³) |
+| `pricing.json` | Import/export pricing: surcharges per kg, per-item base prices, importable/exportable flags |
 | `dev_base_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
 
 ## Inventory & Refinery Design
@@ -115,6 +120,38 @@ All in `content/`. Loaded at runtime; never compiled in.
 - **Processor stall:** Before running, a processor estimates its output volume. If the output would exceed the station's remaining capacity, the processor sets `stalled = true` and emits `ModuleStalled { station_id, module_id, shortfall_m3 }`. On the next tick where space is available, it clears the stall and emits `ModuleResumed { station_id, module_id }`. Stall events are emitted only on transition (not every tick).
 - **Deposit blocking:** When a ship with a `Deposit` task arrives and there is not enough station capacity for its cargo, the task sets `blocked = true` and emits `DepositBlocked { ship_id, station_id, shortfall_m3 }`. If partial space is available, a partial deposit occurs (FIFO by inventory order). When full space opens, the remaining cargo is deposited and `DepositUnblocked { ship_id, station_id }` is emitted.
 - **Metric:** `refinery_stalled_count` — number of processor modules currently in `stalled = true` state.
+
+## Economy & Trade
+
+**Balance:** `GameState.balance` (f64) starts at $1,000,000,000. Funds are deducted on import and credited on export.
+
+**PricingTable:** Loaded from `content/pricing.json`. Contains `import_surcharge_per_kg` and `export_surcharge_per_kg` (flat surcharges added per kg of traded goods), plus `items: HashMap<String, PricingEntry>` keyed by item identifier (element ID, component ID, or module def ID). Each `PricingEntry` has `base_price_per_unit`, `importable: bool`, `exportable: bool`.
+
+**TradeItemSpec:** Specifies what to trade. Three variants:
+- `Material { element, kg }` — bulk material by element and mass
+- `Component { component_id, count }` — components by ID and quantity
+- `Module { module_def_id }` — a station module by definition ID
+
+**Import cost:** `base_price_per_unit * quantity + import_surcharge_per_kg * total_mass_kg`. Deducted from balance. Items added to station inventory.
+
+**Export revenue:** `base_price_per_unit * quantity - export_surcharge_per_kg * total_mass_kg`. Credited to balance. Items removed from station inventory.
+
+**Commands:** `Command::Import { station_id, item_spec }` and `Command::Export { station_id, item_spec }`. Processed during tick step 1 (apply_commands). Emits `InsufficientFunds` if balance is too low for an import.
+
+**Events:**
+- `ItemImported { station_id, item_spec, cost, balance_after }` — successful import
+- `ItemExported { station_id, item_spec, revenue, balance_after }` — successful export
+- `ShipConstructed { station_id, ship_id }` — shipyard assembler produced a new ship
+- `InsufficientFunds { station_id, action, required, available }` — import rejected due to low balance
+- `ModuleAwaitingTech { station_id, module_id, tech_id }` — module skipped because required tech is not yet unlocked
+
+**OutputSpec::Ship:** Assembler recipe output variant `Ship { cargo_capacity_m3 }`. When a shipyard assembler completes a recipe with this output, a new `ShipState` is created at the station's location node with the specified cargo capacity. Requires `tech_ship_construction` to be unlocked; otherwise emits `ModuleAwaitingTech` and skips.
+
+**Autopilot thruster import:** The `AutopilotController` auto-imports thrusters when conditions are met: station has an enabled shipyard module, `tech_ship_construction` is unlocked, station has >= 5000 kg Fe, station has < 4 thrusters in inventory, and balance > 2x the import cost. Imports up to 4 thrusters total.
+
+**API endpoints:**
+- `POST /api/v1/command` — enqueue a `Command` (JSON body) into the daemon's command queue, processed next tick
+- `GET /api/v1/pricing` — returns the `PricingTable` as JSON
 
 **Future direction (not yet built):**
 - Ore keyed by composition hash instead of asteroid ID — compatible ores blend naturally.
@@ -186,3 +223,4 @@ runs/<name>_<timestamp>/
 - **Sound Effects (done):** Web Audio synthesis (`sounds.ts`) — noise-burst click for pause/resume, two-tone beep for save.
 - **Pause Tick Freeze (done):** `useAnimatedTick` freezes `displayTick` immediately when paused (no drift).
 - **Benchmark Runner (done):** `sim_bench` crate — JSON scenario files, constant overrides, parallel seed execution (rayon), per-seed CSV metrics, cross-seed summary statistics, collapse detection.
+- **Economy & Trade (done):** Balance system ($1B start), import/export commands, pricing table from pricing.json, shipyard assembler (OutputSpec::Ship), thruster import autopilot, Economy UI panel, daemon command queue + pricing endpoint.

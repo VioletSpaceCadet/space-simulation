@@ -1,0 +1,7 @@
+{
+  "name": "economy_long",
+  "ticks": 1051200,
+  "metrics_every": 1440,
+  "seeds": [1, 2, 3],
+  "state": "./content/dev_base_state.json"
+}

@@ -10,10 +10,11 @@ pub mod metrics;
 mod research;
 mod station;
 pub(crate) mod tasks;
+pub mod trade;
 mod types;
 pub mod wear;
 
-pub use engine::tick;
+pub use engine::{tick, TRADE_UNLOCK_TICK};
 pub use graph::shortest_hop_count;
 pub use id::generate_uuid;
 pub use metrics::{

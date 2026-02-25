@@ -9,7 +9,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use sim_core::EventEnvelope;
+use sim_core::{CommandEnvelope, CommandId, EventEnvelope, PrincipalId};
 use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::sync::atomic::Ordering;
@@ -38,6 +38,8 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> Router {
         .route("/api/v1/pause", post(pause_handler))
         .route("/api/v1/resume", post(resume_handler))
         .route("/api/v1/alerts", get(alerts_handler))
+        .route("/api/v1/command", post(command_handler))
+        .route("/api/v1/pricing", get(pricing_handler))
         .route("/api/v1/speed", post(speed_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -54,6 +56,7 @@ pub async fn meta_handler(State(app_state): State<AppState>) -> Json<serde_json:
         "content_version": sim.game_state.meta.content_version,
         "ticks_per_sec": ticks_per_sec,
         "paused": paused,
+        "trade_unlock_tick": sim_core::TRADE_UNLOCK_TICK,
     }))
 }
 
@@ -158,6 +161,50 @@ pub async fn pause_handler(State(app_state): State<AppState>) -> Json<serde_json
 pub async fn resume_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
     app_state.paused.store(false, Ordering::Relaxed);
     Json(serde_json::json!({"paused": false}))
+}
+
+pub async fn command_handler(
+    State(app_state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let command: sim_core::Command = match serde_json::from_value(body["command"].clone()) {
+        Ok(cmd) => cmd,
+        Err(err) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("invalid command: {err}")})),
+            );
+        }
+    };
+
+    let (command_id_str, tick) = {
+        let mut sim = app_state.sim.lock();
+        let id_num = sim.next_command_id;
+        sim.next_command_id += 1;
+        let tick = sim.game_state.meta.tick;
+        let command_id = format!("cmd_{id_num}");
+        (command_id, tick)
+    };
+
+    let envelope = CommandEnvelope {
+        id: CommandId(command_id_str.clone()),
+        issued_by: PrincipalId("principal_player".to_string()),
+        issued_tick: tick,
+        execute_at_tick: tick,
+        command,
+    };
+
+    app_state.command_queue.lock().push(envelope);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"command_id": command_id_str})),
+    )
+}
+
+pub async fn pricing_handler(State(app_state): State<AppState>) -> Json<sim_core::PricingTable> {
+    let sim = app_state.sim.lock();
+    Json(sim.content.pricing.clone())
 }
 
 pub async fn speed_handler(

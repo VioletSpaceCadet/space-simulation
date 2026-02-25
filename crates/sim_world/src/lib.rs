@@ -143,7 +143,9 @@ pub fn validate_content(content: &GameContent) {
                                 );
                             }
                         }
-                        OutputSpec::Slag { .. } | OutputSpec::Component { .. } => {}
+                        OutputSpec::Slag { .. }
+                        | OutputSpec::Component { .. }
+                        | OutputSpec::Ship { .. } => {}
                     }
                 }
             }
@@ -279,6 +281,18 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
                 item_id: ModuleItemId("module_item_0005".to_string()),
                 module_def_id: "module_materials_lab".to_string(),
             },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0006".to_string()),
+                module_def_id: "module_engineering_lab".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0007".to_string()),
+                module_def_id: "module_sensor_array".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0008".to_string()),
+                module_def_id: "module_shipyard".to_string(),
+            },
             InventoryItem::Material {
                 element: "Fe".to_string(),
                 kg: 500.0,
@@ -329,6 +343,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             evidence: std::collections::HashMap::new(),
             action_counts: std::collections::HashMap::new(),
         },
+        balance: 1_000_000_000.0,
         counters: Counters {
             next_event_id: 0,
             next_command_id: 0,
@@ -619,6 +634,7 @@ mod tests {
                 evidence: HashMap::new(),
                 action_counts: HashMap::new(),
             },
+            balance: 0.0,
             counters: Counters {
                 next_event_id: 0,
                 next_command_id: 0,

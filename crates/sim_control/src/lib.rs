@@ -1,8 +1,8 @@
 use sim_core::{
-    inventory_volume_m3, mine_duration, shortest_hop_count, AnomalyTag, AsteroidId, AsteroidState,
-    Command, CommandEnvelope, CommandId, DomainProgress, GameContent, GameState, InventoryItem,
-    ModuleBehaviorDef, ModuleKindState, NodeId, PrincipalId, ShipId, ShipState, SiteId, TaskKind,
-    TechDef, TechId,
+    inventory_volume_m3, mine_duration, shortest_hop_count, trade, AnomalyTag, AsteroidId,
+    AsteroidState, Command, CommandEnvelope, CommandId, ComponentId, DomainProgress, GameContent,
+    GameState, InputAmount, InputFilter, InventoryItem, ModuleBehaviorDef, ModuleKindState, NodeId,
+    PrincipalId, ShipId, ShipState, SiteId, TaskKind, TechDef, TechId, TradeItemSpec,
 };
 
 pub trait CommandSource {
@@ -273,6 +273,119 @@ fn lab_assignment_commands(
     commands
 }
 
+/// Maximum fleet size the autopilot will build toward.
+/// Autopilot won't spend more than this fraction of balance on a single thruster import.
+const AUTOPILOT_BUDGET_CAP_FRACTION: f64 = 0.05;
+
+/// Emits Import commands for thrusters when a shipyard is ready and conditions are met.
+///
+/// Guards (VIO-41):
+/// 1. Trade must be unlocked (tick >= TRADE_UNLOCK_TICK).
+/// 2. `tech_ship_construction` must be researched.
+/// 3. Station must have fewer thrusters than the shipyard recipe requires.
+/// 4. Budget cap: import cost must be < AUTOPILOT_BUDGET_CAP_FRACTION of current balance.
+fn thruster_import_commands(
+    state: &GameState,
+    content: &GameContent,
+    owner: &PrincipalId,
+    next_id: &mut u64,
+) -> Vec<CommandEnvelope> {
+    let mut commands = Vec::new();
+
+    // Gate 1: Trade unlock
+    if state.meta.tick < sim_core::TRADE_UNLOCK_TICK {
+        return commands;
+    }
+
+    // Gate 2: Tech requirement
+    let tech_unlocked = state
+        .research
+        .unlocked
+        .contains(&TechId("tech_ship_construction".to_string()));
+    if !tech_unlocked {
+        return commands;
+    }
+
+    let mut sorted_stations: Vec<_> = state.stations.values().collect();
+    sorted_stations.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+
+    // Look up the shipyard recipe's thruster requirement from content.
+    let required_thrusters = content
+        .module_defs
+        .iter()
+        .find(|def| def.id == "module_shipyard")
+        .and_then(|def| match &def.behavior {
+            ModuleBehaviorDef::Assembler(asm) => asm.recipes.first(),
+            _ => None,
+        })
+        .map(|recipe| {
+            recipe
+                .inputs
+                .iter()
+                .find_map(|input| match (&input.filter, &input.amount) {
+                    (InputFilter::Component(cid), InputAmount::Count(n)) if cid.0 == "thruster" => {
+                        Some(*n)
+                    }
+                    _ => None,
+                })
+                .unwrap_or(4)
+        })
+        .unwrap_or(4);
+
+    for station in sorted_stations {
+        // Find the shipyard module — must be enabled
+        let has_shipyard = station
+            .modules
+            .iter()
+            .any(|module| module.def_id == "module_shipyard" && module.enabled);
+        if !has_shipyard {
+            continue;
+        }
+
+        // Count current thrusters in inventory
+        let thruster_count: u32 = station
+            .inventory
+            .iter()
+            .filter_map(|item| match item {
+                InventoryItem::Component {
+                    component_id,
+                    count,
+                    ..
+                } if component_id.0 == "thruster" => Some(*count),
+                _ => None,
+            })
+            .sum();
+        if thruster_count >= required_thrusters {
+            continue; // Already have enough for the recipe
+        }
+
+        let needed = required_thrusters - thruster_count;
+        let item_spec = TradeItemSpec::Component {
+            component_id: ComponentId("thruster".to_string()),
+            count: needed,
+        };
+
+        // Gate 5: Budget cap — cost must be < 5% of current balance
+        let Some(cost) = trade::compute_import_cost(&item_spec, &content.pricing, content) else {
+            continue;
+        };
+        if cost > state.balance * AUTOPILOT_BUDGET_CAP_FRACTION {
+            continue;
+        }
+
+        commands.push(make_cmd(
+            owner,
+            state.meta.tick,
+            next_id,
+            Command::Import {
+                station_id: station.id.clone(),
+                item_spec,
+            },
+        ));
+    }
+    commands
+}
+
 /// Jettisons all slag from stations whose storage usage exceeds the threshold.
 fn slag_jettison_commands(
     state: &GameState,
@@ -321,6 +434,12 @@ impl CommandSource for AutopilotController {
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut commands = station_module_commands(state, content, &owner, next_command_id);
         commands.extend(lab_assignment_commands(
+            state,
+            content,
+            &owner,
+            next_command_id,
+        ));
+        commands.extend(thruster_import_commands(
             state,
             content,
             &owner,
@@ -1062,6 +1181,277 @@ mod tests {
                 } if t.0 == "tech_materials_v2"
             )),
             "autopilot should reassign lab from unlocked tech to next eligible tech"
+        );
+    }
+
+    // --- Engineering lab assignment test ---
+
+    #[test]
+    fn test_lab_assignment_assigns_engineering_lab_to_ship_construction() {
+        let mut content = base_content();
+        content.techs.clear();
+        content.techs.push(sim_core::TechDef {
+            id: TechId("tech_ship_construction".to_string()),
+            name: "Ship Construction".to_string(),
+            prereqs: vec![],
+            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Engineering, 200.0)]),
+            accepted_data: vec![sim_core::DataKind::EngineeringData],
+            difficulty: 500.0,
+            effects: vec![],
+        });
+        content.module_defs.push(sim_core::ModuleDef {
+            id: "module_engineering_lab".to_string(),
+            name: "Engineering Lab".to_string(),
+            mass_kg: 4000.0,
+            volume_m3: 8.0,
+            power_consumption_per_run: 12.0,
+            wear_per_run: 0.005,
+            behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
+                domain: sim_core::ResearchDomain::Engineering,
+                data_consumption_per_run: 10.0,
+                research_points_per_run: 5.0,
+                accepted_data: vec![sim_core::DataKind::EngineeringData],
+                research_interval_ticks: 1,
+            }),
+        });
+        content.constants.station_power_available_per_tick = 0.0;
+
+        let mut state = base_state(&content);
+        state.scan_sites.clear();
+        let station_id = StationId("station_earth_orbit".to_string());
+        if let Some(station) = state.stations.get_mut(&station_id) {
+            station.power_available_per_tick = 0.0;
+        }
+
+        // Install engineering lab module on the station
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .modules
+            .push(sim_core::ModuleState {
+                id: sim_core::ModuleInstanceId("module_inst_eng_lab_001".to_string()),
+                def_id: "module_engineering_lab".to_string(),
+                enabled: true,
+                kind_state: sim_core::ModuleKindState::Lab(sim_core::LabState {
+                    ticks_since_last_run: 0,
+                    assigned_tech: None,
+                    starved: false,
+                }),
+                wear: sim_core::WearState::default(),
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                sim_core::Command::AssignLabTech {
+                    tech_id: Some(ref t),
+                    ..
+                } if t.0 == "tech_ship_construction"
+            )),
+            "autopilot should assign engineering lab to tech_ship_construction"
+        );
+    }
+
+    // --- Thruster import tests ---
+
+    /// Helper to set up state for thruster import tests.
+    /// Shipyard recipe requires 4 thrusters, assembly interval is 1440 ticks.
+    fn thruster_import_setup() -> (sim_core::GameContent, sim_core::GameState) {
+        let mut content = base_content();
+        content.techs.clear();
+        content.constants.station_power_available_per_tick = 0.0;
+
+        // Add shipyard module def with a recipe requiring 4 thrusters
+        content.module_defs.push(sim_core::ModuleDef {
+            id: "module_shipyard".to_string(),
+            name: "Shipyard".to_string(),
+            mass_kg: 5000.0,
+            volume_m3: 20.0,
+            power_consumption_per_run: 25.0,
+            wear_per_run: 0.02,
+            behavior: sim_core::ModuleBehaviorDef::Assembler(sim_core::AssemblerDef {
+                assembly_interval_ticks: 1440,
+                recipes: vec![sim_core::RecipeDef {
+                    id: "recipe_test_ship".to_string(),
+                    inputs: vec![
+                        sim_core::RecipeInput {
+                            filter: sim_core::InputFilter::Element("Fe".to_string()),
+                            amount: sim_core::InputAmount::Kg(5000.0),
+                        },
+                        sim_core::RecipeInput {
+                            filter: sim_core::InputFilter::Component(ComponentId(
+                                "thruster".to_string(),
+                            )),
+                            amount: sim_core::InputAmount::Count(4),
+                        },
+                    ],
+                    outputs: vec![sim_core::OutputSpec::Ship {
+                        cargo_capacity_m3: 50.0,
+                    }],
+                    efficiency: 1.0,
+                }],
+                max_stock: HashMap::new(),
+            }),
+        });
+
+        // Add thruster component def (needed for mass calculation)
+        content.component_defs.push(sim_core::ComponentDef {
+            id: "thruster".to_string(),
+            name: "Thruster".to_string(),
+            mass_kg: 200.0,
+            volume_m3: 2.0,
+        });
+
+        // Set up pricing for thruster
+        content.pricing = sim_core::PricingTable {
+            import_surcharge_per_kg: 100.0,
+            export_surcharge_per_kg: 50.0,
+            items: HashMap::from([(
+                "thruster".to_string(),
+                sim_core::PricingEntry {
+                    base_price_per_unit: 50_000.0,
+                    importable: true,
+                    exportable: true,
+                },
+            )]),
+        };
+
+        let mut state = base_state(&content);
+        state.scan_sites.clear();
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.power_available_per_tick = 0.0;
+
+        // Install enabled shipyard module
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("module_inst_shipyard_001".to_string()),
+            def_id: "module_shipyard".to_string(),
+            enabled: true,
+            kind_state: sim_core::ModuleKindState::Assembler(sim_core::AssemblerState {
+                ticks_since_last_run: 0,
+                stalled: false,
+                capped: false,
+                cap_override: HashMap::new(),
+            }),
+            wear: sim_core::WearState::default(),
+        });
+
+        // Add 5000 kg Fe to station inventory
+        station.inventory.push(sim_core::InventoryItem::Material {
+            element: "Fe".to_string(),
+            kg: 5000.0,
+            quality: 1.0,
+        });
+
+        // Unlock tech_ship_construction
+        state
+            .research
+            .unlocked
+            .insert(TechId("tech_ship_construction".to_string()));
+
+        // Set high balance and advance past trade unlock
+        state.balance = 10_000_000.0;
+        state.meta.tick = sim_core::TRADE_UNLOCK_TICK;
+
+        (content, state)
+    }
+
+    #[test]
+    fn test_autopilot_imports_thrusters_when_shipyard_ready() {
+        let (content, state) = thruster_import_setup();
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let import_cmd = commands.iter().find(|cmd| {
+            matches!(
+                &cmd.command,
+                Command::Import {
+                    item_spec: TradeItemSpec::Component {
+                        component_id,
+                        count: 4,
+                    },
+                    ..
+                } if component_id.0 == "thruster"
+            )
+        });
+
+        assert!(
+            import_cmd.is_some(),
+            "autopilot should import 4 thrusters when shipyard is ready and past interval"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_no_thruster_import_when_balance_low() {
+        let (content, mut state) = thruster_import_setup();
+        state.balance = 100.0;
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                Command::Import {
+                    item_spec: TradeItemSpec::Component { .. },
+                    ..
+                }
+            )),
+            "autopilot should NOT import thrusters when balance is too low"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_no_thruster_import_when_tech_not_unlocked() {
+        let (content, mut state) = thruster_import_setup();
+        state.research.unlocked.clear();
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                Command::Import {
+                    item_spec: TradeItemSpec::Component { .. },
+                    ..
+                }
+            )),
+            "autopilot should NOT import thrusters when tech_ship_construction is not unlocked"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_no_thruster_import_exceeds_budget_cap() {
+        let (content, mut state) = thruster_import_setup();
+        // Set balance so that import cost > 5% of balance.
+        // 4 thrusters: (50_000 * 4) + (200 * 4 * 100) = 200_000 + 80_000 = 280_000
+        // 280_000 / 0.05 = 5_600_000 — so balance below that should block
+        state.balance = 5_000_000.0;
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                Command::Import {
+                    item_spec: TradeItemSpec::Component { .. },
+                    ..
+                }
+            )),
+            "autopilot should NOT import thrusters when cost exceeds 5% budget cap"
         );
     }
 }

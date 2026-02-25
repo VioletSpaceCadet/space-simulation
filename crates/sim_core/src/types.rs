@@ -106,6 +106,8 @@ pub struct GameState {
     pub ships: HashMap<ShipId, ShipState>,
     pub stations: HashMap<StationId, StationState>,
     pub research: ResearchState,
+    #[serde(default)]
+    pub balance: f64,
     pub counters: Counters,
 }
 
@@ -303,6 +305,49 @@ pub enum TaskKind {
 }
 
 // ---------------------------------------------------------------------------
+// Trade types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum TradeItemSpec {
+    Material {
+        element: String,
+        kg: f32,
+    },
+    Component {
+        component_id: ComponentId,
+        count: u32,
+    },
+    Module {
+        module_def_id: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PricingEntry {
+    pub base_price_per_unit: f64,
+    pub importable: bool,
+    pub exportable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PricingTable {
+    pub import_surcharge_per_kg: f64,
+    pub export_surcharge_per_kg: f64,
+    pub items: HashMap<String, PricingEntry>,
+}
+
+impl Default for PricingTable {
+    fn default() -> Self {
+        Self {
+            import_surcharge_per_kg: 0.0,
+            export_surcharge_per_kg: 0.0,
+            items: HashMap::new(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Command types
 // ---------------------------------------------------------------------------
 
@@ -349,6 +394,14 @@ pub enum Command {
         module_id: ModuleInstanceId,
         component_id: ComponentId,
         max_stock: u32,
+    },
+    Import {
+        station_id: StationId,
+        item_spec: TradeItemSpec,
+    },
+    Export {
+        station_id: StationId,
+        item_spec: TradeItemSpec,
     },
     JettisonSlag {
         station_id: StationId,
@@ -536,6 +589,33 @@ pub enum Event {
         ship_id: ShipId,
         station_id: StationId,
     },
+    ItemImported {
+        station_id: StationId,
+        item_spec: TradeItemSpec,
+        cost: f64,
+        balance_after: f64,
+    },
+    ItemExported {
+        station_id: StationId,
+        item_spec: TradeItemSpec,
+        revenue: f64,
+        balance_after: f64,
+    },
+    ShipConstructed {
+        station_id: StationId,
+        ship_id: ShipId,
+    },
+    InsufficientFunds {
+        station_id: StationId,
+        action: String,
+        required: f64,
+        available: f64,
+    },
+    ModuleAwaitingTech {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        tech_id: TechId,
+    },
     SlagJettisoned {
         station_id: StationId,
         kg: f32,
@@ -584,6 +664,7 @@ pub struct TechDef {
 pub enum TechEffect {
     EnableDeepScan,
     DeepScanCompositionNoise { sigma: f32 },
+    EnableShipConstruction,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -698,6 +779,7 @@ pub enum InputFilter {
         element: ElementId,
         min_quality: f32,
     },
+    Component(ComponentId),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -728,6 +810,9 @@ pub enum OutputSpec {
         component_id: ComponentId,
         quality_formula: QualityFormula,
     },
+    Ship {
+        cargo_capacity_m3: f32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -740,20 +825,6 @@ pub enum YieldFormula {
 pub enum QualityFormula {
     ElementFractionTimesMultiplier { element: ElementId, multiplier: f32 },
     Fixed(f32),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PricingEntry {
-    pub base_price_per_unit: f64,
-    pub importable: bool,
-    pub exportable: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PricingTable {
-    pub import_surcharge_per_kg: f64,
-    pub export_surcharge_per_kg: f64,
-    pub items: HashMap<String, PricingEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

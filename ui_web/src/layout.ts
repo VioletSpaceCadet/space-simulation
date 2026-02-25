@@ -1,4 +1,4 @@
-export type PanelId = 'map' | 'events' | 'asteroids' | 'fleet' | 'research'
+export type PanelId = 'map' | 'events' | 'asteroids' | 'fleet' | 'research' | 'economy'
 export type LeafNode = { type: 'leaf'; panelId: PanelId }
 export type GroupNode = {
   type: 'group'
@@ -7,7 +7,7 @@ export type GroupNode = {
 }
 export type LayoutNode = LeafNode | GroupNode
 
-export const ALL_PANELS: PanelId[] = ['map', 'events', 'asteroids', 'fleet', 'research']
+export const ALL_PANELS: PanelId[] = ['map', 'events', 'asteroids', 'fleet', 'research', 'economy']
 
 export const PANEL_LABELS: Record<PanelId, string> = {
   map: 'Map',
@@ -15,6 +15,7 @@ export const PANEL_LABELS: Record<PanelId, string> = {
   asteroids: 'Asteroids',
   fleet: 'Fleet',
   research: 'Research',
+  economy: 'Economy',
 }
 
 const VALID_PANEL_IDS = new Set<string>(ALL_PANELS)

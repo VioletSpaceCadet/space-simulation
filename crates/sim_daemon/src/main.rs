@@ -127,6 +127,7 @@ async fn main() -> Result<()> {
                     metrics_writer,
                     alert_engine,
                 })),
+                command_queue: Arc::new(Mutex::new(Vec::new())),
                 event_tx: event_tx.clone(),
                 ticks_per_sec: ticks_per_sec_atomic,
                 run_dir,
@@ -142,6 +143,7 @@ async fn main() -> Result<()> {
             info!("sim_daemon listening on http://localhost:{port}  speed={speed}");
             tokio::spawn(run_tick_loop(
                 app_state.sim,
+                app_state.command_queue.clone(),
                 event_tx,
                 app_state.ticks_per_sec.clone(),
                 max_ticks,
@@ -183,6 +185,7 @@ mod tests {
                 metrics_writer: None,
                 alert_engine: None,
             })),
+            command_queue: Arc::new(Mutex::new(Vec::new())),
             event_tx,
             ticks_per_sec: Arc::new(AtomicU64::new(10.0_f64.to_bits())),
             run_dir: None,
@@ -530,6 +533,80 @@ mod tests {
         assert!(
             alerts.contains(&serde_json::json!("STORAGE_SATURATION")),
             "expected STORAGE_SATURATION in active alerts: {alerts:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_command_returns_200_with_valid_import() {
+        let state = make_test_state();
+        let app = make_router(state.clone());
+        let body = serde_json::json!({
+            "command": {
+                "Import": {
+                    "station_id": "station_earth_orbit",
+                    "item_spec": { "Component": { "component_id": "thruster", "count": 2 } }
+                }
+            }
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/command")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let resp_body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&resp_body).unwrap();
+        assert_eq!(json["command_id"], "cmd_0");
+
+        // Verify command was queued
+        let queue = state.command_queue.lock();
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue[0].id.0, "cmd_0");
+    }
+
+    #[tokio::test]
+    async fn test_command_returns_400_with_invalid_body() {
+        let app = make_router(make_test_state());
+        let body = serde_json::json!({ "command": { "Bogus": {} } });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/command")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_pricing_returns_200() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/pricing")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json.is_object(), "pricing response should be a JSON object");
+        assert!(
+            json.get("items").is_some(),
+            "pricing response should contain 'items'"
         );
     }
 

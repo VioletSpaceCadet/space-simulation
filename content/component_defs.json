@@ -4,5 +4,11 @@
     "name": "Repair Kit",
     "mass_kg": 50.0,
     "volume_m3": 0.1
+  },
+  {
+    "id": "thruster",
+    "name": "Thruster",
+    "mass_kg": 200.0,
+    "volume_m3": 0.5
   }
 ]

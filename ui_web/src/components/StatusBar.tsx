@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { saveGame } from '../api'
 import { playSave } from '../sounds'
 import type { ActiveAlert } from '../types'
+import { formatCurrency } from '../utils'
 import { AlertBadges } from './AlertBadges'
 
 const SPEED_PRESETS = [
@@ -17,6 +18,7 @@ interface Props {
   connected: boolean
   measuredTickRate: number
   paused: boolean
+  balance?: number
   onTogglePause: () => void
   alerts: Map<string, ActiveAlert>
   dismissedAlerts: Set<string>
@@ -27,7 +29,7 @@ interface Props {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
-export function StatusBar({ tick, connected, measuredTickRate, paused, onTogglePause, alerts, dismissedAlerts, onDismissAlert, activeSpeed, onSetSpeed }: Props) {
+export function StatusBar({ tick, connected, measuredTickRate, paused, balance, onTogglePause, alerts, dismissedAlerts, onDismissAlert, activeSpeed, onSetSpeed }: Props) {
   const roundedTick = Math.floor(tick)
   const day = Math.floor(roundedTick / 1440)
   const hour = Math.floor((roundedTick % 1440) / 60)
@@ -79,6 +81,12 @@ export function StatusBar({ tick, connected, measuredTickRate, paused, onToggleP
       <span className={connected ? 'text-online' : 'text-offline'}>
         {connected ? '● connected' : '○ reconnecting...'}
       </span>
+      {balance !== undefined && (
+        <span className="flex items-baseline gap-1">
+          <span className="text-faint">Balance</span>
+          <span className="text-accent font-bold">{formatCurrency(balance)}</span>
+        </span>
+      )}
       <div className="ml-auto flex items-center gap-3">
         <AlertBadges alerts={alerts} dismissed={dismissedAlerts} onDismiss={onDismissAlert} />
         <div className="flex items-center gap-0.5">

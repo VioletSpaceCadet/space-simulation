@@ -58,7 +58,7 @@ fn composition_noise_sigma(research: &ResearchState, content: &GameContent) -> f
         .flat_map(|tech| &tech.effects)
         .find_map(|effect| match effect {
             TechEffect::DeepScanCompositionNoise { sigma } => Some(*sigma),
-            TechEffect::EnableDeepScan => None,
+            TechEffect::EnableDeepScan | TechEffect::EnableShipConstruction => None,
         })
         .unwrap_or(0.0)
 }

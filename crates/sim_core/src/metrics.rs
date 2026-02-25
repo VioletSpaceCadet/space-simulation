@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-const METRICS_VERSION: u32 = 3;
+const METRICS_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
@@ -68,6 +68,10 @@ pub struct MetricsSnapshot {
     pub avg_module_wear: f32,
     pub max_module_wear: f32,
     pub repair_kits_remaining: u32,
+
+    // Economy
+    pub balance: f64,
+    pub thruster_count: u32,
 }
 
 #[derive(Default)]
@@ -151,6 +155,7 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
     let mut wear_count = 0_u32;
     let mut max_wear = 0.0_f32;
     let mut total_repair_kits = 0_u32;
+    let mut total_thruster_count = 0_u32;
 
     // --- Stations ---
     for station in state.stations.values() {
@@ -219,7 +224,7 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
             }
         }
 
-        // Count repair kits
+        // Count repair kits and thrusters
         for item in &station.inventory {
             if let InventoryItem::Component {
                 component_id,
@@ -229,6 +234,9 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
             {
                 if component_id.0 == "repair_kit" {
                     total_repair_kits += *count;
+                }
+                if component_id.0 == "thruster" {
+                    total_thruster_count += *count;
                 }
             }
         }
@@ -366,6 +374,8 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         avg_module_wear,
         max_module_wear: max_wear,
         repair_kits_remaining: total_repair_kits,
+        balance: state.balance,
+        thruster_count: total_thruster_count,
     }
 }
 
@@ -383,7 +393,8 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
          fleet_total,fleet_idle,fleet_mining,fleet_transiting,fleet_surveying,fleet_depositing,\
          scan_sites_remaining,asteroids_discovered,asteroids_depleted,\
          techs_unlocked,total_scan_data,max_tech_evidence,\
-         avg_module_wear,max_module_wear,repair_kits_remaining"
+         avg_module_wear,max_module_wear,repair_kits_remaining,\
+         balance,thruster_count"
     )
 }
 
@@ -394,7 +405,7 @@ pub fn append_metrics_row(
 ) -> std::io::Result<()> {
     writeln!(
         writer,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         snapshot.tick,
         snapshot.metrics_version,
         snapshot.total_ore_kg,
@@ -428,6 +439,8 @@ pub fn append_metrics_row(
         snapshot.avg_module_wear,
         snapshot.max_module_wear,
         snapshot.repair_kits_remaining,
+        snapshot.balance,
+        snapshot.thruster_count,
     )
 }
 
@@ -534,6 +547,7 @@ mod tests {
                 evidence: HashMap::new(),
                 action_counts: HashMap::new(),
             },
+            balance: 0.0,
             counters: Counters {
                 next_event_id: 0,
                 next_command_id: 0,
@@ -600,6 +614,8 @@ mod tests {
         assert_eq!(snapshot.avg_module_wear, 0.0);
         assert_eq!(snapshot.max_module_wear, 0.0);
         assert_eq!(snapshot.repair_kits_remaining, 0);
+        assert_eq!(snapshot.balance, 0.0);
+        assert_eq!(snapshot.thruster_count, 0);
     }
 
     #[test]

@@ -155,5 +155,41 @@
         "scan_interval_ticks": 120
       }
     }
+  },
+  {
+    "id": "module_shipyard",
+    "name": "Shipyard",
+    "mass_kg": 5000.0,
+    "volume_m3": 20.0,
+    "power_consumption_per_run": 25.0,
+    "wear_per_run": 0.02,
+    "behavior": {
+      "Assembler": {
+        "assembly_interval_ticks": 20160,
+        "recipes": [
+          {
+            "id": "recipe_basic_mining_shuttle",
+            "inputs": [
+              {
+                "filter": { "Element": "Fe" },
+                "amount": { "Kg": 10000.0 }
+              },
+              {
+                "filter": { "Component": "thruster" },
+                "amount": { "Count": 8 }
+              }
+            ],
+            "outputs": [
+              {
+                "Ship": {
+                  "cargo_capacity_m3": 50.0
+                }
+              }
+            ],
+            "efficiency": 1.0
+          }
+        ]
+      }
+    }
   }
 ]

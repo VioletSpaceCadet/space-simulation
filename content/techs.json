@@ -21,6 +21,17 @@
       "accepted_data": ["MiningData", "EngineeringData"],
       "difficulty": 400.0,
       "effects": []
+    },
+    {
+      "id": "tech_ship_construction",
+      "name": "Ship Construction",
+      "prereqs": [],
+      "domain_requirements": { "Engineering": 200.0 },
+      "accepted_data": ["EngineeringData", "MiningData"],
+      "difficulty": 500.0,
+      "effects": [
+        { "type": "EnableShipConstruction" }
+      ]
     }
   ]
 }
