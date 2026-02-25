@@ -2,6 +2,7 @@
 //!
 //! No IO, no network. All randomness via the passed-in Rng.
 
+mod commands;
 mod composition;
 mod engine;
 mod graph;
@@ -14,7 +15,8 @@ pub mod trade;
 mod types;
 pub mod wear;
 
-pub use engine::{tick, TRADE_UNLOCK_TICK};
+pub use commands::TRADE_UNLOCK_TICK;
+pub use engine::tick;
 pub use graph::shortest_hop_count;
 pub use id::generate_uuid;
 pub use metrics::{
