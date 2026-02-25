@@ -248,6 +248,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     Ok(content)
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
     let earth_orbit = NodeId("node_earth_orbit".to_string());
     let c = &content.constants;

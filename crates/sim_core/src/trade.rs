@@ -16,7 +16,7 @@ pub fn pricing_key(item_spec: &TradeItemSpec) -> &str {
 /// Returns `None` if a component or module def is not found in content.
 pub fn compute_mass(item_spec: &TradeItemSpec, content: &GameContent) -> Option<f64> {
     match item_spec {
-        TradeItemSpec::Material { kg, .. } => Some(*kg as f64),
+        TradeItemSpec::Material { kg, .. } => Some(f64::from(*kg)),
         TradeItemSpec::Component {
             component_id,
             count,
@@ -25,14 +25,14 @@ pub fn compute_mass(item_spec: &TradeItemSpec, content: &GameContent) -> Option<
                 .component_defs
                 .iter()
                 .find(|d| d.id == component_id.0)?;
-            Some(def.mass_kg as f64 * *count as f64)
+            Some(f64::from(def.mass_kg) * f64::from(*count))
         }
         TradeItemSpec::Module { module_def_id } => {
             let def = content
                 .module_defs
                 .iter()
                 .find(|d| d.id == *module_def_id)?;
-            Some(def.mass_kg as f64)
+            Some(f64::from(def.mass_kg))
         }
     }
 }
@@ -40,8 +40,8 @@ pub fn compute_mass(item_spec: &TradeItemSpec, content: &GameContent) -> Option<
 /// Compute the quantity (unit count) for pricing calculation.
 fn quantity(item_spec: &TradeItemSpec) -> f64 {
     match item_spec {
-        TradeItemSpec::Material { kg, .. } => *kg as f64,
-        TradeItemSpec::Component { count, .. } => *count as f64,
+        TradeItemSpec::Material { kg, .. } => f64::from(*kg),
+        TradeItemSpec::Component { count, .. } => f64::from(*count),
         TradeItemSpec::Module { .. } => 1.0,
     }
 }
@@ -229,7 +229,7 @@ pub fn remove_inventory_items(
 
 /// Merge imported items into existing inventory.
 /// Materials merge with existing entries of the same element and quality.
-/// Components merge with existing entries of the same component_id and quality.
+/// Components merge with existing entries of the same `component_id` and quality.
 /// Modules are appended directly.
 pub fn merge_into_inventory(inventory: &mut Vec<InventoryItem>, new_items: Vec<InventoryItem>) {
     for new_item in new_items {
@@ -270,9 +270,6 @@ pub fn merge_into_inventory(inventory: &mut Vec<InventoryItem>, new_items: Vec<I
                 } else {
                     inventory.push(new_item);
                 }
-            }
-            InventoryItem::Module { .. } => {
-                inventory.push(new_item);
             }
             _ => {
                 inventory.push(new_item);

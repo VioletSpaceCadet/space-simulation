@@ -872,6 +872,7 @@ fn tick_assembler_modules(
     }
 }
 
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 fn resolve_assembler_run(
     state: &mut GameState,
     station_id: &StationId,
@@ -899,7 +900,7 @@ fn resolve_assembler_run(
         match (&input.filter, &input.amount) {
             (InputFilter::Element(el), InputAmount::Kg(required_kg)) => {
                 let element_id = el.clone();
-                consumed_element = element_id.clone();
+                consumed_element.clone_from(&element_id);
                 let mut remaining = *required_kg;
 
                 if let Some(station) = state.stations.get_mut(station_id) {

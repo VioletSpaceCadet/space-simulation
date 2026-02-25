@@ -105,23 +105,20 @@ export function EconomyPanel({ snapshot, events }: Props) {
     [categorizedItems, exportCategory],
   )
 
-  // Reset selected item when category changes
-  useEffect(() => {
-    setImportItem(importItems[0]?.key ?? '')
-  }, [importItems])
+  // Category change handlers: reset selected item and quantity in one pass
+  const handleImportCategoryChange = (category: ItemCategory) => {
+    setImportCategory(category)
+    const items = categorizedItems.filter((item) => item.category === category && item.importable)
+    setImportItem(items[0]?.key ?? '')
+    if (category === 'Module') setImportQuantity(1)
+  }
 
-  useEffect(() => {
-    setExportItem(exportItems[0]?.key ?? '')
-  }, [exportItems])
-
-  // Reset quantity to 1 for modules
-  useEffect(() => {
-    if (importCategory === 'Module') setImportQuantity(1)
-  }, [importCategory])
-
-  useEffect(() => {
-    if (exportCategory === 'Module') setExportQuantity(1)
-  }, [exportCategory])
+  const handleExportCategoryChange = (category: ItemCategory) => {
+    setExportCategory(category)
+    const items = categorizedItems.filter((item) => item.category === category && item.exportable)
+    setExportItem(items[0]?.key ?? '')
+    if (category === 'Module') setExportQuantity(1)
+  }
 
   const importCost = useMemo(() => {
     if (!pricing || !importItem) return 0
@@ -229,7 +226,7 @@ export function EconomyPanel({ snapshot, events }: Props) {
             <div className="flex flex-col gap-1.5">
               <select
                 value={importCategory}
-                onChange={(event) => setImportCategory(event.target.value as ItemCategory)}
+                onChange={(event) => handleImportCategoryChange(event.target.value as ItemCategory)}
                 className={selectClass}
               >
                 <option value="Material">Material</option>
@@ -295,7 +292,7 @@ export function EconomyPanel({ snapshot, events }: Props) {
             <div className="flex flex-col gap-1.5">
               <select
                 value={exportCategory}
-                onChange={(event) => setExportCategory(event.target.value as ItemCategory)}
+                onChange={(event) => handleExportCategoryChange(event.target.value as ItemCategory)}
                 className={selectClass}
               >
                 <option value="Material">Material</option>

@@ -1570,6 +1570,7 @@ mod trade_integration_tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines, clippy::cast_possible_truncation)]
     fn economy_full_loop() {
         let content = economy_content();
         let mut state = economy_state(&content);
