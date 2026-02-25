@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchMeta, fetchSnapshot, saveGame } from './api'
+import { fetchMeta, fetchSnapshot, saveGame, setSpeed } from './api'
 
 describe('fetchSnapshot', () => {
   beforeEach(() => {
@@ -59,5 +59,23 @@ describe('saveGame', () => {
       new Response(JSON.stringify({ error: 'no run directory' }), { status: 503 })
     )
     await expect(saveGame()).rejects.toThrow('no run directory')
+  })
+})
+
+describe('setSpeed', () => {
+  beforeEach(() => {
+    global.fetch = vi.fn()
+  })
+
+  it('sends POST to /api/v1/speed with ticks_per_sec', async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ ticks_per_sec: 1000 }))
+    )
+    await setSpeed(1000)
+    expect(global.fetch).toHaveBeenCalledWith('/api/v1/speed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticks_per_sec: 1000 }),
+    })
   })
 })

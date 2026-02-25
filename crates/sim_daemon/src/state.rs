@@ -4,7 +4,7 @@ use sim_control::AutopilotController;
 use sim_core::{EventEnvelope, GameContent, GameState, MetricsFileWriter, MetricsSnapshot};
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -44,7 +44,7 @@ pub type EventTx = broadcast::Sender<Vec<EventEnvelope>>;
 pub struct AppState {
     pub sim: SharedSim,
     pub event_tx: EventTx,
-    pub ticks_per_sec: f64,
+    pub ticks_per_sec: Arc<AtomicU64>,
     pub run_dir: Option<PathBuf>,
     pub paused: Arc<AtomicBool>,
 }

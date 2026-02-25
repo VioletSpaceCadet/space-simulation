@@ -9,6 +9,8 @@ const defaultProps = {
   alerts: new Map(),
   dismissedAlerts: new Set<string>(),
   onDismissAlert: () => {},
+  activeSpeed: 10,
+  onSetSpeed: () => {},
 }
 
 describe('StatusBar', () => {

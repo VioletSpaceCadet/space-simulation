@@ -4,6 +4,14 @@ import { playSave } from '../sounds'
 import type { ActiveAlert } from '../types'
 import { AlertBadges } from './AlertBadges'
 
+const SPEED_PRESETS = [
+  { label: '100', tps: 100 },
+  { label: '1K', tps: 1_000 },
+  { label: '10K', tps: 10_000 },
+  { label: '100K', tps: 100_000 },
+  { label: 'Max', tps: 0 },
+] as const
+
 interface Props {
   tick: number
   connected: boolean
@@ -13,11 +21,13 @@ interface Props {
   alerts: Map<string, ActiveAlert>
   dismissedAlerts: Set<string>
   onDismissAlert: (alertId: string) => void
+  activeSpeed: number
+  onSetSpeed: (tps: number) => void
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
-export function StatusBar({ tick, connected, measuredTickRate, paused, onTogglePause, alerts, dismissedAlerts, onDismissAlert }: Props) {
+export function StatusBar({ tick, connected, measuredTickRate, paused, onTogglePause, alerts, dismissedAlerts, onDismissAlert, activeSpeed, onSetSpeed }: Props) {
   const roundedTick = Math.floor(tick)
   const day = Math.floor(roundedTick / 1440)
   const hour = Math.floor((roundedTick % 1440) / 60)
@@ -71,6 +81,22 @@ export function StatusBar({ tick, connected, measuredTickRate, paused, onToggleP
       </span>
       <div className="ml-auto flex items-center gap-3">
         <AlertBadges alerts={alerts} dismissed={dismissedAlerts} onDismiss={onDismissAlert} />
+        <div className="flex items-center gap-0.5">
+          {SPEED_PRESETS.map(({ label, tps }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onSetSpeed(tps)}
+              className={`px-2 py-0.5 rounded-sm text-[10px] uppercase tracking-widest transition-colors cursor-pointer border ${
+                activeSpeed === tps
+                  ? 'border-accent/40 text-accent'
+                  : 'border-edge text-muted hover:text-dim hover:border-dim'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={onTogglePause}

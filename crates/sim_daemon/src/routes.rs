@@ -38,6 +38,7 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> Router {
         .route("/api/v1/pause", post(pause_handler))
         .route("/api/v1/resume", post(resume_handler))
         .route("/api/v1/alerts", get(alerts_handler))
+        .route("/api/v1/speed", post(speed_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -45,7 +46,7 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> Router {
 
 pub async fn meta_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
     let sim = app_state.sim.lock();
-    let ticks_per_sec = app_state.ticks_per_sec;
+    let ticks_per_sec = f64::from_bits(app_state.ticks_per_sec.load(Ordering::Relaxed));
     let paused = app_state.paused.load(Ordering::Relaxed);
     Json(serde_json::json!({
         "tick": sim.game_state.meta.tick,
@@ -157,6 +158,31 @@ pub async fn pause_handler(State(app_state): State<AppState>) -> Json<serde_json
 pub async fn resume_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
     app_state.paused.store(false, Ordering::Relaxed);
     Json(serde_json::json!({"paused": false}))
+}
+
+pub async fn speed_handler(
+    State(app_state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let Some(tps) = body.get("ticks_per_sec").and_then(|v| v.as_f64()) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "missing or invalid ticks_per_sec"})),
+        );
+    };
+    if tps < 0.0 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "ticks_per_sec must be >= 0"})),
+        );
+    }
+    app_state
+        .ticks_per_sec
+        .store(tps.to_bits(), Ordering::Relaxed);
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"ticks_per_sec": tps})),
+    )
 }
 
 pub async fn stream_handler(

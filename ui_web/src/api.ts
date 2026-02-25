@@ -33,6 +33,16 @@ export async function resumeGame(): Promise<{ paused: boolean }> {
   return response.json()
 }
 
+export async function setSpeed(ticksPerSec: number): Promise<{ ticks_per_sec: number }> {
+  const response = await fetch('/api/v1/speed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticks_per_sec: ticksPerSec }),
+  })
+  if (!response.ok) throw new Error(`Speed change failed: ${response.status}`)
+  return response.json()
+}
+
 export function createEventSource(): EventSource {
   return new EventSource('/api/v1/stream')
 }

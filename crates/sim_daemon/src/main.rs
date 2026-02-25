@@ -18,7 +18,7 @@ use parking_lot::Mutex;
 use sim_control::AutopilotController;
 use sim_core::EventEnvelope;
 use std::collections::VecDeque;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -114,6 +114,7 @@ async fn main() -> Result<()> {
             };
 
             let (event_tx, _) = broadcast::channel::<Vec<EventEnvelope>>(256);
+            let ticks_per_sec_atomic = Arc::new(AtomicU64::new(ticks_per_sec.to_bits()));
             let app_state = AppState {
                 sim: Arc::new(Mutex::new(SimState {
                     game_state,
@@ -127,7 +128,7 @@ async fn main() -> Result<()> {
                     alert_engine,
                 })),
                 event_tx: event_tx.clone(),
-                ticks_per_sec,
+                ticks_per_sec: ticks_per_sec_atomic,
                 run_dir,
                 paused: Arc::new(AtomicBool::new(false)),
             };
@@ -142,7 +143,7 @@ async fn main() -> Result<()> {
             tokio::spawn(run_tick_loop(
                 app_state.sim,
                 event_tx,
-                ticks_per_sec,
+                app_state.ticks_per_sec.clone(),
                 max_ticks,
                 app_state.paused.clone(),
             ));
@@ -183,7 +184,7 @@ mod tests {
                 alert_engine: None,
             })),
             event_tx,
-            ticks_per_sec: 10.0,
+            ticks_per_sec: Arc::new(AtomicU64::new(10.0_f64.to_bits())),
             run_dir: None,
             paused: Arc::new(AtomicBool::new(false)),
         }
@@ -531,6 +532,35 @@ mod tests {
             "expected STORAGE_SATURATION in active alerts: {:?}",
             alerts
         );
+    }
+
+    #[tokio::test]
+    async fn test_speed_sets_ticks_per_sec() {
+        let state = make_test_state();
+        let app = make_router(state.clone());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/speed")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"ticks_per_sec": 1000}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["ticks_per_sec"], 1000.0);
+
+        // Verify atomic reflects new speed
+        let rate = f64::from_bits(
+            state
+                .ticks_per_sec
+                .load(std::sync::atomic::Ordering::Relaxed),
+        );
+        assert!((rate - 1000.0).abs() < 0.001);
     }
 
     #[test]

@@ -14,7 +14,7 @@ import { LayoutRenderer } from './components/LayoutRenderer'
 import { ResearchPanel } from './components/ResearchPanel'
 import { SolarSystemMap } from './components/SolarSystemMap'
 import { StatusBar } from './components/StatusBar'
-import { fetchMeta, pauseGame, resumeGame } from './api'
+import { fetchMeta, pauseGame, resumeGame, setSpeed } from './api'
 import { playPause, playResume } from './sounds'
 import { useAnimatedTick } from './hooks/useAnimatedTick'
 import { useLayoutState } from './hooks/useLayoutState'
@@ -52,18 +52,44 @@ export default function App() {
     ;(nextPaused ? pauseGame() : resumeGame()).catch(() => setPaused(!nextPaused))
   }, [paused])
 
+  const handleSetSpeed = useCallback((tps: number) => {
+    setTicksPerSec(tps)
+    setSpeed(tps).catch(() => {
+      // Revert on failure — re-fetch meta to get actual speed
+      fetchMeta().then((meta) => setTicksPerSec(meta.ticks_per_sec)).catch(() => {})
+    })
+  }, [])
+
   useEffect(() => {
+    const SPEED_KEYS: Record<string, number> = {
+      'Digit1': 100,
+      'Digit2': 1_000,
+      'Digit3': 10_000,
+      'Digit4': 100_000,
+      'Digit5': 0,
+      'Numpad1': 100,
+      'Numpad2': 1_000,
+      'Numpad3': 10_000,
+      'Numpad4': 100_000,
+      'Numpad5': 0,
+    }
     function handleKeyDown(event: KeyboardEvent) {
       const tag = (event.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT') return
       if (event.code === 'Space') {
         event.preventDefault()
         handleTogglePause()
+        return
+      }
+      const speedTps = SPEED_KEYS[event.code]
+      if (speedTps !== undefined) {
+        handleSetSpeed(speedTps)
+        return
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleTogglePause])
+  }, [handleTogglePause, handleSetSpeed])
 
   const renderPanel = useCallback(
     (id: PanelId) => {
@@ -113,7 +139,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <StatusBar tick={displayTick} connected={connected} measuredTickRate={measuredTickRate} paused={paused} onTogglePause={handleTogglePause} alerts={activeAlerts} dismissedAlerts={dismissedAlerts} onDismissAlert={dismissAlert} />
+      <StatusBar tick={displayTick} connected={connected} measuredTickRate={measuredTickRate} paused={paused} onTogglePause={handleTogglePause} alerts={activeAlerts} dismissedAlerts={dismissedAlerts} onDismissAlert={dismissAlert} activeSpeed={ticksPerSec} onSetSpeed={handleSetSpeed} />
       <div className="flex flex-1 overflow-hidden">
         <nav className="flex flex-col shrink-0 bg-surface border-r border-edge py-2 px-1 gap-0.5">
           {ALL_PANELS.map((id) => (

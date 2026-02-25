@@ -1,25 +1,17 @@
 use crate::state::{EventTx, SharedSim, SimState};
 use sim_control::CommandSource;
 use sim_core::EventLevel;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 pub async fn run_tick_loop(
     sim: SharedSim,
     event_tx: EventTx,
-    ticks_per_sec: f64,
+    ticks_per_sec: Arc<AtomicU64>,
     max_ticks: Option<u64>,
     paused: Arc<AtomicBool>,
 ) {
-    let mut interval = if ticks_per_sec > 0.0 {
-        let mut iv = tokio::time::interval(Duration::from_secs_f64(1.0 / ticks_per_sec));
-        iv.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
-        Some(iv)
-    } else {
-        None
-    };
-
     loop {
         while paused.load(Ordering::Relaxed) {
             tokio::time::sleep(Duration::from_millis(50)).await;
@@ -74,8 +66,9 @@ pub async fn run_tick_loop(
             break;
         }
 
-        if let Some(ref mut iv) = interval {
-            iv.tick().await;
+        let rate = f64::from_bits(ticks_per_sec.load(Ordering::Relaxed));
+        if rate > 0.0 {
+            tokio::time::sleep(Duration::from_secs_f64(1.0 / rate)).await;
         } else {
             tokio::task::yield_now().await;
         }
@@ -118,7 +111,14 @@ mod tests {
     #[tokio::test]
     async fn test_tick_loop_advances_tick() {
         let (sim, event_tx, paused) = make_test_sim();
-        run_tick_loop(sim.clone(), event_tx, 0.0, Some(5), paused).await;
+        run_tick_loop(
+            sim.clone(),
+            event_tx,
+            Arc::new(AtomicU64::new(0.0_f64.to_bits())),
+            Some(5),
+            paused,
+        )
+        .await;
         let guard = sim.lock();
         assert_eq!(guard.game_state.meta.tick, 5);
     }
@@ -127,7 +127,14 @@ mod tests {
     async fn test_tick_loop_broadcasts_events() {
         let (sim, event_tx, paused) = make_test_sim();
         let mut rx = event_tx.subscribe();
-        run_tick_loop(sim, event_tx, 0.0, Some(3), paused).await;
+        run_tick_loop(
+            sim,
+            event_tx,
+            Arc::new(AtomicU64::new(0.0_f64.to_bits())),
+            Some(3),
+            paused,
+        )
+        .await;
 
         let mut received = 0;
         while rx.try_recv().is_ok() {
@@ -147,7 +154,14 @@ mod tests {
         let sim_clone = sim.clone();
         let paused_clone = paused.clone();
         let handle = tokio::spawn(async move {
-            run_tick_loop(sim_clone, event_tx, 0.0, Some(5), paused_clone).await;
+            run_tick_loop(
+                sim_clone,
+                event_tx,
+                Arc::new(AtomicU64::new(0.0_f64.to_bits())),
+                Some(5),
+                paused_clone,
+            )
+            .await;
         });
 
         // Give the loop time to notice it's paused (it sleeps 50ms per check).
@@ -169,7 +183,14 @@ mod tests {
         let (sim, event_tx, paused) = make_test_sim();
         sim.lock().metrics_every = 1;
 
-        run_tick_loop(sim.clone(), event_tx, 0.0, Some(5), paused).await;
+        run_tick_loop(
+            sim.clone(),
+            event_tx,
+            Arc::new(AtomicU64::new(0.0_f64.to_bits())),
+            Some(5),
+            paused,
+        )
+        .await;
         let guard = sim.lock();
         assert_eq!(
             guard.metrics_history.len(),
