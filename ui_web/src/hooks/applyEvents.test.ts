@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { applyEvents } from './applyEvents'
-import type { AsteroidState, OreItem, ResearchState, ShipState, StationState } from '../types'
+import type { AsteroidState, ComponentItem, MaterialItem, OreItem, ResearchState, ShipState, SlagItem, StationState, TradeItemSpec } from '../types'
 
 const emptyResearch: ResearchState = { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} }
+const defaultBalance = 1_000_000_000
 
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
@@ -77,6 +78,7 @@ describe('applyEvents', () => {
         {},
         emptyResearch,
         [],
+        defaultBalance,
         events,
       )
 
@@ -109,6 +111,7 @@ describe('applyEvents', () => {
         {},
         emptyResearch,
         [],
+        defaultBalance,
         events,
       )
 
@@ -145,6 +148,7 @@ describe('applyEvents', () => {
         { station_001: station },
         emptyResearch,
         [],
+        defaultBalance,
         events,
       )
 
@@ -178,6 +182,7 @@ describe('applyEvents', () => {
         { station_001: station },
         emptyResearch,
         [],
+        defaultBalance,
         events,
       )
 
@@ -185,6 +190,228 @@ describe('applyEvents', () => {
       expect(result.stations['station_001'].inventory[0]).toEqual(existingOre)
       expect(result.stations['station_001'].inventory[1]).toEqual(newOre)
       expect(result.ships['ship_0001'].inventory).toEqual([])
+    })
+  })
+
+  describe('ItemImported', () => {
+    it('updates balance and adds material to station inventory', () => {
+      const station = makeStation()
+      const itemSpec: TradeItemSpec = { Material: { element: 'Fe', kg: 100 } }
+      const events = [{
+        id: 'e1',
+        tick: 10,
+        event: {
+          ItemImported: {
+            station_id: 'station_001',
+            item_spec: itemSpec,
+            cost: 5000,
+            balance_after: 999_995_000,
+          },
+        },
+      }]
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events)
+
+      expect(result.balance).toBe(999_995_000)
+      expect(result.stations['station_001'].inventory).toHaveLength(1)
+      const item = result.stations['station_001'].inventory[0] as MaterialItem
+      expect(item.kind).toBe('Material')
+      expect(item.element).toBe('Fe')
+      expect(item.kg).toBe(100)
+    })
+
+    it('merges imported material with existing stock', () => {
+      const station = makeStation({
+        inventory: [{ kind: 'Material', element: 'Fe', kg: 50, quality: 1.0 }],
+      })
+      const itemSpec: TradeItemSpec = { Material: { element: 'Fe', kg: 100 } }
+      const events = [{
+        id: 'e1',
+        tick: 10,
+        event: {
+          ItemImported: {
+            station_id: 'station_001',
+            item_spec: itemSpec,
+            cost: 5000,
+            balance_after: 999_995_000,
+          },
+        },
+      }]
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events)
+
+      expect(result.stations['station_001'].inventory).toHaveLength(1)
+      const item = result.stations['station_001'].inventory[0] as MaterialItem
+      expect(item.kg).toBe(150)
+    })
+
+    it('merges imported component with existing stock', () => {
+      const station = makeStation({
+        inventory: [{ kind: 'Component', component_id: 'thruster', count: 2, quality: 1.0 }],
+      })
+      const itemSpec: TradeItemSpec = { Component: { component_id: 'thruster', count: 3 } }
+      const events = [{
+        id: 'e1',
+        tick: 10,
+        event: {
+          ItemImported: {
+            station_id: 'station_001',
+            item_spec: itemSpec,
+            cost: 10000,
+            balance_after: 999_990_000,
+          },
+        },
+      }]
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events)
+
+      expect(result.stations['station_001'].inventory).toHaveLength(1)
+      const item = result.stations['station_001'].inventory[0] as ComponentItem
+      expect(item.count).toBe(5)
+    })
+
+    it('adds module as new inventory item', () => {
+      const station = makeStation()
+      const itemSpec: TradeItemSpec = { Module: { module_def_id: 'module_refinery' } }
+      const events = [{
+        id: 'e1',
+        tick: 10,
+        event: {
+          ItemImported: {
+            station_id: 'station_001',
+            item_spec: itemSpec,
+            cost: 50000,
+            balance_after: 999_950_000,
+          },
+        },
+      }]
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events)
+
+      expect(result.balance).toBe(999_950_000)
+      expect(result.stations['station_001'].inventory).toHaveLength(1)
+      expect(result.stations['station_001'].inventory[0].kind).toBe('Module')
+    })
+  })
+
+  describe('ItemExported', () => {
+    it('updates balance and removes material from station inventory', () => {
+      const station = makeStation({
+        inventory: [{ kind: 'Material', element: 'Fe', kg: 100, quality: 1.0 }],
+      })
+      const itemSpec: TradeItemSpec = { Material: { element: 'Fe', kg: 50 } }
+      const events = [{
+        id: 'e1',
+        tick: 10,
+        event: {
+          ItemExported: {
+            station_id: 'station_001',
+            item_spec: itemSpec,
+            revenue: 3000,
+            balance_after: 1_000_003_000,
+          },
+        },
+      }]
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events)
+
+      expect(result.balance).toBe(1_000_003_000)
+      expect(result.stations['station_001'].inventory).toHaveLength(1)
+      const item = result.stations['station_001'].inventory[0] as MaterialItem
+      expect(item.kg).toBe(50)
+    })
+
+    it('removes material entry when fully exported', () => {
+      const station = makeStation({
+        inventory: [{ kind: 'Material', element: 'Fe', kg: 100, quality: 1.0 }],
+      })
+      const itemSpec: TradeItemSpec = { Material: { element: 'Fe', kg: 100 } }
+      const events = [{
+        id: 'e1',
+        tick: 10,
+        event: {
+          ItemExported: {
+            station_id: 'station_001',
+            item_spec: itemSpec,
+            revenue: 6000,
+            balance_after: 1_000_006_000,
+          },
+        },
+      }]
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events)
+
+      expect(result.stations['station_001'].inventory).toHaveLength(0)
+    })
+
+    it('removes component from inventory', () => {
+      const station = makeStation({
+        inventory: [{ kind: 'Component', component_id: 'repair_kit', count: 5, quality: 1.0 }],
+      })
+      const itemSpec: TradeItemSpec = { Component: { component_id: 'repair_kit', count: 2 } }
+      const events = [{
+        id: 'e1',
+        tick: 10,
+        event: {
+          ItemExported: {
+            station_id: 'station_001',
+            item_spec: itemSpec,
+            revenue: 1000,
+            balance_after: 1_000_001_000,
+          },
+        },
+      }]
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events)
+
+      expect(result.stations['station_001'].inventory).toHaveLength(1)
+      const item = result.stations['station_001'].inventory[0] as ComponentItem
+      expect(item.count).toBe(3)
+    })
+  })
+
+  describe('SlagJettisoned', () => {
+    it('removes all slag from station inventory', () => {
+      const station = makeStation({
+        inventory: [
+          { kind: 'Slag', kg: 50, composition: {} } as SlagItem,
+          { kind: 'Material', element: 'Fe', kg: 100, quality: 1.0 },
+          { kind: 'Slag', kg: 30, composition: {} } as SlagItem,
+        ],
+      })
+      const events = [{
+        id: 'e1',
+        tick: 10,
+        event: { SlagJettisoned: { station_id: 'station_001', kg: 80 } },
+      }]
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events)
+
+      expect(result.stations['station_001'].inventory).toHaveLength(1)
+      expect(result.stations['station_001'].inventory[0].kind).toBe('Material')
+    })
+  })
+
+  describe('InsufficientFunds', () => {
+    it('does not change state', () => {
+      const station = makeStation()
+      const events = [{
+        id: 'e1',
+        tick: 10,
+        event: {
+          InsufficientFunds: {
+            station_id: 'station_001',
+            action: 'Import Fe 100kg',
+            required: 5000,
+            available: 100,
+          },
+        },
+      }]
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events)
+
+      expect(result.balance).toBe(defaultBalance)
+      expect(result.stations['station_001'].inventory).toHaveLength(0)
     })
   })
 })
