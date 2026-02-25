@@ -68,12 +68,13 @@ function reducer(state: State, action: Action): State {
       }
 
       if (!state.snapshot) return { ...state, events: newEvents, currentTick: latestTick, activeAlerts: newAlerts, dismissedAlerts: newDismissed }
-      const { asteroids, ships, stations, research, scanSites } = applyEvents(
+      const { asteroids, ships, stations, research, scanSites, balance } = applyEvents(
         state.snapshot.asteroids,
         state.snapshot.ships,
         state.snapshot.stations,
         state.snapshot.research,
         state.snapshot.scan_sites,
+        state.snapshot.balance,
         action.events,
       )
       return {
@@ -82,7 +83,7 @@ function reducer(state: State, action: Action): State {
         currentTick: latestTick,
         activeAlerts: newAlerts,
         dismissedAlerts: newDismissed,
-        snapshot: { ...state.snapshot, asteroids, ships, stations, research, scan_sites: scanSites },
+        snapshot: { ...state.snapshot, asteroids, ships, stations, research, scan_sites: scanSites, balance },
       }
     }
 
