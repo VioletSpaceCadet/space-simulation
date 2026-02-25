@@ -226,7 +226,8 @@ function ExpandableTable<T extends { id: string }>({
     return { ...sortable, _row: row }
   })
 
-  const { sortedData, sortConfig, requestSort } = useSortableData(sortableRows)
+  const { sortedData, sortConfig, requestSort: requestSortTyped } = useSortableData(sortableRows)
+  const requestSort = requestSortTyped as (key: string) => void
   const colSpan = columns.length
 
   return (
@@ -323,10 +324,11 @@ function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: n
 function ModuleCard({ module: m }: { module: ModuleState }) {
   const name = m.def_id.replace(/^module_/, '')
   const healthPct = m.wear ? Math.round((1 - m.wear.wear) * 100) : 100
-  const isProcessor = typeof m.kind_state === 'object' && 'Processor' in m.kind_state
-  const isMaintenance = typeof m.kind_state === 'object' && 'Maintenance' in m.kind_state
-  const isAssembler = typeof m.kind_state === 'object' && 'Assembler' in m.kind_state
-  const isStalled = (isProcessor && m.kind_state.Processor.stalled) || (isAssembler && m.kind_state.Assembler.stalled)
+  const ks = m.kind_state
+  const processor = typeof ks === 'object' && 'Processor' in ks ? ks.Processor : null
+  const assembler = typeof ks === 'object' && 'Assembler' in ks ? ks.Assembler : null
+  const isMaintenance = typeof ks === 'object' && 'Maintenance' in ks
+  const isStalled = (processor?.stalled) || (assembler?.stalled)
 
   return (
     <div className="border border-edge rounded px-2 py-1.5 bg-surface/30">
@@ -342,13 +344,13 @@ function ModuleCard({ module: m }: { module: ModuleState }) {
       <div className="flex items-center gap-2 mt-1 text-[10px]">
         <span className="text-dim">health</span>
         <span className={m.wear ? wearColor(m.wear.wear) : 'text-green-400'}>{healthPct}%</span>
-        {isProcessor && (
-          <span className="text-faint ml-2">threshold {m.kind_state.Processor.threshold_kg} kg</span>
+        {processor && (
+          <span className="text-faint ml-2">threshold {processor.threshold_kg} kg</span>
         )}
         {isMaintenance && (
           <span className="text-faint ml-2">maintenance bay</span>
         )}
-        {isAssembler && (
+        {assembler && (
           <span className="text-faint ml-2">assembler</span>
         )}
       </div>
