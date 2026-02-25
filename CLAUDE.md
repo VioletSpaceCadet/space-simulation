@@ -107,18 +107,18 @@ For larger features (new modules, new systems, sim_core changes):
 - Stale reviews dismissed on new pushes
 - Force pushes and branch deletion blocked
 
-**PR review by Claude Code:**
-- Claude Code can review PRs when asked (e.g., "review PR #N")
-- Reviews read the full diff via `gh pr diff`, cross-reference codebase conventions, and post line-level comments via `gh pr review`
-- Use `gh` CLI for all GitHub operations (creating PRs, reading comments, posting reviews)
+**Mandatory Claude Code PR review:**
+- Before any PR is merged, Claude Code MUST do a fresh review of the full diff
+- Read the diff with "gh pr diff N", cross-reference against codebase conventions and design rules
+- Post a review comment via "gh pr review N --comment" with findings or confirmation
+- The review comment MUST start with: "Claude Code Review -- No issues found." (if clean) or "Claude Code Review -- Issues found:" (if not)
+- Do NOT use backticks in review comment bodies (causes permission prompts)
+- This review is mandatory even if Claude Code authored the PR — fresh eyes catch things
 
 **Creating a PR:**
-```bash
-git push -u origin <branch>
-gh pr create --title "feat(scope): summary" --body "## Summary\n- ...\n## Test plan\n- ..."
-```
+Push branch, then open with "gh pr create". Include a Summary section and Test plan section in the body.
 
-**NEVER push directly to main.** Always branch → PR → CI green → review → squash merge.
+**NEVER push directly to main.** Always branch, PR, CI green, Claude review, owner approval, squash merge.
 
 ### Scenario Files
 
