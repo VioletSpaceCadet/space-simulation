@@ -2,7 +2,7 @@
 
 Space industry simulation game. Deterministic Rust sim core, HTTP daemon with SSE event streaming, React mission control UI.
 
-`docs/DESIGN_SPINE.md` — authoritative design philosophy. `docs/reference.md` — detailed types, content files, inventory/refinery design. `docs/workflow.md` — CI, hooks, PR conventions, GitHub MCP setup. `base-project.md` — original design doc. Balance analysis and tuning tracked in Linear ("Balance & Tuning" project, VioletSpaceCadet workspace).
+`docs/DESIGN_SPINE.md` — authoritative design philosophy. `docs/reference.md` — detailed types, content files, inventory/refinery design. `docs/workflow.md` — CI, hooks, PR conventions, scenarios, balance tuning loop. `base-project.md` — original design doc. Balance analysis tracked in Linear ("Balance & Tuning" project, VioletSpaceCadet workspace).
 
 ## Common Commands
 
@@ -14,155 +14,84 @@ cargo test <name>                                         # Run a single test by
 cargo clippy                                              # Lint
 cargo fmt                                                 # Format
 
-# CLI runner
-cargo run -p sim_cli -- run --ticks 1000 --seed 42
-cargo run -p sim_cli -- run --ticks 500 --seed 42 --print-every 50 --event-level debug
+cargo run -p sim_cli -- run --ticks 1000 --seed 42        # CLI runner
 cargo run -p sim_cli -- run --state content/dev_base_state.json
-cargo run -p sim_cli -- run --ticks 500 --seed 42 --metrics-every 60
-cargo run -p sim_cli -- run --ticks 500 --seed 42 --no-metrics
+cargo run -p sim_daemon -- run --seed 42                  # HTTP daemon (:3001)
+cd ui_web && npm run dev                                  # React UI (:5173)
+cd ui_web && npm test                                     # vitest
 
-# HTTP daemon (http://localhost:3001)
-cargo run -p sim_daemon -- run --seed 42
-cargo run -p sim_daemon -- run --seed 42 --ticks-per-sec 0
-
-# React UI (in ui_web/)
-cd ui_web && npm run dev     # dev at http://localhost:5173 (proxies /api to :3001)
-cd ui_web && npm test        # vitest
-
-# Benchmark runner
 cargo run -p sim_bench -- run --scenario scenarios/baseline.json
-cargo run -p sim_bench -- run --scenario scenarios/balance_v1.json
-cargo run -p sim_bench -- run --scenario scenarios/cargo_sweep.json --output-dir /tmp/bench
 
-# CI scripts (same checks as GitHub Actions)
 ./scripts/ci_rust.sh                                      # fmt + clippy + test
 ./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
-./scripts/ci_check_summary.sh artifacts                   # Gate check on batch_summary.json
-./scripts/install_hooks.sh                                # One-time: install git hooks
 ```
 
 ## Architecture
 
-Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus `sim_world` (shared content loading + world gen) and `ui_web/` (React).
+Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus `sim_world` (content loading + world gen) and `ui_web/` (React).
 
-- **sim_core** — Pure deterministic sim. No IO. Modules: `types`, `engine`, `tasks`, `research`, `station`, `graph`, `id`, `composition`, `metrics`, `wear`, `trade`. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, `shortest_hop_count()`, `generate_uuid()`, `compute_metrics()`, `write_metrics_csv()`, `write_metrics_header()`, `append_metrics_row()`, `wear_efficiency()`. Key types: `PricingTable`, `PricingEntry`, `TradeItemSpec`, `OutputSpec::Ship`, `Command::Import/Export`.
-- **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management). Skips re-enabling modules at max wear. Auto-assigns labs to eligible techs. Auto-imports thrusters when shipyard is ready (requires tech_ship_construction, >=5000 kg Fe, <4 thrusters, balance > 2x cost).
-- **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json` (9 files incl. `component_defs.json`, `pricing.json`).
-- **sim_bench** — Automated scenario runner. Loads JSON scenario files with optional `"state"` field (e.g., `"./content/dev_base_state.json"`), applies constant overrides AND module-level overrides (dotted keys: `module.lab.research_interval_ticks`, `module.processor.processing_interval_ticks`, etc.). Runs N seeds in parallel (rayon). Writes per-seed `run_result.json` (schema v1) + `metrics_000.csv`, and batch-level `batch_summary.json` with aggregated metrics (mean/min/max/stddev). Collapse detection (refinery starved + fleet idle). Output: `runs/<name>_<timestamp>/`.
-- **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags. Auto-writes to `runs/<run_id>/`.
-- **sim_daemon** — axum 0.7. SSE (50ms flush, 200ms heartbeat). `--metrics-every` flag (default 60), `--no-metrics`. Auto-writes to `runs/<run_id>/`. AlertEngine evaluates 9 pure-Rust rules after each metrics sample, emits `AlertRaised`/`AlertCleared` events on SSE. `AtomicBool` pause flag checked by tick loop (no Mutex). Command queue (`Arc<Mutex<Vec<Command>>>`) drained each tick. Endpoints: `/api/v1/meta`, `/api/v1/snapshot`, `/api/v1/metrics`, `/api/v1/stream`, `POST /api/v1/save`, `POST /api/v1/pause`, `POST /api/v1/resume`, `GET /api/v1/alerts` (active alerts), `POST /api/v1/command` (enqueue command), `GET /api/v1/pricing` (pricing table), `POST /api/v1/speed` (set tick rate: `{"ticks_per_sec": N}`, 0 = max).
-- **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. `useSimStream` (useReducer + applyEvents), `useAnimatedTick` (60fps interpolation), `useSortableData`. Draggable panels via @dnd-kit (Map, Events, Asteroids, Fleet, Research, Economy). Fleet panel has expandable rows with detail sections. StatusBar: alert badges (dismissible, color-coded), pause/resume toggle, save button. Keyboard shortcuts: spacebar (pause/resume), Cmd/Ctrl+S (save), 1-5 (speed presets: 100/1K/10K/100K/Max TPS). Web Audio sound effects (`sounds.ts`) for pause, resume, and save. `useAnimatedTick` freezes display tick immediately when paused.
+- **sim_core** — Pure deterministic sim. No IO. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, etc.
+- **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management).
+- **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json`.
+- **sim_bench** — Scenario runner. JSON overrides (constants + `module.*` dotted keys). Parallel seeds via rayon.
+- **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags.
+- **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints.
+- **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
 
-**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (3a processors, 3b assemblers, 3c sensor arrays, 3d labs, 3e maintenance) → 4. Advance research (batch roll every N ticks) → 5. Replenish scan sites → 6. Increment tick.
+**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
 
 **Key design rules:**
 - Asteroids created on discovery (scan_sites → AsteroidState), not pre-populated.
-- Research uses lab-based domain system. Labs consume raw data, produce domain-specific points. Tech unlock is probabilistic with domain sufficiency.
-- Raw data is sim-wide (on ResearchState), not station inventory.
-- Research rolls every N ticks (configurable), not every tick.
+- Research uses lab-based domain system. Labs consume raw data, produce domain-specific points. Tech unlock is probabilistic.
+- Raw data is sim-wide (on ResearchState), not station inventory. Rolls every N ticks, not every tick.
 - DeepScan commands dropped if no unlocked tech has EnableDeepScan effect.
 - All collection iteration sorted by ID before RNG use for determinism.
-- Scan sites replenished when count < 5. Deterministic UUIDs from seeded RNG.
 - sim_core takes `&mut impl rand::Rng` — concrete ChaCha8Rng in sim_cli/sim_daemon.
-- **Wear system:** `WearState` (0.0–1.0) on each module. Processors accumulate `wear_per_run` after each run. 3-band efficiency: nominal (1.0), degraded (0.75 at ≥0.5), critical (0.5 at ≥0.8). Auto-disables at 1.0. Maintenance Bay repairs most-worn module, consumes RepairKit. `WearState` is generic — designed for future ship module wear.
-- **Economy system:** Balance starts at $1B. Import/export commands processed in apply_commands. Ship construction requires tech_ship_construction. Pricing from pricing.json.
+- **Wear system:** `WearState` (0.0–1.0) on each module. 3-band efficiency: nominal/degraded/critical. Auto-disables at 1.0. Maintenance Bay repairs most-worn, consumes RepairKit.
+- **Economy system:** Balance starts at $1B. Import/export in apply_commands. Ship construction requires tech_ship_construction. Pricing from pricing.json.
 
 ## Development Workflow
 
 ### Project Tracking (Linear)
 
-Issues are tracked in Linear (VioletSpaceCadet workspace, MCP integration configured). Use the Linear MCP tools to:
-- Create issues for bugs, features, and balance recommendations
-- Organize into projects (e.g., "Balance & Tuning") for related work
-- Set blocking relationships between dependent issues
-- Update issues with sim results and revised proposals
-
-### Balance & Tuning Loop
-
-1. **Run sim_bench scenarios** — `scenarios/baseline.json` (current defaults) or custom scenario with overrides
-2. **Analyze results** — inspect `batch_summary.json` aggregated metrics, per-seed `run_result.json`, and `metrics_000.csv` time series
-3. **File Linear tickets** — create issues with sim data, proposed changes, and rationale
-4. **Test via overrides** — use `module.*` dotted keys in scenario overrides to test changes without editing content files
-5. **Apply to content** — once validated, update `content/constants.json` or `content/module_defs.json`
-6. **Re-run and verify** — confirm metrics improve, no regressions
+Issues tracked in Linear (VioletSpaceCadet workspace, MCP integration configured). Create issues for bugs, features, balance recommendations. Organize into projects, set blocking relationships.
 
 ### Feature Development (Multi-Ticket Projects)
 
-For larger features spanning multiple Linear tickets:
-
-1. **Create a feature branch** from main: `feat/<project-name>` (e.g., `feat/energy-propellant`)
-2. **Each Linear ticket gets its own branch** off the feature branch: `feat/<project>/<ticket-id>-<short-name>`
+1. **Create a feature branch** from main: `feat/<project-name>`
+2. **Each ticket gets its own branch** off the feature branch: `feat/<project>/<ticket-id>-<short-name>`
 3. **PR per ticket into the feature branch** — standard Claude review process applies
-4. **Claude auto-merges ticket PRs** into the feature branch after CI passes and review is clean (squash merge via `gh pr merge --squash`)
-5. **Final PR from feature branch into main** — requires owner (@VioletSpaceCadet) approval before merge
-6. **Clean up** — delete feature branch and sub-branches after merge to main
-
-Example flow for a project with tickets VIO-100, VIO-101, VIO-102:
-- Create `feat/energy-propellant` from main
-- VIO-100: branch `feat/energy-propellant/vio-100-fuel-types` -> PR into `feat/energy-propellant` -> Claude reviews + auto-merges
-- VIO-101: branch `feat/energy-propellant/vio-101-burn-rates` -> PR into `feat/energy-propellant` -> Claude reviews + auto-merges
-- VIO-102: branch `feat/energy-propellant/vio-102-ui-gauges` -> PR into `feat/energy-propellant` -> Claude reviews + auto-merges
-- Final: PR `feat/energy-propellant` -> `main` -> Claude reviews, owner approves, squash merge
+4. **Claude auto-merges ticket PRs** after CI passes and review is clean (squash merge)
+5. **Final PR from feature branch into main** — merge main into feature branch first to resolve conflicts, then requires owner (@VioletSpaceCadet) approval
+6. **Clean up** — delete feature branch and sub-branches after merge
 
 ### Small Changes (Single-Ticket)
 
-For small features, bug fixes, or docs changes (single ticket, no project branch needed):
-
-1. **Branch from main** — `fix/<ticket-id>-<short-name>` or `chore/<short-name>`
-2. **PR directly into main** — standard review process, owner approval required
-3. **Clean up** — delete branch after merge
+Branch from main (`fix/<ticket-id>-<short-name>` or `chore/<short-name>`), PR directly into main, owner approval required.
 
 ### Pull Request Workflow
 
-**Branch protection is enforced on `main`:**
-- Direct pushes to main are blocked — all changes go through PRs
-- Required CI checks: "Rust (fmt + clippy + test)", "Web (lint + typecheck + test)", "Bench smoke" (must pass before merge)
-- CODEOWNERS (`@VioletSpaceCadet`) review required on all PRs
-- Stale reviews dismissed on new pushes
-- Force pushes and branch deletion blocked
+**Branch protection on `main`:** Direct pushes blocked, required CI checks ("Rust", "Web", "Bench smoke"), CODEOWNERS review required, stale reviews dismissed.
 
-**Mandatory Claude Code PR review (full process):**
-1. After pushing, watch CI with "gh pr checks N --watch" until all checks resolve
-2. If any check fails, read logs with "gh run view RUN_ID --log-failed", fix the issue, commit, push, and watch again
-3. Once all checks pass, do a fresh review: read the full diff with "gh pr diff N"
-4. Cross-reference against codebase conventions, design rules, and architecture
-5. Post a review comment via "gh pr review N --comment" with findings or confirmation
-6. The review comment MUST start with: "Claude Code Review -- No issues found." (if clean) or "Claude Code Review -- Issues found:" (if not)
-7. Do NOT use backticks in review comment bodies (causes permission prompts)
-8. This review is mandatory even if Claude Code authored the PR — fresh eyes catch things
+**Mandatory Claude Code PR review:**
+1. Watch CI: `gh pr checks N --watch`
+2. If fails: `gh run view RUN_ID --log-failed`, fix, push, watch again
+3. Once green: fresh review via `gh pr diff N`
+4. Post review: `gh pr review N --comment` — must start with "Claude Code Review -- No issues found." or "Claude Code Review -- Issues found:"
+5. Do NOT use backticks in review comment bodies (causes permission prompts)
 
-**Creating a PR:**
-Push branch, then open with "gh pr create". Include a Summary section and Test plan section in the body. Set the base branch explicitly when targeting a feature branch: "gh pr create --base feat/project-name".
+**Creating a PR:** Push branch, `gh pr create`. Include Summary + Test plan. Use `--base feat/project-name` when targeting a feature branch.
 
 **Two merge paths:**
-- **PR into feature branch:** Claude auto-merges after CI green + review posted ("gh pr merge --squash")
+- **PR into feature branch:** Claude auto-merges after CI green + review (`gh pr merge --squash`)
 - **PR into main:** Claude reviews but NEVER merges — owner must approve and merge
 
-**NEVER push directly to main.** Always branch, PR, CI green, Claude review, then merge (auto for feature branches, owner-approved for main).
-
-### Scenario Files
-
-| Scenario | Ticks | Purpose |
-|---|---|---|
-| `scenarios/baseline.json` | 20,160 (2 weeks) | Current defaults with `dev_base_state.json` |
-| `scenarios/balance_v1.json` | 20,160 (2 weeks) | Module tuning proposals (lab/refinery/assembler overrides) |
-| `scenarios/month.json` | 43,200 (30 days) | Medium-term sustainability (refinery throughput, kit economy) |
-| `scenarios/quarter.json` | 129,600 (90 days) | Long-term sustainability (slag buildup, research progress) |
-| `scenarios/cargo_sweep.json` | 10,000 | Cargo capacity stress test |
-
-Scenarios support: `"state"` (path to initial state JSON), `"overrides"` (constants + `module.*` keys), `"seeds"` (list or `{"range": [1, 5]}`).
-
-### Content & Starting State
-
-- `content/dev_base_state.json` — canonical starting state for gameplay testing (refinery, assembler, maintenance bay, 2 labs, 500 kg Fe, 10 repair kits, 50 m³ ship cargo, 2,000 m³ station cargo)
-- `content/constants.json` — game constants (already rebalanced for hard sci-fi pacing)
-- `content/module_defs.json` — module behavior parameters (intervals, wear, recipes)
-- `build_initial_state()` in sim_world should stay in sync with `dev_base_state.json`
+**NEVER push directly to main.**
 
 ## After Every Change
 
-Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on `.rs` edits — `cargo fmt` then `cargo test -p <crate>` for the edited crate. Fix failures before moving on.
+Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on `.rs` edits — `cargo fmt` then `cargo test -p <crate>`. Fix failures before moving on.
 
 - **If you changed a type or tick ordering:** update this file and `docs/reference.md` as needed.
 - **Before claiming work is complete:** confirm tests pass, no TODO stubs introduced.
@@ -171,16 +100,8 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 **Always squash merge. Never push directly to main.**
 
-**Ticket PR into feature branch (Claude auto-merges):**
-1. CI must pass
-2. Claude posts review comment
-3. Claude runs "gh pr merge --squash" to merge
-
-**Feature branch or single-ticket PR into main (owner merges):**
-1. CI must pass
-2. Claude posts review comment
-3. Owner (@VioletSpaceCadet) approves and squash merges on GitHub
-4. Clean up branches after merge
+- **Ticket PR into feature branch:** CI pass → Claude review → Claude runs `gh pr merge --squash`
+- **PR into main:** CI pass → Claude review → Owner approves and squash merges
 
 ## Notes
 
