@@ -110,7 +110,10 @@ pub(crate) fn item_volume_m3(item: &InventoryItem, content: &GameContent) -> f32
 
 /// Volume (m³) currently occupied by the inventory items.
 pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -> f32 {
-    inventory.iter().map(|item| item_volume_m3(item, content)).sum()
+    inventory
+        .iter()
+        .map(|item| item_volume_m3(item, content))
+        .sum()
 }
 
 /// Pre-compute how many ticks a mining run will take.
