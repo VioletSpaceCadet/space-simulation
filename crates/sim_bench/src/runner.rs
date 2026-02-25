@@ -17,6 +17,7 @@ pub struct SeedResult {
     pub run_id: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_seed(
     content: &GameContent,
     seed: u64,
@@ -160,7 +161,7 @@ mod tests {
 
         assert_eq!(result.seed, 42);
         assert_eq!(result.final_snapshot.tick, 120);
-        assert!(result.wall_time_ms > 0 || result.wall_time_ms == 0); // just exists
+        let _ = result.wall_time_ms; // just verify field exists
         assert!(!result.run_id.is_empty());
         assert!(seed_dir.join("run_info.json").exists());
         assert!(seed_dir.join("metrics_000.csv").exists());

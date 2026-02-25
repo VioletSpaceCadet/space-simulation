@@ -34,6 +34,7 @@ enum Commands {
     },
 }
 
+#[allow(clippy::too_many_lines)]
 fn run(scenario_path: &str, output_dir: &str) -> Result<()> {
     let scenario = scenario::load_scenario(Path::new(scenario_path))?;
     let seeds = scenario.seeds.expand();

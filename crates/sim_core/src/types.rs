@@ -772,7 +772,7 @@ pub struct Constants {
     pub mining_rate_kg_per_tick: f32,
     pub deposit_ticks: u64,
     pub station_power_available_per_tick: f32,
-    /// Minimum IronRich tag confidence for autopilot to queue a deep scan.
+    /// Minimum `IronRich` tag confidence for autopilot to queue a deep scan.
     pub autopilot_iron_rich_confidence_threshold: f32,
     /// Default refinery processing threshold (kg) set by autopilot on newly installed modules.
     pub autopilot_refinery_threshold_kg: f32,

@@ -1,5 +1,5 @@
 use sim_core::MetricsSnapshot;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 type RuleFn = fn(&VecDeque<MetricsSnapshot>, &AlertEngine) -> bool;
 
@@ -107,8 +107,11 @@ const RULES: &[AlertRule] = &[
             if recent.len() < 2 {
                 return false;
             }
-            let evidence_unchanged =
-                max_f(&recent, |s| s.max_tech_evidence) == min_f(&recent, |s| s.max_tech_evidence);
+            let evidence_unchanged = (max_f(&recent, |s| s.max_tech_evidence)
+                - min_f(&recent, |s| s.max_tech_evidence))
+            .abs()
+                < f32::EPSILON;
+            #[allow(clippy::cast_possible_truncation)]
             let all_unlocked = max_u(&recent, |s| s.techs_unlocked) >= engine.total_techs as u32;
             evidence_unchanged && !all_unlocked
         },
@@ -149,21 +152,21 @@ fn min_u(snapshots: &[&MetricsSnapshot], f: fn(&MetricsSnapshot) -> u32) -> u32 
 // --- AlertEngine ---
 
 pub struct AlertEngine {
-    active: HashMap<String, ()>,
+    active: HashSet<String>,
     total_techs: usize,
 }
 
 impl AlertEngine {
     pub fn new(total_techs: usize) -> Self {
         Self {
-            active: HashMap::new(),
+            active: HashSet::new(),
             total_techs,
         }
     }
 
     /// Returns current active alert IDs (for the /api/v1/alerts endpoint).
     pub fn active_alert_ids(&self) -> Vec<String> {
-        self.active.keys().cloned().collect()
+        self.active.iter().cloned().collect()
     }
 
     /// Evaluate all rules against recent metrics history. Returns events for state changes.
@@ -177,14 +180,14 @@ impl AlertEngine {
 
         for rule in RULES {
             let fired = (rule.check)(history, self);
-            let was_active = self.active.contains_key(rule.id);
+            let was_active = self.active.contains(rule.id);
 
             if fired && !was_active {
                 // SHIP_IDLE_WITH_WORK only fires if another alert is already active
                 if rule.id == "SHIP_IDLE_WITH_WORK" && self.active.is_empty() {
                     continue;
                 }
-                self.active.insert(rule.id.to_string(), ());
+                self.active.insert(rule.id.to_string());
                 events.push(make_envelope(
                     counters,
                     tick,

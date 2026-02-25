@@ -32,6 +32,11 @@ fn test_identical_seeds_produce_identical_event_logs() {
 }
 
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 fn test_full_survey_deepscan_mine_deposit_cycle() {
     let content = test_content();
     let mut state = test_state(&content);

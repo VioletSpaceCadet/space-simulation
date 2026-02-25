@@ -35,7 +35,7 @@ enum Commands {
         /// Generate world procedurally with this seed. Mutually exclusive with --state.
         #[arg(long, conflicts_with = "state_file")]
         seed: Option<u64>,
-        /// Load initial GameState from a JSON file. Mutually exclusive with --seed.
+        /// Load initial `GameState` from a JSON file. Mutually exclusive with --seed.
         #[arg(long = "state", conflicts_with = "seed")]
         state_file: Option<String>,
         #[arg(long, default_value = "./content")]
@@ -426,7 +426,7 @@ mod tests {
             .unwrap();
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let result: Result<serde_json::Value, _> = serde_json::from_slice(&body);
-        assert!(result.is_ok(), "snapshot was not valid JSON: {:?}", body);
+        assert!(result.is_ok(), "snapshot was not valid JSON: {body:?}");
     }
 
     #[tokio::test]
@@ -529,8 +529,7 @@ mod tests {
         );
         assert!(
             alerts.contains(&serde_json::json!("STORAGE_SATURATION")),
-            "expected STORAGE_SATURATION in active alerts: {:?}",
-            alerts
+            "expected STORAGE_SATURATION in active alerts: {alerts:?}"
         );
     }
 

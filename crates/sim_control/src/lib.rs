@@ -197,9 +197,8 @@ fn compute_sufficiency(tech: &TechDef, progress: Option<&DomainProgress>) -> f32
         .domain_requirements
         .iter()
         .map(|(domain, required)| {
-            let accumulated = progress
-                .map(|p| p.points.get(domain).copied().unwrap_or(0.0))
-                .unwrap_or(0.0);
+            let accumulated =
+                progress.map_or(0.0, |p| p.points.get(domain).copied().unwrap_or(0.0));
             (accumulated / required).min(1.0)
         })
         .collect();
@@ -312,6 +311,7 @@ fn slag_jettison_commands(
 // ---------------------------------------------------------------------------
 
 impl CommandSource for AutopilotController {
+    #[allow(clippy::too_many_lines)]
     fn generate_commands(
         &mut self,
         state: &GameState,

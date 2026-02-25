@@ -202,6 +202,7 @@ pub fn print_summary(scenario_name: &str, ticks: u64, stats: &SummaryStats) {
 mod tests {
     use super::*;
 
+    #[allow(clippy::too_many_arguments)]
     fn make_snapshot(
         tick: u64,
         storage_pct: f32,

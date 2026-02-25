@@ -101,6 +101,7 @@ fn test_shortest_hop_count_no_path() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn transit_moves_ship_and_starts_next_task() {
     let mut content = test_content();
     let node_a = NodeId("node_a".to_string());

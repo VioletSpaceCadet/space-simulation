@@ -1,6 +1,7 @@
 use super::*;
 
 #[test]
+#[allow(clippy::float_cmp)]
 fn test_deposit_moves_inventory_to_station() {
     let content = test_content();
     let mut state = test_state(&content);

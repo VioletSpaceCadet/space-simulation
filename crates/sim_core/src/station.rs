@@ -93,6 +93,7 @@ pub(crate) fn tick_stations(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn tick_station_modules(
     state: &mut GameState,
     station_id: &StationId,
@@ -286,6 +287,7 @@ fn tick_station_modules(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn resolve_processor_run(
     state: &mut GameState,
     station_id: &StationId,
@@ -461,6 +463,7 @@ fn resolve_processor_run(
 
 /// FIFO-consume up to `rate_kg` from matching Ore items.
 /// Returns `(consumed_kg, Vec<(composition, kg_taken)>)` for weighted averaging.
+#[allow(clippy::type_complexity)]
 fn consume_ore_fifo_with_lots(
     inventory: &mut Vec<InventoryItem>,
     rate_kg: f32,
@@ -503,6 +506,7 @@ fn consume_ore_fifo_with_lots(
     (consumed_kg, lots)
 }
 
+#[allow(clippy::too_many_lines)]
 fn tick_assembler_modules(
     state: &mut GameState,
     station_id: &StationId,
@@ -829,7 +833,7 @@ fn resolve_assembler_run(
             _ => continue,
         };
 
-        consumed_element = element_id.clone();
+        consumed_element.clone_from(&element_id);
         let mut remaining = required_kg;
 
         if let Some(station) = state.stations.get_mut(station_id) {
@@ -1008,6 +1012,7 @@ fn tick_sensor_array_modules(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn tick_lab_modules(
     state: &mut GameState,
     station_id: &StationId,
@@ -1225,6 +1230,7 @@ fn tick_lab_modules(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn tick_maintenance_modules(
     state: &mut GameState,
     station_id: &StationId,
@@ -1414,6 +1420,7 @@ fn tick_maintenance_modules(
 
 /// Peek at what would be consumed by FIFO without mutating inventory.
 /// Returns `(consumed_kg, Vec<(composition, kg_taken)>)`.
+#[allow(clippy::type_complexity)]
 fn peek_ore_fifo_with_lots(
     inventory: &[InventoryItem],
     rate_kg: f32,

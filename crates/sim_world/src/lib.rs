@@ -1,4 +1,4 @@
-//! World generation and content loading shared between sim_cli and sim_daemon.
+//! World generation and content loading shared between `sim_cli` and `sim_daemon`.
 
 use anyhow::{Context, Result};
 use rand::Rng;
@@ -32,6 +32,7 @@ struct ElementsFile {
 ///
 /// Catches mistakes like: referencing an unknown element in a recipe, a tech
 /// prereq that doesn't exist, or a solar-system edge pointing at an unknown node.
+#[allow(clippy::too_many_lines)]
 pub fn validate_content(content: &GameContent) {
     let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
     assert!(
@@ -359,6 +360,7 @@ pub fn create_run_dir(run_id: &str) -> Result<std::path::PathBuf> {
 /// Writes `run_info.json` into the run directory.
 ///
 /// `runner_args` is an arbitrary JSON value containing runner-specific CLI arguments.
+#[allow(clippy::needless_pass_by_value)]
 pub fn write_run_info(
     dir: &std::path::Path,
     run_id: &str,

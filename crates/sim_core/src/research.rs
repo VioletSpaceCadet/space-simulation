@@ -2,6 +2,7 @@ use crate::{Event, EventLevel, GameContent, GameState, TechId};
 use rand::Rng;
 
 /// Diminishing-returns yield: `floor + (peak - floor) * decay_rate^count`
+#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn data_yield(count: u64, peak: f32, floor: f32, decay_rate: f32) -> f32 {
     floor + (peak - floor) * decay_rate.powi(count as i32)
 }
@@ -47,7 +48,9 @@ pub(crate) fn advance_research(
     let current_tick = state.meta.tick;
 
     // Only roll every N ticks (skip tick 0)
-    if current_tick == 0 || current_tick % content.constants.research_roll_interval_ticks != 0 {
+    if current_tick == 0
+        || !current_tick.is_multiple_of(content.constants.research_roll_interval_ticks)
+    {
         return;
     }
 
@@ -78,16 +81,15 @@ pub(crate) fn advance_research(
                 .domain_requirements
                 .iter()
                 .map(|(domain, required)| {
-                    let accumulated = progress
-                        .map(|p| p.points.get(domain).copied().unwrap_or(0.0))
-                        .unwrap_or(0.0);
+                    let accumulated =
+                        progress.map_or(0.0, |p| p.points.get(domain).copied().unwrap_or(0.0));
                     (accumulated / required).min(1.0)
                 })
                 .collect();
             geometric_mean(&ratios)
         };
 
-        let total_points: f32 = progress.map(|p| p.points.values().sum()).unwrap_or(0.0);
+        let total_points: f32 = progress.map_or(0.0, |p| p.points.values().sum());
 
         let effective = sufficiency * total_points;
         let probability = if tech_def.difficulty > 0.0 {

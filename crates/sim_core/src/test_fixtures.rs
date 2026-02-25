@@ -1,4 +1,4 @@
-//! Shared test fixtures for sim_core and downstream crates.
+//! Shared test fixtures for `sim_core` and downstream crates.
 //!
 //! `base_content()` provides a full-featured `GameContent` suitable for
 //! integration-level tests (techs, templates, all elements, compressed durations).
@@ -14,7 +14,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
 
-/// Full-featured content: deep_scan_v1 tech, iron_rich template, ore/Fe/Si/slag elements,
+/// Full-featured content: `deep_scan_v1` tech, `iron_rich` template, ore/Fe/Si/slag elements,
 /// single-node solar system, compressed durations for fast tests.
 pub fn base_content() -> GameContent {
     GameContent {
@@ -175,7 +175,7 @@ pub fn minimal_content() -> GameContent {
     }
 }
 
-/// Standard game state: 1 ship, 1 station, 1 scan site at node_test.
+/// Standard game state: 1 ship, 1 station, 1 scan site at `node_test`.
 pub fn base_state(content: &GameContent) -> GameState {
     let node_id = NodeId("node_test".to_string());
     let ship_id = ShipId("ship_0001".to_string());

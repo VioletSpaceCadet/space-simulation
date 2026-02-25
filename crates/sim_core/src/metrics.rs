@@ -133,7 +133,7 @@ impl InventoryAccumulator {
     }
 }
 
-#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_truncation, clippy::too_many_lines)]
 pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnapshot {
     let mut acc = InventoryAccumulator::new();
 
@@ -567,6 +567,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn test_empty_state_all_zeros() {
         let content = empty_content();
         let state = empty_state();
@@ -807,6 +808,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn test_determinism_same_state_same_snapshot() {
         let content = empty_content();
         let mut state = empty_state();

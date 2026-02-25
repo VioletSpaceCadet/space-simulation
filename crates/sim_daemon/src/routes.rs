@@ -145,7 +145,7 @@ async fn alerts_handler(State(app_state): State<AppState>) -> Json<serde_json::V
     let active_ids: Vec<String> = sim
         .alert_engine
         .as_ref()
-        .map(|e| e.active_alert_ids())
+        .map(super::alerts::AlertEngine::active_alert_ids)
         .unwrap_or_default();
     Json(serde_json::json!({ "active_alerts": active_ids }))
 }
@@ -164,7 +164,10 @@ pub async fn speed_handler(
     State(app_state): State<AppState>,
     Json(body): Json<serde_json::Value>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let Some(tps) = body.get("ticks_per_sec").and_then(|v| v.as_f64()) else {
+    let Some(tps) = body
+        .get("ticks_per_sec")
+        .and_then(serde_json::Value::as_f64)
+    else {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "missing or invalid ticks_per_sec"})),

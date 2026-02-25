@@ -246,7 +246,7 @@ fn apply_commands(
                     continue;
                 };
                 if let crate::ModuleKindState::Lab(ls) = &mut module.kind_state {
-                    ls.assigned_tech = tech_id.clone();
+                    ls.assigned_tech.clone_from(tech_id);
                 }
             }
             Command::SetAssemblerCap {

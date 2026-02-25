@@ -26,7 +26,7 @@ enum Commands {
         /// Generate world procedurally with this seed. Mutually exclusive with --state.
         #[arg(long, conflicts_with = "state_file")]
         seed: Option<u64>,
-        /// Load initial GameState from a JSON file. Mutually exclusive with --seed.
+        /// Load initial `GameState` from a JSON file. Mutually exclusive with --seed.
         #[arg(long = "state", conflicts_with = "seed")]
         state_file: Option<String>,
         #[arg(long, default_value = "./content")]
@@ -48,6 +48,7 @@ enum Commands {
 // Run loop
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn run(
     ticks: u64,
     seed: Option<u64>,

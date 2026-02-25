@@ -64,11 +64,7 @@ fn test_mine_reduces_asteroid_mass() {
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
     }
 
-    let remaining = state
-        .asteroids
-        .get(&asteroid_id)
-        .map(|a| a.mass_kg)
-        .unwrap_or(0.0);
+    let remaining = state.asteroids.get(&asteroid_id).map_or(0.0, |a| a.mass_kg);
     assert!(
         remaining < original_mass,
         "asteroid mass must decrease after mining"

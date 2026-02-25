@@ -376,6 +376,7 @@ pub(crate) fn resolve_mine(
     ));
 }
 
+#[allow(clippy::too_many_lines)]
 pub(crate) fn resolve_deposit(
     state: &mut GameState,
     ship_id: &ShipId,
@@ -390,8 +391,7 @@ pub(crate) fn resolve_deposit(
         .ships
         .get(ship_id)
         .and_then(|s| s.task.as_ref())
-        .map(|t| matches!(&t.kind, TaskKind::Deposit { blocked: true, .. }))
-        .unwrap_or(false);
+        .is_some_and(|t| matches!(&t.kind, TaskKind::Deposit { blocked: true, .. }));
 
     let items = if let Some(ship) = state.ships.get_mut(ship_id) {
         std::mem::take(&mut ship.inventory)
@@ -451,11 +451,10 @@ pub(crate) fn resolve_deposit(
             let ship_volume = state
                 .ships
                 .get(ship_id)
-                .map(|s| inventory_volume_m3(&s.inventory, content))
-                .unwrap_or(0.0);
+                .map_or(0.0, |s| inventory_volume_m3(&s.inventory, content));
             let free_space = (station_capacity
                 - inventory_volume_m3(
-                    &state
+                    state
                         .stations
                         .get(station_id)
                         .map_or(&[] as &[_], |s| &s.inventory),

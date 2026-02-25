@@ -25,7 +25,9 @@ pub(crate) fn weighted_composition(pairs: &[(&HashMap<String, f32>, f32)]) -> Ha
             *result.entry(element.clone()).or_insert(0.0) += fraction * kg;
         }
     }
-    result.values_mut().for_each(|v| *v /= total_kg);
+    for v in result.values_mut() {
+        *v /= total_kg;
+    }
     result
 }
 
@@ -67,6 +69,7 @@ pub(crate) fn merge_material_lot(
     kg: f32,
     quality: f32,
 ) {
+    #[allow(clippy::float_cmp)]
     let existing = inventory.iter_mut().find(|item| {
         matches!(
             item,
