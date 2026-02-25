@@ -233,7 +233,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         &std::fs::read_to_string(dir.join("pricing.json")).context("reading pricing.json")?,
     )
     .context("parsing pricing.json")?;
-    let content = GameContent {
+    let mut content = GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
         solar_system,
@@ -243,7 +243,9 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         component_defs,
         pricing,
         constants,
+        density_map: std::collections::HashMap::new(),
     };
+    content.init_caches();
     validate_content(&content);
     Ok(content)
 }

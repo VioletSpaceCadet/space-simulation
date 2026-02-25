@@ -75,22 +75,42 @@ pub(crate) fn element_density(content: &GameContent, element_id: &str) -> f32 {
         .density_kg_per_m3
 }
 
+/// Volume (m³) of a single inventory item. Uses `density_map` for O(1) lookups.
+pub(crate) fn item_volume_m3(item: &InventoryItem, content: &GameContent) -> f32 {
+    match item {
+        InventoryItem::Ore { kg, .. } => {
+            kg / content
+                .density_map
+                .get(crate::ELEMENT_ORE)
+                .copied()
+                .unwrap_or_else(|| element_density(content, crate::ELEMENT_ORE))
+        }
+        InventoryItem::Slag { kg, .. } => {
+            kg / content
+                .density_map
+                .get(crate::ELEMENT_SLAG)
+                .copied()
+                .unwrap_or_else(|| element_density(content, crate::ELEMENT_SLAG))
+        }
+        InventoryItem::Material { element, kg, .. } => {
+            kg / content
+                .density_map
+                .get(element.as_str())
+                .copied()
+                .unwrap_or_else(|| element_density(content, element))
+        }
+        InventoryItem::Component { count, .. } => *count as f32 * 1.0,
+        InventoryItem::Module { module_def_id, .. } => content
+            .module_defs
+            .iter()
+            .find(|m| m.id == *module_def_id)
+            .map_or(0.0, |m| m.volume_m3),
+    }
+}
+
 /// Volume (m³) currently occupied by the inventory items.
 pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -> f32 {
-    inventory
-        .iter()
-        .map(|item| match item {
-            InventoryItem::Ore { kg, .. } => kg / element_density(content, crate::ELEMENT_ORE),
-            InventoryItem::Slag { kg, .. } => kg / element_density(content, crate::ELEMENT_SLAG),
-            InventoryItem::Material { element, kg, .. } => kg / element_density(content, element),
-            InventoryItem::Component { count, .. } => *count as f32 * 1.0, // 1.0 m³ per unit; replace with ComponentDef.volume_m3 when defs exist
-            InventoryItem::Module { module_def_id, .. } => content
-                .module_defs
-                .iter()
-                .find(|m| m.id == *module_def_id)
-                .map_or(0.0, |m| m.volume_m3), // TODO: unknown module def — should not occur in valid state
-        })
-        .sum()
+    inventory.iter().map(|item| item_volume_m3(item, content)).sum()
 }
 
 /// Pre-compute how many ticks a mining run will take.
@@ -419,7 +439,7 @@ pub(crate) fn resolve_deposit(
     let mut to_deposit = Vec::new();
     let mut to_return = Vec::new();
     for item in items {
-        let item_volume = inventory_volume_m3(std::slice::from_ref(&item), content);
+        let item_volume = item_volume_m3(&item, content);
         if station_volume + item_volume <= station_capacity {
             station_volume += item_volume;
             to_deposit.push(item);

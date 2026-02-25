@@ -17,7 +17,7 @@ use std::collections::HashMap;
 /// Full-featured content: `deep_scan_v1` tech, `iron_rich` template, ore/Fe/Si/slag elements,
 /// single-node solar system, compressed durations for fast tests.
 pub fn base_content() -> GameContent {
-    GameContent {
+    let mut content = GameContent {
         content_version: "test".to_string(),
         techs: vec![TechDef {
             id: TechId("tech_deep_scan_v1".to_string()),
@@ -107,12 +107,15 @@ pub fn base_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
         },
-    }
+        density_map: HashMap::new(),
+    };
+    content.init_caches();
+    content
 }
 
 /// Bare-minimum content for validation tests: no techs, no templates, just Fe element.
 pub fn minimal_content() -> GameContent {
-    GameContent {
+    let mut content = GameContent {
         content_version: "test".to_string(),
         techs: vec![],
         solar_system: SolarSystemDef {
@@ -172,7 +175,10 @@ pub fn minimal_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
         },
-    }
+        density_map: HashMap::new(),
+    };
+    content.init_caches();
+    content
 }
 
 /// Standard game state: 1 ship, 1 station, 1 scan site at `node_test`.

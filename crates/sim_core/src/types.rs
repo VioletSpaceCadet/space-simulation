@@ -639,6 +639,20 @@ pub struct GameContent {
     pub component_defs: Vec<ComponentDef>,
     pub pricing: PricingTable,
     pub constants: Constants,
+    /// Pre-computed element id → density (kg/m³) lookup. Populated by `init_caches()`.
+    #[serde(skip)]
+    pub density_map: HashMap<String, f32>,
+}
+
+impl GameContent {
+    /// Populate derived caches from content data. Must be called after deserialization.
+    pub fn init_caches(&mut self) {
+        self.density_map = self
+            .elements
+            .iter()
+            .map(|e| (e.id.clone(), e.density_kg_per_m3))
+            .collect();
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

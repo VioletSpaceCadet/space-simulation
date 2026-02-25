@@ -533,7 +533,7 @@ mod replenish_tests {
     use std::collections::{HashMap, HashSet};
 
     fn replenish_test_content() -> GameContent {
-        GameContent {
+        let mut content = GameContent {
             content_version: "test".to_string(),
             techs: vec![],
             solar_system: SolarSystemDef {
@@ -589,7 +589,10 @@ mod replenish_tests {
                 wear_band_degraded_efficiency: 0.75,
                 wear_band_critical_efficiency: 0.5,
             },
-        }
+            density_map: HashMap::new(),
+        };
+        content.init_caches();
+        content
     }
 
     fn empty_sites_state(content: &GameContent) -> GameState {
