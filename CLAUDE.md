@@ -87,16 +87,31 @@ Issues are tracked in Linear (VioletSpaceCadet workspace, MCP integration config
 5. **Apply to content** — once validated, update `content/constants.json` or `content/module_defs.json`
 6. **Re-run and verify** — confirm metrics improve, no regressions
 
-### Feature Development
+### Feature Development (Multi-Ticket Projects)
 
-For larger features (new modules, new systems, sim_core changes):
+For larger features spanning multiple Linear tickets:
 
-1. **Create Linear issues** — scope the work, set priorities and dependencies
-2. **Work in a git worktree** — `git worktree add .worktrees/<name> -b feat/<name>` for isolation
-3. **Implement and test** — iterate in the worktree, run `cargo test`, run sim_bench scenarios
-4. **Open a PR** — push branch, create PR via `gh pr create`, CI must pass
-5. **Review and merge** — owner reviews and merges via GitHub (squash merge)
-6. **Clean up** — `git worktree remove .worktrees/<name>` + `git branch -D feat/<name>`
+1. **Create a feature branch** from main: `feat/<project-name>` (e.g., `feat/energy-propellant`)
+2. **Each Linear ticket gets its own branch** off the feature branch: `feat/<project>/<ticket-id>-<short-name>`
+3. **PR per ticket into the feature branch** — standard Claude review process applies
+4. **Claude auto-merges ticket PRs** into the feature branch after CI passes and review is clean (squash merge via `gh pr merge --squash`)
+5. **Final PR from feature branch into main** — requires owner (@VioletSpaceCadet) approval before merge
+6. **Clean up** — delete feature branch and sub-branches after merge to main
+
+Example flow for a project with tickets VIO-100, VIO-101, VIO-102:
+- Create `feat/energy-propellant` from main
+- VIO-100: branch `feat/energy-propellant/vio-100-fuel-types` -> PR into `feat/energy-propellant` -> Claude reviews + auto-merges
+- VIO-101: branch `feat/energy-propellant/vio-101-burn-rates` -> PR into `feat/energy-propellant` -> Claude reviews + auto-merges
+- VIO-102: branch `feat/energy-propellant/vio-102-ui-gauges` -> PR into `feat/energy-propellant` -> Claude reviews + auto-merges
+- Final: PR `feat/energy-propellant` -> `main` -> Claude reviews, owner approves, squash merge
+
+### Small Changes (Single-Ticket)
+
+For small features, bug fixes, or docs changes (single ticket, no project branch needed):
+
+1. **Branch from main** — `fix/<ticket-id>-<short-name>` or `chore/<short-name>`
+2. **PR directly into main** — standard review process, owner approval required
+3. **Clean up** — delete branch after merge
 
 ### Pull Request Workflow
 
@@ -118,9 +133,13 @@ For larger features (new modules, new systems, sim_core changes):
 8. This review is mandatory even if Claude Code authored the PR — fresh eyes catch things
 
 **Creating a PR:**
-Push branch, then open with "gh pr create". Include a Summary section and Test plan section in the body.
+Push branch, then open with "gh pr create". Include a Summary section and Test plan section in the body. Set the base branch explicitly when targeting a feature branch: "gh pr create --base feat/project-name".
 
-**NEVER push directly to main.** Always branch, PR, CI green, Claude review, owner approval, squash merge.
+**Two merge paths:**
+- **PR into feature branch:** Claude auto-merges after CI green + review posted ("gh pr merge --squash")
+- **PR into main:** Claude reviews but NEVER merges — owner must approve and merge
+
+**NEVER push directly to main.** Always branch, PR, CI green, Claude review, then merge (auto for feature branches, owner-approved for main).
 
 ### Scenario Files
 
@@ -148,15 +167,20 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 - **If you changed a type or tick ordering:** update this file and `docs/reference.md` as needed.
 - **Before claiming work is complete:** confirm tests pass, no TODO stubs introduced.
 
-## Merging Branches to Main
+## Merging
 
-**Always squash merge via GitHub PR.** Never push directly to main.
+**Always squash merge. Never push directly to main.**
 
-1. Push branch and open PR (`gh pr create`)
-2. CI must pass (rust, web, bench-smoke)
-3. Owner (`@VioletSpaceCadet`) approves
-4. Squash merge on GitHub
-5. Clean up: `git worktree remove .worktrees/<name>` + `git branch -D <branch-name>`
+**Ticket PR into feature branch (Claude auto-merges):**
+1. CI must pass
+2. Claude posts review comment
+3. Claude runs "gh pr merge --squash" to merge
+
+**Feature branch or single-ticket PR into main (owner merges):**
+1. CI must pass
+2. Claude posts review comment
+3. Owner (@VioletSpaceCadet) approves and squash merges on GitHub
+4. Clean up branches after merge
 
 ## Notes
 
