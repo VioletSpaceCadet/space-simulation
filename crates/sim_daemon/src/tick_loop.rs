@@ -3,7 +3,14 @@ use sim_control::CommandSource;
 use sim_core::EventLevel;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+/// How often the tick loop yields to the tokio runtime when running flat-out.
+/// Lower = more responsive HTTP/SSE but more overhead. 1ms is a good balance.
+const YIELD_INTERVAL: Duration = Duration::from_millis(1);
+
+/// How often to log throughput stats.
+const PERF_LOG_INTERVAL: Duration = Duration::from_secs(5);
 
 pub async fn run_tick_loop(
     sim: SharedSim,
@@ -12,24 +19,34 @@ pub async fn run_tick_loop(
     max_ticks: Option<u64>,
     paused: Arc<AtomicBool>,
 ) {
-    let mut next_tick_at: Option<std::time::Instant> = None;
+    let mut next_tick_at: Option<Instant> = None;
+    let mut last_yield_at = Instant::now();
+    let mut perf_window_start = Instant::now();
+    let mut perf_window_ticks: u64 = 0;
 
     loop {
         while paused.load(Ordering::Relaxed) {
             tokio::time::sleep(Duration::from_millis(50)).await;
-            next_tick_at = None; // Reset pacing after unpause
+            next_tick_at = None;
+            last_yield_at = Instant::now();
+            perf_window_start = Instant::now();
+            perf_window_ticks = 0;
         }
 
-        // Pace: sleep only if there's time remaining before the next tick is due.
+        // --- Pacing ---
         let rate = f64::from_bits(ticks_per_sec.load(Ordering::Relaxed));
         if rate > 0.0 {
-            let now = std::time::Instant::now();
+            let now = Instant::now();
             let target = next_tick_at.unwrap_or(now);
             if now < target {
+                // Ahead of schedule — sleep until the next tick is due.
                 tokio::time::sleep(target - now).await;
-            } else {
-                // Behind schedule — yield so tokio can service HTTP/SSE handlers.
+                last_yield_at = Instant::now();
+            } else if now.duration_since(last_yield_at) >= YIELD_INTERVAL {
+                // Behind schedule but haven't yielded recently — yield so tokio
+                // can service HTTP/SSE handlers without starving them.
                 tokio::task::yield_now().await;
+                last_yield_at = Instant::now();
             }
             next_tick_at = Some(
                 next_tick_at
@@ -38,11 +55,16 @@ pub async fn run_tick_loop(
                     .unwrap_or(now),
             );
         } else {
-            // Unlimited: yield once per tick to let the tokio runtime service SSE etc.
-            tokio::task::yield_now().await;
+            // Unlimited — yield periodically instead of every tick.
+            let now = Instant::now();
+            if now.duration_since(last_yield_at) >= YIELD_INTERVAL {
+                tokio::task::yield_now().await;
+                last_yield_at = Instant::now();
+            }
             next_tick_at = None;
         }
 
+        // --- Execute one tick ---
         let (events, done) = {
             let mut guard = sim.lock();
             let SimState {
@@ -83,6 +105,20 @@ pub async fn run_tick_loop(
         };
 
         let _ = event_tx.send(events);
+
+        // --- Performance logging ---
+        perf_window_ticks += 1;
+        let elapsed = perf_window_start.elapsed();
+        if elapsed >= PERF_LOG_INTERVAL {
+            let tps = perf_window_ticks as f64 / elapsed.as_secs_f64();
+            tracing::info!(
+                tps = format_args!("{tps:.0}"),
+                ticks = perf_window_ticks,
+                "tick loop throughput"
+            );
+            perf_window_start = Instant::now();
+            perf_window_ticks = 0;
+        }
 
         if done {
             break;
