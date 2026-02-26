@@ -182,7 +182,7 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
 
         for module in &station.modules {
             // Track wear for all processor modules (enabled or not)
-            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+            let Some(def) = content.module_defs.get(&module.def_id) else {
                 continue;
             };
             if matches!(
@@ -754,18 +754,21 @@ mod tests {
     #[test]
     fn test_refinery_starved_detection() {
         let mut content = empty_content();
-        content.module_defs = vec![crate::ModuleDef {
-            id: "module_basic_iron_refinery".to_string(),
-            name: "Basic Iron Refinery".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 10.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.01,
-            behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
-                processing_interval_ticks: 60,
-                recipes: vec![],
-            }),
-        }];
+        content.module_defs = HashMap::from([(
+            "module_basic_iron_refinery".to_string(),
+            crate::ModuleDef {
+                id: "module_basic_iron_refinery".to_string(),
+                name: "Basic Iron Refinery".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 10.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.01,
+                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_ticks: 60,
+                    recipes: vec![],
+                }),
+            },
+        )]);
 
         let mut state = empty_state();
         // Station with 100kg ore but threshold is 500kg → starved
@@ -913,18 +916,21 @@ mod tests {
     #[test]
     fn test_refinery_stalled_metric() {
         let mut content = empty_content();
-        content.module_defs = vec![crate::ModuleDef {
-            id: "module_basic_iron_refinery".to_string(),
-            name: "Basic Iron Refinery".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 10.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.01,
-            behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
-                processing_interval_ticks: 60,
-                recipes: vec![],
-            }),
-        }];
+        content.module_defs = HashMap::from([(
+            "module_basic_iron_refinery".to_string(),
+            crate::ModuleDef {
+                id: "module_basic_iron_refinery".to_string(),
+                name: "Basic Iron Refinery".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 10.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.01,
+                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_ticks: 60,
+                    recipes: vec![],
+                }),
+            },
+        )]);
 
         let mut state = empty_state();
         let station = make_station(
@@ -1012,18 +1018,21 @@ mod tests {
     #[test]
     fn test_wear_metrics() {
         let mut content = empty_content();
-        content.module_defs = vec![crate::ModuleDef {
-            id: "module_basic_iron_refinery".to_string(),
-            name: "Basic Iron Refinery".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 10.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.01,
-            behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
-                processing_interval_ticks: 60,
-                recipes: vec![],
-            }),
-        }];
+        content.module_defs = HashMap::from([(
+            "module_basic_iron_refinery".to_string(),
+            crate::ModuleDef {
+                id: "module_basic_iron_refinery".to_string(),
+                name: "Basic Iron Refinery".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 10.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.01,
+                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_ticks: 60,
+                    recipes: vec![],
+                }),
+            },
+        )]);
 
         let mut state = empty_state();
         let station = make_station(

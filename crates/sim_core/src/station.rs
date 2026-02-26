@@ -121,7 +121,7 @@ fn tick_station_modules(
             if !module.enabled {
                 continue;
             }
-            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+            let Some(def) = content.module_defs.get(&module.def_id) else {
                 continue;
             };
             let interval = match &def.behavior {
@@ -196,7 +196,7 @@ fn tick_station_modules(
 
         // --- Capacity pre-check: estimate output volume and stall if it won't fit ---
         {
-            let Some(def) = content.module_defs.iter().find(|d| d.id == def_id) else {
+            let Some(def) = content.module_defs.get(&def_id) else {
                 continue;
             };
             let ModuleBehaviorDef::Processor(processor_def) = &def.behavior else {
@@ -318,7 +318,7 @@ fn resolve_processor_run(
         return;
     };
 
-    let Some(def) = content.module_defs.iter().find(|d| d.id == def_id) else {
+    let Some(def) = content.module_defs.get(def_id) else {
         return;
     };
     let ModuleBehaviorDef::Processor(processor_def) = &def.behavior else {
@@ -467,8 +467,7 @@ fn resolve_processor_run(
     // Accumulate wear
     let wear_per_run = content
         .module_defs
-        .iter()
-        .find(|d| d.id == def_id)
+        .get(def_id)
         .map_or(0.0, |d| d.wear_per_run);
     apply_wear(state, station_id, module_idx, wear_per_run, events);
 }
@@ -545,7 +544,7 @@ fn tick_assembler_modules(
             if !module.enabled {
                 continue;
             }
-            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+            let Some(def) = content.module_defs.get(&module.def_id) else {
                 continue;
             };
             let ModuleBehaviorDef::Assembler(assembler_def) = &def.behavior else {
@@ -1091,7 +1090,7 @@ fn tick_sensor_array_modules(
             if !module.enabled {
                 continue;
             }
-            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+            let Some(def) = content.module_defs.get(&module.def_id) else {
                 continue;
             };
             let ModuleBehaviorDef::SensorArray(sensor_def) = &def.behavior else {
@@ -1184,7 +1183,7 @@ fn tick_lab_modules(
             if !module.enabled {
                 continue;
             }
-            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+            let Some(def) = content.module_defs.get(&module.def_id) else {
                 continue;
             };
             let ModuleBehaviorDef::Lab(lab_def) = &def.behavior else {
@@ -1401,7 +1400,7 @@ fn tick_maintenance_modules(
             if !module.enabled {
                 continue;
             }
-            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+            let Some(def) = content.module_defs.get(&module.def_id) else {
                 continue;
             };
             let ModuleBehaviorDef::Maintenance(maint_def) = &def.behavior else {
@@ -1728,21 +1727,24 @@ mod lab_tests {
 
     fn lab_content() -> GameContent {
         let mut content = crate::test_fixtures::base_content();
-        content.module_defs.push(ModuleDef {
-            id: "module_exploration_lab".to_string(),
-            name: "Exploration Lab".to_string(),
-            mass_kg: 3500.0,
-            volume_m3: 7.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.005,
-            behavior: ModuleBehaviorDef::Lab(LabDef {
-                domain: ResearchDomain::Exploration,
-                data_consumption_per_run: 8.0,
-                research_points_per_run: 4.0,
-                accepted_data: vec![DataKind::ScanData],
-                research_interval_ticks: 1,
-            }),
-        });
+        content.module_defs.insert(
+            "module_exploration_lab".to_string(),
+            ModuleDef {
+                id: "module_exploration_lab".to_string(),
+                name: "Exploration Lab".to_string(),
+                mass_kg: 3500.0,
+                volume_m3: 7.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.005,
+                behavior: ModuleBehaviorDef::Lab(LabDef {
+                    domain: ResearchDomain::Exploration,
+                    data_consumption_per_run: 8.0,
+                    research_points_per_run: 4.0,
+                    accepted_data: vec![DataKind::ScanData],
+                    research_interval_ticks: 1,
+                }),
+            },
+        );
         content
     }
 
@@ -1944,19 +1946,22 @@ mod lab_tests {
 
     fn sensor_content() -> crate::GameContent {
         let mut content = crate::test_fixtures::base_content();
-        content.module_defs.push(crate::ModuleDef {
-            id: "module_sensor_array".to_string(),
-            name: "Sensor Array".to_string(),
-            mass_kg: 2500.0,
-            volume_m3: 6.0,
-            power_consumption_per_run: 8.0,
-            wear_per_run: 0.003,
-            behavior: ModuleBehaviorDef::SensorArray(crate::SensorArrayDef {
-                data_kind: crate::DataKind::ScanData,
-                action_key: "sensor_scan".to_string(),
-                scan_interval_ticks: 5,
-            }),
-        });
+        content.module_defs.insert(
+            "module_sensor_array".to_string(),
+            crate::ModuleDef {
+                id: "module_sensor_array".to_string(),
+                name: "Sensor Array".to_string(),
+                mass_kg: 2500.0,
+                volume_m3: 6.0,
+                power_consumption_per_run: 8.0,
+                wear_per_run: 0.003,
+                behavior: ModuleBehaviorDef::SensorArray(crate::SensorArrayDef {
+                    data_kind: crate::DataKind::ScanData,
+                    action_key: "sensor_scan".to_string(),
+                    scan_interval_ticks: 5,
+                }),
+            },
+        );
         content
     }
 
@@ -2131,36 +2136,39 @@ mod assembler_component_tests {
             volume_m3: 5.0,
         });
         // Assembler recipe: 100kg Fe + 4 thrusters => 1 hull_plate
-        content.module_defs.push(ModuleDef {
-            id: "module_shipyard".to_string(),
-            name: "Shipyard".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 20.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
-                assembly_interval_ticks: 1,
-                recipes: vec![RecipeDef {
-                    id: "recipe_hull_plate".to_string(),
-                    inputs: vec![
-                        RecipeInput {
-                            filter: InputFilter::Element("Fe".to_string()),
-                            amount: InputAmount::Kg(100.0),
-                        },
-                        RecipeInput {
-                            filter: InputFilter::Component(ComponentId("thruster".to_string())),
-                            amount: InputAmount::Count(4),
-                        },
-                    ],
-                    outputs: vec![OutputSpec::Component {
-                        component_id: ComponentId("hull_plate".to_string()),
-                        quality_formula: QualityFormula::Fixed(0.9),
+        content.module_defs.insert(
+            "module_shipyard".to_string(),
+            ModuleDef {
+                id: "module_shipyard".to_string(),
+                name: "Shipyard".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 20.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.0,
+                behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                    assembly_interval_ticks: 1,
+                    recipes: vec![RecipeDef {
+                        id: "recipe_hull_plate".to_string(),
+                        inputs: vec![
+                            RecipeInput {
+                                filter: InputFilter::Element("Fe".to_string()),
+                                amount: InputAmount::Kg(100.0),
+                            },
+                            RecipeInput {
+                                filter: InputFilter::Component(ComponentId("thruster".to_string())),
+                                amount: InputAmount::Count(4),
+                            },
+                        ],
+                        outputs: vec![OutputSpec::Component {
+                            component_id: ComponentId("hull_plate".to_string()),
+                            quality_formula: QualityFormula::Fixed(0.9),
+                        }],
+                        efficiency: 1.0,
                     }],
-                    efficiency: 1.0,
-                }],
-                max_stock: HashMap::new(),
-            }),
-        });
+                    max_stock: HashMap::new(),
+                }),
+            },
+        );
         content
     }
 
@@ -2408,35 +2416,38 @@ mod assembler_component_tests {
             volume_m3: 2.0,
         });
         // Shipyard recipe: 100kg Fe + 2 thrusters => Ship with 50 m3 cargo
-        content.module_defs.push(ModuleDef {
-            id: "module_shipyard".to_string(),
-            name: "Shipyard".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 20.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
-                assembly_interval_ticks: 1,
-                recipes: vec![RecipeDef {
-                    id: "recipe_build_ship".to_string(),
-                    inputs: vec![
-                        RecipeInput {
-                            filter: InputFilter::Element("Fe".to_string()),
-                            amount: InputAmount::Kg(100.0),
-                        },
-                        RecipeInput {
-                            filter: InputFilter::Component(ComponentId("thruster".to_string())),
-                            amount: InputAmount::Count(2),
-                        },
-                    ],
-                    outputs: vec![OutputSpec::Ship {
-                        cargo_capacity_m3: 50.0,
+        content.module_defs.insert(
+            "module_shipyard".to_string(),
+            ModuleDef {
+                id: "module_shipyard".to_string(),
+                name: "Shipyard".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 20.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.0,
+                behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                    assembly_interval_ticks: 1,
+                    recipes: vec![RecipeDef {
+                        id: "recipe_build_ship".to_string(),
+                        inputs: vec![
+                            RecipeInput {
+                                filter: InputFilter::Element("Fe".to_string()),
+                                amount: InputAmount::Kg(100.0),
+                            },
+                            RecipeInput {
+                                filter: InputFilter::Component(ComponentId("thruster".to_string())),
+                                amount: InputAmount::Count(2),
+                            },
+                        ],
+                        outputs: vec![OutputSpec::Ship {
+                            cargo_capacity_m3: 50.0,
+                        }],
+                        efficiency: 1.0,
                     }],
-                    efficiency: 1.0,
-                }],
-                max_stock: HashMap::new(),
-            }),
-        });
+                    max_stock: HashMap::new(),
+                }),
+            },
+        );
         content
     }
 

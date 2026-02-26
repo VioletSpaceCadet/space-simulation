@@ -103,7 +103,7 @@ fn apply_commands(
                 state.counters.next_module_instance_id += 1;
                 let module_id = crate::ModuleInstanceId(module_id_str);
 
-                let kind_state = match content.module_defs.iter().find(|d| d.id == module_def_id) {
+                let kind_state = match content.module_defs.get(&module_def_id) {
                     Some(def) => match &def.behavior {
                         crate::ModuleBehaviorDef::Processor(_) => {
                             crate::ModuleKindState::Processor(crate::ProcessorState {
@@ -557,7 +557,7 @@ mod replenish_tests {
                 display_name: "Raw Ore".to_string(),
                 refined_name: None,
             }],
-            module_defs: vec![],
+            module_defs: HashMap::new(),
             component_defs: vec![],
             pricing: PricingTable {
                 import_surcharge_per_kg: 100.0,
@@ -887,18 +887,21 @@ mod trade_tests {
                 volume_m3: 0.5,
             },
         ];
-        content.module_defs = vec![ModuleDef {
-            id: "module_basic_iron_refinery".to_string(),
-            name: "Basic Iron Refinery".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.01,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
-                processing_interval_ticks: 10,
-                recipes: vec![],
-            }),
-        }];
+        content.module_defs = HashMap::from([(
+            "module_basic_iron_refinery".to_string(),
+            ModuleDef {
+                id: "module_basic_iron_refinery".to_string(),
+                name: "Basic Iron Refinery".to_string(),
+                mass_kg: 1000.0,
+                volume_m3: 5.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.01,
+                behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                    processing_interval_ticks: 10,
+                    recipes: vec![],
+                }),
+            },
+        )]);
         content
     }
 
@@ -1514,35 +1517,38 @@ mod trade_integration_tests {
 
         // Shipyard assembler: consumes 100kg Fe + 2 thrusters => Ship (50 m3 cargo)
         // Use assembly_interval_ticks=2 so the test doesn't need thousands of ticks.
-        content.module_defs = vec![ModuleDef {
-            id: "module_shipyard".to_string(),
-            name: "Shipyard".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 20.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
-                assembly_interval_ticks: 2,
-                recipes: vec![RecipeDef {
-                    id: "recipe_build_ship".to_string(),
-                    inputs: vec![
-                        RecipeInput {
-                            filter: InputFilter::Element("Fe".to_string()),
-                            amount: InputAmount::Kg(100.0),
-                        },
-                        RecipeInput {
-                            filter: InputFilter::Component(ComponentId("thruster".to_string())),
-                            amount: InputAmount::Count(2),
-                        },
-                    ],
-                    outputs: vec![OutputSpec::Ship {
-                        cargo_capacity_m3: 50.0,
+        content.module_defs = HashMap::from([(
+            "module_shipyard".to_string(),
+            ModuleDef {
+                id: "module_shipyard".to_string(),
+                name: "Shipyard".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 20.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.0,
+                behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                    assembly_interval_ticks: 2,
+                    recipes: vec![RecipeDef {
+                        id: "recipe_build_ship".to_string(),
+                        inputs: vec![
+                            RecipeInput {
+                                filter: InputFilter::Element("Fe".to_string()),
+                                amount: InputAmount::Kg(100.0),
+                            },
+                            RecipeInput {
+                                filter: InputFilter::Component(ComponentId("thruster".to_string())),
+                                amount: InputAmount::Count(2),
+                            },
+                        ],
+                        outputs: vec![OutputSpec::Ship {
+                            cargo_capacity_m3: 50.0,
+                        }],
+                        efficiency: 1.0,
                     }],
-                    efficiency: 1.0,
-                }],
-                max_stock: HashMap::new(),
-            }),
-        }];
+                    max_stock: HashMap::new(),
+                }),
+            },
+        )]);
 
         content
     }

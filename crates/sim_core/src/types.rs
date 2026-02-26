@@ -635,7 +635,7 @@ pub struct GameContent {
     pub solar_system: SolarSystemDef,
     pub asteroid_templates: Vec<AsteroidTemplateDef>,
     pub elements: Vec<ElementDef>,
-    pub module_defs: Vec<ModuleDef>,
+    pub module_defs: HashMap<String, ModuleDef>,
     pub component_defs: Vec<ComponentDef>,
     pub pricing: PricingTable,
     pub constants: Constants,

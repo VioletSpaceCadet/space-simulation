@@ -74,7 +74,7 @@ pub fn base_content() -> GameContent {
                 refined_name: None,
             },
         ],
-        module_defs: vec![],
+        module_defs: HashMap::new(),
         component_defs: vec![],
         pricing: PricingTable {
             import_surcharge_per_kg: 100.0,
@@ -143,7 +143,7 @@ pub fn minimal_content() -> GameContent {
                 refined_name: None,
             },
         ],
-        module_defs: vec![],
+        module_defs: HashMap::new(),
         component_defs: vec![],
         pricing: PricingTable {
             import_surcharge_per_kg: 100.0,

@@ -102,8 +102,7 @@ pub(crate) fn item_volume_m3(item: &InventoryItem, content: &GameContent) -> f32
         InventoryItem::Component { count, .. } => *count as f32 * 1.0,
         InventoryItem::Module { module_def_id, .. } => content
             .module_defs
-            .iter()
-            .find(|m| m.id == *module_def_id)
+            .get(module_def_id.as_str())
             .map_or(0.0, |m| m.volume_m3),
     }
 }
