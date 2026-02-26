@@ -5,8 +5,8 @@ const TRADE_UNLOCK_TICK = 525_600;
 
 /**
  * Poll the daemon until the sim tick reaches the target.
- * Uses max speed (tps=0) to advance as fast as possible,
- * then pauses the simulation once the target is reached.
+ * Uses max speed (tps=0) to advance as fast as possible.
+ * Caller is responsible for pausing after this returns.
  */
 async function advanceToTick(
   target: number,
@@ -30,9 +30,9 @@ async function advanceToTick(
 }
 
 async function getBalance(): Promise<number> {
-  const snapshot = await (
-    await fetch(`${DAEMON_URL}/api/v1/snapshot`)
-  ).json();
+  const response = await fetch(`${DAEMON_URL}/api/v1/snapshot`);
+  if (!response.ok) throw new Error(`snapshot returned ${response.status}`);
+  const snapshot = await response.json();
   return snapshot.balance;
 }
 
@@ -53,6 +53,7 @@ test.describe("Import command via Economy panel", () => {
   });
 
   test("importing an item decreases the balance", async ({ page }) => {
+    test.setTimeout(120_000); // Needs time to advance past TRADE_UNLOCK_TICK
     // Advance past the trade unlock tick so imports are accepted.
     // This uses max speed; may take several seconds to reach tick 525,700.
     await advanceToTick(TRADE_UNLOCK_TICK + 100);

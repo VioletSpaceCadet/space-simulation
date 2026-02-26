@@ -63,10 +63,13 @@ server.tool(
   },
 );
 
-// Cleanup on exit
-process.on("exit", () => {
-  void closeBrowser();
-});
+// Cleanup on signals (exit handler can't await async work)
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, async () => {
+    await closeBrowser();
+    process.exit(0);
+  });
+}
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

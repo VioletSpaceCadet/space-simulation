@@ -19,8 +19,11 @@ async function waitForUrl(
   url: string,
   retries: number,
   intervalMs: number,
+  earlyExit?: () => Error | null,
 ): Promise<void> {
   for (let attempt = 0; attempt < retries; attempt++) {
+    const exitError = earlyExit?.();
+    if (exitError) throw exitError;
     try {
       const response = await fetch(url);
       if (response.ok) return;
@@ -42,15 +45,13 @@ export default async function globalSetup(): Promise<void> {
     stdio: "inherit",
   });
 
-  // Start daemon
+  // Spawn the compiled binary directly (not `cargo run`) so the PID we
+  // record is the actual daemon process, not a cargo wrapper.
+  const daemonBin = path.join(PROJECT_ROOT, "target", "debug", "sim_daemon");
   console.log("[e2e] Starting sim_daemon on port", DAEMON_PORT);
   const daemon = spawn(
-    cargo,
+    daemonBin,
     [
-      "run",
-      "-p",
-      "sim_daemon",
-      "--",
       "run",
       "--seed",
       "42",
@@ -60,8 +61,16 @@ export default async function globalSetup(): Promise<void> {
       "--cors-origin",
       `http://localhost:${VITE_PORT}`,
     ],
-    { cwd: PROJECT_ROOT, stdio: "ignore", detached: false },
+    { cwd: PROJECT_ROOT, stdio: "inherit", detached: false },
   );
+
+  // Fail fast if the daemon exits unexpectedly during startup
+  let daemonExitError: Error | null = null;
+  daemon.on("exit", (code) => {
+    if (code !== 0 && code !== null) {
+      daemonExitError = new Error(`sim_daemon exited with code ${code}`);
+    }
+  });
 
   // Start Vite dev server
   console.log("[e2e] Starting Vite dev server on port", VITE_PORT);
@@ -70,7 +79,7 @@ export default async function globalSetup(): Promise<void> {
     ["vite", "--port", String(VITE_PORT)],
     {
       cwd: path.join(PROJECT_ROOT, "ui_web"),
-      stdio: "ignore",
+      stdio: "inherit",
       detached: false,
       env: {
         ...process.env,
@@ -91,6 +100,7 @@ export default async function globalSetup(): Promise<void> {
     `http://localhost:${DAEMON_PORT}/api/v1/meta`,
     60,
     500,
+    () => daemonExitError,
   );
 
   console.log("[e2e] Waiting for Vite...");

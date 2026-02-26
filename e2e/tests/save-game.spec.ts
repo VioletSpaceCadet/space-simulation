@@ -23,8 +23,8 @@ test.describe("Save game", () => {
     await expect(page.locator("text=/saved/i")).toBeVisible({ timeout: 5_000 });
   });
 
-  test("Cmd+S triggers save", async ({ page }) => {
-    await page.keyboard.press("Meta+s");
+  test("Ctrl+S triggers save", async ({ page }) => {
+    await page.keyboard.press("Control+s");
     await expect(page.locator("text=/saved/i")).toBeVisible({ timeout: 5_000 });
   });
 });
