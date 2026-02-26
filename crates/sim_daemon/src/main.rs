@@ -57,6 +57,9 @@ enum Commands {
         /// CORS allowed origin (default: `http://localhost:5173`).
         #[arg(long, default_value = "http://localhost:5173")]
         cors_origin: String,
+        /// Start the simulation in a paused state.
+        #[arg(long)]
+        paused: bool,
     },
 }
 
@@ -74,6 +77,7 @@ async fn main() -> Result<()> {
             metrics_every,
             no_metrics,
             cors_origin,
+            paused,
         } => {
             tracing_subscriber::fmt()
                 .with_env_filter(
@@ -132,7 +136,7 @@ async fn main() -> Result<()> {
                 event_tx: event_tx.clone(),
                 ticks_per_sec: ticks_per_sec_atomic,
                 run_dir,
-                paused: Arc::new(AtomicBool::new(false)),
+                paused: Arc::new(AtomicBool::new(paused)),
             };
             let router = make_router_with_cors(app_state.clone(), &cors_origin);
             let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
@@ -726,6 +730,15 @@ mod tests {
                 .load(std::sync::atomic::Ordering::Relaxed),
         );
         assert!((rate - 1000.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_paused_flag_parsed() {
+        use clap::Parser;
+        let cli = Cli::parse_from(["sim_daemon", "run", "--seed", "1", "--paused"]);
+        match cli.command {
+            Commands::Run { paused, .. } => assert!(paused),
+        }
     }
 
     #[test]
