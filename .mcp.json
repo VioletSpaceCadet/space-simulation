@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "balance-advisor": {
+      "command": "node",
+      "args": ["mcp_advisor/dist/index.js"],
+      "env": {
+        "DAEMON_URL": "http://localhost:3001",
+        "CONTENT_DIR": "./content"
+      }
+    }
+  }
+}
