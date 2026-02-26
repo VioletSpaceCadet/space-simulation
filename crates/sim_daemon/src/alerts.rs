@@ -1,9 +1,8 @@
 use sim_core::MetricsSnapshot;
 use std::collections::{HashSet, VecDeque};
 
-/// Alert detail returned by the advisor digest endpoint (used by VIO-153).
+/// Alert detail returned by the advisor digest endpoint.
 #[derive(Debug, Clone, serde::Serialize)]
-#[allow(dead_code)]
 pub struct AlertDetail {
     pub id: String,
     pub severity: String,
@@ -180,7 +179,6 @@ impl AlertEngine {
     }
 
     /// Returns full details for all currently active alerts.
-    #[allow(dead_code)]
     pub fn active_alert_details(&self) -> Vec<AlertDetail> {
         RULES
             .iter()
