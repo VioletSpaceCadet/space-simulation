@@ -101,9 +101,6 @@ fn tick_station_modules(
         .get(station_id)
         .map_or(0, |s| s.modules.len());
 
-    // Pre-compute volume once; recompute only when inventory actually changes.
-    let mut cached_volume: Option<f32> = None;
-
     for module_idx in 0..module_count {
         let (def_id, interval, power_needed) = {
             let Some(station) = state.stations.get(station_id) else {
@@ -205,6 +202,12 @@ fn tick_station_modules(
 
             let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
 
+            // Warm the station-level volume cache before the immutable borrow.
+            {
+                let station_mut = state.stations.get_mut(station_id).unwrap();
+                let _ = station_mut.used_volume_m3(content);
+            }
+
             let station = state.stations.get(station_id).unwrap();
             let (peeked_kg, lots) = peek_ore_fifo_with_lots(&station.inventory, rate_kg, |item| {
                 matches_input_filter(item, input_filter.as_ref())
@@ -220,9 +223,7 @@ fn tick_station_modules(
             let output_volume =
                 estimate_output_volume_m3(recipe, &avg_composition, peeked_kg, content);
 
-            let current_used = *cached_volume.get_or_insert_with(|| {
-                crate::tasks::inventory_volume_m3(&station.inventory, content)
-            });
+            let current_used = station.cached_inventory_volume_m3.unwrap();
             let capacity = station.cargo_capacity_m3;
             let shortfall = (current_used + output_volume) - capacity;
 
@@ -281,7 +282,9 @@ fn tick_station_modules(
         resolve_processor_run(state, station_id, module_idx, &def_id, content, events);
 
         // Inventory changed — invalidate cached volume.
-        cached_volume = None;
+        if let Some(station) = state.stations.get_mut(station_id) {
+            station.invalidate_volume_cache();
+        }
 
         if let Some(station) = state.stations.get_mut(station_id) {
             if let ModuleKindState::Processor(ps) = &mut station.modules[module_idx].kind_state {
@@ -522,9 +525,6 @@ fn tick_assembler_modules(
         .stations
         .get(station_id)
         .map_or(0, |s| s.modules.len());
-
-    // Pre-compute volume once; recompute only when inventory actually changes.
-    let mut cached_volume: Option<f32> = None;
 
     for module_idx in 0..module_count {
         // Extract module info and assembler def
@@ -807,10 +807,12 @@ fn tick_assembler_modules(
             .clone();
 
         {
+            let current_used = state
+                .stations
+                .get_mut(station_id)
+                .unwrap()
+                .used_volume_m3(content);
             let station = state.stations.get(station_id).unwrap();
-            let current_used = *cached_volume.get_or_insert_with(|| {
-                crate::tasks::inventory_volume_m3(&station.inventory, content)
-            });
             let capacity = station.cargo_capacity_m3;
             let shortfall = (current_used + output_volume) - capacity;
 
@@ -868,7 +870,9 @@ fn tick_assembler_modules(
         );
 
         // Inventory changed — invalidate cached volume.
-        cached_volume = None;
+        if let Some(station) = state.stations.get_mut(station_id) {
+            station.invalidate_volume_cache();
+        }
 
         // Reset timer
         if let Some(station) = state.stations.get_mut(station_id) {
@@ -1497,6 +1501,7 @@ fn tick_maintenance_modules(
             station
                 .inventory
                 .retain(|i| !matches!(i, InventoryItem::Component { count, .. } if *count == 0));
+            station.invalidate_volume_cache();
         }
 
         // Apply repair
@@ -1771,6 +1776,7 @@ mod lab_tests {
                         }),
                         wear: WearState::default(),
                     }],
+                    cached_inventory_volume_m3: None,
                 },
             )]),
             research: ResearchState {
@@ -1986,6 +1992,7 @@ mod lab_tests {
                         }),
                         wear: crate::WearState::default(),
                     }],
+                    cached_inventory_volume_m3: None,
                 },
             )]),
             research: crate::ResearchState {
@@ -2207,6 +2214,7 @@ mod assembler_component_tests {
                         }),
                         wear: WearState::default(),
                     }],
+                    cached_inventory_volume_m3: None,
                 },
             )]),
             research: ResearchState {
@@ -2486,6 +2494,7 @@ mod assembler_component_tests {
                         }),
                         wear: WearState::default(),
                     }],
+                    cached_inventory_volume_m3: None,
                 },
             )]),
             research: ResearchState {

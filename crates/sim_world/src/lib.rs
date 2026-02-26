@@ -308,6 +308,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         modules: vec![],
+        cached_inventory_volume_m3: None,
     };
     let ship_id = ShipId("ship_0001".to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
@@ -638,6 +639,7 @@ mod tests {
                     cargo_capacity_m3: 1000.0,
                     power_available_per_tick: 100.0,
                     modules: vec![],
+                    cached_inventory_volume_m3: None,
                 },
             )]),
             research: ResearchState {

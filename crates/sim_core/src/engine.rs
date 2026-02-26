@@ -97,6 +97,7 @@ fn apply_commands(
                 else {
                     continue;
                 };
+                station.invalidate_volume_cache();
 
                 let module_id_str =
                     format!("module_inst_{:04}", state.counters.next_module_instance_id);
@@ -182,6 +183,7 @@ fn apply_commands(
                     item_id: item_id.clone(),
                     module_def_id: module.def_id.clone(),
                 });
+                station.invalidate_volume_cache();
 
                 events.push(crate::emit(
                     &mut state.counters,
@@ -277,9 +279,9 @@ fn apply_commands(
                 if current_tick < TRADE_UNLOCK_TICK {
                     continue;
                 }
-                let Some(station) = state.stations.get(station_id) else {
+                if !state.stations.contains_key(station_id) {
                     continue;
-                };
+                }
 
                 // Look up pricing and compute cost
                 let Some(cost) = trade::compute_import_cost(item_spec, &content.pricing, content)
@@ -305,8 +307,10 @@ fn apply_commands(
                 // Check cargo capacity
                 let new_items = trade::create_inventory_items(item_spec, rng);
                 let new_volume = inventory_volume_m3(&new_items, content);
-                let current_volume = inventory_volume_m3(&station.inventory, content);
-                if current_volume + new_volume > station.cargo_capacity_m3 {
+                let station = state.stations.get_mut(station_id).unwrap();
+                let current_volume = station.used_volume_m3(content);
+                let cargo_cap = station.cargo_capacity_m3;
+                if current_volume + new_volume > cargo_cap {
                     continue; // no room
                 }
 
@@ -314,6 +318,7 @@ fn apply_commands(
                 state.balance -= cost;
                 let station = state.stations.get_mut(station_id).unwrap();
                 trade::merge_into_inventory(&mut station.inventory, new_items);
+                station.invalidate_volume_cache();
 
                 events.push(crate::emit(
                     &mut state.counters,
@@ -354,6 +359,7 @@ fn apply_commands(
                 if !trade::remove_inventory_items(&mut station.inventory, item_spec) {
                     continue;
                 }
+                station.invalidate_volume_cache();
                 state.balance += revenue;
 
                 events.push(crate::emit(
@@ -385,6 +391,7 @@ fn apply_commands(
                 station
                     .inventory
                     .retain(|i| !matches!(i, InventoryItem::Slag { .. }));
+                station.invalidate_volume_cache();
                 if jettisoned_kg > 0.0 {
                     events.push(crate::emit(
                         &mut state.counters,
@@ -615,6 +622,7 @@ mod replenish_tests {
                     cargo_capacity_m3: 10_000.0,
                     power_available_per_tick: 100.0,
                     modules: vec![],
+                    cached_inventory_volume_m3: None,
                 },
             )]),
             research: ResearchState {
