@@ -109,16 +109,18 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 ## Balance Advisor (MCP)
 
-6 MCP tools are available for balance analysis. Use them when investigating simulation balance, tuning parameters, or diagnosing issues:
+9 MCP tools are available for balance analysis. Use them when investigating simulation balance, tuning parameters, or diagnosing issues:
 
 - **start_simulation** — Start a sim daemon as a background process. Accepts optional `seed` and `max_ticks`. Stops any previous daemon first. Auto-kills on session end.
 - **stop_simulation** — Stop a previously started sim daemon.
+- **set_speed** — Set simulation tick speed. Default is 10 tps; use 1000+ for fast analysis runs.
+- **pause_simulation** / **resume_simulation** — Pause and resume the simulation.
 - **get_metrics_digest** — Fetch trend analysis, production rates, and bottleneck detection from the running sim. Use this first when asked about simulation performance or balance problems.
 - **get_active_alerts** — Fetch currently firing alerts (e.g. inventory full, starvation, wear critical). Use when diagnosing operational issues.
 - **get_game_parameters** — Read content files (constants, module_defs, techs, pricing) without manual file reads. Use when comparing current values to proposed changes.
 - **suggest_parameter_change** — Save a proposed balance change with rationale and expected impact to `content/advisor_proposals/`. Use after analyzing metrics to recommend a tuning adjustment.
 
-**Workflow:** Use `start_simulation` to launch a daemon (or connect to one already running on port 3001). The default tick speed is 10 tps — for meaningful analysis, speed up via `curl -X POST http://localhost:3001/api/v1/speed -H 'Content-Type: application/json' -d '{"ticks_per_sec": 1000}'`. Wait for data to accumulate (tens of thousands of ticks), then use `get_metrics_digest` to analyze trends. If something looks off, check `get_active_alerts` and `get_game_parameters` to understand why, then `suggest_parameter_change` to propose a fix. Use `stop_simulation` when done.
+**Workflow:** Use `start_simulation` to launch a daemon, then `set_speed` to 1000+ tps for fast analysis. Wait for data to accumulate (tens of thousands of ticks), then use `get_metrics_digest` to analyze trends. If something looks off, check `get_active_alerts` and `get_game_parameters` to understand why, then `suggest_parameter_change` to propose a fix. Use `stop_simulation` when done.
 
 **Tips:** Rates may show 0.0 during ship transit periods (2,880 ticks per hop) — this is normal, check again after the ship delivers ore. Trends need 50+ metric samples (captured every 60 ticks) to differentiate short vs long windows.
 

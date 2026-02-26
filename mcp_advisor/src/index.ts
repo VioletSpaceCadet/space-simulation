@@ -319,6 +319,85 @@ server.tool(
   },
 );
 
+// ---------- Tool 7: set_speed ----------
+
+server.tool(
+  "set_speed",
+  "Set the simulation tick speed (ticks per second). Use higher values like 1000 for faster analysis.",
+  {
+    ticks_per_sec: z.number().min(0)
+      .describe("Ticks per second (e.g. 10 for default, 1000 for fast analysis, 0 to pause)"),
+  },
+  async ({ ticks_per_sec }) => {
+    let response: Response;
+    try {
+      response = await fetch(`${DAEMON_URL}/api/v1/speed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticks_per_sec }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to connect to daemon at ${DAEMON_URL}: ${message}`,
+        }) }],
+      };
+    }
+    const body = await response.text();
+    return { content: [{ type: "text" as const, text: body }] };
+  },
+);
+
+// ---------- Tool 8: pause_simulation ----------
+
+server.tool(
+  "pause_simulation",
+  "Pause the running simulation. Use resume_simulation to continue.",
+  {},
+  async () => {
+    let response: Response;
+    try {
+      response = await fetch(`${DAEMON_URL}/api/v1/pause`, { method: "POST" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to connect to daemon at ${DAEMON_URL}: ${message}`,
+        }) }],
+      };
+    }
+    const body = await response.text();
+    return { content: [{ type: "text" as const, text: body }] };
+  },
+);
+
+// ---------- Tool 9: resume_simulation ----------
+
+server.tool(
+  "resume_simulation",
+  "Resume a paused simulation.",
+  {},
+  async () => {
+    let response: Response;
+    try {
+      response = await fetch(`${DAEMON_URL}/api/v1/resume`, { method: "POST" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to connect to daemon at ${DAEMON_URL}: ${message}`,
+        }) }],
+      };
+    }
+    const body = await response.text();
+    return { content: [{ type: "text" as const, text: body }] };
+  },
+);
+
 // ---------- Startup validation ----------
 
 function validateContentDir(): void {
