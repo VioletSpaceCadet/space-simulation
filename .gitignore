@@ -39,3 +39,4 @@ saves/
 # MCP advisor
 mcp_advisor/node_modules/
 mcp_advisor/dist/
+content/advisor_proposals/
