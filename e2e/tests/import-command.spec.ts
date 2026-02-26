@@ -47,14 +47,14 @@ test.describe("Import command via Economy panel", () => {
     }
     await economyTab.waitFor({ state: "visible", timeout: 5_000 });
 
-    // Scope to the Import section (identified by its heading text).
-    // The Economy panel has Import and Export sections, each with their own
-    // category select, item select, quantity input, and action button.
-    const importSection = page
-      .locator("div")
-      .filter({ hasText: /^Import$/ })
-      .first();
-    await importSection.waitFor({ state: "visible", timeout: 10_000 });
+    // The Economy panel has Import and Export sections. Each section is a
+    // div.mb-3 containing a heading div ("Import"/"Export"), selects, input,
+    // and a button. We find the Import section by locating the heading and
+    // then scoping to its parent container.
+    const importHeading = page.locator("div", { hasText: /^Import$/ }).first();
+    await importHeading.waitFor({ state: "visible", timeout: 10_000 });
+    // The parent of the heading contains all the form controls
+    const importSection = importHeading.locator("..");
 
     // Select "Material" category (should be the default)
     const categorySelect = importSection.locator("select").first();
