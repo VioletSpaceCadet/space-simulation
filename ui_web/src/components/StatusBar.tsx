@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import { saveGame } from '../api'
-import { playSave } from '../sounds'
-import type { ActiveAlert } from '../types'
-import { formatCurrency } from '../utils'
-import { AlertBadges } from './AlertBadges'
+import { useCallback, useEffect, useState } from 'react';
+
+import { saveGame } from '../api';
+import { playSave } from '../sounds';
+import type { ActiveAlert } from '../types';
+import { formatCurrency } from '../utils';
+
+import { AlertBadges } from './AlertBadges';
 
 const SPEED_PRESETS = [
   { label: '100', tps: 100 },
@@ -11,7 +13,7 @@ const SPEED_PRESETS = [
   { label: '10K', tps: 10_000 },
   { label: '100K', tps: 100_000 },
   { label: 'Max', tps: 0 },
-] as const
+] as const;
 
 interface Props {
   tick: number
@@ -29,38 +31,42 @@ interface Props {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
-export function StatusBar({ tick, connected, measuredTickRate, paused, balance, onTogglePause, alerts, dismissedAlerts, onDismissAlert, activeSpeed, onSetSpeed }: Props) {
-  const roundedTick = Math.floor(tick)
-  const day = Math.floor(roundedTick / 1440)
-  const hour = Math.floor((roundedTick % 1440) / 60)
-  const minute = roundedTick % 60
+export function StatusBar({
+  tick, connected, measuredTickRate, paused, balance,
+  onTogglePause, alerts, dismissedAlerts, onDismissAlert,
+  activeSpeed, onSetSpeed,
+}: Props) {
+  const roundedTick = Math.floor(tick);
+  const day = Math.floor(roundedTick / 1440);
+  const hour = Math.floor((roundedTick % 1440) / 60);
+  const minute = roundedTick % 60;
 
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
 
   const handleSave = useCallback(() => {
-    setSaveStatus('saving')
+    setSaveStatus('saving');
     saveGame()
       .then(() => {
-        setSaveStatus('saved')
-        playSave()
-        setTimeout(() => setSaveStatus('idle'), 2000)
+        setSaveStatus('saved');
+        playSave();
+        setTimeout(() => setSaveStatus('idle'), 2000);
       })
       .catch(() => {
-        setSaveStatus('error')
-        setTimeout(() => setSaveStatus('idle'), 3000)
-      })
-  }, [])
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      });
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        handleSave()
+        e.preventDefault();
+        handleSave();
       }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [handleSave])
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleSave]);
 
   const saveLabel =
     saveStatus === 'saving'
@@ -69,7 +75,7 @@ export function StatusBar({ tick, connected, measuredTickRate, paused, balance, 
         ? 'Saved'
         : saveStatus === 'error'
           ? 'Save failed'
-          : 'Save'
+          : 'Save';
 
   return (
     <div className="flex gap-6 items-center px-4 py-1.5 bg-surface border-b border-edge text-xs shrink-0">
@@ -132,5 +138,5 @@ export function StatusBar({ tick, connected, measuredTickRate, paused, balance, 
         </button>
       </div>
     </div>
-  )
+  );
 }

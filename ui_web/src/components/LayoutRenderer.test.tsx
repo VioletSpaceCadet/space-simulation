@@ -1,16 +1,18 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
-import { DndContext } from '@dnd-kit/core'
-import { LayoutRenderer } from './LayoutRenderer'
-import type { GroupNode, PanelId } from '../layout'
+import { DndContext } from '@dnd-kit/core';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { GroupNode, PanelId } from '../layout';
+
+import { LayoutRenderer } from './LayoutRenderer';
 
 function renderWithDnd(ui: React.ReactNode) {
-  return render(<DndContext>{ui}</DndContext>)
+  return render(<DndContext>{ui}</DndContext>);
 }
 
 const renderPanelMock = vi.fn((id: PanelId) => (
   <div data-testid={`content-${id}`}>{id} content</div>
-))
+));
 
 describe('LayoutRenderer', () => {
   it('renders leaf panels with their tab headers', () => {
@@ -21,7 +23,7 @@ describe('LayoutRenderer', () => {
         { type: 'leaf', panelId: 'map' },
         { type: 'leaf', panelId: 'fleet' },
       ],
-    }
+    };
 
     renderWithDnd(
       <LayoutRenderer
@@ -30,11 +32,11 @@ describe('LayoutRenderer', () => {
         isDragging={false}
         activeDragId={null}
       />,
-    )
+    );
 
-    expect(screen.getByText('Map')).toBeInTheDocument()
-    expect(screen.getByText('Fleet')).toBeInTheDocument()
-  })
+    expect(screen.getByText('Map')).toBeInTheDocument();
+    expect(screen.getByText('Fleet')).toBeInTheDocument();
+  });
 
   it('renders nested vertical groups with all labels present', () => {
     const layout: GroupNode = {
@@ -51,7 +53,7 @@ describe('LayoutRenderer', () => {
           ],
         },
       ],
-    }
+    };
 
     renderWithDnd(
       <LayoutRenderer
@@ -60,12 +62,12 @@ describe('LayoutRenderer', () => {
         isDragging={false}
         activeDragId={null}
       />,
-    )
+    );
 
-    expect(screen.getByText('Map')).toBeInTheDocument()
-    expect(screen.getByText('Events')).toBeInTheDocument()
-    expect(screen.getByText('Asteroids')).toBeInTheDocument()
-  })
+    expect(screen.getByText('Map')).toBeInTheDocument();
+    expect(screen.getByText('Events')).toBeInTheDocument();
+    expect(screen.getByText('Asteroids')).toBeInTheDocument();
+  });
 
   it('renders resize handles between panels', () => {
     const layout: GroupNode = {
@@ -76,7 +78,7 @@ describe('LayoutRenderer', () => {
         { type: 'leaf', panelId: 'events' },
         { type: 'leaf', panelId: 'asteroids' },
       ],
-    }
+    };
 
     const { container } = renderWithDnd(
       <LayoutRenderer
@@ -85,16 +87,16 @@ describe('LayoutRenderer', () => {
         isDragging={false}
         activeDragId={null}
       />,
-    )
+    );
 
-    const handles = container.querySelectorAll('[data-panel-resize-handle-id]')
-    expect(handles).toHaveLength(2)
-  })
+    const handles = container.querySelectorAll('[data-panel-resize-handle-id]');
+    expect(handles).toHaveLength(2);
+  });
 
   it('calls renderPanel for each leaf', () => {
     const mockRender = vi.fn((id: PanelId) => (
       <div data-testid={`content-${id}`}>{id}</div>
-    ))
+    ));
 
     const layout: GroupNode = {
       type: 'group',
@@ -103,7 +105,7 @@ describe('LayoutRenderer', () => {
         { type: 'leaf', panelId: 'map' },
         { type: 'leaf', panelId: 'research' },
       ],
-    }
+    };
 
     renderWithDnd(
       <LayoutRenderer
@@ -112,10 +114,10 @@ describe('LayoutRenderer', () => {
         isDragging={false}
         activeDragId={null}
       />,
-    )
+    );
 
-    expect(mockRender).toHaveBeenCalledWith('map')
-    expect(mockRender).toHaveBeenCalledWith('research')
-    expect(mockRender).toHaveBeenCalledTimes(2)
-  })
-})
+    expect(mockRender).toHaveBeenCalledWith('map');
+    expect(mockRender).toHaveBeenCalledWith('research');
+    expect(mockRender).toHaveBeenCalledTimes(2);
+  });
+});

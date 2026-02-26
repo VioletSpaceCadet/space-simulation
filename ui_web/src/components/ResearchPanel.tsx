@@ -1,20 +1,20 @@
-import type { DomainProgress, ResearchState } from '../types'
+import type { DomainProgress, ResearchState } from '../types';
 
 interface Props {
   research: ResearchState
 }
 
 function totalEvidence(dp: DomainProgress | undefined): number {
-  if (!dp) return 0
-  return Object.values(dp.points).reduce((sum, v) => sum + v, 0)
+  if (!dp) {return 0;}
+  return Object.values(dp.points).reduce((sum, v) => sum + v, 0);
 }
 
 function unlockProbability(evidence: number, difficulty = 200): number {
-  return 1 - Math.exp(-evidence / difficulty)
+  return 1 - Math.exp(-evidence / difficulty);
 }
 
 export function ResearchPanel({ research }: Props) {
-  const allTechIds = new Set([...research.unlocked, ...Object.keys(research.evidence)])
+  const allTechIds = new Set([...research.unlocked, ...Object.keys(research.evidence)]);
 
   return (
     <div className="overflow-y-auto flex-1">
@@ -31,9 +31,9 @@ export function ResearchPanel({ research }: Props) {
       </div>
       <div>
         {[...allTechIds].map((techId) => {
-          const evidence = totalEvidence(research.evidence[techId])
-          const isUnlocked = research.unlocked.includes(techId)
-          const prob = unlockProbability(evidence)
+          const evidence = totalEvidence(research.evidence[techId]);
+          const isUnlocked = research.unlocked.includes(techId);
+          const prob = unlockProbability(evidence);
           return (
             <div key={techId} className="py-1.5 border-b border-surface text-[11px]">
               <div className="text-accent mb-0.5">{techId}</div>
@@ -44,10 +44,10 @@ export function ResearchPanel({ research }: Props) {
                 <div className="text-muted mt-0.5">p(unlock): {(prob * 100).toFixed(1)}%</div>
               )}
             </div>
-          )
+          );
         })}
         {allTechIds.size === 0 && <div className="text-faint italic">no research data yet</div>}
       </div>
     </div>
-  )
+  );
 }

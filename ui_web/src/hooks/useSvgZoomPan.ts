@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
-import { select } from 'd3-selection'
-import { zoom, zoomIdentity } from 'd3-zoom'
-import type { D3ZoomEvent } from 'd3-zoom'
+import { select } from 'd3-selection';
+import { zoom, zoomIdentity } from 'd3-zoom';
+import type { D3ZoomEvent } from 'd3-zoom';
+import { useEffect } from 'react';
 
 interface ZoomPanOptions {
   minZoom?: number
@@ -13,25 +13,25 @@ export function useSvgZoomPan(
   groupRef: React.RefObject<SVGGElement | null>,
   options: ZoomPanOptions = {},
 ) {
-  const { minZoom = 0.3, maxZoom = 5 } = options
+  const { minZoom = 0.3, maxZoom = 5 } = options;
 
   useEffect(() => {
-    const svgEl = svgRef.current
-    const groupEl = groupRef.current
-    if (!svgEl || !groupEl) return
+    const svgEl = svgRef.current;
+    const groupEl = groupRef.current;
+    if (!svgEl || !groupEl) {return;}
 
-    const svgSelection = select<SVGSVGElement, unknown>(svgEl)
+    const svgSelection = select<SVGSVGElement, unknown>(svgEl);
     const zoomBehavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([minZoom, maxZoom])
       .on('zoom', (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
-        select(groupEl).attr('transform', event.transform.toString())
-      })
+        select(groupEl).attr('transform', event.transform.toString());
+      });
 
-    svgSelection.call(zoomBehavior)
-    svgSelection.call(zoomBehavior.transform, zoomIdentity)
+    svgSelection.call(zoomBehavior);
+    svgSelection.call(zoomBehavior.transform, zoomIdentity);
 
     return () => {
-      svgSelection.on('.zoom', null)
-    }
-  }, [svgRef, groupRef, minZoom, maxZoom])
+      svgSelection.on('.zoom', null);
+    };
+  }, [svgRef, groupRef, minZoom, maxZoom]);
 }

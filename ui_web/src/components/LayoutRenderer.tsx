@@ -1,7 +1,9 @@
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
-import { DraggableTab } from './DraggableTab'
-import { DropZoneOverlay } from './DropZoneOverlay'
-import type { GroupNode, LayoutNode, PanelId } from '../layout'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+
+import type { GroupNode, LayoutNode, PanelId } from '../layout';
+
+import { DraggableTab } from './DraggableTab';
+import { DropZoneOverlay } from './DropZoneOverlay';
 
 interface Props {
   layout: GroupNode
@@ -36,7 +38,7 @@ function RenderNode({
           dragSourceId={drag.activeDragId}
         />
       </section>
-    )
+    );
   }
 
   return (
@@ -45,7 +47,7 @@ function RenderNode({
       renderPanel={renderPanel}
       {...drag}
     />
-  )
+  );
 }
 
 function RenderGroup({
@@ -56,16 +58,16 @@ function RenderGroup({
   group: GroupNode
   renderPanel: Props['renderPanel']
 } & SharedDragProps) {
-  const defaultSize = 100 / group.children.length
+  const defaultSize = 100 / group.children.length;
 
   return (
     <PanelGroup direction={group.direction}>
       {group.children.map((child, index) => {
-        const key = child.type === 'leaf' ? child.panelId : `group-${index}`
+        const key = child.type === 'leaf' ? child.panelId : `group-${index}`;
         const handleClass =
           group.direction === 'horizontal'
             ? 'w-px bg-edge hover:bg-dim cursor-col-resize transition-colors'
-            : 'h-px bg-edge hover:bg-dim cursor-row-resize transition-colors'
+            : 'h-px bg-edge hover:bg-dim cursor-row-resize transition-colors';
 
         return (
           <span key={key} className="contents">
@@ -78,10 +80,10 @@ function RenderGroup({
               />
             </Panel>
           </span>
-        )
+        );
       })}
     </PanelGroup>
-  )
+  );
 }
 
 export function LayoutRenderer({ layout, renderPanel, isDragging, activeDragId }: Props) {
@@ -93,5 +95,5 @@ export function LayoutRenderer({ layout, renderPanel, isDragging, activeDragId }
       activeDragId={activeDragId}
       rootLayout={layout}
     />
-  )
+  );
 }

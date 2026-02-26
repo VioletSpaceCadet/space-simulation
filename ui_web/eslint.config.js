@@ -52,7 +52,7 @@ export default defineConfig([
       // --- Best practices ---
       'prefer-const': 'error',
       'no-var': 'error',
-      eqeqeq: ['error', 'always'],
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
       curly: 'error',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-debugger': 'error',
