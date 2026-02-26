@@ -144,37 +144,47 @@ server.tool(
       .describe("What should improve with this change"),
   },
   async ({ parameter_path, current_value, proposed_value, rationale, expected_impact }) => {
-    const proposalsDir = path.join(CONTENT_DIR, "advisor_proposals");
-    await fsPromises.mkdir(proposalsDir, { recursive: true });
+    try {
+      const proposalsDir = path.join(CONTENT_DIR, "advisor_proposals");
+      await fsPromises.mkdir(proposalsDir, { recursive: true });
 
-    const timestamp = Date.now();
-    const filename = `proposal_${timestamp}.json`;
-    const filePath = path.join(proposalsDir, filename);
+      const timestamp = Date.now();
+      const filename = `proposal_${timestamp}.json`;
+      const filePath = path.join(proposalsDir, filename);
 
-    const proposal = {
-      parameter_path,
-      current_value,
-      proposed_value,
-      rationale,
-      expected_impact,
-      created_at: new Date(timestamp).toISOString(),
-    };
+      const proposal = {
+        parameter_path,
+        current_value,
+        proposed_value,
+        rationale,
+        expected_impact,
+        created_at: new Date(timestamp).toISOString(),
+      };
 
-    await fsPromises.writeFile(filePath, JSON.stringify(proposal, null, 2) + "\n");
+      await fsPromises.writeFile(filePath, JSON.stringify(proposal, null, 2) + "\n");
 
-    const relativePath = path.relative(
-      path.resolve(CONTENT_DIR, ".."),
-      filePath,
-    );
+      const relativePath = path.relative(
+        path.resolve(CONTENT_DIR, ".."),
+        filePath,
+      );
 
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify({ status: "saved", path: relativePath }),
-        },
-      ],
-    };
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ status: "saved", path: relativePath }),
+          },
+        ],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to save proposal: ${message}`,
+        }) }],
+      };
+    }
   },
 );
 
