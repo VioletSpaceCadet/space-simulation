@@ -1,5 +1,6 @@
-import { useDraggable } from '@dnd-kit/core'
-import { PANEL_LABELS, type PanelId } from '../layout'
+import { useDraggable } from '@dnd-kit/core';
+
+import { PANEL_LABELS, type PanelId } from '../layout';
 
 interface DraggableTabProps {
   panelId: PanelId
@@ -10,7 +11,7 @@ export function DraggableTab({ panelId, isDragging }: DraggableTabProps) {
   const { attributes, listeners, setNodeRef } = useDraggable({
     id: `tab-${panelId}`,
     data: { panelId },
-  })
+  });
 
   return (
     <div
@@ -24,5 +25,5 @@ export function DraggableTab({ panelId, isDragging }: DraggableTabProps) {
       <span className="mr-1.5 text-[9px] text-muted">⠿</span>
       {PANEL_LABELS[panelId]}
     </div>
-  )
+  );
 }

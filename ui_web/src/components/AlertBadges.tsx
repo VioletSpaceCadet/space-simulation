@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import type { ActiveAlert } from '../types'
+import { useState } from 'react';
+
+import type { ActiveAlert } from '../types';
 
 interface Props {
   alerts: Map<string, ActiveAlert>
@@ -8,19 +9,19 @@ interface Props {
 }
 
 export function AlertBadges({ alerts, dismissed, onDismiss }: Props) {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const visible = [...alerts.values()].filter(a => !dismissed.has(a.alert_id))
-  if (visible.length === 0) return null
+  const visible = [...alerts.values()].filter(a => !dismissed.has(a.alert_id));
+  if (visible.length === 0) {return null;}
 
   return (
     <div className="flex gap-1.5 items-center">
       {visible.map((alert) => {
-        const isWarning = alert.severity === 'Warning'
-        const bgColor = isWarning ? 'bg-amber-500/20' : 'bg-red-500/20'
-        const textColor = isWarning ? 'text-amber-400' : 'text-red-400'
-        const borderColor = isWarning ? 'border-amber-500/40' : 'border-red-500/40'
-        const isExpanded = expandedId === alert.alert_id
+        const isWarning = alert.severity === 'Warning';
+        const bgColor = isWarning ? 'bg-amber-500/20' : 'bg-red-500/20';
+        const textColor = isWarning ? 'text-amber-400' : 'text-red-400';
+        const borderColor = isWarning ? 'border-amber-500/40' : 'border-red-500/40';
+        const isExpanded = expandedId === alert.alert_id;
 
         return (
           <div key={alert.alert_id} className="relative">
@@ -34,8 +35,8 @@ export function AlertBadges({ alerts, dismissed, onDismiss }: Props) {
                 role="button"
                 tabIndex={0}
                 className="ml-1 opacity-60 hover:opacity-100"
-                onClick={(e) => { e.stopPropagation(); onDismiss(alert.alert_id) }}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onDismiss(alert.alert_id) } }}
+                onClick={(e) => { e.stopPropagation(); onDismiss(alert.alert_id); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onDismiss(alert.alert_id); } }}
               >
                 ×
               </span>
@@ -48,8 +49,8 @@ export function AlertBadges({ alerts, dismissed, onDismiss }: Props) {
               </div>
             )}
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

@@ -14,5 +14,5 @@ export function PanelHeader({ title, collapsed, onToggle }: Props) {
       <span className="text-[9px] leading-none">{collapsed ? '▸' : '▾'}</span>
       <span>{title}</span>
     </button>
-  )
+  );
 }

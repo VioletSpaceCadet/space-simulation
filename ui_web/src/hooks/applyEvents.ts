@@ -1,4 +1,4 @@
-import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types'
+import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
 
 function buildTaskStub(taskKind: string, target: string | null, tick: number): TaskState {
   const kindMap: Record<string, Record<string, unknown>> = {
@@ -7,26 +7,26 @@ function buildTaskStub(taskKind: string, target: string | null, tick: number): T
     Mine: target ? { Mine: { asteroid: target, duration_ticks: 0 } } : { Idle: {} },
     Deposit: target ? { Deposit: { station: target } } : { Idle: {} },
     Transit: target ? { Transit: { destination: target, total_ticks: 0 } } : { Idle: {} },
-  }
+  };
   return {
     kind: (kindMap[taskKind] ?? { Idle: {} }) as TaskState['kind'],
     started_tick: tick,
     eta_tick: 0,
-  }
+  };
 }
 
 /** Convert a TradeItemSpec (serde-tagged union) into an InventoryItem for the UI. */
 function tradeItemToInventory(itemSpec: TradeItemSpec): InventoryItem {
   if ('Material' in itemSpec) {
-    const { element, kg } = itemSpec.Material
-    return { kind: 'Material', element, kg, quality: 1.0 }
+    const { element, kg } = itemSpec.Material;
+    return { kind: 'Material', element, kg, quality: 1.0 };
   }
   if ('Component' in itemSpec) {
-    const { component_id, count } = itemSpec.Component
-    return { kind: 'Component', component_id, count, quality: 1.0 }
+    const { component_id, count } = itemSpec.Component;
+    return { kind: 'Component', component_id, count, quality: 1.0 };
   }
-  const { module_def_id } = itemSpec.Module
-  return { kind: 'Module', item_id: `imported_${module_def_id}_${Date.now()}`, module_def_id }
+  const { module_def_id } = itemSpec.Module;
+  return { kind: 'Module', item_id: `imported_${module_def_id}_${Date.now()}`, module_def_id };
 }
 
 export function applyEvents(
@@ -45,21 +45,21 @@ export function applyEvents(
   scanSites: ScanSite[]
   balance: number
 } {
-  let updatedAsteroids = { ...asteroids }
-  let updatedShips = { ...ships }
-  let updatedStations = { ...stations }
-  let updatedResearch = research
-  const updatedScanSites = [...scanSites]
-  let updatedBalance = balance
+  let updatedAsteroids = { ...asteroids };
+  let updatedShips = { ...ships };
+  let updatedStations = { ...stations };
+  let updatedResearch = research;
+  const updatedScanSites = [...scanSites];
+  let updatedBalance = balance;
 
   for (const evt of events) {
-    const e = evt.event
-    const eventKey = Object.keys(e)[0]
-    const event = e[eventKey] as Record<string, unknown>
+    const e = evt.event;
+    const eventKey = Object.keys(e)[0];
+    const event = e[eventKey] as Record<string, unknown>;
 
     switch (eventKey) {
       case 'AsteroidDiscovered': {
-        const { asteroid_id, location_node } = event as { asteroid_id: string; location_node: string }
+        const { asteroid_id, location_node } = event as { asteroid_id: string; location_node: string };
         if (!updatedAsteroids[asteroid_id]) {
           updatedAsteroids = {
             ...updatedAsteroids,
@@ -70,9 +70,9 @@ export function applyEvents(
               // mass_kg intentionally omitted — unknown until snapshot or OreMined event
               knowledge: { tag_beliefs: [], composition: null },
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'OreMined': {
@@ -81,16 +81,16 @@ export function applyEvents(
           asteroid_id: string
           ore_lot: ShipState['inventory'][number]
           asteroid_remaining_kg: number
-        }
+        };
         if (asteroid_remaining_kg <= 0) {
           updatedAsteroids = Object.fromEntries(
             Object.entries(updatedAsteroids).filter(([id]) => id !== asteroid_id)
-          )
+          );
         } else if (updatedAsteroids[asteroid_id]) {
           updatedAsteroids = {
             ...updatedAsteroids,
             [asteroid_id]: { ...updatedAsteroids[asteroid_id], mass_kg: asteroid_remaining_kg },
-          }
+          };
         }
         if (updatedShips[ship_id]) {
           updatedShips = {
@@ -99,9 +99,9 @@ export function applyEvents(
               ...updatedShips[ship_id],
               inventory: [...updatedShips[ship_id].inventory, ore_lot],
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'OreDeposited': {
@@ -109,12 +109,12 @@ export function applyEvents(
           ship_id: string
           station_id: string
           items: StationState['inventory']
-        }
+        };
         if (updatedShips[ship_id]) {
           updatedShips = {
             ...updatedShips,
             [ship_id]: { ...updatedShips[ship_id], inventory: [] },
-          }
+          };
         }
         if (updatedStations[station_id]) {
           updatedStations = {
@@ -123,9 +123,9 @@ export function applyEvents(
               ...updatedStations[station_id],
               inventory: [...updatedStations[station_id].inventory, ...items],
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'ModuleInstalled': {
@@ -134,16 +134,16 @@ export function applyEvents(
           module_id: string
           module_item_id: string
           module_def_id: string
-        }
+        };
         if (updatedStations[station_id]) {
-          const station = updatedStations[station_id]
+          const station = updatedStations[station_id];
           const kindState: ModuleKindState = module_def_id.includes('maintenance')
             ? { Maintenance: { ticks_since_last_run: 0 } }
             : module_def_id.includes('assembler')
               ? { Assembler: { ticks_since_last_run: 0, stalled: false } }
               : module_def_id.includes('lab')
                 ? { Lab: { ticks_since_last_run: 0, assigned_tech: null, starved: false } }
-                : { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } }
+                : { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } };
           updatedStations = {
             ...updatedStations,
             [station_id]: {
@@ -162,9 +162,9 @@ export function applyEvents(
                 },
               ],
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'ModuleToggled': {
@@ -172,7 +172,7 @@ export function applyEvents(
           station_id: string
           module_id: string
           enabled: boolean
-        }
+        };
         if (updatedStations[station_id]) {
           updatedStations = {
             ...updatedStations,
@@ -182,9 +182,9 @@ export function applyEvents(
                 m.id === module_id ? { ...m, enabled } : m
               ),
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'ModuleThresholdSet': {
@@ -192,138 +192,144 @@ export function applyEvents(
           station_id: string
           module_id: string
           threshold_kg: number
-        }
+        };
         if (updatedStations[station_id]) {
           updatedStations = {
             ...updatedStations,
             [station_id]: {
               ...updatedStations[station_id],
               modules: updatedStations[station_id].modules.map((m) => {
-                if (m.id !== module_id) return m
-                const ks = m.kind_state
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
                 if (typeof ks === 'object' && 'Processor' in ks) {
-                  return { ...m, kind_state: { Processor: { ...ks.Processor, threshold_kg } } }
+                  return { ...m, kind_state: { Processor: { ...ks.Processor, threshold_kg } } };
                 }
-                return m
+                return m;
               }),
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'RefineryRan': {
-        const { station_id, ore_consumed_kg, material_produced_kg, material_quality, slag_produced_kg, material_element } = event as {
+        const {
+          station_id, ore_consumed_kg, material_produced_kg,
+          material_quality, slag_produced_kg, material_element,
+        } = event as {
           station_id: string
           ore_consumed_kg: number
           material_produced_kg: number
           material_quality: number
           slag_produced_kg: number
           material_element: string
-        }
-        const REFINERY_ELEMENT = material_element as string
+        };
+        const REFINERY_ELEMENT = material_element as string;
         if (updatedStations[station_id]) {
-          let stationInv = [...updatedStations[station_id].inventory]
+          let stationInv = [...updatedStations[station_id].inventory];
 
           // Consume ore_consumed_kg from Ore items FIFO
-          let remaining = ore_consumed_kg
+          let remaining = ore_consumed_kg;
           stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
             if (remaining > 0 && item.kind === 'Ore') {
-              const take = Math.min(item.kg, remaining)
-              remaining -= take
+              const take = Math.min(item.kg, remaining);
+              remaining -= take;
               if (item.kg - take > 0.001) {
-                acc.push({ ...item, kg: item.kg - take })
+                acc.push({ ...item, kg: item.kg - take });
               }
-              return acc
+              return acc;
             }
-            acc.push(item)
-            return acc
-          }, [])
+            acc.push(item);
+            return acc;
+          }, []);
 
           // Merge material into existing lot of same element, or push new
           if (material_produced_kg > 0.001) {
-            const matIndex = stationInv.findIndex((i) => i.kind === 'Material' && i.element === REFINERY_ELEMENT)
+            const matIndex = stationInv.findIndex((i) => i.kind === 'Material' && i.element === REFINERY_ELEMENT);
             if (matIndex >= 0) {
-              const existing = stationInv[matIndex] as MaterialItem
-              const total = existing.kg + material_produced_kg
+              const existing = stationInv[matIndex] as MaterialItem;
+              const total = existing.kg + material_produced_kg;
               stationInv[matIndex] = {
                 ...existing,
                 kg: total,
                 quality: (existing.kg * existing.quality + material_produced_kg * material_quality) / total,
-              }
+              };
             } else {
-              stationInv.push({ kind: 'Material', element: REFINERY_ELEMENT, kg: material_produced_kg, quality: material_quality })
+              stationInv.push({ kind: 'Material', element: REFINERY_ELEMENT, kg: material_produced_kg, quality: material_quality });
             }
           }
 
           // Blend or add slag
           if (slag_produced_kg > 0.001) {
-            const existingIndex = stationInv.findIndex((i) => i.kind === 'Slag')
+            const existingIndex = stationInv.findIndex((i) => i.kind === 'Slag');
             if (existingIndex >= 0) {
-              const existing = stationInv[existingIndex] as SlagItem
-              stationInv[existingIndex] = { ...existing, kg: existing.kg + slag_produced_kg }
+              const existing = stationInv[existingIndex] as SlagItem;
+              stationInv[existingIndex] = { ...existing, kg: existing.kg + slag_produced_kg };
             } else {
-              stationInv.push({ kind: 'Slag', kg: slag_produced_kg, composition: {} })
+              stationInv.push({ kind: 'Slag', kg: slag_produced_kg, composition: {} });
             }
           }
 
           updatedStations = {
             ...updatedStations,
             [station_id]: { ...updatedStations[station_id], inventory: stationInv },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'AssemblerRan': {
-        const { station_id, material_consumed_kg, material_element, component_produced_id, component_produced_count, component_quality } = event as {
+        const {
+          station_id, material_consumed_kg, material_element,
+          component_produced_id, component_produced_count, component_quality,
+        } = event as {
           station_id: string
           material_consumed_kg: number
           material_element: string
           component_produced_id: string
           component_produced_count: number
           component_quality: number
-        }
+        };
         if (updatedStations[station_id]) {
-          let stationInv = [...updatedStations[station_id].inventory]
+          let stationInv = [...updatedStations[station_id].inventory];
 
           // Consume material
-          let remaining = material_consumed_kg
+          let remaining = material_consumed_kg;
           stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
             if (remaining > 0 && item.kind === 'Material' && item.element === material_element) {
-              const take = Math.min(item.kg, remaining)
-              remaining -= take
+              const take = Math.min(item.kg, remaining);
+              remaining -= take;
               if (item.kg - take > 0.001) {
-                acc.push({ ...item, kg: item.kg - take })
+                acc.push({ ...item, kg: item.kg - take });
               }
-              return acc
+              return acc;
             }
-            acc.push(item)
-            return acc
-          }, [])
+            acc.push(item);
+            return acc;
+          }, []);
 
           // Merge or create component
           const compIndex = stationInv.findIndex(
             (i) => i.kind === 'Component' && (i as ComponentItem).component_id === component_produced_id
-          )
+          );
           if (compIndex >= 0) {
-            const existing = stationInv[compIndex] as ComponentItem
-            stationInv[compIndex] = { ...existing, count: existing.count + component_produced_count }
+            const existing = stationInv[compIndex] as ComponentItem;
+            stationInv[compIndex] = { ...existing, count: existing.count + component_produced_count };
           } else {
             stationInv.push({
               kind: 'Component',
               component_id: component_produced_id,
               count: component_produced_count,
               quality: component_quality,
-            })
+            });
           }
 
           updatedStations = {
             ...updatedStations,
             [station_id]: { ...updatedStations[station_id], inventory: stationInv },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'WearAccumulated': {
@@ -331,7 +337,7 @@ export function applyEvents(
           station_id: string
           module_id: string
           wear_after: number
-        }
+        };
         if (updatedStations[station_id]) {
           updatedStations = {
             ...updatedStations,
@@ -341,16 +347,16 @@ export function applyEvents(
                 m.id === module_id ? { ...m, wear: { wear: wear_after } } : m
               ),
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'ModuleAutoDisabled': {
         const { station_id, module_id } = event as {
           station_id: string
           module_id: string
-        }
+        };
         if (updatedStations[station_id]) {
           updatedStations = {
             ...updatedStations,
@@ -360,9 +366,9 @@ export function applyEvents(
                 m.id === module_id ? { ...m, enabled: false } : m
               ),
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'MaintenanceRan': {
@@ -371,30 +377,30 @@ export function applyEvents(
           target_module_id: string
           wear_after: number
           repair_kits_remaining: number
-        }
+        };
         if (updatedStations[station_id]) {
-          const station = updatedStations[station_id]
+          const station = updatedStations[station_id];
           // Update target module's wear
           const updatedModules = station.modules.map((m) =>
             m.id === target_module_id ? { ...m, wear: { wear: wear_after } } : m
-          )
+          );
           // Update RepairKit count in inventory
           const updatedInventory = station.inventory.map((item) => {
             if (item.kind === 'Component' && (item as ComponentItem).component_id === 'repair_kit') {
-              return { ...item, count: repair_kits_remaining } as ComponentItem
+              return { ...item, count: repair_kits_remaining } as ComponentItem;
             }
-            return item
-          })
+            return item;
+          });
           updatedStations = {
             ...updatedStations,
             [station_id]: { ...station, modules: updatedModules, inventory: updatedInventory },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'ScanResult': {
-        const { asteroid_id, tags } = event as { asteroid_id: string; tags: [string, number][] }
+        const { asteroid_id, tags } = event as { asteroid_id: string; tags: [string, number][] };
         if (updatedAsteroids[asteroid_id]) {
           updatedAsteroids = {
             ...updatedAsteroids,
@@ -402,13 +408,13 @@ export function applyEvents(
               ...updatedAsteroids[asteroid_id],
               knowledge: { ...updatedAsteroids[asteroid_id].knowledge, tag_beliefs: tags },
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'CompositionMapped': {
-        const { asteroid_id, composition } = event as { asteroid_id: string; composition: Record<string, number> }
+        const { asteroid_id, composition } = event as { asteroid_id: string; composition: Record<string, number> };
         if (updatedAsteroids[asteroid_id]) {
           updatedAsteroids = {
             ...updatedAsteroids,
@@ -416,24 +422,24 @@ export function applyEvents(
               ...updatedAsteroids[asteroid_id],
               knowledge: { ...updatedAsteroids[asteroid_id].knowledge, composition },
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'TechUnlocked': {
-        const { tech_id } = event as { tech_id: string }
+        const { tech_id } = event as { tech_id: string };
         updatedResearch = {
           ...updatedResearch,
           unlocked: [...updatedResearch.unlocked, tech_id],
-        }
-        break
+        };
+        break;
       }
 
       case 'ScanSiteSpawned': {
-        const { site_id, node, template_id } = event as { site_id: string; node: string; template_id: string }
-        updatedScanSites.push({ id: site_id, node, template_id })
-        break
+        const { site_id, node, template_id } = event as { site_id: string; node: string; template_id: string };
+        updatedScanSites.push({ id: site_id, node, template_id });
+        break;
       }
 
       case 'ShipConstructed': {
@@ -441,7 +447,7 @@ export function applyEvents(
           ship_id: string
           location_node: string
           cargo_capacity_m3: number
-        }
+        };
         updatedShips = {
           ...updatedShips,
           [ship_id]: {
@@ -452,8 +458,8 @@ export function applyEvents(
             cargo_capacity_m3,
             task: null,
           },
-        }
-        break
+        };
+        break;
       }
 
       case 'ItemImported': {
@@ -462,40 +468,40 @@ export function applyEvents(
           item_spec: TradeItemSpec
           cost: number
           balance_after: number
-        }
-        updatedBalance = balance_after
+        };
+        updatedBalance = balance_after;
         if (updatedStations[station_id]) {
-          const station = updatedStations[station_id]
-          const newItem = tradeItemToInventory(item_spec)
+          const station = updatedStations[station_id];
+          const newItem = tradeItemToInventory(item_spec);
           // Merge with existing material/component if possible
-          const stationInv = [...station.inventory]
-          let merged = false
+          const stationInv = [...station.inventory];
+          let merged = false;
           if (newItem.kind === 'Material') {
             const existingIndex = stationInv.findIndex(
               (i) => i.kind === 'Material' && i.element === newItem.element
-            )
+            );
             if (existingIndex >= 0) {
-              const existing = stationInv[existingIndex] as MaterialItem
-              stationInv[existingIndex] = { ...existing, kg: existing.kg + newItem.kg }
-              merged = true
+              const existing = stationInv[existingIndex] as MaterialItem;
+              stationInv[existingIndex] = { ...existing, kg: existing.kg + newItem.kg };
+              merged = true;
             }
           } else if (newItem.kind === 'Component') {
             const existingIndex = stationInv.findIndex(
               (i) => i.kind === 'Component' && (i as ComponentItem).component_id === newItem.component_id
-            )
+            );
             if (existingIndex >= 0) {
-              const existing = stationInv[existingIndex] as ComponentItem
-              stationInv[existingIndex] = { ...existing, count: existing.count + newItem.count }
-              merged = true
+              const existing = stationInv[existingIndex] as ComponentItem;
+              stationInv[existingIndex] = { ...existing, count: existing.count + newItem.count };
+              merged = true;
             }
           }
-          if (!merged) stationInv.push(newItem)
+          if (!merged) {stationInv.push(newItem);}
           updatedStations = {
             ...updatedStations,
             [station_id]: { ...station, inventory: stationInv },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'ItemExported': {
@@ -504,69 +510,69 @@ export function applyEvents(
           item_spec: TradeItemSpec
           revenue: number
           balance_after: number
-        }
-        updatedBalance = balance_after
+        };
+        updatedBalance = balance_after;
         if (updatedStations[station_id]) {
-          const station = updatedStations[station_id]
-          let stationInv = [...station.inventory]
+          const station = updatedStations[station_id];
+          let stationInv = [...station.inventory];
           if ('Material' in item_spec) {
-            const { element, kg } = item_spec.Material
-            let remaining = kg
+            const { element, kg } = item_spec.Material;
+            let remaining = kg;
             stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
               if (remaining > 0 && item.kind === 'Material' && item.element === element) {
-                const take = Math.min(item.kg, remaining)
-                remaining -= take
+                const take = Math.min(item.kg, remaining);
+                remaining -= take;
                 if (item.kg - take > 0.001) {
-                  acc.push({ ...item, kg: item.kg - take })
+                  acc.push({ ...item, kg: item.kg - take });
                 }
-                return acc
+                return acc;
               }
-              acc.push(item)
-              return acc
-            }, [])
+              acc.push(item);
+              return acc;
+            }, []);
           } else if ('Component' in item_spec) {
-            const { component_id, count } = item_spec.Component
-            let remaining = count
+            const { component_id, count } = item_spec.Component;
+            let remaining = count;
             stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
               if (remaining > 0 && item.kind === 'Component' && (item as ComponentItem).component_id === component_id) {
-                const take = Math.min((item as ComponentItem).count, remaining)
-                remaining -= take
+                const take = Math.min((item as ComponentItem).count, remaining);
+                remaining -= take;
                 if ((item as ComponentItem).count - take > 0) {
-                  acc.push({ ...item, count: (item as ComponentItem).count - take } as ComponentItem)
+                  acc.push({ ...item, count: (item as ComponentItem).count - take } as ComponentItem);
                 }
-                return acc
+                return acc;
               }
-              acc.push(item)
-              return acc
-            }, [])
+              acc.push(item);
+              return acc;
+            }, []);
           } else if ('Module' in item_spec) {
-            const { module_def_id } = item_spec.Module
+            const { module_def_id } = item_spec.Module;
             const moduleIndex = stationInv.findIndex(
               (i) => i.kind === 'Module' && i.module_def_id === module_def_id
-            )
-            if (moduleIndex >= 0) stationInv.splice(moduleIndex, 1)
+            );
+            if (moduleIndex >= 0) {stationInv.splice(moduleIndex, 1);}
           }
           updatedStations = {
             ...updatedStations,
             [station_id]: { ...station, inventory: stationInv },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'SlagJettisoned': {
-        const { station_id } = event as { station_id: string; kg: number }
+        const { station_id } = event as { station_id: string; kg: number };
         if (updatedStations[station_id]) {
-          const station = updatedStations[station_id]
+          const station = updatedStations[station_id];
           updatedStations = {
             ...updatedStations,
             [station_id]: {
               ...station,
               inventory: station.inventory.filter((i) => i.kind !== 'Slag'),
             },
-          }
+          };
         }
-        break
+        break;
       }
 
       case 'InsufficientFunds':
@@ -579,7 +585,7 @@ export function applyEvents(
         ship_id: string
         task_kind: string
         target: string | null
-      }
+      };
       if (updatedShips[ship_id]) {
         updatedShips = {
           ...updatedShips,
@@ -587,39 +593,39 @@ export function applyEvents(
             ...updatedShips[ship_id],
             task: buildTaskStub(task_kind, target, evt.tick),
           },
-        }
+        };
       }
     }
 
     if (e['TaskCompleted']) {
-      const { ship_id } = e['TaskCompleted'] as { ship_id: string }
+      const { ship_id } = e['TaskCompleted'] as { ship_id: string };
       if (updatedShips[ship_id]) {
         updatedShips = {
           ...updatedShips,
           [ship_id]: { ...updatedShips[ship_id], task: null },
-        }
+        };
       }
     }
 
     if (e['ShipArrived']) {
-      const { ship_id, node } = e['ShipArrived'] as { ship_id: string; node: string }
+      const { ship_id, node } = e['ShipArrived'] as { ship_id: string; node: string };
       if (updatedShips[ship_id]) {
         updatedShips = {
           ...updatedShips,
           [ship_id]: { ...updatedShips[ship_id], location_node: node },
-        }
+        };
       }
     }
 
     if (e['DataGenerated']) {
-      const { kind, amount } = e['DataGenerated'] as { kind: string; amount: number }
+      const { kind, amount } = e['DataGenerated'] as { kind: string; amount: number };
       updatedResearch = {
         ...updatedResearch,
         data_pool: {
           ...updatedResearch.data_pool,
           [kind]: (updatedResearch.data_pool[kind] ?? 0) + amount,
         },
-      }
+      };
     }
   }
 
@@ -630,5 +636,5 @@ export function applyEvents(
     research: updatedResearch,
     scanSites: updatedScanSites,
     balance: updatedBalance,
-  }
+  };
 }

@@ -12,5 +12,5 @@ export function Tooltip({ x, y, children }: TooltipProps) {
     >
       {children}
     </div>
-  )
+  );
 }
