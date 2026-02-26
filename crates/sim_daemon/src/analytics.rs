@@ -34,10 +34,10 @@ pub enum TrendDirection {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Rates {
-    pub material_production_per_sample: f64,
-    pub ore_consumption_per_sample: f64,
-    pub wear_accumulation_per_sample: f64,
-    pub slag_accumulation_per_sample: f64,
+    pub material_production: f64,
+    pub ore_consumption: f64,
+    pub wear_accumulation: f64,
+    pub slag_accumulation: f64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -157,22 +157,20 @@ fn window_average(
 fn compute_rates(history: &VecDeque<MetricsSnapshot>) -> Rates {
     if history.len() < 2 {
         return Rates {
-            material_production_per_sample: 0.0,
-            ore_consumption_per_sample: 0.0,
-            wear_accumulation_per_sample: 0.0,
-            slag_accumulation_per_sample: 0.0,
+            material_production: 0.0,
+            ore_consumption: 0.0,
+            wear_accumulation: 0.0,
+            slag_accumulation: 0.0,
         };
     }
     let last = &history[history.len() - 1];
     let prev = &history[history.len() - 2];
 
     Rates {
-        material_production_per_sample: f64::from(last.total_material_kg)
-            - f64::from(prev.total_material_kg),
-        ore_consumption_per_sample: f64::from(prev.total_ore_kg) - f64::from(last.total_ore_kg),
-        wear_accumulation_per_sample: f64::from(last.avg_module_wear)
-            - f64::from(prev.avg_module_wear),
-        slag_accumulation_per_sample: f64::from(last.total_slag_kg) - f64::from(prev.total_slag_kg),
+        material_production: f64::from(last.total_material_kg) - f64::from(prev.total_material_kg),
+        ore_consumption: f64::from(prev.total_ore_kg) - f64::from(last.total_ore_kg),
+        wear_accumulation: f64::from(last.avg_module_wear) - f64::from(prev.avg_module_wear),
+        slag_accumulation: f64::from(last.total_slag_kg) - f64::from(prev.total_slag_kg),
     }
 }
 
@@ -346,10 +344,10 @@ mod tests {
         history.push_back(last);
 
         let rates = compute_rates(&history);
-        assert!((rates.material_production_per_sample - 20.0).abs() < 1e-5);
-        assert!((rates.ore_consumption_per_sample - 20.0).abs() < 1e-5);
-        assert!((rates.wear_accumulation_per_sample - 0.02).abs() < 1e-5);
-        assert!((rates.slag_accumulation_per_sample - 5.0).abs() < 1e-5);
+        assert!((rates.material_production - 20.0).abs() < 1e-5);
+        assert!((rates.ore_consumption - 20.0).abs() < 1e-5);
+        assert!((rates.wear_accumulation - 0.02).abs() < 1e-5);
+        assert!((rates.slag_accumulation - 5.0).abs() < 1e-5);
     }
 
     #[test]
