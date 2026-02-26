@@ -82,17 +82,9 @@ pub(crate) fn tick_stations(
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
     for station_id in &station_ids {
         tick_station_modules(state, station_id, content, events);
-    }
-    for station_id in &station_ids {
         tick_assembler_modules(state, station_id, content, rng, events);
-    }
-    for station_id in &station_ids {
         tick_sensor_array_modules(state, station_id, content, events);
-    }
-    for station_id in &station_ids {
         tick_lab_modules(state, station_id, content, events);
-    }
-    for station_id in &station_ids {
         tick_maintenance_modules(state, station_id, content, events);
     }
 }
