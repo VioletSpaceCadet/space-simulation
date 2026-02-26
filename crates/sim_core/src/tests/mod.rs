@@ -279,3 +279,51 @@ fn state_with_maintenance(content: &GameContent) -> GameState {
 
     state
 }
+
+#[test]
+fn test_station_volume_cache_invalidation() {
+    let content = test_content();
+    let mut state = test_state(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    let station = state.stations.get_mut(&station_id).unwrap();
+    assert!(
+        station.cached_inventory_volume_m3.is_none(),
+        "cache starts empty"
+    );
+
+    // First call computes and caches.
+    let vol1 = station.used_volume_m3(&content);
+    assert!(
+        station.cached_inventory_volume_m3.is_some(),
+        "cache populated after first call"
+    );
+    assert!(
+        (station.used_volume_m3(&content) - vol1).abs() < f32::EPSILON,
+        "cached value is stable"
+    );
+
+    // Mutate inventory and invalidate.
+    station.inventory.push(InventoryItem::Ore {
+        lot_id: LotId("lot_cache_test".to_string()),
+        asteroid_id: AsteroidId("asteroid_test".to_string()),
+        kg: 100.0,
+        composition: HashMap::from([("Fe".to_string(), 1.0)]),
+    });
+    station.invalidate_volume_cache();
+    assert!(
+        station.cached_inventory_volume_m3.is_none(),
+        "cache cleared after invalidation"
+    );
+
+    // Recompute — should reflect the new item.
+    let vol2 = station.used_volume_m3(&content);
+    assert!(
+        vol2 > vol1,
+        "volume increased after adding ore (was {vol1}, now {vol2})"
+    );
+    assert!(
+        station.cached_inventory_volume_m3.is_some(),
+        "cache repopulated"
+    );
+}

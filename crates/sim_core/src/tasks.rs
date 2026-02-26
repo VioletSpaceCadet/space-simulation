@@ -441,7 +441,10 @@ pub(crate) fn resolve_deposit(
     };
 
     // Split items into those that fit in the station and those that don't.
-    let mut station_volume = station.cached_inventory_volume_m3.unwrap();
+    // SAFETY: cache warmed via used_volume_m3() above; no intervening invalidation.
+    let mut station_volume = station
+        .cached_inventory_volume_m3
+        .unwrap_or_else(|| inventory_volume_m3(&station.inventory, content));
     let station_capacity = station.cargo_capacity_m3;
     let mut to_deposit = Vec::new();
     let mut to_return = Vec::new();

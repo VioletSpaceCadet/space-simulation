@@ -141,7 +141,10 @@ pub(super) fn tick_station_modules(
             let output_volume =
                 estimate_output_volume_m3(recipe, &avg_composition, peeked_kg, content);
 
-            let current_used = station.cached_inventory_volume_m3.unwrap();
+            // SAFETY: cache warmed via used_volume_m3() above; no intervening invalidation.
+            let current_used = station
+                .cached_inventory_volume_m3
+                .unwrap_or_else(|| crate::inventory_volume_m3(&station.inventory, content));
             let capacity = station.cargo_capacity_m3;
             let shortfall = (current_used + output_volume) - capacity;
 
