@@ -38,6 +38,7 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> Router {
         .route("/api/v1/pause", post(pause_handler))
         .route("/api/v1/resume", post(resume_handler))
         .route("/api/v1/alerts", get(alerts_handler))
+        .route("/api/v1/advisor/digest", get(advisor_digest_handler))
         .route("/api/v1/command", post(command_handler))
         .route("/api/v1/pricing", get(pricing_handler))
         .route("/api/v1/speed", post(speed_handler))
@@ -151,6 +152,63 @@ async fn alerts_handler(State(app_state): State<AppState>) -> Json<serde_json::V
         .map(super::alerts::AlertEngine::active_alert_ids)
         .unwrap_or_default();
     Json(serde_json::json!({ "active_alerts": active_ids }))
+}
+
+async fn advisor_digest_handler(
+    State(app_state): State<AppState>,
+) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
+    let sim = app_state.sim.lock();
+
+    if sim.metrics_history.is_empty() {
+        return (
+            StatusCode::NO_CONTENT,
+            [(header::CONTENT_TYPE, "application/json")],
+            String::new(),
+        );
+    }
+
+    let alert_details: Vec<super::analytics::AlertDetail> = sim
+        .alert_engine
+        .as_ref()
+        .map(|engine| {
+            engine
+                .active_alert_details()
+                .into_iter()
+                .map(|a| super::analytics::AlertDetail {
+                    id: a.id,
+                    severity: a.severity,
+                    message: a.message,
+                    suggested_action: a.suggested_action,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let digest = super::analytics::compute_digest(&sim.metrics_history, alert_details);
+    drop(sim);
+
+    match digest {
+        Some(d) => match serde_json::to_string(&d) {
+            Ok(json) => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "application/json")],
+                json,
+            ),
+            Err(err) => {
+                tracing::error!("advisor digest serialization failed: {err}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    [(header::CONTENT_TYPE, "application/json")],
+                    r#"{"error":"serialization failed"}"#.to_string(),
+                )
+            }
+        },
+        None => (
+            StatusCode::NO_CONTENT,
+            [(header::CONTENT_TYPE, "application/json")],
+            String::new(),
+        ),
+    }
 }
 
 pub async fn pause_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {

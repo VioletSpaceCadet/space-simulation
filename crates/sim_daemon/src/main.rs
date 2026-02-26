@@ -538,6 +538,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_advisor_digest_returns_204_with_empty_history() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/advisor/digest")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn test_advisor_digest_returns_200_with_data() {
+        let state = make_test_state();
+        {
+            let mut sim = state.sim.lock();
+            let snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
+            sim.push_metrics(snapshot);
+        }
+        let app = make_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/advisor/digest")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json.get("tick").is_some(), "digest should contain tick");
+        assert!(json.get("trends").is_some(), "digest should contain trends");
+        assert!(json.get("rates").is_some(), "digest should contain rates");
+        assert!(
+            json.get("bottleneck").is_some(),
+            "digest should contain bottleneck"
+        );
+        assert!(json.get("alerts").is_some(), "digest should contain alerts");
+    }
+
+    #[tokio::test]
     async fn test_command_returns_200_with_valid_import() {
         let state = make_test_state();
         let app = make_router(state.clone());
