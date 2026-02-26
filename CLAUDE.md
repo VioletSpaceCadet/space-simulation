@@ -22,6 +22,9 @@ cd ui_web && npm test                                     # vitest
 
 cargo run -p sim_bench -- run --scenario scenarios/baseline.json
 
+cd mcp_advisor && npm run build                           # Build MCP advisor
+cd mcp_advisor && npm start                               # Run MCP advisor (stdio transport)
+
 ./scripts/ci_rust.sh                                      # fmt + clippy + test
 ./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
@@ -36,7 +39,8 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json`.
 - **sim_bench** — Scenario runner. JSON overrides (constants + `module.*` dotted keys). Parallel seeds via rayon.
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags.
-- **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints.
+- **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints. Includes `analytics` module (trend/rate/bottleneck analysis) and `GET /api/v1/advisor/digest` endpoint.
+- **mcp_advisor** — MCP server (TypeScript, stdio transport) for balance analysis. 4 tools: `get_metrics_digest`, `get_active_alerts`, `get_game_parameters`, `suggest_parameter_change`. Auto-discovered via `.mcp.json`. Requires running `sim_daemon`.
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
 
 **Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
