@@ -22,6 +22,9 @@ cd ui_web && npm test                                     # vitest
 
 cargo run -p sim_bench -- run --scenario scenarios/baseline.json
 
+cd mcp_advisor && npm run build                           # Build MCP advisor
+cd mcp_advisor && npm start                               # Run MCP advisor (stdio transport)
+
 ./scripts/ci_rust.sh                                      # fmt + clippy + test
 ./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
@@ -36,7 +39,8 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json`.
 - **sim_bench** — Scenario runner. JSON overrides (constants + `module.*` dotted keys). Parallel seeds via rayon.
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags.
-- **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints.
+- **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints. Includes `analytics` module (trend/rate/bottleneck analysis) and `GET /api/v1/advisor/digest` endpoint.
+- **mcp_advisor** — MCP server (TypeScript, stdio transport) for balance analysis. Auto-discovered via `.mcp.json`. Requires running `sim_daemon`.
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
 
 **Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
@@ -102,6 +106,23 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 - **Ticket PR into feature branch:** CI pass → Claude review → Claude runs `gh pr merge --squash`
 - **PR into main:** CI pass → Claude review → Owner approves and squash merges
+
+## Balance Advisor (MCP)
+
+9 MCP tools are available for balance analysis. Use them when investigating simulation balance, tuning parameters, or diagnosing issues:
+
+- **start_simulation** — Start a sim daemon as a background process. Accepts optional `seed` and `max_ticks`. Stops any previous daemon first. Auto-kills on session end.
+- **stop_simulation** — Stop a previously started sim daemon.
+- **set_speed** — Set simulation tick speed. Default is 10 tps; use 1000+ for fast analysis runs.
+- **pause_simulation** / **resume_simulation** — Pause and resume the simulation.
+- **get_metrics_digest** — Fetch trend analysis, production rates, and bottleneck detection from the running sim. Use this first when asked about simulation performance or balance problems.
+- **get_active_alerts** — Fetch currently firing alerts (e.g. inventory full, starvation, wear critical). Use when diagnosing operational issues.
+- **get_game_parameters** — Read content files (constants, module_defs, techs, pricing) without manual file reads. Use when comparing current values to proposed changes.
+- **suggest_parameter_change** — Save a proposed balance change with rationale and expected impact to `content/advisor_proposals/`. Use after analyzing metrics to recommend a tuning adjustment.
+
+**Workflow:** Use `start_simulation` to launch a daemon, then `set_speed` to 1000+ tps for fast analysis. Wait for data to accumulate (tens of thousands of ticks), then use `get_metrics_digest` to analyze trends. If something looks off, check `get_active_alerts` and `get_game_parameters` to understand why, then `suggest_parameter_change` to propose a fix. Use `stop_simulation` when done.
+
+**Tips:** Rates may show 0.0 during ship transit periods (2,880 ticks per hop) — this is normal, check again after the ship delivers ore. Trends need 50+ metric samples (captured every 60 ticks) to differentiate short vs long windows.
 
 ## Notes
 
