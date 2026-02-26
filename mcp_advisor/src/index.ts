@@ -4,6 +4,7 @@ import { z } from "zod";
 import * as fs from "node:fs";
 import * as fsPromises from "node:fs/promises";
 import * as path from "node:path";
+import { spawn, type ChildProcess } from "node:child_process";
 
 const DAEMON_URL = process.env["DAEMON_URL"] ?? "http://localhost:3001";
 const CONTENT_DIR = process.env["CONTENT_DIR"] ?? path.resolve(
@@ -12,6 +13,25 @@ const CONTENT_DIR = process.env["CONTENT_DIR"] ?? path.resolve(
   "..",
   "content",
 );
+
+const PROJECT_ROOT = process.env["PROJECT_ROOT"] ?? path.resolve(
+  path.dirname(new URL(import.meta.url).pathname),
+  "..",
+  "..",
+);
+
+let managedDaemon: ChildProcess | null = null;
+
+function killManagedDaemon(): void {
+  if (managedDaemon && !managedDaemon.killed) {
+    managedDaemon.kill("SIGTERM");
+    managedDaemon = null;
+  }
+}
+
+process.on("exit", killManagedDaemon);
+process.on("SIGINT", () => { killManagedDaemon(); process.exit(0); });
+process.on("SIGTERM", () => { killManagedDaemon(); process.exit(0); });
 
 const server = new McpServer({
   name: "balance-advisor",
@@ -185,6 +205,109 @@ server.tool(
         }) }],
       };
     }
+  },
+);
+
+// ---------- Tool 5: start_simulation ----------
+
+async function waitForDaemon(retries = 30, intervalMs = 500): Promise<boolean> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(`${DAEMON_URL}/api/v1/state`);
+      if (response.ok) return true;
+    } catch {
+      // Daemon not ready yet
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return false;
+}
+
+server.tool(
+  "start_simulation",
+  "Start a simulation daemon as a background process. Stops any previously started daemon first.",
+  {
+    seed: z.number().int().optional()
+      .describe("RNG seed (default: random)"),
+    max_ticks: z.number().int().optional()
+      .describe("Stop after N ticks (default: unlimited)"),
+  },
+  async ({ seed, max_ticks }) => {
+    killManagedDaemon();
+
+    const actualSeed = seed ?? Math.floor(Math.random() * 2 ** 32);
+    const args = [
+      "run", "-p", "sim_daemon", "--",
+      "run", "--seed", String(actualSeed),
+    ];
+    if (max_ticks !== undefined && max_ticks > 0) {
+      args.push("--max-ticks", String(max_ticks));
+    }
+
+    const child = spawn("cargo", args, {
+      cwd: PROJECT_ROOT,
+      stdio: "ignore",
+      detached: false,
+    });
+
+    managedDaemon = child;
+
+    child.on("error", (err) => {
+      console.error(`[balance-advisor] daemon spawn error: ${err.message}`);
+      if (managedDaemon === child) managedDaemon = null;
+    });
+
+    child.on("exit", (code) => {
+      console.error(`[balance-advisor] daemon exited with code ${code}`);
+      if (managedDaemon === child) managedDaemon = null;
+    });
+
+    const ready = await waitForDaemon();
+    if (!ready) {
+      killManagedDaemon();
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: "Daemon failed to start within 15 seconds. Check that cargo and sim_daemon build correctly.",
+        }) }],
+      };
+    }
+
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({
+        status: "started",
+        seed: actualSeed,
+        pid: child.pid,
+      }) }],
+    };
+  },
+);
+
+// ---------- Tool 6: stop_simulation ----------
+
+server.tool(
+  "stop_simulation",
+  "Stop a previously started simulation daemon",
+  {},
+  async () => {
+    if (!managedDaemon || managedDaemon.killed) {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "not_running",
+          message: "No managed daemon is currently running.",
+        }) }],
+      };
+    }
+
+    const pid = managedDaemon.pid;
+    killManagedDaemon();
+
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({
+        status: "stopped",
+        pid,
+      }) }],
+    };
   },
 );
 

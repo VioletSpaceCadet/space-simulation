@@ -109,14 +109,16 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 ## Balance Advisor (MCP)
 
-When the sim daemon is running, you have 4 MCP tools available for balance analysis. Use them when investigating simulation balance, tuning parameters, or diagnosing issues:
+6 MCP tools are available for balance analysis. Use them when investigating simulation balance, tuning parameters, or diagnosing issues:
 
+- **start_simulation** — Start a sim daemon as a background process. Accepts optional `seed` and `max_ticks`. Stops any previous daemon first. Auto-kills on session end.
+- **stop_simulation** — Stop a previously started sim daemon.
 - **get_metrics_digest** — Fetch trend analysis, production rates, and bottleneck detection from the running sim. Use this first when asked about simulation performance or balance problems.
 - **get_active_alerts** — Fetch currently firing alerts (e.g. inventory full, starvation, wear critical). Use when diagnosing operational issues.
 - **get_game_parameters** — Read content files (constants, module_defs, techs, pricing) without manual file reads. Use when comparing current values to proposed changes.
 - **suggest_parameter_change** — Save a proposed balance change with rationale and expected impact to `content/advisor_proposals/`. Use after analyzing metrics to recommend a tuning adjustment.
 
-**Workflow:** Start the daemon (`cargo run -p sim_daemon -- run --seed 42`), let it accumulate ticks, then use `get_metrics_digest` to analyze trends. If something looks off, check `get_active_alerts` and `get_game_parameters` to understand why, then `suggest_parameter_change` to propose a fix.
+**Workflow:** Use `start_simulation` to launch a daemon (or connect to one already running on port 3001). Wait for data to accumulate, then use `get_metrics_digest` to analyze trends. If something looks off, check `get_active_alerts` and `get_game_parameters` to understand why, then `suggest_parameter_change` to propose a fix. Use `stop_simulation` when done.
 
 ## Notes
 
