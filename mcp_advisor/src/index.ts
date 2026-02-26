@@ -5,6 +5,7 @@ import * as fs from "node:fs";
 import * as fsPromises from "node:fs/promises";
 import * as path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
+import * as os from "node:os";
 
 const DAEMON_URL = process.env["DAEMON_URL"] ?? "http://localhost:3001";
 const CONTENT_DIR = process.env["CONTENT_DIR"] ?? path.resolve(
@@ -19,6 +20,12 @@ const PROJECT_ROOT = process.env["PROJECT_ROOT"] ?? path.resolve(
   "..",
   "..",
 );
+
+function findCargo(): string {
+  const homeCargo = path.join(os.homedir(), ".cargo", "bin", "cargo");
+  if (fs.existsSync(homeCargo)) return homeCargo;
+  return "cargo";
+}
 
 let managedDaemon: ChildProcess | null = null;
 
@@ -210,7 +217,7 @@ server.tool(
 
 // ---------- Tool 5: start_simulation ----------
 
-async function waitForDaemon(retries = 30, intervalMs = 500): Promise<boolean> {
+async function waitForDaemon(retries = 120, intervalMs = 500): Promise<boolean> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const response = await fetch(`${DAEMON_URL}/api/v1/state`);
@@ -244,7 +251,7 @@ server.tool(
       args.push("--max-ticks", String(max_ticks));
     }
 
-    const child = spawn("cargo", args, {
+    const child = spawn(findCargo(), args, {
       cwd: PROJECT_ROOT,
       stdio: "ignore",
       detached: false,
@@ -268,7 +275,7 @@ server.tool(
       return {
         content: [{ type: "text" as const, text: JSON.stringify({
           status: "error",
-          message: "Daemon failed to start within 15 seconds. Check that cargo and sim_daemon build correctly.",
+          message: "Daemon failed to start within 60 seconds. Check that cargo and sim_daemon build correctly.",
         }) }],
       };
     }
