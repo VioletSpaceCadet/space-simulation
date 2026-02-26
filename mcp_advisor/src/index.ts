@@ -220,7 +220,7 @@ server.tool(
 async function waitForDaemon(retries = 120, intervalMs = 500): Promise<boolean> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const response = await fetch(`${DAEMON_URL}/api/v1/state`);
+      const response = await fetch(`${DAEMON_URL}/api/v1/meta`);
       if (response.ok) return true;
     } catch {
       // Daemon not ready yet
@@ -242,6 +242,7 @@ server.tool(
   async ({ seed, max_ticks }) => {
     killManagedDaemon();
 
+    const cargoPath = findCargo();
     const actualSeed = seed ?? Math.floor(Math.random() * 2 ** 32);
     const args = [
       "run", "-p", "sim_daemon", "--",
@@ -251,7 +252,7 @@ server.tool(
       args.push("--max-ticks", String(max_ticks));
     }
 
-    const child = spawn(findCargo(), args, {
+    const child = spawn(cargoPath, args, {
       cwd: PROJECT_ROOT,
       stdio: "ignore",
       detached: false,
