@@ -1,35 +1,37 @@
-import React, { useState } from 'react'
-import { useSortableData } from '../hooks/useSortableData'
-import type { ComponentItem, InventoryItem, MaterialItem, ModuleItem, ModuleState, OreItem, ShipState, SlagItem, StationState } from '../types'
-import { SortIndicator } from './SortIndicator'
+import React, { useState } from 'react';
 
-const QUALITY_TIER_EXCELLENT = 0.8
-const QUALITY_TIER_GOOD = 0.5
-const WEAR_TIER_HIGH = 0.8
-const WEAR_TIER_MED = 0.5
+import { useSortableData } from '../hooks/useSortableData';
+import type { ComponentItem, InventoryItem, MaterialItem, ModuleItem, ModuleState, OreItem, ShipState, SlagItem, StationState } from '../types';
+
+import { SortIndicator } from './SortIndicator';
+
+const QUALITY_TIER_EXCELLENT = 0.8;
+const QUALITY_TIER_GOOD = 0.5;
+const WEAR_TIER_HIGH = 0.8;
+const WEAR_TIER_MED = 0.5;
 
 function qualityTier(quality: number): string {
-  if (quality >= QUALITY_TIER_EXCELLENT) return 'excellent'
-  if (quality >= QUALITY_TIER_GOOD) return 'good'
-  return 'poor'
+  if (quality >= QUALITY_TIER_EXCELLENT) {return 'excellent';}
+  if (quality >= QUALITY_TIER_GOOD) {return 'good';}
+  return 'poor';
 }
 
 function pct(frac: number): string {
-  return `${Math.round(frac * 100)}%`
+  return `${Math.round(frac * 100)}%`;
 }
 
 function formatKg(kg: number): string {
-  return kg.toLocaleString(undefined, { maximumFractionDigits: 1 })
+  return kg.toLocaleString(undefined, { maximumFractionDigits: 1 });
 }
 
 function taskLabel(task: ShipState['task']): string {
-  if (!task) return 'idle'
-  const key = Object.keys(task.kind)[0] ?? 'idle'
-  return key.toLowerCase()
+  if (!task) {return 'idle';}
+  const key = Object.keys(task.kind)[0] ?? 'idle';
+  return key.toLowerCase();
 }
 
 function totalInventoryKg(inventory: InventoryItem[]): number {
-  return inventory.reduce((sum, i) => sum + ('kg' in i ? (i as { kg: number }).kg : 0), 0)
+  return inventory.reduce((sum, i) => sum + ('kg' in i ? (i as { kg: number }).kg : 0), 0);
 }
 
 interface AggregatedOre {
@@ -39,35 +41,35 @@ interface AggregatedOre {
 }
 
 function aggregateOre(inventory: InventoryItem[]): AggregatedOre | null {
-  const oreLots = inventory.filter((i): i is OreItem => i.kind === 'Ore')
-  if (oreLots.length === 0) return null
+  const oreLots = inventory.filter((i): i is OreItem => i.kind === 'Ore');
+  if (oreLots.length === 0) {return null;}
 
-  const totalKg = oreLots.reduce((sum, lot) => sum + lot.kg, 0)
+  const totalKg = oreLots.reduce((sum, lot) => sum + lot.kg, 0);
   // Weighted-average composition
-  const composition: Record<string, number> = {}
+  const composition: Record<string, number> = {};
   for (const lot of oreLots) {
     for (const [el, frac] of Object.entries(lot.composition)) {
-      composition[el] = (composition[el] ?? 0) + frac * lot.kg
+      composition[el] = (composition[el] ?? 0) + frac * lot.kg;
     }
   }
   for (const el of Object.keys(composition)) {
-    composition[el] /= totalKg
+    composition[el] /= totalKg;
   }
-  return { totalKg, lotCount: oreLots.length, composition }
+  return { totalKg, lotCount: oreLots.length, composition };
 }
 
 function InventoryDisplay({ inventory }: { inventory: InventoryItem[] }) {
-  const hasModules = inventory.some((i) => i.kind === 'Module')
-  const hasComponents = inventory.some((i) => i.kind === 'Component')
-  const totalKg = totalInventoryKg(inventory)
+  const hasModules = inventory.some((i) => i.kind === 'Module');
+  const hasComponents = inventory.some((i) => i.kind === 'Component');
+  const totalKg = totalInventoryKg(inventory);
 
-  if (totalKg === 0 && !hasModules && !hasComponents) return null
+  if (totalKg === 0 && !hasModules && !hasComponents) {return null;}
 
-  const oreAgg = aggregateOre(inventory)
-  const materials = inventory.filter((i) => i.kind === 'Material') as MaterialItem[]
-  const slags = inventory.filter((i) => i.kind === 'Slag') as SlagItem[]
-  const components = inventory.filter((i) => i.kind === 'Component') as ComponentItem[]
-  const modules = inventory.filter((i) => i.kind === 'Module') as ModuleItem[]
+  const oreAgg = aggregateOre(inventory);
+  const materials = inventory.filter((i) => i.kind === 'Material') as MaterialItem[];
+  const slags = inventory.filter((i) => i.kind === 'Slag') as SlagItem[];
+  const components = inventory.filter((i) => i.kind === 'Component') as ComponentItem[];
+  const modules = inventory.filter((i) => i.kind === 'Module') as ModuleItem[];
 
   return (
     <div className="space-y-1 mt-0.5">
@@ -106,21 +108,21 @@ function InventoryDisplay({ inventory }: { inventory: InventoryItem[] }) {
         </div>
       ))}
     </div>
-  )
+  );
 }
 
 function wearColor(wear: number): string {
-  if (wear >= WEAR_TIER_HIGH) return 'text-red-400'
-  if (wear >= WEAR_TIER_MED) return 'text-yellow-400'
-  return 'text-green-400'
+  if (wear >= WEAR_TIER_HIGH) {return 'text-red-400';}
+  if (wear >= WEAR_TIER_MED) {return 'text-yellow-400';}
+  return 'text-green-400';
 }
 
 function TaskProgress({ task, displayTick }: { task: ShipState['task']; displayTick: number }) {
-  if (!task) return null
-  const total = task.eta_tick - task.started_tick
-  if (total <= 0) return null
-  const elapsed = Math.max(0, Math.min(displayTick - task.started_tick, total))
-  const pctDone = Math.round((elapsed / total) * 100)
+  if (!task) {return null;}
+  const total = task.eta_tick - task.started_tick;
+  if (total <= 0) {return null;}
+  const elapsed = Math.max(0, Math.min(displayTick - task.started_tick, total));
+  const pctDone = Math.round((elapsed / total) * 100);
 
   return (
     <div className="flex items-center gap-1.5 min-w-[80px]">
@@ -138,14 +140,14 @@ function TaskProgress({ task, displayTick }: { task: ShipState['task']; displayT
       </div>
       <span className="text-muted text-[10px] w-7 text-right">{pctDone}%</span>
     </div>
-  )
+  );
 }
 
 // --- Ship detail ---
 
 function ShipDetail({ ship, displayTick }: { ship: ShipState; displayTick: number }) {
-  const task = ship.task
-  const taskType = task ? Object.keys(task.kind)[0] : null
+  const task = ship.task;
+  const taskType = task ? Object.keys(task.kind)[0] : null;
 
   return (
     <div className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2 text-[11px] w-fit">
@@ -191,16 +193,16 @@ function ShipDetail({ ship, displayTick }: { ship: ShipState; displayTick: numbe
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // --- Expandable table ---
 
 const HEADER_CLASS =
-  'text-left text-label px-2 py-1 border-b border-edge font-normal cursor-pointer hover:text-dim transition-colors select-none'
+  'text-left text-label px-2 py-1 border-b border-edge font-normal cursor-pointer hover:text-dim transition-colors select-none';
 const HEADER_CLASS_STATIC =
-  'text-left text-label px-2 py-1 border-b border-edge font-normal select-none'
-const CELL_CLASS = 'px-2 py-0.5 border-b border-surface'
+  'text-left text-label px-2 py-1 border-b border-edge font-normal select-none';
+const CELL_CLASS = 'px-2 py-0.5 border-b border-surface';
 
 interface ColumnDef<T> {
   key: string
@@ -218,17 +220,17 @@ function ExpandableTable<T extends { id: string }>({
   columns: ColumnDef<T>[]
   renderDetail: (row: T) => React.ReactNode
 }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const sortableRows = data.map((row) => {
-    const sortable: Record<string, unknown> = { id: row.id }
-    for (const col of columns) sortable[col.key] = col.key === 'id' ? row.id : (row as Record<string, unknown>)[col.key]
-    return { ...sortable, _row: row }
-  })
+    const sortable: Record<string, unknown> = { id: row.id };
+    for (const col of columns) {sortable[col.key] = col.key === 'id' ? row.id : (row as Record<string, unknown>)[col.key];}
+    return { ...sortable, _row: row };
+  });
 
-  const { sortedData, sortConfig, requestSort: requestSortTyped } = useSortableData(sortableRows)
-  const requestSort = requestSortTyped as (key: string) => void
-  const colSpan = columns.length
+  const { sortedData, sortConfig, requestSort: requestSortTyped } = useSortableData(sortableRows);
+  const requestSort = requestSortTyped as (key: string) => void;
+  const colSpan = columns.length;
 
   return (
     <table className="w-full border-collapse text-[11px]">
@@ -248,8 +250,8 @@ function ExpandableTable<T extends { id: string }>({
       </thead>
       <tbody>
         {sortedData.map((sortableRow) => {
-          const row = sortableRow._row as T
-          const isExpanded = expandedId === row.id
+          const row = sortableRow._row as T;
+          const isExpanded = expandedId === row.id;
           return (
             <React.Fragment key={row.id}>
               <tr
@@ -273,11 +275,11 @@ function ExpandableTable<T extends { id: string }>({
                 </tr>
               )}
             </React.Fragment>
-          )
+          );
         })}
       </tbody>
     </table>
-  )
+  );
 }
 
 // --- Ship table ---
@@ -297,7 +299,7 @@ function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: n
     task: taskLabel(ship.task),
     cargo_kg: totalInventoryKg(ship.inventory),
     ship,
-  }))
+  }));
 
   const columns: ColumnDef<ShipRow>[] = [
     { key: 'id', label: 'ID', render: (r) => r.id },
@@ -308,7 +310,7 @@ function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: n
       ? <span className="text-faint">empty</span>
       : <span className="text-cargo">{formatKg(r.cargo_kg)} kg</span>
     },
-  ]
+  ];
 
   return (
     <ExpandableTable
@@ -316,19 +318,19 @@ function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: n
       columns={columns}
       renderDetail={(r) => <ShipDetail ship={r.ship} displayTick={displayTick} />}
     />
-  )
+  );
 }
 
 // --- Station detail components ---
 
 function ModuleCard({ module: m }: { module: ModuleState }) {
-  const name = m.def_id.replace(/^module_/, '')
-  const healthPct = m.wear ? Math.round((1 - m.wear.wear) * 100) : 100
-  const ks = m.kind_state
-  const processor = typeof ks === 'object' && 'Processor' in ks ? ks.Processor : null
-  const assembler = typeof ks === 'object' && 'Assembler' in ks ? ks.Assembler : null
-  const isMaintenance = typeof ks === 'object' && 'Maintenance' in ks
-  const isStalled = (processor?.stalled) || (assembler?.stalled)
+  const name = m.def_id.replace(/^module_/, '');
+  const healthPct = m.wear ? Math.round((1 - m.wear.wear) * 100) : 100;
+  const ks = m.kind_state;
+  const processor = typeof ks === 'object' && 'Processor' in ks ? ks.Processor : null;
+  const assembler = typeof ks === 'object' && 'Assembler' in ks ? ks.Assembler : null;
+  const isMaintenance = typeof ks === 'object' && 'Maintenance' in ks;
+  const isStalled = (processor?.stalled) || (assembler?.stalled);
 
   return (
     <div className="border border-edge rounded px-2 py-1.5 bg-surface/30">
@@ -355,7 +357,7 @@ function ModuleCard({ module: m }: { module: ModuleState }) {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 function StationDetail({ station }: { station: StationState }) {
@@ -382,7 +384,7 @@ function StationDetail({ station }: { station: StationState }) {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // --- Station table ---
@@ -400,7 +402,7 @@ function StationsTable({ stations }: { stations: StationState[] }) {
     location_node: station.location_node,
     cargo_kg: totalInventoryKg(station.inventory),
     station,
-  }))
+  }));
 
   const columns: ColumnDef<StationRow>[] = [
     { key: 'id', label: 'ID', render: (r) => r.id },
@@ -409,7 +411,7 @@ function StationsTable({ stations }: { stations: StationState[] }) {
       ? <span className="text-faint">empty</span>
       : <span className="text-cargo">{formatKg(r.cargo_kg)} kg</span>
     },
-  ]
+  ];
 
   return (
     <ExpandableTable
@@ -417,7 +419,7 @@ function StationsTable({ stations }: { stations: StationState[] }) {
       columns={columns}
       renderDetail={(r) => <StationDetail station={r.station} />}
     />
-  )
+  );
 }
 
 // --- Main panel ---
@@ -429,8 +431,8 @@ interface Props {
 }
 
 export function FleetPanel({ ships, stations, displayTick }: Props) {
-  const shipRows = Object.values(ships)
-  const stationRows = Object.values(stations)
+  const shipRows = Object.values(ships);
+  const stationRows = Object.values(stations);
 
   return (
     <div className="overflow-y-auto flex-1">
@@ -450,5 +452,5 @@ export function FleetPanel({ ships, stations, displayTick }: Props) {
         <StationsTable stations={stationRows} />
       )}
     </div>
-  )
+  );
 }

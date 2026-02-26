@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { SolarSystemMap } from './SolarSystemMap'
-import type { SimSnapshot } from '../types'
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+
+import type { SimSnapshot } from '../types';
+
+import { SolarSystemMap } from './SolarSystemMap';
 
 const emptySnapshot: SimSnapshot = {
   meta: { tick: 100, seed: 42, content_version: '0.0.1' },
@@ -10,15 +12,15 @@ const emptySnapshot: SimSnapshot = {
   ships: {},
   stations: {},
   research: { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} },
-}
+};
 
 describe('SolarSystemMap', () => {
   it('renders an SVG element', () => {
     const { container } = render(
       <SolarSystemMap snapshot={emptySnapshot} currentTick={100} />,
-    )
-    expect(container.querySelector('svg')).toBeInTheDocument()
-  })
+    );
+    expect(container.querySelector('svg')).toBeInTheDocument();
+  });
 
   it('renders station markers', () => {
     const snapshotWithEntities: SimSnapshot = {
@@ -33,13 +35,13 @@ describe('SolarSystemMap', () => {
           facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1 },
         },
       },
-    }
+    };
     const { container } = render(
       <SolarSystemMap snapshot={snapshotWithEntities} currentTick={100} />
-    )
-    const stationMarkers = container.querySelectorAll('[data-entity-type="station"]')
-    expect(stationMarkers.length).toBe(1)
-  })
+    );
+    const stationMarkers = container.querySelectorAll('[data-entity-type="station"]');
+    expect(stationMarkers.length).toBe(1);
+  });
 
   it('renders ship markers', () => {
     const snapshotWithShip: SimSnapshot = {
@@ -54,13 +56,13 @@ describe('SolarSystemMap', () => {
           task: null,
         },
       },
-    }
+    };
     const { container } = render(
       <SolarSystemMap snapshot={snapshotWithShip} currentTick={100} />
-    )
-    const shipMarkers = container.querySelectorAll('[data-entity-type="ship"]')
-    expect(shipMarkers.length).toBe(1)
-  })
+    );
+    const shipMarkers = container.querySelectorAll('[data-entity-type="ship"]');
+    expect(shipMarkers.length).toBe(1);
+  });
 
   it('renders asteroid markers', () => {
     const snapshotWithAsteroids: SimSnapshot = {
@@ -74,13 +76,13 @@ describe('SolarSystemMap', () => {
           knowledge: { tag_beliefs: [['IronRich', 0.85]], composition: null },
         },
       },
-    }
+    };
     const { container } = render(
       <SolarSystemMap snapshot={snapshotWithAsteroids} currentTick={100} />
-    )
-    const markers = container.querySelectorAll('[data-entity-type="asteroid"]')
-    expect(markers.length).toBe(1)
-  })
+    );
+    const markers = container.querySelectorAll('[data-entity-type="asteroid"]');
+    expect(markers.length).toBe(1);
+  });
 
   it('renders scan site markers', () => {
     const snapshotWithSites: SimSnapshot = {
@@ -88,21 +90,21 @@ describe('SolarSystemMap', () => {
       scan_sites: [
         { id: 'site_001', node: 'node_belt_mid', template_id: 'tmpl_iron' },
       ],
-    }
+    };
     const { container } = render(
       <SolarSystemMap snapshot={snapshotWithSites} currentTick={100} />
-    )
-    const markers = container.querySelectorAll('[data-entity-type="scan-site"]')
-    expect(markers.length).toBe(1)
-  })
+    );
+    const markers = container.querySelectorAll('[data-entity-type="scan-site"]');
+    expect(markers.length).toBe(1);
+  });
 
   it('renders orbital ring labels', () => {
     render(
       <SolarSystemMap snapshot={emptySnapshot} currentTick={100} />,
-    )
-    expect(screen.getByText('Earth Orbit')).toBeInTheDocument()
-    expect(screen.getByText('Inner Belt')).toBeInTheDocument()
-    expect(screen.getByText('Mid Belt')).toBeInTheDocument()
-    expect(screen.getByText('Outer Belt')).toBeInTheDocument()
-  })
-})
+    );
+    expect(screen.getByText('Earth Orbit')).toBeInTheDocument();
+    expect(screen.getByText('Inner Belt')).toBeInTheDocument();
+    expect(screen.getByText('Mid Belt')).toBeInTheDocument();
+    expect(screen.getByText('Outer Belt')).toBeInTheDocument();
+  });
+});

@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
-import { DetailCard } from './DetailCard'
-import type { AsteroidState, ScanSite, ShipState, StationState } from '../../types'
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { AsteroidState, ScanSite, ShipState, StationState } from '../../types';
+
+import { DetailCard } from './DetailCard';
 
 describe('DetailCard', () => {
   it('renders station detail with inventory', () => {
@@ -13,12 +15,12 @@ describe('DetailCard', () => {
       cargo_capacity_m3: 100.0,
       facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1.0 },
       modules: [],
-    }
-    render(<DetailCard entity={{ type: 'station', data: station }} onClose={() => {}} />)
-    expect(screen.getByText('node_earth_orbit')).toBeInTheDocument()
-    expect(screen.getByText(/500/)).toBeInTheDocument()
-    expect(screen.getByText(/kg/)).toBeInTheDocument()
-  })
+    };
+    render(<DetailCard entity={{ type: 'station', data: station }} onClose={() => {}} />);
+    expect(screen.getByText('node_earth_orbit')).toBeInTheDocument();
+    expect(screen.getByText(/500/)).toBeInTheDocument();
+    expect(screen.getByText(/kg/)).toBeInTheDocument();
+  });
 
   it('renders ship detail with task', () => {
     const ship: ShipState = {
@@ -32,11 +34,11 @@ describe('DetailCard', () => {
         started_tick: 0,
         eta_tick: 100,
       },
-    }
-    render(<DetailCard entity={{ type: 'ship', data: ship }} onClose={() => {}} />)
-    expect(screen.getByText(/node_belt_inner/)).toBeInTheDocument()
-    expect(screen.getByText(/mine/)).toBeInTheDocument()
-  })
+    };
+    render(<DetailCard entity={{ type: 'ship', data: ship }} onClose={() => {}} />);
+    expect(screen.getByText(/node_belt_inner/)).toBeInTheDocument();
+    expect(screen.getByText(/mine/)).toBeInTheDocument();
+  });
 
   it('renders asteroid detail with composition', () => {
     const asteroid: AsteroidState = {
@@ -48,29 +50,29 @@ describe('DetailCard', () => {
         tag_beliefs: [['IronRich', 0.85]],
         composition: { Fe: 0.7, Si: 0.2, Ni: 0.1 },
       },
-    }
-    render(<DetailCard entity={{ type: 'asteroid', data: asteroid }} onClose={() => {}} />)
-    expect(screen.getByText('node_belt_inner')).toBeInTheDocument()
-    expect(screen.getByText(/Fe 70%/)).toBeInTheDocument()
-    expect(screen.getByText(/Si 20%/)).toBeInTheDocument()
-  })
+    };
+    render(<DetailCard entity={{ type: 'asteroid', data: asteroid }} onClose={() => {}} />);
+    expect(screen.getByText('node_belt_inner')).toBeInTheDocument();
+    expect(screen.getByText(/Fe 70%/)).toBeInTheDocument();
+    expect(screen.getByText(/Si 20%/)).toBeInTheDocument();
+  });
 
   it('renders scan-site detail', () => {
     const site: ScanSite = {
       id: 'site_0001',
       node: 'node_belt_outer',
       template_id: 'template_rocky',
-    }
-    render(<DetailCard entity={{ type: 'scan-site', data: site }} onClose={() => {}} />)
-    expect(screen.getByText('node_belt_outer')).toBeInTheDocument()
-    expect(screen.getByText(/template_rocky/)).toBeInTheDocument()
-  })
+    };
+    render(<DetailCard entity={{ type: 'scan-site', data: site }} onClose={() => {}} />);
+    expect(screen.getByText('node_belt_outer')).toBeInTheDocument();
+    expect(screen.getByText(/template_rocky/)).toBeInTheDocument();
+  });
 
   it('calls onClose when close button clicked', () => {
-    const onClose = vi.fn()
-    const site: ScanSite = { id: 'site_0001', node: 'node_belt_outer', template_id: 'template_rocky' }
-    render(<DetailCard entity={{ type: 'scan-site', data: site }} onClose={onClose} />)
-    fireEvent.click(screen.getByText('✕'))
-    expect(onClose).toHaveBeenCalledOnce()
-  })
-})
+    const onClose = vi.fn();
+    const site: ScanSite = { id: 'site_0001', node: 'node_belt_outer', template_id: 'template_rocky' };
+    render(<DetailCard entity={{ type: 'scan-site', data: site }} onClose={onClose} />);
+    fireEvent.click(screen.getByText('✕'));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});

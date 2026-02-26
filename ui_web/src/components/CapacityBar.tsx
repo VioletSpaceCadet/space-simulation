@@ -1,13 +1,13 @@
 function formatKg(kg: number): string {
-  if (kg >= 1_000_000) return `${(kg / 1_000_000).toFixed(1)}M`
-  if (kg >= 1_000) return `${(kg / 1_000).toFixed(1)}k`
-  return kg.toLocaleString(undefined, { maximumFractionDigits: 1 })
+  if (kg >= 1_000_000) {return `${(kg / 1_000_000).toFixed(1)}M`;}
+  if (kg >= 1_000) {return `${(kg / 1_000).toFixed(1)}k`;}
+  return kg.toLocaleString(undefined, { maximumFractionDigits: 1 });
 }
 
 function capacityColor(pct: number): string {
-  if (pct >= 90) return 'bg-red-400'
-  if (pct >= 70) return 'bg-yellow-400'
-  return 'bg-green-400'
+  if (pct >= 90) {return 'bg-red-400';}
+  if (pct >= 70) {return 'bg-yellow-400';}
+  return 'bg-green-400';
 }
 
 interface Props {
@@ -16,7 +16,7 @@ interface Props {
 }
 
 export function CapacityBar({ usedKg, capacityKg }: Props) {
-  const pct = capacityKg > 0 ? Math.round((usedKg / capacityKg) * 100) : 0
+  const pct = capacityKg > 0 ? Math.round((usedKg / capacityKg) * 100) : 0;
 
   return (
     <div className="flex items-center gap-2 min-w-[120px]">
@@ -37,5 +37,5 @@ export function CapacityBar({ usedKg, capacityKg }: Props) {
         {pct}% — {formatKg(usedKg)} kg
       </span>
     </div>
-  )
+  );
 }

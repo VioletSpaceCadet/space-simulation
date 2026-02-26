@@ -1,21 +1,21 @@
-import type { SimEvent } from '../types'
+import type { SimEvent } from '../types';
 
 interface Props {
   events: SimEvent[]
 }
 
 function eventType(event: Record<string, unknown>): string {
-  return Object.keys(event)[0] ?? 'Unknown'
+  return Object.keys(event)[0] ?? 'Unknown';
 }
 
 function eventDetail(event: Record<string, unknown>): string {
-  const key = Object.keys(event)[0]
-  if (!key) return ''
-  const value = event[key] as Record<string, unknown>
-  if (!value || typeof value !== 'object') return ''
+  const key = Object.keys(event)[0];
+  if (!key) {return '';}
+  const value = event[key] as Record<string, unknown>;
+  if (!value || typeof value !== 'object') {return '';}
   return Object.entries(value)
     .map(([k, v]) => `${k}=${String(v)}`)
-    .join(' ')
+    .join(' ');
 }
 
 export function EventsFeed({ events }: Props) {
@@ -24,7 +24,7 @@ export function EventsFeed({ events }: Props) {
       <div className="overflow-y-auto flex-1">
         <div className="text-faint italic">waiting for stream data</div>
       </div>
-    )
+    );
   }
 
   return (
@@ -38,5 +38,5 @@ export function EventsFeed({ events }: Props) {
         </div>
       ))}
     </div>
-  )
+  );
 }

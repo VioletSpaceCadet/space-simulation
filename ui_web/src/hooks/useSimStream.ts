@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useReducer } from 'react'
-import { createEventSource, fetchSnapshot } from '../api'
-import type { ActiveAlert, AlertSeverity, SimEvent, SimSnapshot } from '../types'
-import { applyEvents } from './applyEvents'
+import { useCallback, useEffect, useReducer } from 'react';
+
+import { createEventSource, fetchSnapshot } from '../api';
+import type { ActiveAlert, AlertSeverity, SimEvent, SimSnapshot } from '../types';
+
+import { applyEvents } from './applyEvents';
 
 // Kept for backward compatibility with SolarSystemMap/DetailCard imports.
 // Composition is now embedded in InventoryItem::Ore; this type is unused in new code.
@@ -32,23 +34,23 @@ const initialState: State = {
   currentTick: 0,
   activeAlerts: new Map(),
   dismissedAlerts: new Set(),
-}
+};
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SNAPSHOT_LOADED':
-      return { ...state, snapshot: action.snapshot, currentTick: action.snapshot.meta.tick }
+      return { ...state, snapshot: action.snapshot, currentTick: action.snapshot.meta.tick };
 
     case 'EVENTS_RECEIVED': {
-      const newEvents = [...action.events, ...state.events].slice(0, 500)
-      const latestTick = action.events.reduce((max, e) => Math.max(max, e.tick), state.currentTick)
+      const newEvents = [...action.events, ...state.events].slice(0, 500);
+      const latestTick = action.events.reduce((max, e) => Math.max(max, e.tick), state.currentTick);
 
       // Process alert events
-      const newAlerts = new Map(state.activeAlerts)
-      let newDismissed = state.dismissedAlerts
+      const newAlerts = new Map(state.activeAlerts);
+      let newDismissed = state.dismissedAlerts;
       for (const e of action.events) {
-        const eventKey = Object.keys(e.event)[0]
-        const data = e.event[eventKey] as Record<string, unknown>
+        const eventKey = Object.keys(e.event)[0];
+        const data = e.event[eventKey] as Record<string, unknown>;
         if (eventKey === 'AlertRaised') {
           newAlerts.set(data.alert_id as string, {
             alert_id: data.alert_id as string,
@@ -56,150 +58,156 @@ function reducer(state: State, action: Action): State {
             message: data.message as string,
             suggested_action: data.suggested_action as string,
             tick: e.tick,
-          })
+          });
           // Re-raised after dismiss? Un-dismiss it.
           if (newDismissed.has(data.alert_id as string)) {
-            newDismissed = new Set([...newDismissed].filter(id => id !== data.alert_id))
+            newDismissed = new Set([...newDismissed].filter(id => id !== data.alert_id));
           }
         } else if (eventKey === 'AlertCleared') {
-          newAlerts.delete(data.alert_id as string)
-          newDismissed = new Set([...newDismissed].filter(id => id !== data.alert_id))
+          newAlerts.delete(data.alert_id as string);
+          newDismissed = new Set([...newDismissed].filter(id => id !== data.alert_id));
         }
       }
 
-      if (!state.snapshot) return { ...state, events: newEvents, currentTick: latestTick, activeAlerts: newAlerts, dismissedAlerts: newDismissed }
-      const { asteroids, ships, stations, research, scanSites } = applyEvents(
+      if (!state.snapshot) {
+        return {
+          ...state, events: newEvents, currentTick: latestTick,
+          activeAlerts: newAlerts, dismissedAlerts: newDismissed,
+        };
+      }
+      const { asteroids, ships, stations, research, scanSites, balance } = applyEvents(
         state.snapshot.asteroids,
         state.snapshot.ships,
         state.snapshot.stations,
         state.snapshot.research,
         state.snapshot.scan_sites,
+        state.snapshot.balance,
         action.events,
-      )
+      );
       return {
         ...state,
         events: newEvents,
         currentTick: latestTick,
         activeAlerts: newAlerts,
         dismissedAlerts: newDismissed,
-        snapshot: { ...state.snapshot, asteroids, ships, stations, research, scan_sites: scanSites },
-      }
+        snapshot: { ...state.snapshot, asteroids, ships, stations, research, scan_sites: scanSites, balance },
+      };
     }
 
     case 'HEARTBEAT':
-      return { ...state, currentTick: action.tick }
+      return { ...state, currentTick: action.tick };
 
     case 'CONNECTED':
-      return { ...state, connected: true }
+      return { ...state, connected: true };
 
     case 'DISCONNECTED':
-      return { ...state, connected: false }
+      return { ...state, connected: false };
 
     case 'DISMISS_ALERT':
       return {
         ...state,
         dismissedAlerts: new Set([...state.dismissedAlerts, action.alertId]),
-      }
+      };
 
     case 'RESET':
-      return initialState
+      return initialState;
 
     default:
-      return state
+      return state;
   }
 }
 
-const RECONNECT_DELAY_MS = 2000
+const RECONNECT_DELAY_MS = 2000;
 // Must be longer than heartbeat interval (200ms) with generous margin
-const WATCHDOG_MS = 3_000
+const WATCHDOG_MS = 3_000;
 
 export function useSimStream() {
-  const [state, dispatch] = useReducer(reducer, initialState)
+  const [state, dispatch] = useReducer(reducer, initialState);
 
   useEffect(() => {
-    let stopped = false
-    let currentEs: EventSource | null = null
-    let retryTimer: ReturnType<typeof setTimeout> | null = null
-    let watchdogTimer: ReturnType<typeof setTimeout> | null = null
+    let stopped = false;
+    let currentEs: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
 
     function clearWatchdog() {
       if (watchdogTimer !== null) {
-        clearTimeout(watchdogTimer)
-        watchdogTimer = null
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
       }
     }
 
     function resetWatchdog() {
-      clearWatchdog()
+      clearWatchdog();
       watchdogTimer = setTimeout(() => {
-        if (stopped) return
-        dispatch({ type: 'RESET' })
-        currentEs?.close()
-        currentEs = null
-        scheduleRetry()
-      }, WATCHDOG_MS)
+        if (stopped) {return;}
+        dispatch({ type: 'RESET' });
+        currentEs?.close();
+        currentEs = null;
+        scheduleRetry();
+      }, WATCHDOG_MS);
     }
 
     function scheduleRetry() {
-      if (stopped || retryTimer !== null) return
+      if (stopped || retryTimer !== null) {return;}
       retryTimer = setTimeout(() => {
-        retryTimer = null
-        if (!stopped) connect()
-      }, RECONNECT_DELAY_MS)
+        retryTimer = null;
+        if (!stopped) {connect();}
+      }, RECONNECT_DELAY_MS);
     }
 
     function connect() {
       fetchSnapshot()
-        .then((snapshot) => { if (!stopped) dispatch({ type: 'SNAPSHOT_LOADED', snapshot }) })
-        .catch(scheduleRetry)
+        .then((snapshot) => { if (!stopped) {dispatch({ type: 'SNAPSHOT_LOADED', snapshot });} })
+        .catch(scheduleRetry);
 
-      const es = createEventSource()
-      currentEs = es
+      const es = createEventSource();
+      currentEs = es;
 
       es.onopen = () => {
         if (!stopped) {
-          dispatch({ type: 'CONNECTED' })
-          resetWatchdog()
+          dispatch({ type: 'CONNECTED' });
+          resetWatchdog();
         }
-      }
+      };
 
       es.onerror = () => {
-        if (stopped) return
-        clearWatchdog()
-        dispatch({ type: 'RESET' })
-        es.close()
-        if (currentEs === es) currentEs = null
-        scheduleRetry()
-      }
+        if (stopped) {return;}
+        clearWatchdog();
+        dispatch({ type: 'RESET' });
+        es.close();
+        if (currentEs === es) {currentEs = null;}
+        scheduleRetry();
+      };
 
       es.onmessage = (event: MessageEvent) => {
-        if (stopped) return
-        resetWatchdog()
-        const data = JSON.parse(event.data as string) as unknown
+        if (stopped) {return;}
+        resetWatchdog();
+        const data = JSON.parse(event.data as string) as unknown;
         if (data && typeof data === 'object' && 'heartbeat' in data) {
-          dispatch({ type: 'HEARTBEAT', tick: (data as unknown as { tick: number }).tick })
+          dispatch({ type: 'HEARTBEAT', tick: (data as unknown as { tick: number }).tick });
         } else if (Array.isArray(data)) {
-          dispatch({ type: 'EVENTS_RECEIVED', events: data as SimEvent[] })
+          dispatch({ type: 'EVENTS_RECEIVED', events: data as SimEvent[] });
         }
-      }
+      };
     }
 
-    connect()
+    connect();
 
     return () => {
-      stopped = true
-      clearWatchdog()
-      currentEs?.close()
+      stopped = true;
+      clearWatchdog();
+      currentEs?.close();
       if (retryTimer !== null) {
-        clearTimeout(retryTimer)
-        retryTimer = null
+        clearTimeout(retryTimer);
+        retryTimer = null;
       }
-    }
-  }, [])
+    };
+  }, []);
 
   const dismissAlert = useCallback((alertId: string) => {
-    dispatch({ type: 'DISMISS_ALERT', alertId })
-  }, [])
+    dispatch({ type: 'DISMISS_ALERT', alertId });
+  }, []);
 
   return {
     snapshot: state.snapshot,
@@ -209,5 +217,5 @@ export function useSimStream() {
     activeAlerts: state.activeAlerts,
     dismissedAlerts: state.dismissedAlerts,
     dismissAlert,
-  }
+  };
 }
