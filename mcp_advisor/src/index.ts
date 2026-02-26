@@ -283,6 +283,34 @@ server.tool(
   },
 );
 
+// ---------- Tool 6: stop_simulation ----------
+
+server.tool(
+  "stop_simulation",
+  "Stop a previously started simulation daemon",
+  {},
+  async () => {
+    if (!managedDaemon || managedDaemon.killed) {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "not_running",
+          message: "No managed daemon is currently running.",
+        }) }],
+      };
+    }
+
+    const pid = managedDaemon.pid;
+    killManagedDaemon();
+
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({
+        status: "stopped",
+        pid,
+      }) }],
+    };
+  },
+);
+
 // ---------- Startup validation ----------
 
 function validateContentDir(): void {
