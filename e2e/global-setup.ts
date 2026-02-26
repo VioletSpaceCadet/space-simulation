@@ -48,21 +48,13 @@ export default async function globalSetup(): Promise<void> {
   // Spawn the compiled binary directly (not `cargo run`) so the PID we
   // record is the actual daemon process, not a cargo wrapper.
   const daemonBin = path.join(PROJECT_ROOT, "target", "debug", "sim_daemon");
-  // Use a pre-built state file that starts past TRADE_UNLOCK_TICK (525,600)
-  // so the import-command E2E test doesn't need to simulate 500K+ ticks.
-  const stateFile = path.join(
-    PROJECT_ROOT,
-    "e2e",
-    "fixtures",
-    "state-post-trade-unlock.json",
-  );
   console.log("[e2e] Starting sim_daemon on port", DAEMON_PORT);
   const daemon = spawn(
     daemonBin,
     [
       "run",
-      "--state",
-      stateFile,
+      "--seed",
+      "42",
       "--paused",
       "--port",
       String(DAEMON_PORT),
