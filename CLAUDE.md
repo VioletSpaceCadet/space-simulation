@@ -131,7 +131,7 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 ## Ad-Hoc UI Testing (Chrome Browser)
 
-For interactive UI testing during development, use Chrome browser tools (via Claude Code's `--browser` flag or Claude in Chrome MCP) instead of writing new Playwright tests. This is faster and more flexible for one-off inspection.
+For interactive UI testing during development, use Chrome browser tools (via Claude Code's `--chrome` flag or Claude in Chrome MCP) instead of writing new Playwright tests. This is faster and more flexible for one-off inspection.
 
 **Setup:** Start the daemon and Vite dev server, then navigate to `http://localhost:5173`.
 
