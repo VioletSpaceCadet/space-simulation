@@ -1,6 +1,7 @@
-import { useDroppable } from '@dnd-kit/core'
-import { wouldMoveChange } from '../layout'
-import type { LayoutNode, PanelId } from '../layout'
+import { useDroppable } from '@dnd-kit/core';
+
+import { wouldMoveChange } from '../layout';
+import type { LayoutNode, PanelId } from '../layout';
 
 type Position = 'before' | 'after' | 'above' | 'below'
 
@@ -10,7 +11,7 @@ const HIT_CLASSES: Record<Position, string> = {
   after: 'right-0 top-0 w-[20%] h-full',
   above: 'top-0 left-[20%] w-[60%] h-[30%]',
   below: 'bottom-0 left-[20%] w-[60%] h-[30%]',
-}
+};
 
 /** Highlighted preview region showing where the panel will land */
 const PREVIEW_CLASSES: Record<Position, string> = {
@@ -18,16 +19,16 @@ const PREVIEW_CLASSES: Record<Position, string> = {
   after: 'right-0 top-0 w-1/2 h-full',
   above: 'top-0 left-0 w-full h-1/2',
   below: 'bottom-0 left-0 w-full h-1/2',
-}
+};
 
-const POSITIONS: Position[] = ['before', 'after', 'above', 'below']
+const POSITIONS: Position[] = ['before', 'after', 'above', 'below'];
 
 function Zone({ panelId, position }: { panelId: PanelId; position: Position }) {
-  const droppableId = `${panelId}:${position}`
+  const droppableId = `${panelId}:${position}`;
   const { isOver, setNodeRef } = useDroppable({
     id: droppableId,
     data: { targetPanelId: panelId, position },
-  })
+  });
 
   return (
     <>
@@ -45,7 +46,7 @@ function Zone({ panelId, position }: { panelId: PanelId; position: Position }) {
         />
       )}
     </>
-  )
+  );
 }
 
 interface DropZoneOverlayProps {
@@ -56,11 +57,11 @@ interface DropZoneOverlayProps {
 }
 
 export function DropZoneOverlay({ panelId, active, layout, dragSourceId }: DropZoneOverlayProps) {
-  if (!active || !dragSourceId) return null
+  if (!active || !dragSourceId) {return null;}
 
   const validPositions = POSITIONS.filter((position) =>
     wouldMoveChange(layout, dragSourceId, panelId, position),
-  )
+  );
 
   return (
     <>
@@ -68,5 +69,5 @@ export function DropZoneOverlay({ panelId, active, layout, dragSourceId }: DropZ
         <Zone key={position} panelId={panelId} position={position} />
       ))}
     </>
-  )
+  );
 }
