@@ -102,8 +102,7 @@ pub(crate) fn item_volume_m3(item: &InventoryItem, content: &GameContent) -> f32
         InventoryItem::Component { count, .. } => *count as f32 * 1.0,
         InventoryItem::Module { module_def_id, .. } => content
             .module_defs
-            .iter()
-            .find(|m| m.id == *module_def_id)
+            .get(module_def_id.as_str())
             .map_or(0.0, |m| m.volume_m3),
     }
 }
@@ -427,6 +426,11 @@ pub(crate) fn resolve_deposit(
         return;
     }
 
+    // Warm the station-level volume cache.
+    if let Some(station) = state.stations.get_mut(station_id) {
+        let _ = station.used_volume_m3(content);
+    }
+
     let Some(station) = state.stations.get(station_id) else {
         // Station gone — return items to ship and idle.
         if let Some(ship) = state.ships.get_mut(ship_id) {
@@ -437,7 +441,10 @@ pub(crate) fn resolve_deposit(
     };
 
     // Split items into those that fit in the station and those that don't.
-    let mut station_volume = inventory_volume_m3(&station.inventory, content);
+    // SAFETY: cache warmed via used_volume_m3() above; no intervening invalidation.
+    let mut station_volume = station
+        .cached_inventory_volume_m3
+        .unwrap_or_else(|| inventory_volume_m3(&station.inventory, content));
     let station_capacity = station.cargo_capacity_m3;
     let mut to_deposit = Vec::new();
     let mut to_return = Vec::new();
@@ -475,15 +482,11 @@ pub(crate) fn resolve_deposit(
                 .ships
                 .get(ship_id)
                 .map_or(0.0, |s| inventory_volume_m3(&s.inventory, content));
-            let free_space = (station_capacity
-                - inventory_volume_m3(
-                    state
-                        .stations
-                        .get(station_id)
-                        .map_or(&[] as &[_], |s| &s.inventory),
-                    content,
-                ))
-            .max(0.0);
+            let station_vol = state
+                .stations
+                .get_mut(station_id)
+                .map_or(0.0, |s| s.used_volume_m3(content));
+            let free_space = (station_capacity - station_vol).max(0.0);
             let shortfall = (ship_volume - free_space).max(0.0);
 
             events.push(crate::emit(
@@ -501,6 +504,7 @@ pub(crate) fn resolve_deposit(
 
     if let Some(station) = state.stations.get_mut(station_id) {
         station.inventory.extend(to_deposit.clone());
+        station.invalidate_volume_cache();
     }
 
     events.push(crate::emit(

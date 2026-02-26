@@ -12,21 +12,24 @@ fn full_research_lifecycle() {
     let mut content = base_content();
 
     // Add exploration lab module def
-    content.module_defs.push(ModuleDef {
-        id: "module_exploration_lab".to_string(),
-        name: "Exploration Lab".to_string(),
-        mass_kg: 3500.0,
-        volume_m3: 7.0,
-        power_consumption_per_run: 10.0,
-        wear_per_run: 0.0,
-        behavior: ModuleBehaviorDef::Lab(LabDef {
-            domain: ResearchDomain::Exploration,
-            data_consumption_per_run: 8.0,
-            research_points_per_run: 4.0,
-            accepted_data: vec![DataKind::ScanData],
-            research_interval_ticks: 1,
-        }),
-    });
+    content.module_defs.insert(
+        "module_exploration_lab".to_string(),
+        ModuleDef {
+            id: "module_exploration_lab".to_string(),
+            name: "Exploration Lab".to_string(),
+            mass_kg: 3500.0,
+            volume_m3: 7.0,
+            power_consumption_per_run: 10.0,
+            wear_per_run: 0.0,
+            behavior: ModuleBehaviorDef::Lab(LabDef {
+                domain: ResearchDomain::Exploration,
+                data_consumption_per_run: 8.0,
+                research_points_per_run: 4.0,
+                accepted_data: vec![DataKind::ScanData],
+                research_interval_ticks: 1,
+            }),
+        },
+    );
 
     // Make tech require Exploration domain, low difficulty for test
     content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Exploration, 10.0)]);
@@ -80,21 +83,24 @@ fn full_research_lifecycle() {
 fn research_lifecycle_no_data_means_no_unlock() {
     let mut content = base_content();
 
-    content.module_defs.push(ModuleDef {
-        id: "module_exploration_lab".to_string(),
-        name: "Exploration Lab".to_string(),
-        mass_kg: 3500.0,
-        volume_m3: 7.0,
-        power_consumption_per_run: 10.0,
-        wear_per_run: 0.0,
-        behavior: ModuleBehaviorDef::Lab(LabDef {
-            domain: ResearchDomain::Exploration,
-            data_consumption_per_run: 8.0,
-            research_points_per_run: 4.0,
-            accepted_data: vec![DataKind::ScanData],
-            research_interval_ticks: 1,
-        }),
-    });
+    content.module_defs.insert(
+        "module_exploration_lab".to_string(),
+        ModuleDef {
+            id: "module_exploration_lab".to_string(),
+            name: "Exploration Lab".to_string(),
+            mass_kg: 3500.0,
+            volume_m3: 7.0,
+            power_consumption_per_run: 10.0,
+            wear_per_run: 0.0,
+            behavior: ModuleBehaviorDef::Lab(LabDef {
+                domain: ResearchDomain::Exploration,
+                data_consumption_per_run: 8.0,
+                research_points_per_run: 4.0,
+                accepted_data: vec![DataKind::ScanData],
+                research_interval_ticks: 1,
+            }),
+        },
+    );
 
     content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Exploration, 100.0)]);
     content.techs[0].difficulty = 1_000_000.0; // very high

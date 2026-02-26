@@ -49,35 +49,38 @@ fn economy_content() -> GameContent {
 
     // Shipyard assembler: consumes 100kg Fe + 2 thrusters => Ship (50 m3 cargo)
     // Use assembly_interval_ticks=2 so the test doesn't need thousands of ticks.
-    content.module_defs = vec![ModuleDef {
-        id: "module_shipyard".to_string(),
-        name: "Shipyard".to_string(),
-        mass_kg: 5000.0,
-        volume_m3: 20.0,
-        power_consumption_per_run: 10.0,
-        wear_per_run: 0.0,
-        behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
-            assembly_interval_ticks: 2,
-            recipes: vec![RecipeDef {
-                id: "recipe_build_ship".to_string(),
-                inputs: vec![
-                    RecipeInput {
-                        filter: InputFilter::Element("Fe".to_string()),
-                        amount: InputAmount::Kg(100.0),
-                    },
-                    RecipeInput {
-                        filter: InputFilter::Component(ComponentId("thruster".to_string())),
-                        amount: InputAmount::Count(2),
-                    },
-                ],
-                outputs: vec![OutputSpec::Ship {
-                    cargo_capacity_m3: 50.0,
+    content.module_defs = HashMap::from([(
+        "module_shipyard".to_string(),
+        ModuleDef {
+            id: "module_shipyard".to_string(),
+            name: "Shipyard".to_string(),
+            mass_kg: 5000.0,
+            volume_m3: 20.0,
+            power_consumption_per_run: 10.0,
+            wear_per_run: 0.0,
+            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                assembly_interval_ticks: 2,
+                recipes: vec![RecipeDef {
+                    id: "recipe_build_ship".to_string(),
+                    inputs: vec![
+                        RecipeInput {
+                            filter: InputFilter::Element("Fe".to_string()),
+                            amount: InputAmount::Kg(100.0),
+                        },
+                        RecipeInput {
+                            filter: InputFilter::Component(ComponentId("thruster".to_string())),
+                            amount: InputAmount::Count(2),
+                        },
+                    ],
+                    outputs: vec![OutputSpec::Ship {
+                        cargo_capacity_m3: 50.0,
+                    }],
+                    efficiency: 1.0,
                 }],
-                efficiency: 1.0,
-            }],
-            max_stock: HashMap::new(),
-        }),
-    }];
+                max_stock: HashMap::new(),
+            }),
+        },
+    )]);
 
     content
 }

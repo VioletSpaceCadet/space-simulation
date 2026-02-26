@@ -228,7 +228,7 @@ fn lab_assignment_commands(
             }
 
             // Find lab's domain from def
-            let Some(def) = content.module_defs.iter().find(|d| d.id == module.def_id) else {
+            let Some(def) = content.module_defs.get(&module.def_id) else {
                 continue;
             };
             let ModuleBehaviorDef::Lab(lab_def) = &def.behavior else {
@@ -312,8 +312,7 @@ fn thruster_import_commands(
     // Look up the shipyard recipe's thruster requirement from content.
     let required_thrusters = content
         .module_defs
-        .iter()
-        .find(|def| def.id == "module_shipyard")
+        .get("module_shipyard")
         .and_then(|def| match &def.behavior {
             ModuleBehaviorDef::Assembler(asm) => asm.recipes.first(),
             _ => None,
@@ -725,20 +724,23 @@ mod tests {
     #[test]
     fn test_autopilot_installs_maintenance_bay() {
         let mut content = autopilot_content();
-        content.module_defs.push(sim_core::ModuleDef {
-            id: "module_maintenance_bay".to_string(),
-            name: "Maintenance Bay".to_string(),
-            mass_kg: 2000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 5.0,
-            wear_per_run: 0.0,
-            behavior: sim_core::ModuleBehaviorDef::Maintenance(sim_core::MaintenanceDef {
-                repair_interval_ticks: 30,
-                wear_reduction_per_run: 0.2,
-                repair_kit_cost: 1,
-                repair_threshold: 0.0,
-            }),
-        });
+        content.module_defs.insert(
+            "module_maintenance_bay".to_string(),
+            sim_core::ModuleDef {
+                id: "module_maintenance_bay".to_string(),
+                name: "Maintenance Bay".to_string(),
+                mass_kg: 2000.0,
+                volume_m3: 5.0,
+                power_consumption_per_run: 5.0,
+                wear_per_run: 0.0,
+                behavior: sim_core::ModuleBehaviorDef::Maintenance(sim_core::MaintenanceDef {
+                    repair_interval_ticks: 30,
+                    wear_reduction_per_run: 0.2,
+                    repair_kit_cost: 1,
+                    repair_threshold: 0.0,
+                }),
+            },
+        );
         let mut state = autopilot_state(&content);
 
         let station_id = StationId("station_earth_orbit".to_string());
@@ -1006,21 +1008,24 @@ mod tests {
             effects: vec![],
         });
         // Add lab module def
-        content.module_defs.push(sim_core::ModuleDef {
-            id: "module_materials_lab".to_string(),
-            name: "Materials Lab".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 3.0,
-            power_consumption_per_run: 2.0,
-            wear_per_run: 0.01,
-            behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
-                domain: sim_core::ResearchDomain::Materials,
-                data_consumption_per_run: 5.0,
-                research_points_per_run: 10.0,
-                accepted_data: vec![sim_core::DataKind::MiningData],
-                research_interval_ticks: 10,
-            }),
-        });
+        content.module_defs.insert(
+            "module_materials_lab".to_string(),
+            sim_core::ModuleDef {
+                id: "module_materials_lab".to_string(),
+                name: "Materials Lab".to_string(),
+                mass_kg: 1000.0,
+                volume_m3: 3.0,
+                power_consumption_per_run: 2.0,
+                wear_per_run: 0.01,
+                behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
+                    domain: sim_core::ResearchDomain::Materials,
+                    data_consumption_per_run: 5.0,
+                    research_points_per_run: 10.0,
+                    accepted_data: vec![sim_core::DataKind::MiningData],
+                    research_interval_ticks: 10,
+                }),
+            },
+        );
         content.constants.station_power_available_per_tick = 0.0;
         let mut state = base_state(&content);
         state.scan_sites.clear();
@@ -1198,21 +1203,24 @@ mod tests {
             difficulty: 500.0,
             effects: vec![],
         });
-        content.module_defs.push(sim_core::ModuleDef {
-            id: "module_engineering_lab".to_string(),
-            name: "Engineering Lab".to_string(),
-            mass_kg: 4000.0,
-            volume_m3: 8.0,
-            power_consumption_per_run: 12.0,
-            wear_per_run: 0.005,
-            behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
-                domain: sim_core::ResearchDomain::Engineering,
-                data_consumption_per_run: 10.0,
-                research_points_per_run: 5.0,
-                accepted_data: vec![sim_core::DataKind::EngineeringData],
-                research_interval_ticks: 1,
-            }),
-        });
+        content.module_defs.insert(
+            "module_engineering_lab".to_string(),
+            sim_core::ModuleDef {
+                id: "module_engineering_lab".to_string(),
+                name: "Engineering Lab".to_string(),
+                mass_kg: 4000.0,
+                volume_m3: 8.0,
+                power_consumption_per_run: 12.0,
+                wear_per_run: 0.005,
+                behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
+                    domain: sim_core::ResearchDomain::Engineering,
+                    data_consumption_per_run: 10.0,
+                    research_points_per_run: 5.0,
+                    accepted_data: vec![sim_core::DataKind::EngineeringData],
+                    research_interval_ticks: 1,
+                }),
+            },
+        );
         content.constants.station_power_available_per_tick = 0.0;
 
         let mut state = base_state(&content);
@@ -1266,37 +1274,40 @@ mod tests {
         content.constants.station_power_available_per_tick = 0.0;
 
         // Add shipyard module def with a recipe requiring 4 thrusters
-        content.module_defs.push(sim_core::ModuleDef {
-            id: "module_shipyard".to_string(),
-            name: "Shipyard".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 20.0,
-            power_consumption_per_run: 25.0,
-            wear_per_run: 0.02,
-            behavior: sim_core::ModuleBehaviorDef::Assembler(sim_core::AssemblerDef {
-                assembly_interval_ticks: 1440,
-                recipes: vec![sim_core::RecipeDef {
-                    id: "recipe_test_ship".to_string(),
-                    inputs: vec![
-                        sim_core::RecipeInput {
-                            filter: sim_core::InputFilter::Element("Fe".to_string()),
-                            amount: sim_core::InputAmount::Kg(5000.0),
-                        },
-                        sim_core::RecipeInput {
-                            filter: sim_core::InputFilter::Component(ComponentId(
-                                "thruster".to_string(),
-                            )),
-                            amount: sim_core::InputAmount::Count(4),
-                        },
-                    ],
-                    outputs: vec![sim_core::OutputSpec::Ship {
-                        cargo_capacity_m3: 50.0,
+        content.module_defs.insert(
+            "module_shipyard".to_string(),
+            sim_core::ModuleDef {
+                id: "module_shipyard".to_string(),
+                name: "Shipyard".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 20.0,
+                power_consumption_per_run: 25.0,
+                wear_per_run: 0.02,
+                behavior: sim_core::ModuleBehaviorDef::Assembler(sim_core::AssemblerDef {
+                    assembly_interval_ticks: 1440,
+                    recipes: vec![sim_core::RecipeDef {
+                        id: "recipe_test_ship".to_string(),
+                        inputs: vec![
+                            sim_core::RecipeInput {
+                                filter: sim_core::InputFilter::Element("Fe".to_string()),
+                                amount: sim_core::InputAmount::Kg(5000.0),
+                            },
+                            sim_core::RecipeInput {
+                                filter: sim_core::InputFilter::Component(ComponentId(
+                                    "thruster".to_string(),
+                                )),
+                                amount: sim_core::InputAmount::Count(4),
+                            },
+                        ],
+                        outputs: vec![sim_core::OutputSpec::Ship {
+                            cargo_capacity_m3: 50.0,
+                        }],
+                        efficiency: 1.0,
                     }],
-                    efficiency: 1.0,
-                }],
-                max_stock: HashMap::new(),
-            }),
-        });
+                    max_stock: HashMap::new(),
+                }),
+            },
+        );
 
         // Add thruster component def (needed for mass calculation)
         content.component_defs.push(sim_core::ComponentDef {

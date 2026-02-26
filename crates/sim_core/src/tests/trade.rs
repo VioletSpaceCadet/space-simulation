@@ -74,18 +74,21 @@ fn trade_content() -> GameContent {
             volume_m3: 0.5,
         },
     ];
-    content.module_defs = vec![ModuleDef {
-        id: "module_basic_iron_refinery".to_string(),
-        name: "Basic Iron Refinery".to_string(),
-        mass_kg: 1000.0,
-        volume_m3: 5.0,
-        power_consumption_per_run: 10.0,
-        wear_per_run: 0.01,
-        behavior: ModuleBehaviorDef::Processor(ProcessorDef {
-            processing_interval_ticks: 10,
-            recipes: vec![],
-        }),
-    }];
+    content.module_defs = HashMap::from([(
+        "module_basic_iron_refinery".to_string(),
+        ModuleDef {
+            id: "module_basic_iron_refinery".to_string(),
+            name: "Basic Iron Refinery".to_string(),
+            mass_kg: 1000.0,
+            volume_m3: 5.0,
+            power_consumption_per_run: 10.0,
+            wear_per_run: 0.01,
+            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_ticks: 10,
+                recipes: vec![],
+            }),
+        },
+    )]);
     content
 }
 
