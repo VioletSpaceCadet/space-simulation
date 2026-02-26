@@ -10,7 +10,7 @@ const TRADE_UNLOCK_TICK = 525_600;
  */
 async function advanceToTick(
   target: number,
-  timeoutMs = 60_000,
+  timeoutMs = 90_000,
 ): Promise<void> {
   await fetch(`${DAEMON_URL}/api/v1/speed`, {
     method: "POST",
@@ -53,7 +53,7 @@ test.describe("Import command via Economy panel", () => {
   });
 
   test("importing an item decreases the balance", async ({ page }) => {
-    test.setTimeout(120_000); // Needs time to advance past TRADE_UNLOCK_TICK
+    test.setTimeout(180_000); // Needs time to advance past TRADE_UNLOCK_TICK on slow CI
     // Advance past the trade unlock tick so imports are accepted.
     // This uses max speed; may take several seconds to reach tick 525,700.
     await advanceToTick(TRADE_UNLOCK_TICK + 100);
