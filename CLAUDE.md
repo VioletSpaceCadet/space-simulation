@@ -25,9 +25,14 @@ cargo run -p sim_bench -- run --scenario scenarios/baseline.json
 cd mcp_advisor && npm run build                           # Build MCP advisor
 cd mcp_advisor && npm start                               # Run MCP advisor (stdio transport)
 
+cd e2e && npx playwright test                             # E2E tests
+cd e2e && npx playwright test --headed                    # E2E tests (visible browser)
+cd e2e && npx tsx screenshot-cli.ts / --output /tmp/s.png # Screenshot CLI
+
 ./scripts/ci_rust.sh                                      # fmt + clippy + test
 ./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
+./scripts/ci_e2e.sh                                       # E2E Playwright tests
 ```
 
 ## Architecture
@@ -41,6 +46,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags.
 - **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints. Includes `analytics` module (trend/rate/bottleneck analysis) and `GET /api/v1/advisor/digest` endpoint.
 - **mcp_advisor** — MCP server (TypeScript, stdio transport) for balance analysis. Auto-discovered via `.mcp.json`. Requires running `sim_daemon`.
+- **e2e** — Playwright E2E tests + MCP screenshot server. Shared browser helpers in `lib/browser.ts`. Global setup spawns daemon (port 3002) + Vite (port 5174).
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
 
 **Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
