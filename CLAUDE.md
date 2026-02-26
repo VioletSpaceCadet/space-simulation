@@ -27,7 +27,6 @@ cd mcp_advisor && npm start                               # Run MCP advisor (std
 
 cd e2e && npx playwright test                             # E2E tests
 cd e2e && npx playwright test --headed                    # E2E tests (visible browser)
-cd e2e && npx tsx screenshot-cli.ts / --output /tmp/s.png # Screenshot CLI
 
 ./scripts/ci_rust.sh                                      # fmt + clippy + test
 ./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest
@@ -46,7 +45,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags.
 - **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints. Includes `analytics` module (trend/rate/bottleneck analysis) and `GET /api/v1/advisor/digest` endpoint.
 - **mcp_advisor** — MCP server (TypeScript, stdio transport) for balance analysis. Auto-discovered via `.mcp.json`. Requires running `sim_daemon`.
-- **e2e** — Playwright E2E tests + MCP screenshot server. Shared browser helpers in `lib/browser.ts`. Global setup spawns daemon (port 3002) + Vite (port 5174).
+- **e2e** — Playwright E2E smoke tests. Global setup spawns daemon (port 3002) + Vite (port 5174). Kept minimal for CI stability; use Chrome browser tools for ad-hoc UI testing.
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
 
 **Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
@@ -129,6 +128,21 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 **Workflow:** Use `start_simulation` to launch a daemon, then `set_speed` to 1000+ tps for fast analysis. Wait for data to accumulate (tens of thousands of ticks), then use `get_metrics_digest` to analyze trends. If something looks off, check `get_active_alerts` and `get_game_parameters` to understand why, then `suggest_parameter_change` to propose a fix. Use `stop_simulation` when done.
 
 **Tips:** Rates may show 0.0 during ship transit periods (2,880 ticks per hop) — this is normal, check again after the ship delivers ore. Trends need 50+ metric samples (captured every 60 ticks) to differentiate short vs long windows.
+
+## Ad-Hoc UI Testing (Chrome Browser)
+
+For interactive UI testing during development, use Chrome browser tools (via Claude Code's `--browser` flag or Claude in Chrome MCP) instead of writing new Playwright tests. This is faster and more flexible for one-off inspection.
+
+**Setup:** Start the daemon and Vite dev server, then navigate to `http://localhost:5173`.
+
+```bash
+cargo run -p sim_daemon -- run --seed 42                  # Terminal 1: daemon (:3001)
+cd ui_web && npm run dev                                  # Terminal 2: Vite (:5173)
+```
+
+**What you can do:** Take screenshots, click buttons (pause/resume, speed presets, save), use keyboard shortcuts (Space, 1-5, Ctrl+S), read panel data, interact with forms. Good for verifying UI state during balance analysis or after FE changes.
+
+**E2E tests** (`e2e/`) are intentionally minimal — they cover SSE streaming, pause/resume, speed controls, save, and spacebar toggle. Don't add complex E2E tests for form interactions; they're fragile and better covered by vitest unit tests or ad-hoc Chrome inspection.
 
 ## Notes
 

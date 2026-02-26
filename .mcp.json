@@ -7,13 +7,6 @@
         "DAEMON_URL": "http://localhost:3001",
         "CONTENT_DIR": "./content"
       }
-    },
-    "playwright": {
-      "command": "npx",
-      "args": ["tsx", "e2e/mcp-server.ts"],
-      "env": {
-        "BASE_URL": "http://localhost:5173"
-      }
     }
   }
 }

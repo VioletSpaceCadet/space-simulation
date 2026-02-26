@@ -5,13 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "test:headed": "playwright test --headed",
-    "screenshot": "tsx screenshot-cli.ts",
-    "mcp": "tsx mcp-server.ts"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1",
-    "zod": "^3.23.0"
+    "test:headed": "playwright test --headed"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
