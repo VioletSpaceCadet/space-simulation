@@ -15,7 +15,7 @@ Add two new MCP tools: `start_simulation` and `stop_simulation`.
   1. If a managed daemon is already running, kill it first
   2. Spawn `cargo run -p sim_daemon -- run --seed <seed>` via `node:child_process.spawn()` with `detached: false`
   3. If `max_ticks` provided and > 0, pass `--max-ticks <max_ticks>`
-  4. Poll `http://localhost:3001/api/v1/state` every 500ms, up to 30 retries (15s timeout to account for first compilation)
+  4. Poll `http://localhost:3001/api/v1/meta` every 500ms, up to 120 retries (60s timeout to account for first compilation)
   5. Return `{status: "started", seed, pid}` on success, or `{status: "error", message}` on failure
 - **Process management:** Store the `ChildProcess` handle in module-level state
 

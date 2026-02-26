@@ -1,5 +1,5 @@
 mod alerts;
-pub mod analytics;
+mod analytics;
 mod routes;
 mod state;
 mod tick_loop;

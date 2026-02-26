@@ -75,7 +75,7 @@ After the `suggest_parameter_change` tool block (after line 189 closing `);`), a
 async function waitForDaemon(retries = 30, intervalMs = 500): Promise<boolean> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const response = await fetch(`${DAEMON_URL}/api/v1/state`);
+      const response = await fetch(`${DAEMON_URL}/api/v1/meta`);
       if (response.ok) return true;
     } catch {
       // Daemon not ready yet
