@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import * as fs from "node:fs";
+import * as fsPromises from "node:fs/promises";
 import * as path from "node:path";
 
 const DAEMON_URL = process.env["DAEMON_URL"] ?? "http://localhost:3001";
@@ -24,7 +25,18 @@ server.tool(
   "Fetch the latest metrics digest from the running simulation daemon",
   {},
   async () => {
-    const response = await fetch(`${DAEMON_URL}/api/v1/advisor/digest`);
+    let response: Response;
+    try {
+      response = await fetch(`${DAEMON_URL}/api/v1/advisor/digest`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to connect to daemon at ${DAEMON_URL}: ${message}`,
+        }) }],
+      };
+    }
     if (response.status === 204) {
       return {
         content: [
@@ -51,7 +63,18 @@ server.tool(
   "Fetch currently active alerts from the simulation daemon",
   {},
   async () => {
-    const response = await fetch(`${DAEMON_URL}/api/v1/alerts`);
+    let response: Response;
+    try {
+      response = await fetch(`${DAEMON_URL}/api/v1/alerts`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to connect to daemon at ${DAEMON_URL}: ${message}`,
+        }) }],
+      };
+    }
     const body = await response.text();
     return { content: [{ type: "text" as const, text: body }] };
   },
@@ -74,22 +97,32 @@ server.tool(
       .describe("Which parameter file to read, or 'all' for everything"),
   },
   async ({ file }) => {
-    if (file === "all") {
-      const result: Record<string, unknown> = {};
-      for (const [key, filename] of Object.entries(CONTENT_FILES)) {
-        const filePath = path.join(CONTENT_DIR, filename);
-        const raw = fs.readFileSync(filePath, "utf-8");
-        result[key] = JSON.parse(raw);
+    try {
+      if (file === "all") {
+        const result: Record<string, unknown> = {};
+        for (const [key, filename] of Object.entries(CONTENT_FILES)) {
+          const filePath = path.join(CONTENT_DIR, filename);
+          const raw = await fsPromises.readFile(filePath, "utf-8");
+          result[key] = JSON.parse(raw);
+        }
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
       }
+
+      const filename = CONTENT_FILES[file];
+      const filePath = path.join(CONTENT_DIR, filename);
+      const raw = await fsPromises.readFile(filePath, "utf-8");
+      return { content: [{ type: "text" as const, text: raw }] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to read content file: ${message}`,
+        }) }],
       };
     }
-
-    const filename = CONTENT_FILES[file];
-    const filePath = path.join(CONTENT_DIR, filename);
-    const raw = fs.readFileSync(filePath, "utf-8");
-    return { content: [{ type: "text" as const, text: raw }] };
   },
 );
 
@@ -111,41 +144,66 @@ server.tool(
       .describe("What should improve with this change"),
   },
   async ({ parameter_path, current_value, proposed_value, rationale, expected_impact }) => {
-    const proposalsDir = path.join(CONTENT_DIR, "advisor_proposals");
-    if (!fs.existsSync(proposalsDir)) {
-      fs.mkdirSync(proposalsDir, { recursive: true });
+    try {
+      const proposalsDir = path.join(CONTENT_DIR, "advisor_proposals");
+      await fsPromises.mkdir(proposalsDir, { recursive: true });
+
+      const timestamp = Date.now();
+      const filename = `proposal_${timestamp}.json`;
+      const filePath = path.join(proposalsDir, filename);
+
+      const proposal = {
+        parameter_path,
+        current_value,
+        proposed_value,
+        rationale,
+        expected_impact,
+        created_at: new Date(timestamp).toISOString(),
+      };
+
+      await fsPromises.writeFile(filePath, JSON.stringify(proposal, null, 2) + "\n");
+
+      const relativePath = path.relative(
+        path.resolve(CONTENT_DIR, ".."),
+        filePath,
+      );
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ status: "saved", path: relativePath }),
+          },
+        ],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to save proposal: ${message}`,
+        }) }],
+      };
     }
-
-    const timestamp = Date.now();
-    const filename = `proposal_${timestamp}.json`;
-    const filePath = path.join(proposalsDir, filename);
-
-    const proposal = {
-      parameter_path,
-      current_value,
-      proposed_value,
-      rationale,
-      expected_impact,
-      created_at: new Date(timestamp).toISOString(),
-    };
-
-    fs.writeFileSync(filePath, JSON.stringify(proposal, null, 2) + "\n");
-
-    const relativePath = path.relative(
-      path.resolve(CONTENT_DIR, ".."),
-      filePath,
-    );
-
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify({ status: "saved", path: relativePath }),
-        },
-      ],
-    };
   },
 );
+
+// ---------- Startup validation ----------
+
+function validateContentDir(): void {
+  if (!fs.existsSync(CONTENT_DIR)) {
+    console.error(`[balance-advisor] WARNING: CONTENT_DIR does not exist: ${CONTENT_DIR}`);
+    return;
+  }
+  for (const [key, filename] of Object.entries(CONTENT_FILES)) {
+    const filePath = path.join(CONTENT_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      console.error(`[balance-advisor] WARNING: missing content file "${key}": ${filePath}`);
+    }
+  }
+}
+
+validateContentDir();
 
 // ---------- Start server ----------
 
