@@ -38,20 +38,28 @@ test.describe("Pause and resume", () => {
   });
 
   test("resume button restarts tick counter", async ({ page }) => {
-    // Pause via API first (reliable, no SSE race)
-    await fetch(`${DAEMON_URL}/api/v1/pause`, { method: "POST" });
-    await page.waitForTimeout(500);
+    // Pause via UI button (same as the pause test)
+    await page.locator("button", { hasText: /running/i }).click();
+    await expect(
+      page.locator("button", { hasText: /paused/i }),
+    ).toBeVisible();
 
-    // Record tick while paused
-    const metaBefore = await (await fetch(`${DAEMON_URL}/api/v1/meta`)).json();
+    // Record tick while paused via API (reliable source of truth)
+    const metaBefore = await (
+      await fetch(`${DAEMON_URL}/api/v1/meta`)
+    ).json();
 
     // Resume via UI button
     await page.locator("button", { hasText: /paused/i }).click();
-    await expect(page.locator("button", { hasText: /running/i })).toBeVisible();
+    await expect(
+      page.locator("button", { hasText: /running/i }),
+    ).toBeVisible();
 
     // Wait for ticks to advance, then verify via API
     await page.waitForTimeout(2000);
-    const metaAfter = await (await fetch(`${DAEMON_URL}/api/v1/meta`)).json();
+    const metaAfter = await (
+      await fetch(`${DAEMON_URL}/api/v1/meta`)
+    ).json();
     expect(metaAfter.tick).toBeGreaterThan(metaBefore.tick);
   });
 

@@ -1,33 +1,6 @@
 import { test, expect } from "@playwright/test";
 
 const DAEMON_URL = "http://localhost:3002";
-const TRADE_UNLOCK_TICK = 525_600;
-
-/**
- * Poll the daemon until the sim tick reaches the target.
- * Uses max speed (tps=0) to advance as fast as possible.
- * Caller is responsible for pausing after this returns.
- */
-async function advanceToTick(
-  target: number,
-  timeoutMs = 90_000,
-): Promise<void> {
-  await fetch(`${DAEMON_URL}/api/v1/speed`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticks_per_sec: 0 }),
-  });
-
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const meta = await (await fetch(`${DAEMON_URL}/api/v1/meta`)).json();
-    if (meta.tick >= target) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  throw new Error(`Timed out waiting for tick ${target}`);
-}
 
 async function getBalance(): Promise<number> {
   const response = await fetch(`${DAEMON_URL}/api/v1/snapshot`);
@@ -53,10 +26,8 @@ test.describe("Import command via Economy panel", () => {
   });
 
   test("importing an item decreases the balance", async ({ page }) => {
-    test.setTimeout(180_000); // Needs time to advance past TRADE_UNLOCK_TICK on slow CI
-    // Advance past the trade unlock tick so imports are accepted.
-    // This uses max speed; may take several seconds to reach tick 525,700.
-    await advanceToTick(TRADE_UNLOCK_TICK + 100);
+    // The daemon starts from a pre-built state past TRADE_UNLOCK_TICK,
+    // so imports are already accepted — no need to simulate 525K ticks.
 
     // Pause the sim so the balance stays stable while we interact with the UI
     await fetch(`${DAEMON_URL}/api/v1/pause`, { method: "POST" });
