@@ -59,8 +59,7 @@ fn test_refinery_accumulates_wear() {
     let wear = state.stations[&station_id].modules[0].wear.wear;
     let expected_wear = content
         .module_defs
-        .iter()
-        .find(|d| d.id == "module_basic_iron_refinery")
+        .get("module_basic_iron_refinery")
         .unwrap()
         .wear_per_run;
     assert!(
@@ -255,10 +254,8 @@ fn test_maintenance_skips_when_no_worn_modules() {
 #[test]
 fn test_wear_maintenance_full_cycle() {
     let mut content = maintenance_content();
-    for def in &mut content.module_defs {
-        if def.id == "module_basic_iron_refinery" {
-            def.wear_per_run = 0.3;
-        }
+    if let Some(def) = content.module_defs.get_mut("module_basic_iron_refinery") {
+        def.wear_per_run = 0.3;
     }
     let mut state = state_with_maintenance(&content);
     let station_id = StationId("station_earth_orbit".to_string());
@@ -312,7 +309,7 @@ fn test_wear_maintenance_full_cycle() {
 fn test_maintenance_skips_below_repair_threshold() {
     let mut content = maintenance_content();
     // Set a high threshold so trivial wear is ignored
-    for def in &mut content.module_defs {
+    for def in content.module_defs.values_mut() {
         if let ModuleBehaviorDef::Maintenance(ref mut maint_def) = def.behavior {
             maint_def.repair_threshold = 0.5;
         }
@@ -365,7 +362,7 @@ fn test_maintenance_skips_below_repair_threshold() {
 #[test]
 fn test_maintenance_repairs_above_threshold() {
     let mut content = maintenance_content();
-    for def in &mut content.module_defs {
+    for def in content.module_defs.values_mut() {
         if let ModuleBehaviorDef::Maintenance(ref mut maint_def) = def.behavior {
             maint_def.repair_threshold = 0.2;
         }

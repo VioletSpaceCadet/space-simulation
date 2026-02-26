@@ -160,6 +160,7 @@ fn transit_moves_ship_and_starts_next_task() {
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
                 modules: vec![],
+                cached_inventory_volume_m3: None,
             },
         )]),
         research: ResearchState {

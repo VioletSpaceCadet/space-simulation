@@ -268,10 +268,12 @@ fn test_assembler_merges_component_stacks() {
 #[test]
 fn test_assembler_stops_at_max_stock() {
     let mut content = assembler_content();
-    if let ModuleBehaviorDef::Assembler(ref mut asm_def) = content.module_defs[0].behavior {
-        asm_def
-            .max_stock
-            .insert(ComponentId("repair_kit".to_string()), 2);
+    if let Some(def) = content.module_defs.get_mut("module_basic_assembler") {
+        if let ModuleBehaviorDef::Assembler(ref mut asm_def) = def.behavior {
+            asm_def
+                .max_stock
+                .insert(ComponentId("repair_kit".to_string()), 2);
+        }
     }
     let mut state = state_with_assembler(&content);
     let station_id = StationId("station_earth_orbit".to_string());
@@ -324,10 +326,12 @@ fn test_assembler_stops_at_max_stock() {
 #[test]
 fn test_assembler_resumes_below_max_stock() {
     let mut content = assembler_content();
-    if let ModuleBehaviorDef::Assembler(ref mut asm_def) = content.module_defs[0].behavior {
-        asm_def
-            .max_stock
-            .insert(ComponentId("repair_kit".to_string()), 3);
+    if let Some(def) = content.module_defs.get_mut("module_basic_assembler") {
+        if let ModuleBehaviorDef::Assembler(ref mut asm_def) = def.behavior {
+            asm_def
+                .max_stock
+                .insert(ComponentId("repair_kit".to_string()), 3);
+        }
     }
     let mut state = state_with_assembler(&content);
     let station_id = StationId("station_earth_orbit".to_string());
@@ -372,10 +376,12 @@ fn test_assembler_resumes_below_max_stock() {
 #[test]
 fn test_assembler_cap_override_takes_priority() {
     let mut content = assembler_content();
-    if let ModuleBehaviorDef::Assembler(ref mut asm_def) = content.module_defs[0].behavior {
-        asm_def
-            .max_stock
-            .insert(ComponentId("repair_kit".to_string()), 10);
+    if let Some(def) = content.module_defs.get_mut("module_basic_assembler") {
+        if let ModuleBehaviorDef::Assembler(ref mut asm_def) = def.behavior {
+            asm_def
+                .max_stock
+                .insert(ComponentId("repair_kit".to_string()), 10);
+        }
     }
     let mut state = state_with_assembler(&content);
     let station_id = StationId("station_earth_orbit".to_string());

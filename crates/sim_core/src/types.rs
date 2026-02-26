@@ -257,6 +257,27 @@ pub struct StationState {
     pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
     pub modules: Vec<ModuleState>,
+    /// Cached inventory volume. Set to `None` when inventory changes;
+    /// recomputed lazily via [`StationState::used_volume_m3`].
+    #[serde(skip, default)]
+    pub cached_inventory_volume_m3: Option<f32>,
+}
+
+impl StationState {
+    /// Get the cached inventory volume, computing and caching if needed.
+    pub fn used_volume_m3(&mut self, content: &GameContent) -> f32 {
+        if let Some(vol) = self.cached_inventory_volume_m3 {
+            return vol;
+        }
+        let vol = crate::tasks::inventory_volume_m3(&self.inventory, content);
+        self.cached_inventory_volume_m3 = Some(vol);
+        vol
+    }
+
+    /// Invalidate the cached volume. Call after any inventory mutation.
+    pub fn invalidate_volume_cache(&mut self) {
+        self.cached_inventory_volume_m3 = None;
+    }
 }
 
 /// Research distributes automatically to all eligible techs — no player allocation.
@@ -635,7 +656,7 @@ pub struct GameContent {
     pub solar_system: SolarSystemDef,
     pub asteroid_templates: Vec<AsteroidTemplateDef>,
     pub elements: Vec<ElementDef>,
-    pub module_defs: Vec<ModuleDef>,
+    pub module_defs: HashMap<String, ModuleDef>,
     pub component_defs: Vec<ComponentDef>,
     pub pricing: PricingTable,
     pub constants: Constants,

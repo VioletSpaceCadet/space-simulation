@@ -103,40 +103,43 @@ fn mine_command(
 
 fn refinery_content() -> GameContent {
     let mut content = test_content();
-    content.module_defs = vec![ModuleDef {
-        id: "module_basic_iron_refinery".to_string(),
-        name: "Basic Iron Refinery".to_string(),
-        mass_kg: 5000.0,
-        volume_m3: 10.0,
-        power_consumption_per_run: 10.0,
-        wear_per_run: 0.01,
-        behavior: ModuleBehaviorDef::Processor(ProcessorDef {
-            processing_interval_ticks: 2,
-            recipes: vec![RecipeDef {
-                id: "recipe_basic_iron".to_string(),
-                inputs: vec![RecipeInput {
-                    filter: InputFilter::ItemKind(ItemKind::Ore),
-                    amount: InputAmount::Kg(500.0),
+    content.module_defs = HashMap::from([(
+        "module_basic_iron_refinery".to_string(),
+        ModuleDef {
+            id: "module_basic_iron_refinery".to_string(),
+            name: "Basic Iron Refinery".to_string(),
+            mass_kg: 5000.0,
+            volume_m3: 10.0,
+            power_consumption_per_run: 10.0,
+            wear_per_run: 0.01,
+            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_ticks: 2,
+                recipes: vec![RecipeDef {
+                    id: "recipe_basic_iron".to_string(),
+                    inputs: vec![RecipeInput {
+                        filter: InputFilter::ItemKind(ItemKind::Ore),
+                        amount: InputAmount::Kg(500.0),
+                    }],
+                    outputs: vec![
+                        OutputSpec::Material {
+                            element: "Fe".to_string(),
+                            yield_formula: YieldFormula::ElementFraction {
+                                element: "Fe".to_string(),
+                            },
+                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                                element: "Fe".to_string(),
+                                multiplier: 1.0,
+                            },
+                        },
+                        OutputSpec::Slag {
+                            yield_formula: YieldFormula::FixedFraction(1.0),
+                        },
+                    ],
+                    efficiency: 1.0,
                 }],
-                outputs: vec![
-                    OutputSpec::Material {
-                        element: "Fe".to_string(),
-                        yield_formula: YieldFormula::ElementFraction {
-                            element: "Fe".to_string(),
-                        },
-                        quality_formula: QualityFormula::ElementFractionTimesMultiplier {
-                            element: "Fe".to_string(),
-                            multiplier: 1.0,
-                        },
-                    },
-                    OutputSpec::Slag {
-                        yield_formula: YieldFormula::FixedFraction(1.0),
-                    },
-                ],
-                efficiency: 1.0,
-            }],
-        }),
-    }];
+            }),
+        },
+    )]);
     content
 }
 
@@ -172,30 +175,33 @@ fn state_with_refinery(content: &GameContent) -> GameState {
 
 fn assembler_content() -> GameContent {
     let mut content = test_content();
-    content.module_defs = vec![ModuleDef {
-        id: "module_basic_assembler".to_string(),
-        name: "Basic Assembler".to_string(),
-        mass_kg: 3000.0,
-        volume_m3: 8.0,
-        power_consumption_per_run: 8.0,
-        wear_per_run: 0.008,
-        behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
-            assembly_interval_ticks: 2,
-            max_stock: HashMap::new(),
-            recipes: vec![RecipeDef {
-                id: "recipe_basic_repair_kit".to_string(),
-                inputs: vec![RecipeInput {
-                    filter: InputFilter::Element("Fe".to_string()),
-                    amount: InputAmount::Kg(100.0),
+    content.module_defs = HashMap::from([(
+        "module_basic_assembler".to_string(),
+        ModuleDef {
+            id: "module_basic_assembler".to_string(),
+            name: "Basic Assembler".to_string(),
+            mass_kg: 3000.0,
+            volume_m3: 8.0,
+            power_consumption_per_run: 8.0,
+            wear_per_run: 0.008,
+            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                assembly_interval_ticks: 2,
+                max_stock: HashMap::new(),
+                recipes: vec![RecipeDef {
+                    id: "recipe_basic_repair_kit".to_string(),
+                    inputs: vec![RecipeInput {
+                        filter: InputFilter::Element("Fe".to_string()),
+                        amount: InputAmount::Kg(100.0),
+                    }],
+                    outputs: vec![OutputSpec::Component {
+                        component_id: ComponentId("repair_kit".to_string()),
+                        quality_formula: QualityFormula::Fixed(1.0),
+                    }],
+                    efficiency: 1.0,
                 }],
-                outputs: vec![OutputSpec::Component {
-                    component_id: ComponentId("repair_kit".to_string()),
-                    quality_formula: QualityFormula::Fixed(1.0),
-                }],
-                efficiency: 1.0,
-            }],
-        }),
-    }];
+            }),
+        },
+    )]);
     content.component_defs = vec![crate::ComponentDef {
         id: "repair_kit".to_string(),
         name: "Repair Kit".to_string(),
@@ -234,20 +240,23 @@ fn state_with_assembler(content: &GameContent) -> GameState {
 
 fn maintenance_content() -> GameContent {
     let mut content = refinery_content();
-    content.module_defs.push(ModuleDef {
-        id: "module_maintenance_bay".to_string(),
-        name: "Maintenance Bay".to_string(),
-        mass_kg: 2000.0,
-        volume_m3: 5.0,
-        power_consumption_per_run: 5.0,
-        wear_per_run: 0.0,
-        behavior: ModuleBehaviorDef::Maintenance(MaintenanceDef {
-            repair_interval_ticks: 2,
-            wear_reduction_per_run: 0.2,
-            repair_kit_cost: 1,
-            repair_threshold: 0.0,
-        }),
-    });
+    content.module_defs.insert(
+        "module_maintenance_bay".to_string(),
+        ModuleDef {
+            id: "module_maintenance_bay".to_string(),
+            name: "Maintenance Bay".to_string(),
+            mass_kg: 2000.0,
+            volume_m3: 5.0,
+            power_consumption_per_run: 5.0,
+            wear_per_run: 0.0,
+            behavior: ModuleBehaviorDef::Maintenance(MaintenanceDef {
+                repair_interval_ticks: 2,
+                wear_reduction_per_run: 0.2,
+                repair_kit_cost: 1,
+                repair_threshold: 0.0,
+            }),
+        },
+    );
     content
 }
 
@@ -273,4 +282,52 @@ fn state_with_maintenance(content: &GameContent) -> GameState {
     });
 
     state
+}
+
+#[test]
+fn test_station_volume_cache_invalidation() {
+    let content = test_content();
+    let mut state = test_state(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    let station = state.stations.get_mut(&station_id).unwrap();
+    assert!(
+        station.cached_inventory_volume_m3.is_none(),
+        "cache starts empty"
+    );
+
+    // First call computes and caches.
+    let vol1 = station.used_volume_m3(&content);
+    assert!(
+        station.cached_inventory_volume_m3.is_some(),
+        "cache populated after first call"
+    );
+    assert!(
+        (station.used_volume_m3(&content) - vol1).abs() < f32::EPSILON,
+        "cached value is stable"
+    );
+
+    // Mutate inventory and invalidate.
+    station.inventory.push(InventoryItem::Ore {
+        lot_id: LotId("lot_cache_test".to_string()),
+        asteroid_id: AsteroidId("asteroid_test".to_string()),
+        kg: 100.0,
+        composition: HashMap::from([("Fe".to_string(), 1.0)]),
+    });
+    station.invalidate_volume_cache();
+    assert!(
+        station.cached_inventory_volume_m3.is_none(),
+        "cache cleared after invalidation"
+    );
+
+    // Recompute — should reflect the new item.
+    let vol2 = station.used_volume_m3(&content);
+    assert!(
+        vol2 > vol1,
+        "volume increased after adding ore (was {vol1}, now {vol2})"
+    );
+    assert!(
+        station.cached_inventory_volume_m3.is_some(),
+        "cache repopulated"
+    );
 }

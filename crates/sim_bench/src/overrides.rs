@@ -17,7 +17,7 @@ pub fn apply_overrides(
 }
 
 fn apply_module_override(
-    module_defs: &mut [sim_core::ModuleDef],
+    module_defs: &mut HashMap<String, sim_core::ModuleDef>,
     dotted: &str,
     full_key: &str,
     value: &serde_json::Value,
@@ -28,7 +28,7 @@ fn apply_module_override(
 
     let mut matched = false;
 
-    for module_def in module_defs.iter_mut() {
+    for module_def in module_defs.values_mut() {
         match (&mut module_def.behavior, behavior_type) {
             (ModuleBehaviorDef::Processor(ref mut proc_def), "processor") => {
                 match field {
@@ -250,7 +250,7 @@ mod tests {
         ]);
         apply_overrides(&mut content, &overrides).unwrap();
 
-        for module_def in &content.module_defs {
+        for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Processor(ref proc_def) = module_def.behavior {
                 assert_eq!(proc_def.processing_interval_ticks, 180);
                 assert!((module_def.wear_per_run - 0.02).abs() < f32::EPSILON);
@@ -281,7 +281,7 @@ mod tests {
         ]);
         apply_overrides(&mut content, &overrides).unwrap();
 
-        for module_def in &content.module_defs {
+        for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Lab(ref lab_def) = module_def.behavior {
                 assert_eq!(lab_def.research_interval_ticks, 10);
                 assert!((lab_def.data_consumption_per_run - 5.0).abs() < f32::EPSILON);
@@ -300,7 +300,7 @@ mod tests {
         )]);
         apply_overrides(&mut content, &overrides).unwrap();
 
-        for module_def in &content.module_defs {
+        for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Assembler(ref asm_def) = module_def.behavior {
                 assert_eq!(asm_def.assembly_interval_ticks, 240);
             }
@@ -316,7 +316,7 @@ mod tests {
         )]);
         apply_overrides(&mut content, &overrides).unwrap();
 
-        for module_def in &content.module_defs {
+        for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Assembler(ref asm_def) = module_def.behavior {
                 assert_eq!(
                     asm_def
@@ -337,7 +337,7 @@ mod tests {
         )]);
         apply_overrides(&mut content, &overrides).unwrap();
 
-        for module_def in &content.module_defs {
+        for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Maintenance(ref maint_def) = module_def.behavior {
                 assert!((maint_def.wear_reduction_per_run - 0.3).abs() < f32::EPSILON);
             }
@@ -382,7 +382,7 @@ mod tests {
         apply_overrides(&mut content, &overrides).unwrap();
 
         assert!((content.constants.station_cargo_capacity_m3 - 500.0).abs() < f32::EPSILON);
-        for module_def in &content.module_defs {
+        for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Processor(ref proc_def) = module_def.behavior {
                 assert_eq!(proc_def.processing_interval_ticks, 90);
             }

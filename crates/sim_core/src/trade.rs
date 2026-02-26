@@ -28,10 +28,7 @@ pub fn compute_mass(item_spec: &TradeItemSpec, content: &GameContent) -> Option<
             Some(f64::from(def.mass_kg) * f64::from(*count))
         }
         TradeItemSpec::Module { module_def_id } => {
-            let def = content
-                .module_defs
-                .iter()
-                .find(|d| d.id == *module_def_id)?;
+            let def = content.module_defs.get(module_def_id.as_str())?;
             Some(f64::from(def.mass_kg))
         }
     }

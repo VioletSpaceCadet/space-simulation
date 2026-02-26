@@ -9,7 +9,7 @@ use sim_core::{
     OutputSpec, PricingTable, PrincipalId, QualityFormula, ResearchState, ScanSite, ShipId,
     ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId, YieldFormula,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 #[derive(Deserialize)]
@@ -90,7 +90,7 @@ pub fn validate_content(content: &GameContent) {
     }
 
     // Validate module recipe element references.
-    for module_def in &content.module_defs {
+    for module_def in content.module_defs.values() {
         if let ModuleBehaviorDef::Processor(processor) = &module_def.behavior {
             for recipe in &processor.recipes {
                 // Validate inputs.
@@ -219,11 +219,14 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         &std::fs::read_to_string(dir.join("elements.json")).context("reading elements.json")?,
     )
     .context("parsing elements.json")?;
-    let module_defs: Vec<ModuleDef> = serde_json::from_str(
-        &std::fs::read_to_string(dir.join("module_defs.json"))
-            .context("reading module_defs.json")?,
-    )
-    .context("parsing module_defs.json")?;
+    let module_defs: HashMap<String, ModuleDef> = {
+        let defs: Vec<ModuleDef> = serde_json::from_str(
+            &std::fs::read_to_string(dir.join("module_defs.json"))
+                .context("reading module_defs.json")?,
+        )
+        .context("parsing module_defs.json")?;
+        defs.into_iter().map(|d| (d.id.clone(), d)).collect()
+    };
     let component_defs: Vec<sim_core::ComponentDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("component_defs.json"))
             .context("reading component_defs.json")?,
@@ -305,6 +308,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         modules: vec![],
+        cached_inventory_volume_m3: None,
     };
     let ship_id = ShipId("ship_0001".to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
@@ -496,30 +500,33 @@ mod tests {
     #[should_panic(expected = "not a known element")]
     fn test_recipe_output_unknown_element_panics() {
         let mut content = minimal_content();
-        content.module_defs.push(ModuleDef {
-            id: "mod_test".to_string(),
-            name: "Test Module".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
-                processing_interval_ticks: 10,
-                recipes: vec![RecipeDef {
-                    id: "recipe_test".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::ItemKind(ItemKind::Ore),
-                        amount: InputAmount::Kg(100.0),
+        content.module_defs.insert(
+            "mod_test".to_string(),
+            ModuleDef {
+                id: "mod_test".to_string(),
+                name: "Test Module".to_string(),
+                mass_kg: 1000.0,
+                volume_m3: 5.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.0,
+                behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                    processing_interval_ticks: 10,
+                    recipes: vec![RecipeDef {
+                        id: "recipe_test".to_string(),
+                        inputs: vec![RecipeInput {
+                            filter: InputFilter::ItemKind(ItemKind::Ore),
+                            amount: InputAmount::Kg(100.0),
+                        }],
+                        outputs: vec![OutputSpec::Material {
+                            element: "Ghost".to_string(), // does not exist
+                            yield_formula: YieldFormula::FixedFraction(1.0),
+                            quality_formula: QualityFormula::Fixed(1.0),
+                        }],
+                        efficiency: 1.0,
                     }],
-                    outputs: vec![OutputSpec::Material {
-                        element: "Ghost".to_string(), // does not exist
-                        yield_formula: YieldFormula::FixedFraction(1.0),
-                        quality_formula: QualityFormula::Fixed(1.0),
-                    }],
-                    efficiency: 1.0,
-                }],
-            }),
-        });
+                }),
+            },
+        );
         validate_content(&content);
     }
 
@@ -577,27 +584,30 @@ mod tests {
     #[should_panic(expected = "not a known element")]
     fn test_assembler_recipe_unknown_element_panics() {
         let mut content = minimal_content();
-        content.module_defs.push(ModuleDef {
-            id: "mod_assembler_test".to_string(),
-            name: "Test Assembler".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
-                assembly_interval_ticks: 10,
-                max_stock: std::collections::HashMap::new(),
-                recipes: vec![RecipeDef {
-                    id: "recipe_asm_test".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::Element("Unobtanium".to_string()),
-                        amount: InputAmount::Kg(50.0),
+        content.module_defs.insert(
+            "mod_assembler_test".to_string(),
+            ModuleDef {
+                id: "mod_assembler_test".to_string(),
+                name: "Test Assembler".to_string(),
+                mass_kg: 1000.0,
+                volume_m3: 5.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.0,
+                behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                    assembly_interval_ticks: 10,
+                    max_stock: std::collections::HashMap::new(),
+                    recipes: vec![RecipeDef {
+                        id: "recipe_asm_test".to_string(),
+                        inputs: vec![RecipeInput {
+                            filter: InputFilter::Element("Unobtanium".to_string()),
+                            amount: InputAmount::Kg(50.0),
+                        }],
+                        outputs: vec![],
+                        efficiency: 1.0,
                     }],
-                    outputs: vec![],
-                    efficiency: 1.0,
-                }],
-            }),
-        });
+                }),
+            },
+        );
         validate_content(&content);
     }
 
@@ -629,6 +639,7 @@ mod tests {
                     cargo_capacity_m3: 1000.0,
                     power_available_per_tick: 100.0,
                     modules: vec![],
+                    cached_inventory_volume_m3: None,
                 },
             )]),
             research: ResearchState {
