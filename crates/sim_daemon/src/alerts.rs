@@ -1,6 +1,16 @@
 use sim_core::MetricsSnapshot;
 use std::collections::{HashSet, VecDeque};
 
+/// Alert detail returned by the advisor digest endpoint (used by VIO-153).
+#[derive(Debug, Clone, serde::Serialize)]
+#[allow(dead_code)]
+pub struct AlertDetail {
+    pub id: String,
+    pub severity: String,
+    pub message: String,
+    pub suggested_action: String,
+}
+
 type RuleFn = fn(&VecDeque<MetricsSnapshot>, &AlertEngine) -> bool;
 
 struct AlertRule {
@@ -167,6 +177,21 @@ impl AlertEngine {
     /// Returns current active alert IDs (for the /api/v1/alerts endpoint).
     pub fn active_alert_ids(&self) -> Vec<String> {
         self.active.iter().cloned().collect()
+    }
+
+    /// Returns full details for all currently active alerts.
+    #[allow(dead_code)]
+    pub fn active_alert_details(&self) -> Vec<AlertDetail> {
+        RULES
+            .iter()
+            .filter(|rule| self.active.contains(rule.id))
+            .map(|rule| AlertDetail {
+                id: rule.id.to_string(),
+                severity: format!("{:?}", rule.severity),
+                message: rule.message.to_string(),
+                suggested_action: rule.suggested_action.to_string(),
+            })
+            .collect()
     }
 
     /// Evaluate all rules against recent metrics history. Returns events for state changes.
@@ -410,5 +435,25 @@ mod tests {
             raised,
             "two consecutive stalled samples should fire REFINERY_STALLED"
         );
+    }
+
+    #[test]
+    fn active_alert_details_returns_full_info() {
+        let mut history = VecDeque::new();
+        let mut counters = test_counters();
+        let mut engine = AlertEngine::new(5);
+
+        // Trigger STORAGE_SATURATION
+        let mut snap = empty_snapshot(1);
+        snap.station_storage_used_pct = 0.97;
+        history.push_back(snap);
+        engine.evaluate(&history, 1, &mut counters);
+
+        let details = engine.active_alert_details();
+        assert_eq!(details.len(), 1);
+        assert_eq!(details[0].id, "STORAGE_SATURATION");
+        assert!(!details[0].message.is_empty());
+        assert!(!details[0].suggested_action.is_empty());
+        assert_eq!(details[0].severity, "Warning");
     }
 }
