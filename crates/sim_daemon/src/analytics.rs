@@ -71,22 +71,22 @@ struct TrackedMetric {
 const TRACKED_METRICS: &[TrackedMetric] = &[
     TrackedMetric {
         name: "total_material_kg",
-        extract: |s| s.total_material_kg as f64,
+        extract: |s| f64::from(s.total_material_kg),
         higher_is_better: true,
     },
     TrackedMetric {
         name: "total_ore_kg",
-        extract: |s| s.total_ore_kg as f64,
+        extract: |s| f64::from(s.total_ore_kg),
         higher_is_better: true,
     },
     TrackedMetric {
         name: "total_slag_kg",
-        extract: |s| s.total_slag_kg as f64,
+        extract: |s| f64::from(s.total_slag_kg),
         higher_is_better: false,
     },
     TrackedMetric {
         name: "avg_module_wear",
-        extract: |s| s.avg_module_wear as f64,
+        extract: |s| f64::from(s.avg_module_wear),
         higher_is_better: false,
     },
     TrackedMetric {
@@ -96,12 +96,12 @@ const TRACKED_METRICS: &[TrackedMetric] = &[
     },
     TrackedMetric {
         name: "total_scan_data",
-        extract: |s| s.total_scan_data as f64,
+        extract: |s| f64::from(s.total_scan_data),
         higher_is_better: true,
     },
     TrackedMetric {
         name: "asteroids_discovered",
-        extract: |s| s.asteroids_discovered as f64,
+        extract: |s| f64::from(s.asteroids_discovered),
         higher_is_better: true,
     },
 ];
@@ -174,11 +174,12 @@ fn compute_rates(history: &VecDeque<MetricsSnapshot>) -> Rates {
     let prev = &history[history.len() - 2];
 
     Rates {
-        material_production_per_sample: last.total_material_kg as f64
-            - prev.total_material_kg as f64,
-        ore_consumption_per_sample: prev.total_ore_kg as f64 - last.total_ore_kg as f64,
-        wear_accumulation_per_sample: last.avg_module_wear as f64 - prev.avg_module_wear as f64,
-        slag_accumulation_per_sample: last.total_slag_kg as f64 - prev.total_slag_kg as f64,
+        material_production_per_sample: f64::from(last.total_material_kg)
+            - f64::from(prev.total_material_kg),
+        ore_consumption_per_sample: f64::from(prev.total_ore_kg) - f64::from(last.total_ore_kg),
+        wear_accumulation_per_sample: f64::from(last.avg_module_wear)
+            - f64::from(prev.avg_module_wear),
+        slag_accumulation_per_sample: f64::from(last.total_slag_kg) - f64::from(prev.total_slag_kg),
     }
 }
 
