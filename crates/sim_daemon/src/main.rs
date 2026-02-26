@@ -584,6 +584,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_advisor_digest_includes_active_alerts() {
+        let state = make_test_state();
+        {
+            let mut sim = state.sim.lock();
+            let mut engine = alerts::AlertEngine::new(sim.content.techs.len());
+
+            // Create a snapshot with high storage to trigger STORAGE_SATURATION
+            let mut snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
+            snapshot.station_storage_used_pct = 0.97;
+            sim.push_metrics(snapshot);
+
+            // Evaluate alerts against the metrics history
+            let mut counters = sim.game_state.counters.clone();
+            engine.evaluate(
+                &sim.metrics_history,
+                sim.game_state.meta.tick,
+                &mut counters,
+            );
+            sim.alert_engine = Some(engine);
+        }
+        let app = make_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/advisor/digest")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let alerts = json["alerts"].as_array().unwrap();
+        assert!(!alerts.is_empty(), "digest should contain active alerts");
+        assert!(
+            alerts.iter().any(|a| a["id"] == "STORAGE_SATURATION"),
+            "expected STORAGE_SATURATION in digest alerts: {alerts:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn test_command_returns_200_with_valid_import() {
         let state = make_test_state();
         let app = make_router(state.clone());

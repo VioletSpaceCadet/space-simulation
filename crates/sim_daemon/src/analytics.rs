@@ -1,3 +1,4 @@
+use crate::alerts::AlertDetail;
 use serde::Serialize;
 use sim_core::MetricsSnapshot;
 use std::collections::VecDeque;
@@ -48,14 +49,6 @@ pub enum Bottleneck {
     FleetIdle,
     ResearchStalled,
     Healthy,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AlertDetail {
-    pub id: String,
-    pub severity: String,
-    pub message: String,
-    pub suggested_action: String,
 }
 
 // ---------------------------------------------------------------------------

@@ -167,47 +167,30 @@ async fn advisor_digest_handler(
         );
     }
 
-    let alert_details: Vec<super::analytics::AlertDetail> = sim
+    let alert_details = sim
         .alert_engine
         .as_ref()
-        .map(|engine| {
-            engine
-                .active_alert_details()
-                .into_iter()
-                .map(|a| super::analytics::AlertDetail {
-                    id: a.id,
-                    severity: a.severity,
-                    message: a.message,
-                    suggested_action: a.suggested_action,
-                })
-                .collect()
-        })
+        .map(super::alerts::AlertEngine::active_alert_details)
         .unwrap_or_default();
 
-    let digest = super::analytics::compute_digest(&sim.metrics_history, alert_details);
+    // Safe to unwrap: we checked is_empty() above, so history.back() will return Some.
+    let digest = super::analytics::compute_digest(&sim.metrics_history, alert_details).unwrap();
     drop(sim);
 
-    match digest {
-        Some(d) => match serde_json::to_string(&d) {
-            Ok(json) => (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, "application/json")],
-                json,
-            ),
-            Err(err) => {
-                tracing::error!("advisor digest serialization failed: {err}");
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    [(header::CONTENT_TYPE, "application/json")],
-                    r#"{"error":"serialization failed"}"#.to_string(),
-                )
-            }
-        },
-        None => (
-            StatusCode::NO_CONTENT,
+    match serde_json::to_string(&digest) {
+        Ok(json) => (
+            StatusCode::OK,
             [(header::CONTENT_TYPE, "application/json")],
-            String::new(),
+            json,
         ),
+        Err(err) => {
+            tracing::error!("advisor digest serialization failed: {err}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(header::CONTENT_TYPE, "application/json")],
+                r#"{"error":"serialization failed"}"#.to_string(),
+            )
+        }
     }
 }
 
