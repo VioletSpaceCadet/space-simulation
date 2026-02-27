@@ -1,5 +1,16 @@
 import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
 
+const MODULE_KIND_STATE_MAP: Record<string, ModuleKindState> = {
+  Processor: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+  Storage: 'Storage',
+  Maintenance: { Maintenance: { ticks_since_last_run: 0 } },
+  Assembler: { Assembler: { ticks_since_last_run: 0, stalled: false, capped: false, cap_override: {} } },
+  Lab: { Lab: { ticks_since_last_run: 0, assigned_tech: null, starved: false } },
+  SensorArray: { SensorArray: { ticks_since_last_run: 0 } },
+  SolarArray: { SolarArray: { ticks_since_last_run: 0 } },
+  Battery: { Battery: { charge_kwh: 0 } },
+};
+
 function buildTaskStub(taskKind: string, target: string | null, tick: number): TaskState {
   const kindMap: Record<string, Record<string, unknown>> = {
     Survey: target ? { Survey: { site: target } } : { Idle: {} },
@@ -129,21 +140,20 @@ export function applyEvents(
       }
 
       case 'ModuleInstalled': {
-        const { station_id, module_id, module_item_id, module_def_id } = event as {
+        const { station_id, module_id, module_item_id, module_def_id, behavior_type } = event as {
           station_id: string
           module_id: string
           module_item_id: string
           module_def_id: string
+          behavior_type: string
         };
         if (updatedStations[station_id]) {
           const station = updatedStations[station_id];
-          const kindState: ModuleKindState = module_def_id.includes('maintenance')
-            ? { Maintenance: { ticks_since_last_run: 0 } }
-            : module_def_id.includes('assembler')
-              ? { Assembler: { ticks_since_last_run: 0, stalled: false, capped: false, cap_override: {} } }
-              : module_def_id.includes('lab')
-                ? { Lab: { ticks_since_last_run: 0, assigned_tech: null, starved: false } }
-                : { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } };
+          let kindState: ModuleKindState = MODULE_KIND_STATE_MAP[behavior_type];
+          if (!kindState) {
+            console.warn(`[applyEvents] Unknown behavior_type "${behavior_type}" for module ${module_id}, defaulting to Processor`);
+            kindState = { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } };
+          }
           updatedStations = {
             ...updatedStations,
             [station_id]: {
