@@ -82,12 +82,29 @@ fn apply_module_override(
                 }
                 matched = true;
             }
+            (ModuleBehaviorDef::SolarArray(ref mut solar_def), "solar_array") => {
+                match field {
+                    "base_output_kw" => solar_def.base_output_kw = as_f32(full_key, value)?,
+                    "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
+                    _ => bail!("unknown solar_array field '{field}' in override key '{full_key}'. Valid fields: base_output_kw, wear_per_run"),
+                }
+                matched = true;
+            }
+            (ModuleBehaviorDef::Battery(ref mut battery_def), "battery") => {
+                match field {
+                    "capacity_kwh" => battery_def.capacity_kwh = as_f32(full_key, value)?,
+                    "charge_rate_kw" => battery_def.charge_rate_kw = as_f32(full_key, value)?,
+                    "discharge_rate_kw" => battery_def.discharge_rate_kw = as_f32(full_key, value)?,
+                    _ => bail!("unknown battery field '{field}' in override key '{full_key}'. Valid fields: capacity_kwh, charge_rate_kw, discharge_rate_kw"),
+                }
+                matched = true;
+            }
             _ => {}
         }
     }
 
     if !matched {
-        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance, sensor_array");
+        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance, sensor_array, solar_array, battery");
     }
 
     Ok(())
@@ -364,6 +381,50 @@ mod tests {
         let result = apply_overrides(&mut content, &overrides);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("nonexistent"));
+    }
+
+    #[test]
+    fn test_module_solar_array_override() {
+        let mut content = test_content();
+        let overrides = HashMap::from([(
+            "module.solar_array.base_output_kw".to_string(),
+            serde_json::json!(75.0),
+        )]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        for module_def in content.module_defs.values() {
+            if let ModuleBehaviorDef::SolarArray(ref solar_def) = module_def.behavior {
+                assert!((solar_def.base_output_kw - 75.0).abs() < f32::EPSILON);
+            }
+        }
+    }
+
+    #[test]
+    fn test_module_battery_override() {
+        let mut content = test_content();
+        let overrides = HashMap::from([
+            (
+                "module.battery.capacity_kwh".to_string(),
+                serde_json::json!(200.0),
+            ),
+            (
+                "module.battery.charge_rate_kw".to_string(),
+                serde_json::json!(40.0),
+            ),
+            (
+                "module.battery.discharge_rate_kw".to_string(),
+                serde_json::json!(60.0),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        for module_def in content.module_defs.values() {
+            if let ModuleBehaviorDef::Battery(ref battery_def) = module_def.behavior {
+                assert!((battery_def.capacity_kwh - 200.0).abs() < f32::EPSILON);
+                assert!((battery_def.charge_rate_kw - 40.0).abs() < f32::EPSILON);
+                assert!((battery_def.discharge_rate_kw - 60.0).abs() < f32::EPSILON);
+            }
+        }
     }
 
     #[test]
