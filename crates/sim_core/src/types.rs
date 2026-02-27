@@ -527,6 +527,7 @@ pub enum Event {
         module_id: ModuleInstanceId,
         module_item_id: ModuleItemId,
         module_def_id: String,
+        behavior_type: String,
     },
     ModuleUninstalled {
         station_id: StationId,
