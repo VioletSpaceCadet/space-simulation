@@ -428,3 +428,305 @@ fn power_stall_clears_when_power_restored() {
         "no deficit expected after disabling sensor"
     );
 }
+
+// --- Battery tests ---
+
+fn battery_content() -> GameContent {
+    let mut content = solar_array_content();
+    content.module_defs.insert(
+        "module_basic_battery".to_string(),
+        ModuleDef {
+            id: "module_basic_battery".to_string(),
+            name: "Basic Battery".to_string(),
+            mass_kg: 2000.0,
+            volume_m3: 4.0,
+            power_consumption_per_run: 0.0,
+            wear_per_run: 0.001,
+            behavior: ModuleBehaviorDef::Battery(BatteryDef {
+                capacity_kwh: 100.0,
+                charge_rate_kw: 20.0,
+                discharge_rate_kw: 30.0,
+            }),
+        },
+    );
+    content
+}
+
+#[test]
+fn battery_charges_from_surplus() {
+    let content = battery_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Solar: 50 kW, no consumers. Surplus = 50 kW, charge rate = 20 kW.
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("battery_inst_0001".to_string()),
+        def_id: "module_basic_battery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 0.0 }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // Charge rate is 20 kW, surplus is 50 kW, so should charge at 20 kW
+    assert!(
+        (station.power.battery_charge_kw - 20.0).abs() < f32::EPSILON,
+        "battery should charge at charge_rate_kw, got {}",
+        station.power.battery_charge_kw
+    );
+    if let ModuleKindState::Battery(ref bs) = station.modules[1].kind_state {
+        assert!(
+            (bs.charge_kwh - 20.0).abs() < f32::EPSILON,
+            "battery charge should be 20 kWh, got {}",
+            bs.charge_kwh
+        );
+    } else {
+        panic!("expected Battery kind_state");
+    }
+}
+
+#[test]
+fn battery_discharges_to_cover_deficit() {
+    let mut content = battery_content();
+    // Add a high-power consumer (80 kW demand vs 50 kW solar = 30 kW deficit)
+    content.module_defs.insert(
+        "module_power_hungry".to_string(),
+        ModuleDef {
+            id: "module_power_hungry".to_string(),
+            name: "Power Hungry".to_string(),
+            mass_kg: 1000.0,
+            volume_m3: 5.0,
+            power_consumption_per_run: 80.0,
+            wear_per_run: 0.0,
+            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_ticks: 60,
+                recipes: vec![],
+            }),
+        },
+    );
+
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    let station = state.stations.get_mut(&station_id).unwrap();
+
+    // Battery with 50 kWh charge, discharge_rate = 30 kW
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("battery_inst_0001".to_string()),
+        def_id: "module_basic_battery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 50.0 }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("hungry_inst_0001".to_string()),
+        def_id: "module_power_hungry".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+        }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // Deficit = 80 - 50 = 30 kW, discharge rate = 30 kW, battery has 50 kWh
+    // Battery discharges 30 kW, fully covering deficit
+    assert!(
+        (station.power.battery_discharge_kw - 30.0).abs() < f32::EPSILON,
+        "battery should discharge 30 kW, got {}",
+        station.power.battery_discharge_kw
+    );
+    assert!(
+        station.power.deficit_kw.abs() < f32::EPSILON,
+        "deficit should be 0 after battery discharge, got {}",
+        station.power.deficit_kw
+    );
+    // No modules should be stalled since battery covers deficit
+    assert!(
+        !station.modules[2].power_stalled,
+        "consumer should not be stalled when battery covers deficit"
+    );
+    // Battery charge should decrease
+    if let ModuleKindState::Battery(ref bs) = station.modules[1].kind_state {
+        assert!(
+            (bs.charge_kwh - 20.0).abs() < f32::EPSILON,
+            "battery charge should be 20 kWh after discharging 30, got {}",
+            bs.charge_kwh
+        );
+    } else {
+        panic!("expected Battery kind_state");
+    }
+}
+
+#[test]
+fn battery_partial_discharge_then_stall() {
+    let mut content = battery_content();
+    // 80 kW consumer vs 50 kW solar = 30 kW deficit
+    content.module_defs.insert(
+        "module_power_hungry".to_string(),
+        ModuleDef {
+            id: "module_power_hungry".to_string(),
+            name: "Power Hungry".to_string(),
+            mass_kg: 1000.0,
+            volume_m3: 5.0,
+            power_consumption_per_run: 80.0,
+            wear_per_run: 0.0,
+            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_ticks: 60,
+                recipes: vec![],
+            }),
+        },
+    );
+
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    let station = state.stations.get_mut(&station_id).unwrap();
+
+    // Battery with only 10 kWh — not enough to cover 30 kW deficit
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("battery_inst_0001".to_string()),
+        def_id: "module_basic_battery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 10.0 }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("hungry_inst_0001".to_string()),
+        def_id: "module_power_hungry".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+        }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // Battery discharges 10 kW (limited by stored charge), deficit = 30 - 10 = 20 kW
+    assert!(
+        (station.power.battery_discharge_kw - 10.0).abs() < f32::EPSILON,
+        "battery should discharge 10 kW (all it has), got {}",
+        station.power.battery_discharge_kw
+    );
+    assert!(
+        (station.power.deficit_kw - 20.0).abs() < f32::EPSILON,
+        "remaining deficit should be 20 kW, got {}",
+        station.power.deficit_kw
+    );
+    // Consumer should be stalled since battery can't cover full deficit
+    assert!(
+        station.modules[2].power_stalled,
+        "consumer should be stalled when battery can't fully cover deficit"
+    );
+}
+
+#[test]
+fn battery_charge_limited_by_capacity() {
+    let content = battery_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Battery nearly full — only 5 kWh headroom (capacity = 100 kWh)
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("battery_inst_0001".to_string()),
+        def_id: "module_basic_battery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 95.0 }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // Charge limited by headroom (5 kWh), not charge_rate (20 kW)
+    assert!(
+        (station.power.battery_charge_kw - 5.0).abs() < f32::EPSILON,
+        "battery should charge only 5 kW (headroom limited), got {}",
+        station.power.battery_charge_kw
+    );
+}
+
+#[test]
+fn battery_wear_reduces_effective_capacity() {
+    let content = battery_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Battery at degraded wear — effective capacity reduced
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("battery_inst_0001".to_string()),
+        def_id: "module_basic_battery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 0.0 }),
+        wear: WearState {
+            wear: content.constants.wear_band_degraded_threshold,
+        },
+        power_stalled: false,
+    });
+
+    let mut rng = make_rng();
+    // Run multiple ticks to charge up
+    for _ in 0..10 {
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    }
+
+    let station = state.stations.get(&station_id).unwrap();
+    if let ModuleKindState::Battery(ref bs) = station.modules[1].kind_state {
+        let effective_capacity = 100.0 * content.constants.wear_band_degraded_efficiency;
+        assert!(
+            bs.charge_kwh <= effective_capacity + 0.01,
+            "battery charge {} should not exceed effective capacity {} (wear-limited)",
+            bs.charge_kwh,
+            effective_capacity
+        );
+    } else {
+        panic!("expected Battery kind_state");
+    }
+}
+
+#[test]
+fn battery_not_stalled_by_power_system() {
+    let content = battery_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("battery_inst_0001".to_string()),
+        def_id: "module_basic_battery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 50.0 }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    assert!(
+        !station.modules[1].power_stalled,
+        "battery should never be power_stalled"
+    );
+}

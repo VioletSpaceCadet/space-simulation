@@ -102,8 +102,68 @@ fn power_priority(behavior: &crate::ModuleBehaviorDef) -> Option<u8> {
         crate::ModuleBehaviorDef::Assembler(_) => Some(2),
         crate::ModuleBehaviorDef::Processor(_) => Some(3),
         crate::ModuleBehaviorDef::Maintenance(_) => Some(4),
-        crate::ModuleBehaviorDef::SolarArray(_) | crate::ModuleBehaviorDef::Storage { .. } => None,
+        crate::ModuleBehaviorDef::SolarArray(_)
+        | crate::ModuleBehaviorDef::Storage { .. }
+        | crate::ModuleBehaviorDef::Battery(_) => None,
     }
+}
+
+/// Apply battery charge/discharge. Returns (discharge, charge, stored) in kW/kWh.
+fn apply_battery_buffering(
+    state: &mut GameState,
+    station_id: &StationId,
+    batteries: &[(usize, crate::BatteryDef, f32, f32)],
+    raw_surplus: f32,
+    raw_deficit: f32,
+) -> (f32, f32, f32) {
+    let mut discharge_kw = 0.0_f32;
+    let mut charge_kw = 0.0_f32;
+
+    if raw_deficit > 0.0 {
+        let mut remaining = raw_deficit;
+        for (idx, battery_def, current_charge, _efficiency) in batteries {
+            if remaining <= 0.0 {
+                break;
+            }
+            let available = current_charge.min(battery_def.discharge_rate_kw);
+            let discharge = available.min(remaining);
+            remaining -= discharge;
+            discharge_kw += discharge;
+
+            let station = state.stations.get_mut(station_id).unwrap();
+            if let crate::ModuleKindState::Battery(ref mut bs) = station.modules[*idx].kind_state {
+                bs.charge_kwh -= discharge;
+            }
+        }
+    } else if raw_surplus > 0.0 {
+        let mut remaining = raw_surplus;
+        for (idx, battery_def, current_charge, efficiency) in batteries {
+            if remaining <= 0.0 {
+                break;
+            }
+            let effective_capacity = battery_def.capacity_kwh * efficiency;
+            let headroom = (effective_capacity - current_charge).max(0.0);
+            let charge = headroom.min(battery_def.charge_rate_kw).min(remaining);
+            remaining -= charge;
+            charge_kw += charge;
+
+            let station = state.stations.get_mut(station_id).unwrap();
+            if let crate::ModuleKindState::Battery(ref mut bs) = station.modules[*idx].kind_state {
+                bs.charge_kwh += charge;
+            }
+        }
+    }
+
+    // Sum total stored energy across all batteries after updates.
+    let mut stored_kwh = 0.0_f32;
+    let station = state.stations.get(station_id).unwrap();
+    for module in &station.modules {
+        if let crate::ModuleKindState::Battery(ref bs) = module.kind_state {
+            stored_kwh += bs.charge_kwh;
+        }
+    }
+
+    (discharge_kw, charge_kw, stored_kwh)
 }
 
 /// Compute the power budget for a station, store it in `PowerState`, and
@@ -114,7 +174,9 @@ fn power_priority(behavior: &crate::ModuleBehaviorDef) -> Option<u8> {
 ///
 /// Consumed power = sum of `power_consumption_per_run` for all enabled modules.
 ///
-/// When deficit > 0, stall lowest-priority modules first until budget balances.
+/// Batteries buffer power: surplus charges them, deficit discharges them.
+/// Wear reduces effective battery capacity.
+/// Modules are only stalled when batteries cannot cover the remaining deficit.
 fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: &GameContent) {
     let Some(station) = state.stations.get(station_id) else {
         return;
@@ -129,10 +191,9 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
 
     let mut generated_kw = 0.0_f32;
     let mut consumed_kw = 0.0_f32;
-    let mut has_solar_arrays = false;
-
-    // Collect module indices with their priority and consumption for stalling.
+    let mut has_power_infrastructure = false;
     let mut consumers: Vec<(usize, u8, f32)> = Vec::new();
+    let mut batteries: Vec<(usize, crate::BatteryDef, f32, f32)> = Vec::new();
 
     for (idx, module) in station.modules.iter().enumerate() {
         if !module.enabled {
@@ -142,20 +203,41 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
             continue;
         };
 
-        if let crate::ModuleBehaviorDef::SolarArray(solar_def) = &def.behavior {
-            has_solar_arrays = true;
-            let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
-            generated_kw += solar_def.base_output_kw * solar_intensity * efficiency;
-            consumed_kw += def.power_consumption_per_run;
-        } else {
-            consumed_kw += def.power_consumption_per_run;
-            if let Some(priority) = power_priority(&def.behavior) {
-                consumers.push((idx, priority, def.power_consumption_per_run));
+        match &def.behavior {
+            crate::ModuleBehaviorDef::SolarArray(solar_def) => {
+                has_power_infrastructure = true;
+                let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
+                generated_kw += solar_def.base_output_kw * solar_intensity * efficiency;
+                consumed_kw += def.power_consumption_per_run;
+            }
+            crate::ModuleBehaviorDef::Battery(battery_def) => {
+                has_power_infrastructure = true;
+                let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
+                let current_charge =
+                    if let crate::ModuleKindState::Battery(ref bs) = module.kind_state {
+                        bs.charge_kwh
+                    } else {
+                        0.0
+                    };
+                batteries.push((idx, battery_def.clone(), current_charge, efficiency));
+                consumed_kw += def.power_consumption_per_run;
+            }
+            _ => {
+                consumed_kw += def.power_consumption_per_run;
+                if let Some(priority) = power_priority(&def.behavior) {
+                    consumers.push((idx, priority, def.power_consumption_per_run));
+                }
             }
         }
     }
 
-    let deficit_kw = (consumed_kw - generated_kw).max(0.0);
+    let raw_surplus = (generated_kw - consumed_kw).max(0.0);
+    let raw_deficit = (consumed_kw - generated_kw).max(0.0);
+
+    let (battery_discharge_kw, battery_charge_kw, battery_stored_kwh) =
+        apply_battery_buffering(state, station_id, &batteries, raw_surplus, raw_deficit);
+
+    let deficit_kw = (raw_deficit - battery_discharge_kw).max(0.0);
 
     // Reset all power_stalled flags first.
     let station = state.stations.get_mut(station_id).unwrap();
@@ -164,13 +246,8 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
     }
 
     // Stall lowest-priority modules until budget balances.
-    // Only enforce power stalling when the station has solar arrays installed.
-    // Stations without power infrastructure run modules freely.
-    if deficit_kw > 0.0 && has_solar_arrays {
-        // Sort by priority ascending (lowest first = stalled first).
-        // Stable sort preserves module order within the same priority.
+    if deficit_kw > 0.0 && has_power_infrastructure {
         consumers.sort_by_key(|&(_, priority, _)| priority);
-
         let mut remaining_deficit = deficit_kw;
         for (idx, _, consumption) in &consumers {
             if remaining_deficit <= 0.0 {
@@ -185,6 +262,9 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
         generated_kw,
         consumed_kw,
         deficit_kw,
+        battery_discharge_kw,
+        battery_charge_kw,
+        battery_stored_kwh,
     };
 }
 
