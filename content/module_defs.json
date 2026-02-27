@@ -191,5 +191,18 @@
         ]
       }
     }
+  },
+  {
+    "id": "module_basic_solar_array",
+    "name": "Basic Solar Array",
+    "mass_kg": 1500.0,
+    "volume_m3": 12.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.002,
+    "behavior": {
+      "SolarArray": {
+        "base_output_kw": 50.0
+      }
+    }
   }
 ]
