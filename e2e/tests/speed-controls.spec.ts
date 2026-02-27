@@ -15,18 +15,21 @@ test.describe("Speed controls via keyboard presets", () => {
 
   test("pressing 1 sets speed to 100 TPS", async ({ page }) => {
     await page.keyboard.press("Digit1");
+    await page.waitForTimeout(200);
     const meta = await getMeta();
     expect(meta.ticks_per_sec).toBe(100);
   });
 
   test("pressing 2 sets speed to 1K TPS", async ({ page }) => {
     await page.keyboard.press("Digit2");
+    await page.waitForTimeout(200);
     const meta = await getMeta();
     expect(meta.ticks_per_sec).toBe(1000);
   });
 
   test("pressing 5 sets speed to max (0)", async ({ page }) => {
     await page.keyboard.press("Digit5");
+    await page.waitForTimeout(200);
     const meta = await getMeta();
     expect(meta.ticks_per_sec).toBe(0);
   });

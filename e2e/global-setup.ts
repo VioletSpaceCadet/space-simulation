@@ -89,6 +89,8 @@ export default async function globalSetup(): Promise<void> {
   );
 
   // Save PIDs for teardown
+  if (!daemon.pid) throw new Error("Failed to spawn sim_daemon — no PID");
+  if (!vite.pid) throw new Error("Failed to spawn Vite — no PID");
   fs.writeFileSync(
     PID_FILE,
     JSON.stringify({ daemon: daemon.pid, vite: vite.pid }),
