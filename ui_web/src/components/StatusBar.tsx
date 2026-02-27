@@ -25,6 +25,7 @@ interface Props {
   alerts: Map<string, ActiveAlert>
   dismissedAlerts: Set<string>
   onDismissAlert: (alertId: string) => void
+  minutesPerTick: number
   activeSpeed: number
   onSetSpeed: (tps: number) => void
 }
@@ -34,12 +35,13 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 export function StatusBar({
   tick, connected, measuredTickRate, paused, balance,
   onTogglePause, alerts, dismissedAlerts, onDismissAlert,
-  activeSpeed, onSetSpeed,
+  minutesPerTick, activeSpeed, onSetSpeed,
 }: Props) {
   const roundedTick = Math.floor(tick);
-  const day = Math.floor(roundedTick / 1440);
-  const hour = Math.floor((roundedTick % 1440) / 60);
-  const minute = roundedTick % 60;
+  const totalMinutes = roundedTick * minutesPerTick;
+  const day = Math.floor(totalMinutes / 1440);
+  const hour = Math.floor((totalMinutes % 1440) / 60);
+  const minute = Math.floor(totalMinutes % 60);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
 

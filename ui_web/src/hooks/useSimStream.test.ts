@@ -7,7 +7,7 @@ import type { SimSnapshot } from '../types';
 import { useSimStream } from './useSimStream';
 
 const baseSnapshot: SimSnapshot = {
-  meta: { tick: 5, seed: 42, content_version: '0.0.1' },
+  meta: { tick: 5, seed: 42, content_version: '0.0.1', ticks_per_sec: 10, paused: false, minutes_per_tick: 1 },
   scan_sites: [],
   asteroids: {},
   ships: {

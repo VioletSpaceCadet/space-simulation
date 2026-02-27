@@ -10,6 +10,7 @@ const defaultProps = {
   alerts: new Map(),
   dismissedAlerts: new Set<string>(),
   onDismissAlert: () => {},
+  minutesPerTick: 1,
   activeSpeed: 10,
   onSetSpeed: () => {},
 };
@@ -60,6 +61,11 @@ describe('StatusBar', () => {
   it('renders Paused when paused', () => {
     render(<StatusBar tick={0} connected measuredTickRate={10} {...defaultProps} paused />);
     expect(screen.getByRole('button', { name: /paused/i })).toBeInTheDocument();
+  });
+
+  it('shows correct day with minutesPerTick=60', () => {
+    render(<StatusBar {...defaultProps} tick={24} connected measuredTickRate={10} minutesPerTick={60} />);
+    expect(screen.getByText(/day 1/i)).toBeInTheDocument();
   });
 
   it('calls onTogglePause when pause button is clicked', async () => {

@@ -4,6 +4,7 @@ export interface MetaInfo {
   content_version: string
   ticks_per_sec: number
   paused: boolean
+  minutes_per_tick: number
 }
 
 export interface FacilitiesState {

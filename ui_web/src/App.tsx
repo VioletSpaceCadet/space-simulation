@@ -29,6 +29,7 @@ export default function App() {
   const { layout, visiblePanels, move, togglePanel } = useLayoutState();
 
   const [ticksPerSec, setTicksPerSec] = useState(10); // default fallback
+  const [minutesPerTick, setMinutesPerTick] = useState(1);
   const [paused, setPaused] = useState(false);
   const { displayTick, measuredTickRate } = useAnimatedTick(currentTick, ticksPerSec, paused);
 
@@ -42,6 +43,7 @@ export default function App() {
     fetchMeta()
       .then((meta) => {
         setTicksPerSec(meta.ticks_per_sec);
+        setMinutesPerTick(meta.minutes_per_tick ?? 1);
         setPaused(meta.paused);
       })
       .catch(() => {});
@@ -153,6 +155,7 @@ export default function App() {
         alerts={activeAlerts}
         dismissedAlerts={dismissedAlerts}
         onDismissAlert={dismissAlert}
+        minutesPerTick={minutesPerTick}
         activeSpeed={ticksPerSec}
         onSetSpeed={handleSetSpeed}
       />
