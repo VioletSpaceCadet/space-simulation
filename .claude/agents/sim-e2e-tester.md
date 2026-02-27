@@ -19,18 +19,61 @@ This is a Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_dae
 
 **Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
 
-## Available MCP Tools for Simulation Testing
+## MCP Tools Reference
 
-You have access to 9 MCP tools for balance and simulation analysis:
+You have 9 MCP tools via the `balance-advisor` server. **The daemon must be running** for all tools except `start_simulation` and `get_game_parameters`.
 
-- **start_simulation** — Start a sim daemon (optional `seed`, `max_ticks`). Stops any previous daemon first.
-- **stop_simulation** — Stop a previously started daemon.
-- **set_speed** — Set tick speed (default 10 tps; use 1000+ for fast analysis).
-- **pause_simulation** / **resume_simulation** — Pause and resume.
-- **get_metrics_digest** — Fetch trend analysis, production rates, bottleneck detection. **Use this first** when diagnosing any issue.
-- **get_active_alerts** — Fetch firing alerts (inventory full, starvation, wear critical).
-- **get_game_parameters** — Read content files (constants, module_defs, techs, pricing).
-- **suggest_parameter_change** — Save proposed balance changes with rationale to `content/advisor_proposals/`.
+### Lifecycle Tools
+
+**`start_simulation`** — Start a sim daemon process. Kills any previously started daemon first.
+- Parameters: `seed?: integer` (default: random), `max_ticks?: integer` (default: unlimited)
+- Returns: `{ status: "started", seed: number, pid: number }`
+- Errors: `{ status: "error", message: "..." }` if daemon fails to start within 60s
+- Notes: Waits up to 60s for the daemon to be ready (polls `/api/v1/meta`). Always use this instead of manually starting the daemon — otherwise `set_speed`, `pause`, and `stop` controls won't work.
+
+**`stop_simulation`** — Stop the managed daemon.
+- Returns: `{ status: "stopped", pid }` or `{ status: "not_running" }`
+
+**`set_speed`** — Set tick rate.
+- Parameters: `ticks_per_sec: number` (required, min 0). Common values: 10 (default), 1000 (fast analysis), 0 (pause).
+- Returns: daemon response confirming new speed.
+
+**`pause_simulation`** / **`resume_simulation`** — Pause and resume the tick loop. No parameters.
+
+### Analysis Tools
+
+**`get_metrics_digest`** — Fetch the advisor digest: latest snapshot, trends, rates, bottleneck detection, and active alerts.
+- Returns `AdvisorDigest`:
+  ```
+  { tick, snapshot: MetricsSnapshot, trends: TrendInfo[], rates: Rates, bottleneck: Bottleneck, alerts: AlertDetail[] }
+  ```
+  - `snapshot` fields: total_ore_kg, total_material_kg, total_slag_kg, station_storage_used_pct, avg_module_wear, max_module_wear, fleet_total/idle/mining/transiting, techs_unlocked, balance, power_generated_kw, power_consumed_kw, power_deficit_kw, etc.
+  - `trends[]`: per-metric `{ metric, direction: "Improving"|"Declining"|"Stable", short_avg, long_avg }`. Short window = last 10 samples, long window = last 50. Metrics captured every 60 ticks.
+  - `rates`: `{ material_production, ore_consumption, wear_accumulation, slag_accumulation }` — delta between last two samples.
+  - `bottleneck`: one of `OreSupply | StorageFull | SlagBackpressure | WearCritical | FleetIdle | ResearchStalled | Healthy`. Priority order (first match wins).
+- Returns `{ status: "no_data" }` if no metrics history yet — wait for more ticks.
+- Returns `{ status: "error" }` if daemon is not running.
+- **Interpretation:** Need 50+ samples (3000+ ticks at default capture rate) for meaningful trend comparison. Rates of 0.0 during ship transit (2880 ticks/hop) are normal.
+
+**`get_active_alerts`** — Fetch currently firing alerts.
+- Returns: JSON array of `AlertDetail` objects from the daemon's AlertEngine.
+- Alert types include: inventory_full, ore_starvation, wear_critical, slag_backpressure, power_deficit.
+
+**`get_game_parameters`** — Read content JSON files directly (no daemon needed).
+- Parameters: `file: "constants" | "module_defs" | "techs" | "pricing" | "all"`
+- Returns: raw JSON content of the requested file(s).
+
+**`suggest_parameter_change`** — Save a balance proposal to `content/advisor_proposals/`.
+- Parameters (all required strings): `parameter_path` (dotted path, e.g. `constants.mining_rate_kg_per_tick`), `current_value`, `proposed_value`, `rationale`, `expected_impact`.
+- Returns: `{ status: "saved", path: "content/advisor_proposals/proposal_<timestamp>.json" }`
+
+### Sequencing Constraints
+
+1. Call `start_simulation` before any other tool (except `get_game_parameters`).
+2. Call `set_speed(1000)` for fast data accumulation.
+3. Wait for 3000+ ticks before `get_metrics_digest` returns meaningful trends.
+4. Use `pause_simulation` → analyze → `resume_simulation` pattern for stable snapshots.
+5. Always `stop_simulation` when done to clean up the daemon process.
 
 ## Testing Workflows
 
@@ -53,27 +96,12 @@ You have access to 9 MCP tools for balance and simulation analysis:
 3. Compare outputs across seeds to verify determinism.
 4. Run the CI smoke test: `./scripts/ci_bench_smoke.sh`
 
-### Frontend E2E Testing (Browser)
-
-You can use the `--chrome` flag (or `/chrome` in-session) to connect to a real Chrome browser for visual E2E testing of the React UI at `http://localhost:5173`.
-
-**Setup:**
-1. Start the sim daemon: `cargo run -p sim_daemon -- run --seed 42` (or use `start_simulation` MCP tool)
-2. Start the React dev server: `cd ui_web && npm run dev` (serves on port 5173)
-3. Use Chrome integration to navigate to `http://localhost:5173` and interact with the UI
-
-**What to test via browser:**
-- Panel layout renders correctly, drag-and-drop rearrangement works
-- SSE streaming updates panels in real-time (fleet, asteroids, economy, research)
-- Speed controls (buttons and keyboard shortcuts) respond correctly
-- Alert badges appear and are dismissible
-- Import/export commands via Economy panel
-- Save game via button and Cmd+S
-
-**Non-browser frontend testing:**
+### Non-Browser Frontend Testing
 1. Check SSE endpoint connectivity: `curl -N http://localhost:3001/api/v1/events`
 2. Run frontend unit tests: `cd ui_web && npm test`
-3. For SSE issues, check both the daemon logs and browser network tab patterns.
+3. For SSE issues, compare daemon state (`curl localhost:3001/api/v1/state`) vs what the UI renders.
+
+For browser-based UI testing, use the **fe-chrome-tester** agent instead (`.claude/agents/fe-chrome-tester.md`).
 
 ### MCP Advisor Testing
 1. Build: `cd mcp_advisor && npm run build`

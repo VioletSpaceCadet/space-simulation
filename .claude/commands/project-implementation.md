@@ -10,7 +10,7 @@ Argument: $ARGUMENTS (Linear project name, ID, or slug)
 
 1. **Fetch the project** from Linear using `list_projects` or `get_project` with the argument provided.
 2. **Fetch all tickets** in the project using `list_issues` filtered by project. Include sub-issues.
-3. **Read each ticket** with `get_issue` to understand full scope, descriptions, acceptance criteria, and blocking relationships.
+3. **Read each ticket** with `get_issue` to understand full scope, descriptions, acceptance criteria, and blocking relationships. **Also read comments** on each ticket with `list_comments` — they may contain updated requirements, implementation hints, or design decisions made after ticket creation.
 4. **Identify ticket order** — respect `blockedBy` / `blocks` relationships. Build a dependency graph and determine execution order (unblocked tickets first).
 5. **Summarize the plan** to the user: list tickets in planned execution order with brief descriptions. Ask for confirmation before proceeding.
 
@@ -38,6 +38,7 @@ For each ticket in execution order:
 
 ### 3b. Implement the ticket
 - Read the ticket description and any linked documents for requirements.
+- **Read ticket comments** using `list_comments` — comments often contain implementation notes, design clarifications, practitioner tips, or owner feedback added after the ticket was created. Do not skip this.
 - If the ticket needs design exploration, use EnterPlanMode to plan the approach and get user approval before writing code.
 - Write the code. Follow existing project conventions (see CLAUDE.md).
 - Write tests covering the changes — not just happy path.
@@ -68,6 +69,7 @@ For each ticket in execution order:
   ```
   git checkout feat/<project-slug> && git pull
   ```
+- **Compact context** — Run `/compact` to clear stale context from the completed ticket (old diffs, CI logs, review comments). This keeps the session focused for the next ticket.
 
 ### 3f. Repeat
 - Continue to the next unblocked ticket. If a ticket was previously blocked, check whether its blockers are now resolved.
