@@ -16,7 +16,7 @@ function buildTaskStub(taskKind: string, target: string | null, tick: number): T
     Survey: target ? { Survey: { site: target } } : { Idle: {} },
     DeepScan: target ? { DeepScan: { asteroid: target } } : { Idle: {} },
     Mine: target ? { Mine: { asteroid: target, duration_ticks: 0 } } : { Idle: {} },
-    Deposit: target ? { Deposit: { station: target } } : { Idle: {} },
+    Deposit: target ? { Deposit: { station: target, blocked: false } } : { Idle: {} },
     Transit: target ? { Transit: { destination: target, total_ticks: 0, then: { Idle: {} } } } : { Idle: {} },
   };
   return {
