@@ -152,6 +152,7 @@ mod tests {
                         }),
                         wear: WearState::default(),
                     }],
+                    power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
             )]),
