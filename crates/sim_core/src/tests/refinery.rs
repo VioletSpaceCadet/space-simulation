@@ -77,6 +77,7 @@ fn test_refinery_skips_when_below_threshold() {
             stalled: false,
         }),
         wear: WearState::default(),
+        power_stalled: false,
     });
     station.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_0001".to_string()),

@@ -159,6 +159,7 @@ fn state_with_refinery(content: &GameContent) -> GameState {
             stalled: false,
         }),
         wear: WearState::default(),
+        power_stalled: false,
     });
 
     station.inventory.push(InventoryItem::Ore {
@@ -228,6 +229,7 @@ fn state_with_assembler(content: &GameContent) -> GameState {
             cap_override: HashMap::new(),
         }),
         wear: WearState::default(),
+        power_stalled: false,
     });
 
     station.inventory.push(InventoryItem::Material {
@@ -274,6 +276,7 @@ fn state_with_maintenance(content: &GameContent) -> GameState {
             ticks_since_last_run: 0,
         }),
         wear: WearState::default(),
+        power_stalled: false,
     });
 
     station.inventory.push(InventoryItem::Component {

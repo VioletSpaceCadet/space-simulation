@@ -25,7 +25,7 @@ pub(super) fn tick_station_modules(
                 return;
             };
             let module = &station.modules[module_idx];
-            if !module.enabled {
+            if !module.enabled || module.power_stalled {
                 continue;
             }
             let Some(def) = content.module_defs.get(&module.def_id) else {

@@ -92,14 +92,29 @@ pub(crate) fn tick_stations(
     }
 }
 
-/// Compute the power budget for a station and store it in `PowerState`.
+/// Returns the power priority for a module behavior. Lower = stalled first.
+/// Priority (highest first): Maintenance(4) > Processor(3) > Assembler(2) > Lab(1) > SensorArray(0).
+/// Solar arrays and storage are never stalled (they generate power or are passive).
+fn power_priority(behavior: &crate::ModuleBehaviorDef) -> Option<u8> {
+    match behavior {
+        crate::ModuleBehaviorDef::SensorArray(_) => Some(0),
+        crate::ModuleBehaviorDef::Lab(_) => Some(1),
+        crate::ModuleBehaviorDef::Assembler(_) => Some(2),
+        crate::ModuleBehaviorDef::Processor(_) => Some(3),
+        crate::ModuleBehaviorDef::Maintenance(_) => Some(4),
+        crate::ModuleBehaviorDef::SolarArray(_) | crate::ModuleBehaviorDef::Storage { .. } => None,
+    }
+}
+
+/// Compute the power budget for a station, store it in `PowerState`, and
+/// mark modules as `power_stalled` when there is a deficit.
 ///
 /// Generated power = sum of all enabled solar arrays:
 ///   `base_output_kw` * `solar_intensity` * `wear_efficiency`
 ///
 /// Consumed power = sum of `power_consumption_per_run` for all enabled modules.
 ///
-/// Deficit = max(0, consumed - generated).
+/// When deficit > 0, stall lowest-priority modules first until budget balances.
 fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: &GameContent) {
     let Some(station) = state.stations.get(station_id) else {
         return;
@@ -114,8 +129,12 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
 
     let mut generated_kw = 0.0_f32;
     let mut consumed_kw = 0.0_f32;
+    let mut has_solar_arrays = false;
 
-    for module in &station.modules {
+    // Collect module indices with their priority and consumption for stalling.
+    let mut consumers: Vec<(usize, u8, f32)> = Vec::new();
+
+    for (idx, module) in station.modules.iter().enumerate() {
         if !module.enabled {
             continue;
         }
@@ -125,19 +144,46 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
 
         match &def.behavior {
             crate::ModuleBehaviorDef::SolarArray(solar_def) => {
+                has_solar_arrays = true;
                 let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
                 generated_kw += solar_def.base_output_kw * solar_intensity * efficiency;
                 consumed_kw += def.power_consumption_per_run;
             }
             _ => {
                 consumed_kw += def.power_consumption_per_run;
+                if let Some(priority) = power_priority(&def.behavior) {
+                    consumers.push((idx, priority, def.power_consumption_per_run));
+                }
             }
         }
     }
 
     let deficit_kw = (consumed_kw - generated_kw).max(0.0);
 
+    // Reset all power_stalled flags first.
     let station = state.stations.get_mut(station_id).unwrap();
+    for module in &mut station.modules {
+        module.power_stalled = false;
+    }
+
+    // Stall lowest-priority modules until budget balances.
+    // Only enforce power stalling when the station has solar arrays installed.
+    // Stations without power infrastructure run modules freely.
+    if deficit_kw > 0.0 && has_solar_arrays {
+        // Sort by priority ascending (lowest first = stalled first).
+        // Stable sort preserves module order within the same priority.
+        consumers.sort_by_key(|&(_, priority, _)| priority);
+
+        let mut remaining_deficit = deficit_kw;
+        for (idx, _, consumption) in &consumers {
+            if remaining_deficit <= 0.0 {
+                break;
+            }
+            station.modules[*idx].power_stalled = true;
+            remaining_deficit -= consumption;
+        }
+    }
+
     station.power = crate::PowerState {
         generated_kw,
         consumed_kw,
