@@ -380,7 +380,7 @@ fn power_stall_clears_when_power_restored() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let station = state.stations.get_mut(&station_id).unwrap();
-    // 15 kW solar + 10 kW refinery = 5 kW surplus, no stall
+    // Add refinery (10 kW) and sensor (8 kW) — total 18 kW vs 15 kW solar = deficit
     station.modules.push(ModuleState {
         id: ModuleInstanceId("refinery_inst_0001".to_string()),
         def_id: "module_basic_iron_refinery".to_string(),
@@ -393,17 +393,38 @@ fn power_stall_clears_when_power_restored() {
         wear: WearState::default(),
         power_stalled: false,
     });
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("sensor_inst_0001".to_string()),
+        def_id: "module_sensor_array".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::SensorArray(SensorArrayState::default()),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
 
+    // Phase 1: tick with deficit — sensor should be stalled
     let mut rng = make_rng();
     tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
+        station.modules[2].power_stalled,
+        "sensor should be stalled during deficit (18 kW > 15 kW)"
+    );
+
+    // Phase 2: disable the sensor to restore surplus, then tick again
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules[2].enabled = false;
+
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    assert!(
         !station.modules[1].power_stalled,
-        "refinery should not be stalled (15 kW > 10 kW)"
+        "refinery should not be stalled after power restored (15 kW > 10 kW)"
     );
     assert!(
         station.power.deficit_kw.abs() < f32::EPSILON,
-        "no deficit expected"
+        "no deficit expected after disabling sensor"
     );
 }
