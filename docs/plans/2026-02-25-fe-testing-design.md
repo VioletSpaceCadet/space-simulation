@@ -54,11 +54,13 @@ Vite E2E instance proxies `/api` to `localhost:3002`.
 ### Global Setup
 
 1. `cargo build -p sim_daemon` (fail fast on compile error)
-2. Spawn `cargo run -p sim_daemon -- run --seed 42 --ticks-per-sec 0 --port 3002`
+2. Spawn `cargo run -p sim_daemon -- run --seed 42 --paused --port 3002`
 3. Poll `http://localhost:3002/api/v1/meta` until 200 (timeout 30s)
 4. Spawn `npm run dev -- --port 5174` in `ui_web/` (proxy configured to 3002)
 5. Poll `http://localhost:5174` until 200 (timeout 15s)
 6. Store child process PIDs for teardown
+
+The `--paused` flag starts the daemon in a paused state so tests control timing. Tests resume and set speed via `/api/v1/resume` and `/api/v1/speed` as needed.
 
 ### Global Teardown
 

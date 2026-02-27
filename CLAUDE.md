@@ -25,9 +25,13 @@ cargo run -p sim_bench -- run --scenario scenarios/baseline.json
 cd mcp_advisor && npm run build                           # Build MCP advisor
 cd mcp_advisor && npm start                               # Run MCP advisor (stdio transport)
 
+cd e2e && npx playwright test                             # E2E tests
+cd e2e && npx playwright test --headed                    # E2E tests (visible browser)
+
 ./scripts/ci_rust.sh                                      # fmt + clippy + test
 ./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
+./scripts/ci_e2e.sh                                       # E2E Playwright tests
 ```
 
 ## Architecture
@@ -41,6 +45,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags.
 - **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints. Includes `analytics` module (trend/rate/bottleneck analysis) and `GET /api/v1/advisor/digest` endpoint.
 - **mcp_advisor** — MCP server (TypeScript, stdio transport) for balance analysis. Auto-discovered via `.mcp.json`. Requires running `sim_daemon`.
+- **e2e** — Playwright E2E smoke tests. Global setup spawns daemon (port 3002) + Vite (port 5174). Kept minimal for CI stability; use Chrome browser tools for ad-hoc UI testing.
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
 
 **Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
@@ -63,12 +68,15 @@ Issues tracked in Linear (VioletSpaceCadet workspace, MCP integration configured
 
 ### Feature Development (Multi-Ticket Projects)
 
+Use the `/project-implementation <project>` command to run the full workflow end-to-end. It reads Linear tickets, creates branches, implements code, dispatches the pr-reviewer agent, merges ticket PRs, and delivers a final PR for owner approval. See `.claude/commands/project-implementation.md` for the full process.
+
+Manual summary of the branching model:
+
 1. **Create a feature branch** from main: `feat/<project-name>`
 2. **Each ticket gets its own branch** off the feature branch: `feat/<project>/<ticket-id>-<short-name>`
-3. **PR per ticket into the feature branch** — standard Claude review process applies
-4. **Claude auto-merges ticket PRs** after CI passes and review is clean (squash merge)
-5. **Final PR from feature branch into main** — merge main into feature branch first to resolve conflicts, then requires owner (@VioletSpaceCadet) approval
-6. **Clean up** — delete feature branch and sub-branches after merge
+3. **PR per ticket into the feature branch** — pr-reviewer agent reviews, Claude auto-merges after CI + clean review (squash merge)
+4. **Final PR from feature branch into main** — merge main into feature branch first to resolve conflicts, then requires owner (@VioletSpaceCadet) approval
+5. **Clean up** — delete feature branch and sub-branches after merge
 
 ### Small Changes (Single-Ticket)
 
@@ -78,18 +86,13 @@ Branch from main (`fix/<ticket-id>-<short-name>` or `chore/<short-name>`), PR di
 
 **Branch protection on `main`:** Direct pushes blocked, required CI checks ("Rust", "Web", "Bench smoke"), CODEOWNERS review required, stale reviews dismissed.
 
-**Mandatory Claude Code PR review:**
-1. Watch CI: `gh pr checks N --watch`
-2. If fails: `gh run view RUN_ID --log-failed`, fix, push, watch again
-3. Once green: fresh review via `gh pr diff N`
-4. Post review: `gh pr review N --comment` — must start with "Claude Code Review -- No issues found." or "Claude Code Review -- Issues found:"
-5. Do NOT use backticks in review comment bodies (causes permission prompts)
+**PR reviews use the `pr-reviewer` agent** (`.claude/agents/pr-reviewer`). Dispatch it via the Task tool after CI passes. It handles the full review: reads the diff, checks for issues, and posts a review comment on the PR.
 
 **Creating a PR:** Push branch, `gh pr create`. Include Summary + Test plan. Use `--base feat/project-name` when targeting a feature branch.
 
 **Two merge paths:**
-- **PR into feature branch:** Claude auto-merges after CI green + review (`gh pr merge --squash`)
-- **PR into main:** Claude reviews but NEVER merges — owner must approve and merge
+- **PR into feature branch:** Claude auto-merges after CI green + pr-reviewer clean (`gh pr merge --squash`)
+- **PR into main:** pr-reviewer reviews but Claude NEVER merges — owner must approve and merge
 
 **NEVER push directly to main.**
 
@@ -104,25 +107,14 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 **Always squash merge. Never push directly to main.**
 
-- **Ticket PR into feature branch:** CI pass → Claude review → Claude runs `gh pr merge --squash`
-- **PR into main:** CI pass → Claude review → Owner approves and squash merges
+- **Ticket PR into feature branch:** CI pass → pr-reviewer agent → Claude runs `gh pr merge --squash`
+- **PR into main:** CI pass → pr-reviewer agent → Owner approves and squash merges
 
-## Balance Advisor (MCP)
+## Simulation Testing & Balance Analysis
 
-9 MCP tools are available for balance analysis. Use them when investigating simulation balance, tuning parameters, or diagnosing issues:
+Use the **sim-e2e-tester agent** (`.claude/agents/sim-e2e-tester`) for balance analysis, bulk simulation runs, E2E diagnostics, and ad-hoc UI testing. For browser-based UI testing, run Claude Code with the `--chrome` flag — this enables the Claude in Chrome MCP tools (screenshot, click, navigate, etc.) which the agent uses to interact with the UI at `localhost:5173`. It has full docs on MCP tools, diagnostic methodology, and testing workflows.
 
-- **start_simulation** — Start a sim daemon as a background process. Accepts optional `seed` and `max_ticks`. Stops any previous daemon first. Auto-kills on session end.
-- **stop_simulation** — Stop a previously started sim daemon.
-- **set_speed** — Set simulation tick speed. Default is 10 tps; use 1000+ for fast analysis runs.
-- **pause_simulation** / **resume_simulation** — Pause and resume the simulation.
-- **get_metrics_digest** — Fetch trend analysis, production rates, and bottleneck detection from the running sim. Use this first when asked about simulation performance or balance problems.
-- **get_active_alerts** — Fetch currently firing alerts (e.g. inventory full, starvation, wear critical). Use when diagnosing operational issues.
-- **get_game_parameters** — Read content files (constants, module_defs, techs, pricing) without manual file reads. Use when comparing current values to proposed changes.
-- **suggest_parameter_change** — Save a proposed balance change with rationale and expected impact to `content/advisor_proposals/`. Use after analyzing metrics to recommend a tuning adjustment.
-
-**Workflow:** Use `start_simulation` to launch a daemon, then `set_speed` to 1000+ tps for fast analysis. Wait for data to accumulate (tens of thousands of ticks), then use `get_metrics_digest` to analyze trends. If something looks off, check `get_active_alerts` and `get_game_parameters` to understand why, then `suggest_parameter_change` to propose a fix. Use `stop_simulation` when done.
-
-**Tips:** Rates may show 0.0 during ship transit periods (2,880 ticks per hop) — this is normal, check again after the ship delivers ore. Trends need 50+ metric samples (captured every 60 ticks) to differentiate short vs long windows.
+**E2E tests** (`e2e/`) are intentionally minimal — they cover SSE streaming, pause/resume, speed controls, save, and spacebar toggle. Don't add complex E2E tests; they're fragile and better covered by vitest unit tests or the sim-e2e-tester agent with Chrome.
 
 ## Notes
 
