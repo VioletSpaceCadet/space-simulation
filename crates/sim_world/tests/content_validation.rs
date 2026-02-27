@@ -12,6 +12,7 @@ use sim_core::{
 };
 use sim_world::load_content;
 use std::collections::HashSet;
+use std::sync::OnceLock;
 
 /// Helper: resolve the content directory relative to the workspace root.
 /// Integration tests run from the crate directory, so we go up two levels.
@@ -20,8 +21,12 @@ fn content_dir() -> String {
     format!("{manifest}/../../content")
 }
 
-fn load_test_content() -> GameContent {
-    load_content(&content_dir()).expect("load_content should succeed for production content")
+/// Shared content loaded once across all tests in this module.
+fn load_test_content() -> &'static GameContent {
+    static CONTENT: OnceLock<GameContent> = OnceLock::new();
+    CONTENT.get_or_init(|| {
+        load_content(&content_dir()).expect("load_content should succeed for production content")
+    })
 }
 
 // =========================================================================
@@ -152,6 +157,21 @@ fn module_power_consumption_is_non_negative() {
             module_def.id,
             module_def.power_consumption_per_run
         );
+    }
+}
+
+#[test]
+fn storage_capacity_is_positive() {
+    let content = load_test_content();
+    for module_def in content.module_defs.values() {
+        if let ModuleBehaviorDef::Storage { capacity_m3 } = &module_def.behavior {
+            assert!(
+                *capacity_m3 > 0.0,
+                "module '{}' storage has non-positive capacity_m3: {}",
+                module_def.id,
+                capacity_m3
+            );
+        }
     }
 }
 
@@ -457,6 +477,56 @@ fn assembler_max_stock_keys_reference_known_components() {
 }
 
 #[test]
+fn processor_recipe_element_inputs_reference_known_elements() {
+    let content = load_test_content();
+    let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
+
+    for module_def in content.module_defs.values() {
+        if let ModuleBehaviorDef::Processor(processor) = &module_def.behavior {
+            for recipe in &processor.recipes {
+                for input in &recipe.inputs {
+                    match &input.filter {
+                        InputFilter::Element(element_id) => {
+                            assert!(
+                                element_ids.contains(element_id.as_str()),
+                                "module '{}' recipe '{}' input element '{}' is not a known element",
+                                module_def.id,
+                                recipe.id,
+                                element_id
+                            );
+                        }
+                        InputFilter::ElementWithMinQuality { element, .. } => {
+                            assert!(
+                                element_ids.contains(element.as_str()),
+                                "module '{}' recipe '{}' input element '{}' is not a known element",
+                                module_def.id,
+                                recipe.id,
+                                element
+                            );
+                        }
+                        InputFilter::Component(ComponentId(component_id)) => {
+                            let component_ids: HashSet<&str> = content
+                                .component_defs
+                                .iter()
+                                .map(|c| c.id.as_str())
+                                .collect();
+                            assert!(
+                                component_ids.contains(component_id.as_str()),
+                                "module '{}' recipe '{}' input component '{}' is not a known component",
+                                module_def.id,
+                                recipe.id,
+                                component_id
+                            );
+                        }
+                        InputFilter::ItemKind(_) => {} // ItemKind is an enum, always valid
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn solar_system_edges_reference_known_nodes() {
     let content = load_test_content();
     let node_ids: HashSet<&str> = content
@@ -521,6 +591,8 @@ fn at_least_one_asteroid_template_exists() {
 
 #[test]
 fn at_least_one_mineable_ore_element_exists() {
+    // "ore" is the hardcoded element ID that the mining system produces when ships mine asteroids.
+    // Without this element, mined material has no type and the refinery pipeline breaks.
     let content = load_test_content();
     assert!(
         content.elements.iter().any(|e| e.id == "ore"),
@@ -867,7 +939,7 @@ fn no_extreme_pricing_outliers_within_category() {
             return;
         }
         let mut values: Vec<f64> = prices.iter().map(|(_, p)| *p).collect();
-        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let min = values[0];
         let max = values[values.len() - 1];
         // Within a category, a 10,000x spread is suspicious
