@@ -300,6 +300,18 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
                 item_id: ModuleItemId("module_item_0008".to_string()),
                 module_def_id: "module_shipyard".to_string(),
             },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0009".to_string()),
+                module_def_id: "module_basic_solar_array".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0010".to_string()),
+                module_def_id: "module_basic_solar_array".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0011".to_string()),
+                module_def_id: "module_basic_battery".to_string(),
+            },
             InventoryItem::Material {
                 element: "Fe".to_string(),
                 kg: 500.0,
