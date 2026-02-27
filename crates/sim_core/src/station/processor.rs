@@ -118,15 +118,15 @@ fn execute(
     }
 
     // Process the ore
-    resolve_processor_run(ctx, state, content, events);
+    resolve_processor_run(ctx, state, events);
 
     super::RunOutcome::Completed
 }
 
+#[allow(clippy::too_many_lines)]
 fn resolve_processor_run(
     ctx: &super::ModuleTickContext,
     state: &mut GameState,
-    content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) {
     let current_tick = state.meta.tick;

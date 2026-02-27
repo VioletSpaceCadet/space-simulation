@@ -302,7 +302,7 @@ pub(crate) enum StallReason {
     DataStarved,
 }
 
-/// Outcome of a module's execute() call.
+/// Outcome of a module's `execute()` call.
 #[derive(Debug)]
 pub(crate) enum RunOutcome {
     /// Module ran successfully — framework resets timer, applies wear.
@@ -442,7 +442,7 @@ fn should_run(state: &mut GameState, ctx: &ModuleTickContext) -> bool {
     station.power_available_per_tick >= ctx.power_needed
 }
 
-/// Reset the ticks_since_last_run to 0 for any module kind.
+/// Reset the `ticks_since_last_run` to 0 for any module kind.
 fn reset_timer(state: &mut GameState, ctx: &ModuleTickContext) {
     let Some(station) = state.stations.get_mut(&ctx.station_id) else {
         return;
