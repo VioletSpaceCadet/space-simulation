@@ -186,6 +186,7 @@ fn compute_power_budget(
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
+    let prev_power = station.power.clone();
 
     let solar_intensity = content
         .solar_system
@@ -275,6 +276,18 @@ fn compute_power_budget(
         battery_charge_kw,
         battery_stored_kwh,
     };
+
+    if station.power != prev_power {
+        let current_tick = state.meta.tick;
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::PowerStateUpdated {
+                station_id: station_id.clone(),
+                power: station.power.clone(),
+            },
+        ));
+    }
 
     // Apply wear to solar arrays (and any other power infrastructure with wear).
     for (module_idx, wear_per_run) in wear_targets {

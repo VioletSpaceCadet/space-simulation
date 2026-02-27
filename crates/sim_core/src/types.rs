@@ -265,7 +265,7 @@ pub struct ShipState {
     pub task: Option<TaskState>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct PowerState {
     pub generated_kw: f32,
     pub consumed_kw: f32,
@@ -687,6 +687,10 @@ pub enum Event {
     SlagJettisoned {
         station_id: StationId,
         kg: f32,
+    },
+    PowerStateUpdated {
+        station_id: StationId,
+        power: PowerState,
     },
 }
 

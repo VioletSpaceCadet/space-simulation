@@ -1,4 +1,4 @@
-import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
+import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, PowerState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
 
 const MODULE_KIND_STATE_MAP: Record<string, ModuleKindState> = {
   Processor: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
@@ -801,6 +801,17 @@ export function applyEvents(
               ...station,
               inventory: station.inventory.filter((i) => i.kind !== 'Slag'),
             },
+          };
+        }
+        break;
+      }
+
+      case 'PowerStateUpdated': {
+        const { station_id, power } = event as { station_id: string; power: PowerState };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: { ...updatedStations[station_id], power },
           };
         }
         break;
