@@ -62,24 +62,23 @@ pub(crate) enum StallReason {
 }
 
 pub(crate) enum RunOutcome {
-    /// Module ran successfully — apply wear, reset timer.
+    /// Module ran successfully — framework resets timer, applies wear.
     Completed,
-    /// Module can't run (no inputs, no target, etc.) — no wear.
-    /// Timer is NOT reset by the framework; module handles its own reset
-    /// semantics before returning this.
-    Skipped,
-    /// Module is stalled (capacity/stock/data) — no wear, manage stall flag + events.
+    /// Module can't run (no inputs, no target) — no wear.
+    /// `reset_timer`: true = reset to 0 (e.g., lab no-tech-assigned),
+    /// false = keep accumulating (e.g., processor below ore threshold).
+    /// Module specifies intent; framework executes.
+    Skipped { reset_timer: bool },
+    /// Module is stalled (capacity/stock/data) — no wear, reset timer,
+    /// manage stall flag + events.
     Stalled(StallReason),
-    /// Module was already stalled but is now unstalled — will run next tick.
-    Resumed,
 }
 ```
 
 `apply_run_result()` handles:
-- **Completed:** Reset timer to 0, apply wear via `apply_wear()`, invalidate volume cache if needed.
-- **Skipped:** No wear, no timer reset (module may have already reset).
-- **Stalled:** No wear, reset timer to 0. Set stall flag on kind_state, emit `ModuleStalled`/`AssemblerCapped`/`LabStarved` on transition (was_stalled=false -> stalled=true).
-- **Resumed:** Clear stall flag, emit `ModuleResumed`/`AssemblerUncapped`/`LabResumed` on transition.
+- **Completed:** Reset timer to 0, apply wear via `apply_wear()`, invalidate volume cache, clear stall flag if was stalled (emit resume event).
+- **Skipped { reset_timer }:** No wear. Reset timer only if `reset_timer == true`. No stall flag changes.
+- **Stalled:** No wear, reset timer to 0. Set stall flag, emit `ModuleStalled`/`AssemblerCapped`/`LabStarved` on transition (not-stalled -> stalled).
 
 Events passed via `&mut Vec<EventEnvelope>` into `execute()` — no per-run Vec allocation.
 
