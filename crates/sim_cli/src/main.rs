@@ -113,7 +113,7 @@ fn run(
         }
 
         if state.meta.tick % print_every == 0 {
-            print_status(&state);
+            print_status(&state, content.constants.minutes_per_tick);
         }
 
         if let Some(ref mut writer) = metrics_writer {
@@ -126,7 +126,7 @@ fn run(
 
     println!("{}", "-".repeat(80));
     println!("Done. Final state at tick {}:", state.meta.tick);
-    print_status(&state);
+    print_status(&state, content.constants.minutes_per_tick);
 
     if let Some(ref mut writer) = metrics_writer {
         writer.flush().context("final metrics flush")?;
@@ -136,10 +136,11 @@ fn run(
     Ok(())
 }
 
-fn print_status(state: &GameState) {
+fn print_status(state: &GameState, minutes_per_tick: u32) {
     let tick = state.meta.tick;
-    let day = tick / 1440;
-    let hour = (tick % 1440) / 60;
+    let total_minutes = tick * u64::from(minutes_per_tick);
+    let day = total_minutes / 1440;
+    let hour = (total_minutes % 1440) / 60;
 
     let unlocked: Vec<String> = state
         .research

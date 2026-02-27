@@ -254,6 +254,8 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         constants,
         density_map: std::collections::HashMap::new(),
     };
+    content.constants.derive_tick_values();
+    sim_core::derive_module_tick_values(&mut content.module_defs, &content.constants);
     content.init_caches();
     validate_content(&content);
     Ok(content)
@@ -530,6 +532,7 @@ mod tests {
                 power_consumption_per_run: 10.0,
                 wear_per_run: 0.0,
                 behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                    processing_interval_minutes: 10,
                     processing_interval_ticks: 10,
                     recipes: vec![RecipeDef {
                         id: "recipe_test".to_string(),
@@ -614,6 +617,7 @@ mod tests {
                 power_consumption_per_run: 10.0,
                 wear_per_run: 0.0,
                 behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                    assembly_interval_minutes: 10,
                     assembly_interval_ticks: 10,
                     max_stock: std::collections::HashMap::new(),
                     recipes: vec![RecipeDef {

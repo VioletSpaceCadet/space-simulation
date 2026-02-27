@@ -674,6 +674,7 @@ mod framework_tests {
                 power_consumption_per_run: 10.0,
                 wear_per_run: 0.01,
                 behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                    processing_interval_minutes: 5,
                     processing_interval_ticks: 5,
                     recipes: vec![],
                 }),

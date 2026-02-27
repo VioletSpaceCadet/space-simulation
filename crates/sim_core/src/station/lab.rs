@@ -146,6 +146,7 @@ mod tests {
                     data_consumption_per_run: 8.0,
                     research_points_per_run: 4.0,
                     accepted_data: vec![DataKind::ScanData],
+                    research_interval_minutes: 1,
                     research_interval_ticks: 1,
                 }),
             },

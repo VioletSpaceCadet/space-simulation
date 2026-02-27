@@ -26,6 +26,7 @@ fn solar_array_content() -> GameContent {
             power_consumption_per_run: 10.0,
             wear_per_run: 0.01,
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_minutes: 60,
                 processing_interval_ticks: 60,
                 recipes: vec![],
             }),
@@ -135,6 +136,7 @@ fn power_budget_deficit_when_insufficient() {
             power_consumption_per_run: 80.0,
             wear_per_run: 0.0,
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_minutes: 60,
                 processing_interval_ticks: 60,
                 recipes: vec![],
             }),
@@ -272,6 +274,7 @@ fn stall_content() -> GameContent {
             behavior: ModuleBehaviorDef::SensorArray(SensorArrayDef {
                 data_kind: crate::DataKind::ScanData,
                 action_key: "sensor_scan".to_string(),
+                scan_interval_minutes: 120,
                 scan_interval_ticks: 120,
             }),
         },
@@ -504,6 +507,7 @@ fn battery_discharges_to_cover_deficit() {
             power_consumption_per_run: 80.0,
             wear_per_run: 0.0,
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_minutes: 60,
                 processing_interval_ticks: 60,
                 recipes: vec![],
             }),
@@ -583,6 +587,7 @@ fn battery_partial_discharge_then_stall() {
             power_consumption_per_run: 80.0,
             wear_per_run: 0.0,
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_minutes: 60,
                 processing_interval_ticks: 60,
                 recipes: vec![],
             }),

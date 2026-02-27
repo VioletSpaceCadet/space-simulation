@@ -59,6 +59,7 @@ fn economy_content() -> GameContent {
             power_consumption_per_run: 10.0,
             wear_per_run: 0.0,
             behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                assembly_interval_minutes: 2,
                 assembly_interval_ticks: 2,
                 recipes: vec![RecipeDef {
                     id: "recipe_build_ship".to_string(),

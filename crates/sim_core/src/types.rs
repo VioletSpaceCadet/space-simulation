@@ -796,6 +796,8 @@ pub enum ModuleBehaviorDef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssemblerDef {
+    pub assembly_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub assembly_interval_ticks: u64,
     pub recipes: Vec<RecipeDef>,
     #[serde(default)]
@@ -804,6 +806,8 @@ pub struct AssemblerDef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MaintenanceDef {
+    pub repair_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub repair_interval_ticks: u64,
     pub wear_reduction_per_run: f32,
     pub repair_kit_cost: u32,
@@ -818,6 +822,8 @@ pub struct LabDef {
     pub data_consumption_per_run: f32,
     pub research_points_per_run: f32,
     pub accepted_data: Vec<DataKind>,
+    pub research_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub research_interval_ticks: u64,
 }
 
@@ -825,6 +831,8 @@ pub struct LabDef {
 pub struct SensorArrayDef {
     pub data_kind: DataKind,
     pub action_key: String,
+    pub scan_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub scan_interval_ticks: u64,
 }
 
@@ -845,6 +853,8 @@ pub struct BatteryDef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessorDef {
+    pub processing_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub processing_interval_ticks: u64,
     pub recipes: Vec<RecipeDef>,
 }
@@ -921,26 +931,27 @@ pub enum QualityFormula {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Constants {
-    pub survey_scan_ticks: u64,
-    pub deep_scan_ticks: u64,
-    /// Ticks to travel one hop on the solar system graph.
-    pub travel_ticks_per_hop: u64,
+    // -- Game-time fields (deserialized from JSON) --
+    pub survey_scan_minutes: u64,
+    pub deep_scan_minutes: u64,
+    /// Game-time minutes to travel one hop on the solar system graph.
+    pub travel_minutes_per_hop: u64,
     pub survey_tag_detection_probability: f32,
     pub asteroid_count_per_template: u32,
     pub asteroid_mass_min_kg: f32,
     pub asteroid_mass_max_kg: f32,
     pub ship_cargo_capacity_m3: f32,
     pub station_cargo_capacity_m3: f32,
-    /// kg of raw ore extracted per tick of mining
-    pub mining_rate_kg_per_tick: f32,
-    pub deposit_ticks: u64,
-    pub station_power_available_per_tick: f32,
+    /// kg of raw ore extracted per game-time minute of mining
+    pub mining_rate_kg_per_minute: f32,
+    pub deposit_minutes: u64,
+    pub station_power_available_per_minute: f32,
     /// Minimum `IronRich` tag confidence for autopilot to queue a deep scan.
     pub autopilot_iron_rich_confidence_threshold: f32,
     /// Default refinery processing threshold (kg) set by autopilot on newly installed modules.
     pub autopilot_refinery_threshold_kg: f32,
     // Research system
-    pub research_roll_interval_ticks: u64,
+    pub research_roll_interval_minutes: u64,
     pub data_generation_peak: f32,
     pub data_generation_floor: f32,
     pub data_generation_decay_rate: f32,
@@ -958,11 +969,31 @@ pub struct Constants {
     /// Game-time minutes per simulation tick. Production = 60 (1 tick = 1 hour).
     /// Test fixtures use 1 to preserve existing assertions.
     pub minutes_per_tick: u32,
+
+    // -- Derived tick fields (computed at load time, not in JSON) --
+    #[serde(skip_deserializing, default)]
+    pub survey_scan_ticks: u64,
+    #[serde(skip_deserializing, default)]
+    pub deep_scan_ticks: u64,
+    #[serde(skip_deserializing, default)]
+    pub travel_ticks_per_hop: u64,
+    #[serde(skip_deserializing, default)]
+    pub mining_rate_kg_per_tick: f32,
+    #[serde(skip_deserializing, default)]
+    pub deposit_ticks: u64,
+    #[serde(skip_deserializing, default)]
+    pub station_power_available_per_tick: f32,
+    #[serde(skip_deserializing, default)]
+    pub research_roll_interval_ticks: u64,
 }
 
 impl Constants {
     /// Convert a game-time duration in minutes to ticks, rounding up (ceil division).
+    ///
+    /// # Panics
+    /// Debug-asserts that `minutes_per_tick > 0`.
     pub fn game_minutes_to_ticks(&self, minutes: u64) -> u64 {
+        debug_assert!(self.minutes_per_tick > 0, "minutes_per_tick must be > 0");
         let mpt = u64::from(self.minutes_per_tick);
         if minutes == 0 {
             return 0;
@@ -973,6 +1004,60 @@ impl Constants {
     /// Convert a per-minute rate to a per-tick rate.
     pub fn rate_per_minute_to_per_tick(&self, rate_per_minute: f32) -> f32 {
         rate_per_minute * self.minutes_per_tick as f32
+    }
+
+    /// Compute derived tick-based fields from game-time minutes fields.
+    /// Must be called once after deserialization (in `load_content` / after overrides).
+    pub fn derive_tick_values(&mut self) {
+        self.survey_scan_ticks = self.game_minutes_to_ticks(self.survey_scan_minutes);
+        self.deep_scan_ticks = self.game_minutes_to_ticks(self.deep_scan_minutes);
+        self.travel_ticks_per_hop = self.game_minutes_to_ticks(self.travel_minutes_per_hop);
+        self.deposit_ticks = self.game_minutes_to_ticks(self.deposit_minutes);
+        self.research_roll_interval_ticks =
+            self.game_minutes_to_ticks(self.research_roll_interval_minutes);
+        self.mining_rate_kg_per_tick =
+            self.rate_per_minute_to_per_tick(self.mining_rate_kg_per_minute);
+        self.station_power_available_per_tick =
+            self.rate_per_minute_to_per_tick(self.station_power_available_per_minute);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Module tick derivation
+// ---------------------------------------------------------------------------
+
+/// Compute derived tick-based interval fields on all module behavior defs.
+/// Must be called once after deserialization / after overrides.
+///
+/// Reuses `Constants::game_minutes_to_ticks` for the conversion.
+#[allow(clippy::implicit_hasher)]
+pub fn derive_module_tick_values(
+    module_defs: &mut HashMap<String, ModuleDef>,
+    constants: &Constants,
+) {
+    for def in module_defs.values_mut() {
+        match &mut def.behavior {
+            ModuleBehaviorDef::Processor(p) => {
+                p.processing_interval_ticks =
+                    constants.game_minutes_to_ticks(p.processing_interval_minutes);
+            }
+            ModuleBehaviorDef::Assembler(a) => {
+                a.assembly_interval_ticks =
+                    constants.game_minutes_to_ticks(a.assembly_interval_minutes);
+            }
+            ModuleBehaviorDef::Maintenance(m) => {
+                m.repair_interval_ticks =
+                    constants.game_minutes_to_ticks(m.repair_interval_minutes);
+            }
+            ModuleBehaviorDef::Lab(l) => {
+                l.research_interval_ticks =
+                    constants.game_minutes_to_ticks(l.research_interval_minutes);
+            }
+            ModuleBehaviorDef::SensorArray(s) => {
+                s.scan_interval_ticks = constants.game_minutes_to_ticks(s.scan_interval_minutes);
+            }
+            _ => {}
+        }
     }
 }
 
@@ -1040,5 +1125,39 @@ mod time_scale_tests {
         let c = base_content();
         let result = c.constants.rate_per_minute_to_per_tick(15.0);
         assert!((result - 15.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn derive_tick_values_mpt_60() {
+        let mut c = base_content();
+        c.constants.minutes_per_tick = 60;
+        c.constants.survey_scan_minutes = 120;
+        c.constants.deep_scan_minutes = 480;
+        c.constants.travel_minutes_per_hop = 2880;
+        c.constants.deposit_minutes = 120;
+        c.constants.research_roll_interval_minutes = 60;
+        c.constants.mining_rate_kg_per_minute = 15.0;
+        c.constants.station_power_available_per_minute = 100.0;
+        c.constants.derive_tick_values();
+
+        assert_eq!(c.constants.survey_scan_ticks, 2);
+        assert_eq!(c.constants.deep_scan_ticks, 8);
+        assert_eq!(c.constants.travel_ticks_per_hop, 48);
+        assert_eq!(c.constants.deposit_ticks, 2);
+        assert_eq!(c.constants.research_roll_interval_ticks, 1);
+        assert!((c.constants.mining_rate_kg_per_tick - 900.0).abs() < f32::EPSILON);
+        assert!((c.constants.station_power_available_per_tick - 6000.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn derive_tick_values_mpt_1() {
+        let mut c = base_content();
+        // base_content uses minutes_per_tick=1 and all _minutes fields = 1
+        c.constants.derive_tick_values();
+
+        assert_eq!(c.constants.survey_scan_ticks, 1);
+        assert_eq!(c.constants.deep_scan_ticks, 1);
+        assert_eq!(c.constants.travel_ticks_per_hop, 1);
+        assert_eq!(c.constants.deposit_ticks, 1);
     }
 }

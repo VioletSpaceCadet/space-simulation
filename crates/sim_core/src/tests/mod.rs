@@ -114,6 +114,7 @@ fn refinery_content() -> GameContent {
             power_consumption_per_run: 10.0,
             wear_per_run: 0.01,
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_minutes: 2,
                 processing_interval_ticks: 2,
                 recipes: vec![RecipeDef {
                     id: "recipe_basic_iron".to_string(),
@@ -187,6 +188,7 @@ fn assembler_content() -> GameContent {
             power_consumption_per_run: 8.0,
             wear_per_run: 0.008,
             behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                assembly_interval_minutes: 2,
                 assembly_interval_ticks: 2,
                 max_stock: HashMap::new(),
                 recipes: vec![RecipeDef {
@@ -253,6 +255,7 @@ fn maintenance_content() -> GameContent {
             power_consumption_per_run: 5.0,
             wear_per_run: 0.0,
             behavior: ModuleBehaviorDef::Maintenance(MaintenanceDef {
+                repair_interval_minutes: 2,
                 repair_interval_ticks: 2,
                 wear_reduction_per_run: 0.2,
                 repair_kit_cost: 1,

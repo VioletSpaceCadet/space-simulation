@@ -49,6 +49,9 @@ fn run(scenario_path: &str, output_dir: &str) -> Result<()> {
     // Load content and apply overrides.
     let mut content = sim_world::load_content(&scenario.content_dir)?;
     overrides::apply_overrides(&mut content, &scenario.overrides)?;
+    // Re-derive tick values after overrides may have changed game-time fields.
+    content.constants.derive_tick_values();
+    sim_core::derive_module_tick_values(&mut content.module_defs, &content.constants);
 
     // Load base state file if specified.
     let base_state = if let Some(ref state_path) = scenario.state {
