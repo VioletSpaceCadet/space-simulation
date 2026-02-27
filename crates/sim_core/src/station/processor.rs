@@ -5,9 +5,8 @@ use crate::{
 };
 use std::collections::HashMap;
 
-use super::{apply_wear, estimate_output_volume_m3, matches_input_filter, MIN_MEANINGFUL_KG};
+use super::{estimate_output_volume_m3, matches_input_filter, MIN_MEANINGFUL_KG};
 
-#[allow(clippy::too_many_lines)]
 pub(super) fn tick_station_modules(
     state: &mut GameState,
     station_id: &StationId,
@@ -20,230 +19,119 @@ pub(super) fn tick_station_modules(
         .map_or(0, |s| s.modules.len());
 
     for module_idx in 0..module_count {
-        let (def_id, interval, power_needed) = {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            let module = &station.modules[module_idx];
-            if !module.enabled || module.power_stalled {
-                continue;
-            }
-            let Some(def) = content.module_defs.get(&module.def_id) else {
-                continue;
-            };
-            let interval = match &def.behavior {
-                ModuleBehaviorDef::Processor(p) => p.processing_interval_ticks,
-                ModuleBehaviorDef::Storage { .. }
-                | ModuleBehaviorDef::Maintenance(_)
-                | ModuleBehaviorDef::Assembler(_)
-                | ModuleBehaviorDef::Lab(_)
-                | ModuleBehaviorDef::SensorArray(_)
-                | ModuleBehaviorDef::SolarArray(_)
-                | ModuleBehaviorDef::Battery(_) => continue,
-            };
-            (
-                module.def_id.clone(),
-                interval,
-                def.power_consumption_per_run,
-            )
+        let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
+            continue;
         };
 
-        // Tick timer; skip if interval not reached yet.
-        {
-            let Some(station) = state.stations.get_mut(station_id) else {
-                return;
-            };
-            if let ModuleKindState::Processor(ps) = &mut station.modules[module_idx].kind_state {
-                ps.ticks_since_last_run += 1;
-                if ps.ticks_since_last_run < interval {
-                    continue;
-                }
-            }
-        }
-
-        // Check power budget.
-        {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            if station.power_available_per_tick < power_needed {
-                continue;
-            }
-        }
-
-        // Check ore threshold.
-        let threshold_kg = {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            match &station.modules[module_idx].kind_state {
-                ModuleKindState::Processor(ps) => ps.threshold_kg,
-                ModuleKindState::Storage
-                | ModuleKindState::Maintenance(_)
-                | ModuleKindState::Assembler(_)
-                | ModuleKindState::Lab(_)
-                | ModuleKindState::SensorArray(_)
-                | ModuleKindState::SolarArray(_)
-                | ModuleKindState::Battery(_) => continue,
-            }
+        let ModuleBehaviorDef::Processor(_) = &ctx.def.behavior else {
+            continue;
         };
 
-        let total_ore_kg: f32 = state.stations.get(station_id).map_or(0.0, |s| {
-            s.inventory
-                .iter()
-                .filter_map(|i| {
-                    if let InventoryItem::Ore { kg, .. } = i {
-                        Some(*kg)
-                    } else {
-                        None
-                    }
-                })
-                .sum()
-        });
-
-        if total_ore_kg < threshold_kg {
+        if !super::should_run(state, &ctx) {
             continue;
         }
 
-        // --- Capacity pre-check: estimate output volume and stall if it won't fit ---
-        {
-            let Some(def) = content.module_defs.get(&def_id) else {
-                continue;
-            };
-            let ModuleBehaviorDef::Processor(processor_def) = &def.behavior else {
-                continue;
-            };
-            let Some(recipe) = processor_def.recipes.first() else {
-                continue;
-            };
-
-            let rate_kg = match recipe.inputs.first().map(|i| &i.amount) {
-                Some(InputAmount::Kg(kg)) => *kg,
-                _ => continue,
-            };
-
-            let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
-
-            // Warm the station-level volume cache before the immutable borrow.
-            {
-                let station_mut = state.stations.get_mut(station_id).unwrap();
-                let _ = station_mut.used_volume_m3(content);
-            }
-
-            let station = state.stations.get(station_id).unwrap();
-            let (peeked_kg, lots) = peek_ore_fifo_with_lots(&station.inventory, rate_kg, |item| {
-                matches_input_filter(item, input_filter.as_ref())
-            });
-
-            if peeked_kg < MIN_MEANINGFUL_KG {
-                continue;
-            }
-
-            let lot_refs: Vec<(&HashMap<String, f32>, f32)> =
-                lots.iter().map(|(comp, kg)| (comp, *kg)).collect();
-            let avg_composition = weighted_composition(&lot_refs);
-            let output_volume =
-                estimate_output_volume_m3(recipe, &avg_composition, peeked_kg, content);
-
-            // SAFETY: cache warmed via used_volume_m3() above; no intervening invalidation.
-            let current_used = station
-                .cached_inventory_volume_m3
-                .unwrap_or_else(|| crate::inventory_volume_m3(&station.inventory, content));
-            let capacity = station.cargo_capacity_m3;
-            let shortfall = (current_used + output_volume) - capacity;
-
-            let was_stalled = match &station.modules[module_idx].kind_state {
-                ModuleKindState::Processor(ps) => ps.stalled,
-                ModuleKindState::Storage
-                | ModuleKindState::Maintenance(_)
-                | ModuleKindState::Assembler(_)
-                | ModuleKindState::Lab(_)
-                | ModuleKindState::SensorArray(_)
-                | ModuleKindState::SolarArray(_)
-                | ModuleKindState::Battery(_) => false,
-            };
-            let module_id = station.modules[module_idx].id.clone();
-
-            if shortfall > 0.0 {
-                // Stall: reset timer, emit event on transition only
-                let station_mut = state.stations.get_mut(station_id).unwrap();
-                if let ModuleKindState::Processor(ps) =
-                    &mut station_mut.modules[module_idx].kind_state
-                {
-                    ps.stalled = true;
-                    ps.ticks_since_last_run = 0;
-                }
-                if !was_stalled {
-                    events.push(crate::emit(
-                        &mut state.counters,
-                        state.meta.tick,
-                        Event::ModuleStalled {
-                            station_id: station_id.clone(),
-                            module_id,
-                            shortfall_m3: shortfall,
-                        },
-                    ));
-                }
-                continue;
-            }
-
-            // Space available — resume if previously stalled
-            if was_stalled {
-                let station_mut = state.stations.get_mut(station_id).unwrap();
-                if let ModuleKindState::Processor(ps) =
-                    &mut station_mut.modules[module_idx].kind_state
-                {
-                    ps.stalled = false;
-                }
-                events.push(crate::emit(
-                    &mut state.counters,
-                    state.meta.tick,
-                    Event::ModuleResumed {
-                        station_id: station_id.clone(),
-                        module_id,
-                    },
-                ));
-            }
-        }
-
-        resolve_processor_run(state, station_id, module_idx, &def_id, content, events);
-
-        // Inventory changed — invalidate cached volume.
-        if let Some(station) = state.stations.get_mut(station_id) {
-            station.invalidate_volume_cache();
-        }
-
-        if let Some(station) = state.stations.get_mut(station_id) {
-            if let ModuleKindState::Processor(ps) = &mut station.modules[module_idx].kind_state {
-                ps.ticks_since_last_run = 0;
-            }
-        }
+        let outcome = execute(&ctx, state, content, events);
+        super::apply_run_result(state, &ctx, outcome, events);
     }
 }
 
-#[allow(clippy::too_many_lines)]
-fn resolve_processor_run(
+fn execute(
+    ctx: &super::ModuleTickContext,
     state: &mut GameState,
-    station_id: &StationId,
-    module_idx: usize,
-    def_id: &str,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) -> super::RunOutcome {
+    // Check ore threshold
+    let threshold_kg = {
+        let Some(station) = state.stations.get(&ctx.station_id) else {
+            return super::RunOutcome::Skipped { reset_timer: false };
+        };
+        match &station.modules[ctx.module_idx].kind_state {
+            ModuleKindState::Processor(ps) => ps.threshold_kg,
+            _ => return super::RunOutcome::Skipped { reset_timer: false },
+        }
+    };
+
+    let total_ore_kg: f32 = state.stations.get(&ctx.station_id).map_or(0.0, |s| {
+        s.inventory
+            .iter()
+            .filter_map(|i| {
+                if let InventoryItem::Ore { kg, .. } = i {
+                    Some(*kg)
+                } else {
+                    None
+                }
+            })
+            .sum()
+    });
+
+    if total_ore_kg < threshold_kg {
+        return super::RunOutcome::Skipped { reset_timer: false };
+    }
+
+    // Capacity pre-check
+    let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
+        return super::RunOutcome::Skipped { reset_timer: false };
+    };
+    let Some(recipe) = processor_def.recipes.first() else {
+        return super::RunOutcome::Skipped { reset_timer: false };
+    };
+
+    let rate_kg = match recipe.inputs.first().map(|i| &i.amount) {
+        Some(InputAmount::Kg(kg)) => *kg,
+        _ => return super::RunOutcome::Skipped { reset_timer: false },
+    };
+
+    let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
+
+    // Warm the volume cache
+    {
+        let station_mut = state.stations.get_mut(&ctx.station_id).unwrap();
+        let _ = station_mut.used_volume_m3(content);
+    }
+
+    let station = state.stations.get(&ctx.station_id).unwrap();
+    let (peeked_kg, lots) = peek_ore_fifo_with_lots(&station.inventory, rate_kg, |item| {
+        matches_input_filter(item, input_filter.as_ref())
+    });
+
+    if peeked_kg < MIN_MEANINGFUL_KG {
+        return super::RunOutcome::Skipped { reset_timer: false };
+    }
+
+    let lot_refs: Vec<(&HashMap<String, f32>, f32)> =
+        lots.iter().map(|(comp, kg)| (comp, *kg)).collect();
+    let avg_composition = weighted_composition(&lot_refs);
+    let output_volume = estimate_output_volume_m3(recipe, &avg_composition, peeked_kg, content);
+
+    let current_used = station
+        .cached_inventory_volume_m3
+        .unwrap_or_else(|| crate::inventory_volume_m3(&station.inventory, content));
+    let capacity = station.cargo_capacity_m3;
+    let shortfall = (current_used + output_volume) - capacity;
+
+    if shortfall > 0.0 {
+        return super::RunOutcome::Stalled(super::StallReason::VolumeCap {
+            shortfall_m3: shortfall,
+        });
+    }
+
+    // Process the ore
+    resolve_processor_run(ctx, state, content, events);
+
+    super::RunOutcome::Completed
+}
+
+fn resolve_processor_run(
+    ctx: &super::ModuleTickContext,
+    state: &mut GameState,
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) {
     let current_tick = state.meta.tick;
 
-    let Some(module_id) = state
-        .stations
-        .get(station_id)
-        .map(|s| s.modules[module_idx].id.clone())
-    else {
-        return;
-    };
-
-    let Some(def) = content.module_defs.get(def_id) else {
-        return;
-    };
-    let ModuleBehaviorDef::Processor(processor_def) = &def.behavior else {
+    let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
         return;
     };
     let Some(recipe) = processor_def.recipes.first() else {
@@ -259,7 +147,7 @@ fn resolve_processor_run(
 
     // FIFO-consume ore and compute weighted average composition.
     let (consumed_kg, lots) = {
-        let Some(station) = state.stations.get_mut(station_id) else {
+        let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return;
         };
         consume_ore_fifo_with_lots(&mut station.inventory, rate_kg, |item| {
@@ -283,12 +171,8 @@ fn resolve_processor_run(
         }
     });
 
-    // Compute wear efficiency — reduces output, not input (wastes ore)
-    let wear_value = state
-        .stations
-        .get(station_id)
-        .map_or(0.0, |s| s.modules[module_idx].wear.wear);
-    let efficiency = crate::wear::wear_efficiency(wear_value, &content.constants);
+    // Use pre-computed wear efficiency from context
+    let efficiency = ctx.efficiency;
 
     let mut material_kg = 0.0_f32;
     let mut material_quality = 0.0_f32;
@@ -317,7 +201,7 @@ fn resolve_processor_run(
                     QualityFormula::Fixed(q) => *q,
                 };
                 if material_kg > MIN_MEANINGFUL_KG {
-                    if let Some(station) = state.stations.get_mut(station_id) {
+                    if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                         merge_material_lot(
                             &mut station.inventory,
                             element.clone(),
@@ -341,7 +225,7 @@ fn resolve_processor_run(
                     slag_composition_from_avg(&avg_composition, extracted_element.as_deref());
 
                 if slag_kg > MIN_MEANINGFUL_KG {
-                    if let Some(station) = state.stations.get_mut(station_id) {
+                    if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                         let existing = station
                             .inventory
                             .iter_mut()
@@ -376,8 +260,8 @@ fn resolve_processor_run(
         &mut state.counters,
         current_tick,
         Event::RefineryRan {
-            station_id: station_id.clone(),
-            module_id: module_id.clone(),
+            station_id: ctx.station_id.clone(),
+            module_id: ctx.module_id.clone(),
             ore_consumed_kg: consumed_kg,
             material_produced_kg: material_kg,
             material_quality,
@@ -385,13 +269,6 @@ fn resolve_processor_run(
             material_element: extracted_element.unwrap_or_default(),
         },
     ));
-
-    // Accumulate wear
-    let wear_per_run = content
-        .module_defs
-        .get(def_id)
-        .map_or(0.0, |d| d.wear_per_run);
-    apply_wear(state, station_id, module_idx, wear_per_run, events);
 }
 
 /// FIFO-consume up to `rate_kg` from matching Ore items.
