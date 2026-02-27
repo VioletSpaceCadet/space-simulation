@@ -820,6 +820,14 @@ export function applyEvents(
       case 'InsufficientFunds':
         // No state change — event appears in the event feed for visibility
         break;
+
+      // Events intentionally not handled (informational / debug-only):
+      // ResearchRoll, AlertRaised, AlertCleared, PowerConsumed
+      default:
+        if (import.meta.env.DEV) {
+          console.warn(`[applyEvents] Unhandled event type: ${eventKey}`, event);
+        }
+        break;
     }
 
     if (e['TaskStarted']) {
