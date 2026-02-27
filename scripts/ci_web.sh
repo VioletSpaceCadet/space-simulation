@@ -9,6 +9,9 @@ echo "=== Web CI ==="
 echo "  npm ci..."
 npm ci --ignore-scripts
 
+echo "  npm audit..."
+npm audit --audit-level=high
+
 echo "  eslint..."
 npm run lint
 

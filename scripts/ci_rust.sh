@@ -10,6 +10,9 @@ cargo fmt --check
 echo "  cargo clippy..."
 cargo clippy -- -D warnings
 
+echo "  cargo deny check..."
+cargo deny check
+
 IGNORE_RE='tests/|test_helpers|fixtures'
 
 echo "  cargo llvm-cov (test + coverage)..."
