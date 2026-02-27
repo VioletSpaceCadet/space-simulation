@@ -1,7 +1,7 @@
 {
   "name": "baseline",
-  "ticks": 20160,
-  "metrics_every": 60,
+  "ticks": 336,
+  "metrics_every": 1,
   "seeds": [1, 2, 3, 4, 5],
   "state": "./content/dev_base_state.json"
 }

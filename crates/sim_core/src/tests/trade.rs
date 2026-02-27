@@ -95,7 +95,7 @@ fn trade_content() -> GameContent {
 fn trade_state(content: &GameContent) -> GameState {
     let mut state = test_fixtures::base_state(content);
     state.balance = 10_000_000.0;
-    state.meta.tick = TRADE_UNLOCK_TICK;
+    state.meta.tick = trade_unlock_tick(content.constants.minutes_per_tick);
     // Pre-fill 5 scan sites to avoid replenish noise
     for index in 0..5 {
         state.scan_sites.push(ScanSite {
@@ -108,11 +108,13 @@ fn trade_state(content: &GameContent) -> GameState {
 }
 
 fn make_command(command: Command) -> CommandEnvelope {
+    // Test fixtures use minutes_per_tick = 1
+    let unlock_tick = trade_unlock_tick(1);
     CommandEnvelope {
         id: CommandId("cmd_test".to_string()),
         issued_by: PrincipalId("principal_autopilot".to_string()),
-        issued_tick: TRADE_UNLOCK_TICK,
-        execute_at_tick: TRADE_UNLOCK_TICK,
+        issued_tick: unlock_tick,
+        execute_at_tick: unlock_tick,
         command,
     }
 }
@@ -572,7 +574,7 @@ fn import_merges_material_with_existing() {
 fn import_rejected_before_trade_unlock_tick() {
     let content = trade_content();
     let mut state = trade_state(&content);
-    state.meta.tick = TRADE_UNLOCK_TICK - 1;
+    state.meta.tick = trade_unlock_tick(content.constants.minutes_per_tick) - 1;
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let station_id = StationId("station_earth_orbit".to_string());
     let balance_before = state.balance;
@@ -608,7 +610,7 @@ fn import_rejected_before_trade_unlock_tick() {
 fn export_rejected_before_trade_unlock_tick() {
     let content = trade_content();
     let mut state = trade_state(&content);
-    state.meta.tick = TRADE_UNLOCK_TICK - 1;
+    state.meta.tick = trade_unlock_tick(content.constants.minutes_per_tick) - 1;
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let station_id = StationId("station_earth_orbit".to_string());
 

@@ -57,7 +57,8 @@ pub async fn meta_handler(State(app_state): State<AppState>) -> Json<serde_json:
         "content_version": sim.game_state.meta.content_version,
         "ticks_per_sec": ticks_per_sec,
         "paused": paused,
-        "trade_unlock_tick": sim_core::TRADE_UNLOCK_TICK,
+        "trade_unlock_tick": sim_core::trade_unlock_tick(sim.content.constants.minutes_per_tick),
+        "minutes_per_tick": sim.content.constants.minutes_per_tick,
     }))
 }
 

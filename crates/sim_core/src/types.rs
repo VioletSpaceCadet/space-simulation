@@ -954,6 +954,26 @@ pub struct Constants {
     pub wear_band_critical_threshold: f32,
     pub wear_band_degraded_efficiency: f32,
     pub wear_band_critical_efficiency: f32,
+    // Time scale
+    /// Game-time minutes per simulation tick. Production = 60 (1 tick = 1 hour).
+    /// Test fixtures use 1 to preserve existing assertions.
+    pub minutes_per_tick: u32,
+}
+
+impl Constants {
+    /// Convert a game-time duration in minutes to ticks, rounding up (ceil division).
+    pub fn game_minutes_to_ticks(&self, minutes: u64) -> u64 {
+        let mpt = u64::from(self.minutes_per_tick);
+        if minutes == 0 {
+            return 0;
+        }
+        minutes.div_ceil(mpt)
+    }
+
+    /// Convert a per-minute rate to a per-tick rate.
+    pub fn rate_per_minute_to_per_tick(&self, rate_per_minute: f32) -> f32 {
+        rate_per_minute * self.minutes_per_tick as f32
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -975,4 +995,50 @@ impl Default for WearState {
 
 fn default_slag_jettison_pct() -> f32 {
     0.75
+}
+
+#[cfg(test)]
+mod time_scale_tests {
+    use crate::test_fixtures::base_content;
+
+    #[test]
+    fn game_minutes_to_ticks_exact_division() {
+        let mut c = base_content();
+        c.constants.minutes_per_tick = 60;
+        assert_eq!(c.constants.game_minutes_to_ticks(120), 2);
+    }
+
+    #[test]
+    fn game_minutes_to_ticks_rounds_up() {
+        let mut c = base_content();
+        c.constants.minutes_per_tick = 60;
+        assert_eq!(c.constants.game_minutes_to_ticks(30), 1);
+    }
+
+    #[test]
+    fn game_minutes_to_ticks_mpt_1() {
+        let c = base_content();
+        assert_eq!(c.constants.game_minutes_to_ticks(120), 120);
+    }
+
+    #[test]
+    fn game_minutes_to_ticks_zero() {
+        let c = base_content();
+        assert_eq!(c.constants.game_minutes_to_ticks(0), 0);
+    }
+
+    #[test]
+    fn rate_per_minute_to_per_tick_60() {
+        let mut c = base_content();
+        c.constants.minutes_per_tick = 60;
+        let result = c.constants.rate_per_minute_to_per_tick(15.0);
+        assert!((result - 900.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn rate_per_minute_to_per_tick_1() {
+        let c = base_content();
+        let result = c.constants.rate_per_minute_to_per_tick(15.0);
+        assert!((result - 15.0).abs() < f32::EPSILON);
+    }
 }

@@ -6,7 +6,7 @@ import App from './App';
 import type { SimSnapshot } from './types';
 
 const snapshot: SimSnapshot = {
-  meta: { tick: 0, seed: 42, content_version: '0.0.1', ticks_per_sec: 10, paused: false },
+  meta: { tick: 0, seed: 42, content_version: '0.0.1', ticks_per_sec: 10, paused: false, minutes_per_tick: 1 },
   balance: 10_000_000,
   scan_sites: [],
   asteroids: {},

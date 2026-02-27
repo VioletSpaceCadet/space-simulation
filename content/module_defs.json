@@ -8,7 +8,7 @@
     "wear_per_run": 0.01,
     "behavior": {
       "Processor": {
-        "processing_interval_ticks": 60,
+        "processing_interval_ticks": 1,
         "recipes": [
           {
             "id": "recipe_basic_iron",
@@ -49,7 +49,7 @@
     "wear_per_run": 0.0,
     "behavior": {
       "Maintenance": {
-        "repair_interval_ticks": 30,
+        "repair_interval_ticks": 1,
         "wear_reduction_per_run": 0.2,
         "repair_kit_cost": 1,
         "repair_threshold": 0.1
@@ -65,7 +65,7 @@
     "wear_per_run": 0.008,
     "behavior": {
       "Assembler": {
-        "assembly_interval_ticks": 360,
+        "assembly_interval_ticks": 6,
         "recipes": [
           {
             "id": "recipe_basic_repair_kit",
@@ -100,8 +100,8 @@
     "behavior": {
       "Lab": {
         "domain": "Materials",
-        "data_consumption_per_run": 10.0,
-        "research_points_per_run": 5.0,
+        "data_consumption_per_run": 600.0,
+        "research_points_per_run": 300.0,
         "accepted_data": ["MiningData", "EngineeringData"],
         "research_interval_ticks": 1
       }
@@ -117,8 +117,8 @@
     "behavior": {
       "Lab": {
         "domain": "Exploration",
-        "data_consumption_per_run": 8.0,
-        "research_points_per_run": 4.0,
+        "data_consumption_per_run": 480.0,
+        "research_points_per_run": 240.0,
         "accepted_data": ["ScanData"],
         "research_interval_ticks": 1
       }
@@ -134,8 +134,8 @@
     "behavior": {
       "Lab": {
         "domain": "Engineering",
-        "data_consumption_per_run": 10.0,
-        "research_points_per_run": 5.0,
+        "data_consumption_per_run": 600.0,
+        "research_points_per_run": 300.0,
         "accepted_data": ["EngineeringData"],
         "research_interval_ticks": 1
       }
@@ -152,7 +152,7 @@
       "SensorArray": {
         "data_kind": "ScanData",
         "action_key": "sensor_scan",
-        "scan_interval_ticks": 120
+        "scan_interval_ticks": 2
       }
     }
   },
@@ -165,7 +165,7 @@
     "wear_per_run": 0.02,
     "behavior": {
       "Assembler": {
-        "assembly_interval_ticks": 20160,
+        "assembly_interval_ticks": 336,
         "recipes": [
           {
             "id": "recipe_basic_mining_shuttle",

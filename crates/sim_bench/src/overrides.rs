@@ -165,6 +165,9 @@ fn apply_constant_override(
         "wear_band_critical_efficiency" => {
             constants.wear_band_critical_efficiency = as_f32(key, value)?;
         }
+        "minutes_per_tick" => {
+            constants.minutes_per_tick = as_u32(key, value)?;
+        }
         _ => bail!(
             "unknown override key '{key}'. Constant keys or module.<type>.<field> keys are supported."
         ),
@@ -425,6 +428,14 @@ mod tests {
                 assert!((battery_def.discharge_rate_kw - 60.0).abs() < f32::EPSILON);
             }
         }
+    }
+
+    #[test]
+    fn test_minutes_per_tick_override() {
+        let mut content = test_content();
+        let overrides = HashMap::from([("minutes_per_tick".to_string(), serde_json::json!(1))]);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert_eq!(content.constants.minutes_per_tick, 1);
     }
 
     #[test]
