@@ -35,7 +35,10 @@ describe('SolarSystemMap', () => {
           cargo_capacity_m3: 10000,
           facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1 },
           modules: [],
-          power: { generated_kw: 0, consumed_kw: 0, deficit_kw: 0, battery_discharge_kw: 0, battery_charge_kw: 0, battery_stored_kwh: 0 },
+          power: {
+            generated_kw: 0, consumed_kw: 0, deficit_kw: 0,
+            battery_discharge_kw: 0, battery_charge_kw: 0, battery_stored_kwh: 0,
+          },
         },
       },
     };

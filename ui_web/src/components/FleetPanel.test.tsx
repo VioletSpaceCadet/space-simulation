@@ -5,7 +5,10 @@ import type { PowerState, ShipState, StationState } from '../types';
 
 import { FleetPanel } from './FleetPanel';
 
-const zeroPower: PowerState = { generated_kw: 0, consumed_kw: 0, deficit_kw: 0, battery_discharge_kw: 0, battery_charge_kw: 0, battery_stored_kwh: 0 };
+const zeroPower: PowerState = {
+  generated_kw: 0, consumed_kw: 0, deficit_kw: 0,
+  battery_discharge_kw: 0, battery_charge_kw: 0, battery_stored_kwh: 0,
+};
 
 const mockShips: Record<string, ShipState> = {
   ship_0001: {

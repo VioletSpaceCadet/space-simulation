@@ -398,26 +398,26 @@ function StationDetail({ station }: { station: StationState }) {
     <div className="space-y-3 text-[11px] w-fit">
       {station.power && <PowerBar power={station.power} />}
       <div className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2">
-      <div>
-        <div className="text-label text-[10px] uppercase tracking-wider mb-1">Inventory</div>
-        {station.inventory.length === 0 ? (
-          <span className="text-faint">empty</span>
-        ) : (
-          <InventoryDisplay inventory={station.inventory} />
-        )}
-      </div>
-      <div>
-        <div className="text-label text-[10px] uppercase tracking-wider mb-1">Modules</div>
-        {station.modules.length === 0 ? (
-          <span className="text-faint">none installed</span>
-        ) : (
-          <div className="space-y-2">
-            {station.modules.map((m) => (
-              <ModuleCard key={m.id} module={m} />
-            ))}
-          </div>
-        )}
-      </div>
+        <div>
+          <div className="text-label text-[10px] uppercase tracking-wider mb-1">Inventory</div>
+          {station.inventory.length === 0 ? (
+            <span className="text-faint">empty</span>
+          ) : (
+            <InventoryDisplay inventory={station.inventory} />
+          )}
+        </div>
+        <div>
+          <div className="text-label text-[10px] uppercase tracking-wider mb-1">Modules</div>
+          {station.modules.length === 0 ? (
+            <span className="text-faint">none installed</span>
+          ) : (
+            <div className="space-y-2">
+              {station.modules.map((m) => (
+                <ModuleCard key={m.id} module={m} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
