@@ -1,7 +1,7 @@
 {
   "name": "ci_smoke",
-  "ticks": 2000,
-  "metrics_every": 100,
+  "ticks": 34,
+  "metrics_every": 2,
   "seeds": [1, 2],
   "state": "./content/dev_base_state.json",
   "content_dir": "./content"

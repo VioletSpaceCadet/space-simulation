@@ -1,13 +1,13 @@
 {
   "name": "balance_v1_tuned",
-  "ticks": 20160,
-  "metrics_every": 60,
+  "ticks": 336,
+  "metrics_every": 1,
   "seeds": [1, 2, 3, 4, 5],
   "state": "./content/dev_base_state.json",
   "overrides": {
-    "module.lab.research_interval_ticks": 10,
+    "module.lab.research_interval_ticks": 1,
     "module.lab.wear_per_run": 0.002,
-    "module.processor.processing_interval_ticks": 180,
-    "module.assembler.assembly_interval_ticks": 240
+    "module.processor.processing_interval_ticks": 3,
+    "module.assembler.assembly_interval_ticks": 4
   }
 }

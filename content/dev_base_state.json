@@ -3,7 +3,7 @@
     "tick": 0,
     "seed": 42,
     "schema_version": 1,
-    "content_version": "0.0.1"
+    "content_version": "0.1.0"
   },
   "scan_sites": [
     { "id": "site_0001", "node": "node_belt_inner",  "template_id": "tmpl_iron_rich" },

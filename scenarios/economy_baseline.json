@@ -1,7 +1,7 @@
 {
   "name": "economy_baseline",
-  "ticks": 525600,
-  "metrics_every": 1440,
+  "ticks": 8760,
+  "metrics_every": 24,
   "seeds": [1, 2, 3],
   "state": "./content/dev_base_state.json"
 }
