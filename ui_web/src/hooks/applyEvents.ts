@@ -818,7 +818,11 @@ export function applyEvents(
       }
 
       case 'InsufficientFunds':
-        // No state change — event appears in the event feed for visibility
+      case 'AlertRaised':
+      case 'AlertCleared':
+      case 'ResearchRoll':
+      case 'PowerConsumed':
+        // Informational — no sim state mutation needed in the UI
         break;
 
       case 'TaskStarted': {
@@ -873,8 +877,7 @@ export function applyEvents(
         break;
       }
 
-      // Events intentionally not handled (informational / debug-only):
-      // ResearchRoll, AlertRaised, AlertCleared, PowerConsumed
+      // Truly unknown event type — log in dev to catch new daemon events that need handlers
       default:
         if (import.meta.env.DEV) {
           console.warn(`[applyEvents] Unhandled event type: ${eventKey}`, event);
