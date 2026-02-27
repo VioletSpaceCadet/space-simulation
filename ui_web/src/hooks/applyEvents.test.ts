@@ -671,6 +671,24 @@ describe('applyEvents', () => {
     });
   });
 
+  describe('PowerStateUpdated', () => {
+    it('updates station power state', () => {
+      const station = makeStation();
+      const newPower = {
+        generated_kw: 50, consumed_kw: 30, deficit_kw: 0,
+        battery_discharge_kw: 0, battery_charge_kw: 20, battery_stored_kwh: 100,
+      };
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { PowerStateUpdated: { station_id: 'station_001', power: newPower } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      expect(result.stations['station_001'].power).toEqual(newPower);
+    });
+  });
+
   describe('InsufficientFunds', () => {
     it('does not change state', () => {
       const station = makeStation();
