@@ -35,6 +35,7 @@ cd ui_web && npm run test:coverage                        # FE coverage (thresho
 ./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest + coverage
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
 ./scripts/ci_e2e.sh                                       # E2E Playwright tests
+./scripts/ci_event_sync.sh                                # Event exhaustiveness check
 ```
 
 ## Architecture
@@ -62,6 +63,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - sim_core takes `&mut impl rand::Rng` — concrete ChaCha8Rng in sim_cli/sim_daemon.
 - **Wear system:** `WearState` (0.0–1.0) on each module. 3-band efficiency: nominal/degraded/critical. Auto-disables at 1.0. Maintenance Bay repairs most-worn, consumes RepairKit.
 - **Economy system:** Balance starts at $1B. Import/export in apply_commands. Ship construction requires tech_ship_construction. Pricing from pricing.json.
+- **Event sync:** When adding a new `Event` variant to `sim_core/src/types.rs`, you MUST also add a handler in `ui_web/src/hooks/applyEvents.ts` (or add to the allow-list in `scripts/ci_event_sync.sh` if intentionally skipped). CI enforces this.
 - **Time scale:** `minutes_per_tick` in constants.json (default 60 = 1 tick per hour). Test fixtures use 1. Helpers: `Constants::game_minutes_to_ticks()`, `Constants::rate_per_minute_to_per_tick()`. `trade_unlock_tick()` derives from this constant.
 
 ## Development Workflow

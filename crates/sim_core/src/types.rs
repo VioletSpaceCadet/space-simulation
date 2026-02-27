@@ -265,7 +265,7 @@ pub struct ShipState {
     pub task: Option<TaskState>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct PowerState {
     pub generated_kw: f32,
     pub consumed_kw: f32,
@@ -472,6 +472,18 @@ pub struct EventEnvelope {
     pub event: Event,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BehaviorType {
+    Processor,
+    Storage,
+    Maintenance,
+    Assembler,
+    Lab,
+    SensorArray,
+    SolarArray,
+    Battery,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
     TaskStarted {
@@ -527,6 +539,7 @@ pub enum Event {
         module_id: ModuleInstanceId,
         module_item_id: ModuleItemId,
         module_def_id: String,
+        behavior_type: BehaviorType,
     },
     ModuleUninstalled {
         station_id: StationId,
@@ -674,6 +687,10 @@ pub enum Event {
     SlagJettisoned {
         station_id: StationId,
         kg: f32,
+    },
+    PowerStateUpdated {
+        station_id: StationId,
+        power: PowerState,
     },
 }
 
