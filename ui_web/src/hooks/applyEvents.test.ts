@@ -397,6 +397,81 @@ describe('applyEvents', () => {
     });
   });
 
+  describe('LabRan', () => {
+    it('resets ticks_since_last_run, sets assigned_tech, and clears starved', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_lab', def_id: 'module_lab', enabled: true,
+          kind_state: { Lab: { ticks_since_last_run: 5, assigned_tech: 'tech_a', starved: true } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          LabRan: {
+            station_id: 'station_001', module_id: 'mod_lab',
+            tech_id: 'tech_b', data_consumed: 4.0, points_produced: 2.0,
+            domain: 'Materials',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const lab = result.stations['station_001'].modules[0];
+      expect(lab.kind_state).toEqual({
+        Lab: { ticks_since_last_run: 0, assigned_tech: 'tech_b', starved: false },
+      });
+    });
+  });
+
+  describe('LabStarved', () => {
+    it('sets starved to true on the lab module', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_lab', def_id: 'module_lab', enabled: true,
+          kind_state: { Lab: { ticks_since_last_run: 3, assigned_tech: 'tech_a', starved: false } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { LabStarved: { station_id: 'station_001', module_id: 'mod_lab' } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const lab = result.stations['station_001'].modules[0];
+      expect(lab.kind_state).toEqual({
+        Lab: { ticks_since_last_run: 3, assigned_tech: 'tech_a', starved: true },
+      });
+    });
+  });
+
+  describe('LabResumed', () => {
+    it('sets starved to false on the lab module', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_lab', def_id: 'module_lab', enabled: true,
+          kind_state: { Lab: { ticks_since_last_run: 3, assigned_tech: 'tech_a', starved: true } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { LabResumed: { station_id: 'station_001', module_id: 'mod_lab' } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const lab = result.stations['station_001'].modules[0];
+      expect(lab.kind_state).toEqual({
+        Lab: { ticks_since_last_run: 3, assigned_tech: 'tech_a', starved: false },
+      });
+    });
+  });
+
   describe('InsufficientFunds', () => {
     it('does not change state', () => {
       const station = makeStation();
