@@ -110,37 +110,11 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 - **Ticket PR into feature branch:** CI pass → pr-reviewer agent → Claude runs `gh pr merge --squash`
 - **PR into main:** CI pass → pr-reviewer agent → Owner approves and squash merges
 
-## Balance Advisor (MCP)
+## Simulation Testing & Balance Analysis
 
-9 MCP tools are available for balance analysis. Use them when investigating simulation balance, tuning parameters, or diagnosing issues:
+Use the **sim-e2e-tester agent** (`.claude/agents/sim-e2e-tester`) for balance analysis, bulk simulation runs, E2E diagnostics, and ad-hoc UI testing via Chrome (`--chrome` flag). It has full docs on MCP tools, diagnostic methodology, and testing workflows.
 
-- **start_simulation** — Start a sim daemon as a background process. Accepts optional `seed` and `max_ticks`. Stops any previous daemon first. Auto-kills on session end.
-- **stop_simulation** — Stop a previously started sim daemon.
-- **set_speed** — Set simulation tick speed. Default is 10 tps; use 1000+ for fast analysis runs.
-- **pause_simulation** / **resume_simulation** — Pause and resume the simulation.
-- **get_metrics_digest** — Fetch trend analysis, production rates, and bottleneck detection from the running sim. Use this first when asked about simulation performance or balance problems.
-- **get_active_alerts** — Fetch currently firing alerts (e.g. inventory full, starvation, wear critical). Use when diagnosing operational issues.
-- **get_game_parameters** — Read content files (constants, module_defs, techs, pricing) without manual file reads. Use when comparing current values to proposed changes.
-- **suggest_parameter_change** — Save a proposed balance change with rationale and expected impact to `content/advisor_proposals/`. Use after analyzing metrics to recommend a tuning adjustment.
-
-**Workflow:** Use `start_simulation` to launch a daemon, then `set_speed` to 1000+ tps for fast analysis. Wait for data to accumulate (tens of thousands of ticks), then use `get_metrics_digest` to analyze trends. If something looks off, check `get_active_alerts` and `get_game_parameters` to understand why, then `suggest_parameter_change` to propose a fix. Use `stop_simulation` when done.
-
-**Tips:** Rates may show 0.0 during ship transit periods (2,880 ticks per hop) — this is normal, check again after the ship delivers ore. Trends need 50+ metric samples (captured every 60 ticks) to differentiate short vs long windows.
-
-## Ad-Hoc UI Testing (Chrome Browser)
-
-For interactive UI testing during development, use Chrome browser tools (via Claude Code's `--chrome` flag or Claude in Chrome MCP) instead of writing new Playwright tests. This is faster and more flexible for one-off inspection.
-
-**Setup:** Start the daemon and Vite dev server, then navigate to `http://localhost:5173`.
-
-```bash
-cargo run -p sim_daemon -- run --seed 42                  # Terminal 1: daemon (:3001)
-cd ui_web && npm run dev                                  # Terminal 2: Vite (:5173)
-```
-
-**What you can do:** Take screenshots, click buttons (pause/resume, speed presets, save), use keyboard shortcuts (Space, 1-5, Ctrl+S), read panel data, interact with forms. Good for verifying UI state during balance analysis or after FE changes.
-
-**E2E tests** (`e2e/`) are intentionally minimal — they cover SSE streaming, pause/resume, speed controls, save, and spacebar toggle. Don't add complex E2E tests for form interactions; they're fragile and better covered by vitest unit tests or ad-hoc Chrome inspection.
+**E2E tests** (`e2e/`) are intentionally minimal — they cover SSE streaming, pause/resume, speed controls, save, and spacebar toggle. Don't add complex E2E tests; they're fragile and better covered by vitest unit tests or the sim-e2e-tester agent with Chrome.
 
 ## Notes
 
