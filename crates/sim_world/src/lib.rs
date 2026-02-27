@@ -35,6 +35,11 @@ struct ElementsFile {
 /// prereq that doesn't exist, or a solar-system edge pointing at an unknown node.
 #[allow(clippy::too_many_lines)]
 pub fn validate_content(content: &GameContent) {
+    assert!(
+        content.constants.minutes_per_tick > 0,
+        "minutes_per_tick must be > 0"
+    );
+
     let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
     assert!(
         element_ids.contains("ore"),

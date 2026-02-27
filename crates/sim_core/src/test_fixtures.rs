@@ -107,6 +107,7 @@ pub fn base_content() -> GameContent {
             wear_band_critical_threshold: 0.8,
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
+            minutes_per_tick: 1,
         },
         density_map: HashMap::new(),
     };
@@ -175,6 +176,7 @@ pub fn minimal_content() -> GameContent {
             wear_band_critical_threshold: 0.8,
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
+            minutes_per_tick: 1,
         },
         density_map: HashMap::new(),
     };
