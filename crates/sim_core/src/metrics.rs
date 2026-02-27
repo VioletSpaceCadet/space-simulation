@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-const METRICS_VERSION: u32 = 4;
+const METRICS_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
@@ -72,6 +72,12 @@ pub struct MetricsSnapshot {
     // Economy
     pub balance: f64,
     pub thruster_count: u32,
+
+    // Power
+    pub power_generated_kw: f32,
+    pub power_consumed_kw: f32,
+    pub power_deficit_kw: f32,
+    pub battery_charge_pct: f32,
 }
 
 #[derive(Default)]
@@ -157,6 +163,12 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
     let mut total_repair_kits = 0_u32;
     let mut total_thruster_count = 0_u32;
 
+    let mut power_generated_kw = 0.0_f32;
+    let mut power_consumed_kw = 0.0_f32;
+    let mut power_deficit_kw = 0.0_f32;
+    let mut battery_stored_kwh = 0.0_f32;
+    let mut battery_capacity_kwh = 0.0_f32;
+
     // --- Stations ---
     for station in state.stations.values() {
         acc.accumulate(&station.inventory);
@@ -221,6 +233,21 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
                     }
                 }
                 _ => {}
+            }
+        }
+
+        // Accumulate power metrics from station power state
+        power_generated_kw += station.power.generated_kw;
+        power_consumed_kw += station.power.consumed_kw;
+        power_deficit_kw += station.power.deficit_kw;
+        battery_stored_kwh += station.power.battery_stored_kwh;
+
+        // Sum total battery capacity from module defs
+        for module in &station.modules {
+            if let Some(def) = content.module_defs.get(&module.def_id) {
+                if let ModuleBehaviorDef::Battery(battery_def) = &def.behavior {
+                    battery_capacity_kwh += battery_def.capacity_kwh;
+                }
             }
         }
 
@@ -340,6 +367,12 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         0.0
     };
 
+    let battery_charge_pct = if battery_capacity_kwh > 0.0 {
+        battery_stored_kwh / battery_capacity_kwh
+    } else {
+        0.0
+    };
+
     MetricsSnapshot {
         tick: state.meta.tick,
         metrics_version: METRICS_VERSION,
@@ -376,6 +409,10 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         repair_kits_remaining: total_repair_kits,
         balance: state.balance,
         thruster_count: total_thruster_count,
+        power_generated_kw,
+        power_consumed_kw,
+        power_deficit_kw,
+        battery_charge_pct,
     }
 }
 
@@ -394,7 +431,8 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
          scan_sites_remaining,asteroids_discovered,asteroids_depleted,\
          techs_unlocked,total_scan_data,max_tech_evidence,\
          avg_module_wear,max_module_wear,repair_kits_remaining,\
-         balance,thruster_count"
+         balance,thruster_count,\
+         power_generated_kw,power_consumed_kw,power_deficit_kw,battery_charge_pct"
     )
 }
 
@@ -405,7 +443,7 @@ pub fn append_metrics_row(
 ) -> std::io::Result<()> {
     writeln!(
         writer,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         snapshot.tick,
         snapshot.metrics_version,
         snapshot.total_ore_kg,
@@ -441,6 +479,10 @@ pub fn append_metrics_row(
         snapshot.repair_kits_remaining,
         snapshot.balance,
         snapshot.thruster_count,
+        snapshot.power_generated_kw,
+        snapshot.power_consumed_kw,
+        snapshot.power_deficit_kw,
+        snapshot.battery_charge_pct,
     )
 }
 
@@ -618,6 +660,10 @@ mod tests {
         assert_eq!(snapshot.repair_kits_remaining, 0);
         assert_eq!(snapshot.balance, 0.0);
         assert_eq!(snapshot.thruster_count, 0);
+        assert_eq!(snapshot.power_generated_kw, 0.0);
+        assert_eq!(snapshot.power_consumed_kw, 0.0);
+        assert_eq!(snapshot.power_deficit_kw, 0.0);
+        assert_eq!(snapshot.battery_charge_pct, 0.0);
     }
 
     #[test]
@@ -1084,5 +1130,59 @@ mod tests {
             "max wear should be 0.7"
         );
         assert_eq!(snapshot.repair_kits_remaining, 3);
+    }
+
+    #[test]
+    fn test_power_metrics() {
+        let mut content = empty_content();
+        content.module_defs.insert(
+            "module_basic_battery".to_string(),
+            crate::ModuleDef {
+                id: "module_basic_battery".to_string(),
+                name: "Basic Battery".to_string(),
+                mass_kg: 2000.0,
+                volume_m3: 4.0,
+                power_consumption_per_run: 0.0,
+                wear_per_run: 0.0,
+                behavior: ModuleBehaviorDef::Battery(crate::BatteryDef {
+                    capacity_kwh: 100.0,
+                    charge_rate_kw: 20.0,
+                    discharge_rate_kw: 30.0,
+                }),
+            },
+        );
+        let mut state = empty_state();
+
+        let mut station = make_station(vec![], vec![]);
+        station.power = crate::PowerState {
+            generated_kw: 100.0,
+            consumed_kw: 80.0,
+            deficit_kw: 0.0,
+            battery_discharge_kw: 0.0,
+            battery_charge_kw: 20.0,
+            battery_stored_kwh: 50.0,
+        };
+        // Add a battery module so we can compute capacity for charge_pct
+        station.modules.push(ModuleState {
+            id: ModuleInstanceId("mod_bat".to_string()),
+            def_id: "module_basic_battery".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::Battery(crate::BatteryState { charge_kwh: 50.0 }),
+            wear: crate::WearState::default(),
+            power_stalled: false,
+        });
+        state.stations.insert(station.id.clone(), station);
+
+        let snapshot = compute_metrics(&state, &content);
+
+        assert!((snapshot.power_generated_kw - 100.0).abs() < 1e-3);
+        assert!((snapshot.power_consumed_kw - 80.0).abs() < 1e-3);
+        assert!((snapshot.power_deficit_kw - 0.0).abs() < 1e-3);
+        // 50 kWh stored / 100 kWh capacity = 0.5
+        assert!(
+            (snapshot.battery_charge_pct - 0.5).abs() < 1e-3,
+            "expected ~0.5, got {}",
+            snapshot.battery_charge_pct
+        );
     }
 }
