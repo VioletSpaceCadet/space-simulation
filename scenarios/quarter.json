@@ -1,7 +1,7 @@
 {
   "name": "quarter",
-  "ticks": 129600,
-  "metrics_every": 120,
+  "ticks": 2160,
+  "metrics_every": 2,
   "seeds": [1, 2, 3],
   "state": "./content/dev_base_state.json"
 }
