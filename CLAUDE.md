@@ -28,8 +28,11 @@ cd mcp_advisor && npm start                               # Run MCP advisor (std
 cd e2e && npx playwright test                             # E2E tests
 cd e2e && npx playwright test --headed                    # E2E tests (visible browser)
 
-./scripts/ci_rust.sh                                      # fmt + clippy + test
-./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest
+cargo llvm-cov --fail-under-lines 83                      # Rust coverage (83% line threshold)
+cd ui_web && npm run test:coverage                        # FE coverage (thresholds in vite.config.ts)
+
+./scripts/ci_rust.sh                                      # fmt + clippy + test + coverage
+./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest + coverage
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
 ./scripts/ci_e2e.sh                                       # E2E Playwright tests
 ```

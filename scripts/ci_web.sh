@@ -15,7 +15,7 @@ npm run lint
 echo "  tsc..."
 npx tsc -b --noEmit
 
-echo "  vitest..."
-npm test
+echo "  vitest (with coverage)..."
+npm run test:coverage
 
 echo "=== Web CI passed ==="

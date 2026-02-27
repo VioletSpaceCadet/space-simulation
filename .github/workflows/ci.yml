@@ -21,9 +21,11 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: rustfmt, clippy, llvm-tools-preview
 
       - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Format check
         run: cargo fmt --check
@@ -31,8 +33,18 @@ jobs:
       - name: Clippy
         run: cargo clippy -- -D warnings
 
-      - name: Test
-        run: cargo test
+      - name: Test with coverage
+        run: cargo llvm-cov --ignore-filename-regex 'tests/|test_helpers|fixtures' --fail-under-lines 83
+
+      - name: Generate LCOV report
+        run: cargo llvm-cov report --ignore-filename-regex 'tests/|test_helpers|fixtures' --lcov --output-path lcov.info
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-coverage-${{ github.sha }}
+          path: lcov.info
+          retention-days: 30
 
   web:
     name: Web (lint + typecheck + test)
@@ -58,8 +70,15 @@ jobs:
       - name: Typecheck
         run: npx tsc -b --noEmit
 
-      - name: Test
-        run: npm test
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-coverage-${{ github.sha }}
+          path: ui_web/coverage/
+          retention-days: 30
 
   bench-smoke:
     name: Bench smoke
