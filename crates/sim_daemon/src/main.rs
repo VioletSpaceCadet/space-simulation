@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
             tracing_subscriber::fmt()
                 .with_env_filter(
                     tracing_subscriber::EnvFilter::from_default_env()
-                        .add_directive("sim_daemon=info".parse().unwrap()),
+                        .add_directive("sim_daemon=info".parse().expect("valid tracing directive")),
                 )
                 .init();
 

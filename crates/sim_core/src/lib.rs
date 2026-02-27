@@ -1,6 +1,7 @@
 //! `sim_core` — deterministic simulation tick.
 //!
 //! No IO, no network. All randomness via the passed-in Rng.
+#![cfg_attr(not(test), deny(clippy::unwrap_used))]
 
 mod composition;
 mod engine;

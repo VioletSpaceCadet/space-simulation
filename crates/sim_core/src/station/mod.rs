@@ -130,7 +130,9 @@ fn apply_battery_buffering(
             remaining -= discharge;
             discharge_kw += discharge;
 
-            let station = state.stations.get_mut(station_id).unwrap();
+            let Some(station) = state.stations.get_mut(station_id) else {
+                continue;
+            };
             if let crate::ModuleKindState::Battery(ref mut bs) = station.modules[*idx].kind_state {
                 bs.charge_kwh -= discharge;
             }
@@ -147,7 +149,9 @@ fn apply_battery_buffering(
             remaining -= charge;
             charge_kw += charge;
 
-            let station = state.stations.get_mut(station_id).unwrap();
+            let Some(station) = state.stations.get_mut(station_id) else {
+                continue;
+            };
             if let crate::ModuleKindState::Battery(ref mut bs) = station.modules[*idx].kind_state {
                 bs.charge_kwh += charge;
             }
@@ -156,7 +160,9 @@ fn apply_battery_buffering(
 
     // Sum total stored energy across all batteries after updates.
     let mut stored_kwh = 0.0_f32;
-    let station = state.stations.get(station_id).unwrap();
+    let Some(station) = state.stations.get(station_id) else {
+        return (discharge_kw, charge_kw, stored_kwh);
+    };
     for module in &station.modules {
         if let crate::ModuleKindState::Battery(ref bs) = module.kind_state {
             stored_kwh += bs.charge_kwh;
@@ -249,7 +255,9 @@ fn compute_power_budget(
     let deficit_kw = (raw_deficit - battery_discharge_kw).max(0.0);
 
     // Reset all power_stalled flags first.
-    let station = state.stations.get_mut(station_id).unwrap();
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return;
+    };
     for module in &mut station.modules {
         module.power_stalled = false;
     }
