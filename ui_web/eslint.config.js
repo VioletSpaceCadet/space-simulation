@@ -50,7 +50,7 @@ export default defineConfig([
       'no-multiple-empty-lines': ['error', { max: 1, maxEOF: 0 }],
 
       // --- Complexity ---
-      complexity: ['warn', 100],
+      complexity: ['warn', 28],
 
       // --- Best practices ---
       'prefer-const': 'error',
