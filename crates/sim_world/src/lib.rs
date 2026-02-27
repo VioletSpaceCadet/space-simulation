@@ -255,10 +255,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         density_map: std::collections::HashMap::new(),
     };
     content.constants.derive_tick_values();
-    sim_core::derive_module_tick_values(
-        &mut content.module_defs,
-        content.constants.minutes_per_tick,
-    );
+    sim_core::derive_module_tick_values(&mut content.module_defs, &content.constants);
     content.init_caches();
     validate_content(&content);
     Ok(content)

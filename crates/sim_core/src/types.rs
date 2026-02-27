@@ -989,7 +989,11 @@ pub struct Constants {
 
 impl Constants {
     /// Convert a game-time duration in minutes to ticks, rounding up (ceil division).
+    ///
+    /// # Panics
+    /// Debug-asserts that `minutes_per_tick > 0`.
     pub fn game_minutes_to_ticks(&self, minutes: u64) -> u64 {
+        debug_assert!(self.minutes_per_tick > 0, "minutes_per_tick must be > 0");
         let mpt = u64::from(self.minutes_per_tick);
         if minutes == 0 {
             return 0;
@@ -1022,42 +1026,35 @@ impl Constants {
 // Module tick derivation
 // ---------------------------------------------------------------------------
 
-/// Convert a game-time duration in minutes to ticks, rounding up (ceil division).
-fn game_minutes_to_ticks_u64(minutes: u64, minutes_per_tick: u32) -> u64 {
-    if minutes == 0 {
-        return 0;
-    }
-    minutes.div_ceil(u64::from(minutes_per_tick))
-}
-
 /// Compute derived tick-based interval fields on all module behavior defs.
 /// Must be called once after deserialization / after overrides.
+///
+/// Reuses `Constants::game_minutes_to_ticks` for the conversion.
 #[allow(clippy::implicit_hasher)]
 pub fn derive_module_tick_values(
     module_defs: &mut HashMap<String, ModuleDef>,
-    minutes_per_tick: u32,
+    constants: &Constants,
 ) {
     for def in module_defs.values_mut() {
         match &mut def.behavior {
             ModuleBehaviorDef::Processor(p) => {
                 p.processing_interval_ticks =
-                    game_minutes_to_ticks_u64(p.processing_interval_minutes, minutes_per_tick);
+                    constants.game_minutes_to_ticks(p.processing_interval_minutes);
             }
             ModuleBehaviorDef::Assembler(a) => {
                 a.assembly_interval_ticks =
-                    game_minutes_to_ticks_u64(a.assembly_interval_minutes, minutes_per_tick);
+                    constants.game_minutes_to_ticks(a.assembly_interval_minutes);
             }
             ModuleBehaviorDef::Maintenance(m) => {
                 m.repair_interval_ticks =
-                    game_minutes_to_ticks_u64(m.repair_interval_minutes, minutes_per_tick);
+                    constants.game_minutes_to_ticks(m.repair_interval_minutes);
             }
             ModuleBehaviorDef::Lab(l) => {
                 l.research_interval_ticks =
-                    game_minutes_to_ticks_u64(l.research_interval_minutes, minutes_per_tick);
+                    constants.game_minutes_to_ticks(l.research_interval_minutes);
             }
             ModuleBehaviorDef::SensorArray(s) => {
-                s.scan_interval_ticks =
-                    game_minutes_to_ticks_u64(s.scan_interval_minutes, minutes_per_tick);
+                s.scan_interval_ticks = constants.game_minutes_to_ticks(s.scan_interval_minutes);
             }
             _ => {}
         }
