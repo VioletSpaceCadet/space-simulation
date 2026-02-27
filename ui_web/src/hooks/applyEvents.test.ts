@@ -37,7 +37,6 @@ function makeStation(overrides: Partial<StationState> = {}): StationState {
     power_available_per_tick: 10,
     inventory: [],
     cargo_capacity_m3: 100,
-    facilities: { compute_units_total: 1, power_per_compute_unit_per_tick: 1, efficiency: 1 },
     modules: [],
     power: {
       generated_kw: 0, consumed_kw: 0, deficit_kw: 0,

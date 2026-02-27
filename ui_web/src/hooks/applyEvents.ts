@@ -6,7 +6,7 @@ function buildTaskStub(taskKind: string, target: string | null, tick: number): T
     DeepScan: target ? { DeepScan: { asteroid: target } } : { Idle: {} },
     Mine: target ? { Mine: { asteroid: target, duration_ticks: 0 } } : { Idle: {} },
     Deposit: target ? { Deposit: { station: target } } : { Idle: {} },
-    Transit: target ? { Transit: { destination: target, total_ticks: 0 } } : { Idle: {} },
+    Transit: target ? { Transit: { destination: target, total_ticks: 0, then: { Idle: {} } } } : { Idle: {} },
   };
   return {
     kind: (kindMap[taskKind] ?? { Idle: {} }) as TaskState['kind'],
@@ -140,7 +140,7 @@ export function applyEvents(
           const kindState: ModuleKindState = module_def_id.includes('maintenance')
             ? { Maintenance: { ticks_since_last_run: 0 } }
             : module_def_id.includes('assembler')
-              ? { Assembler: { ticks_since_last_run: 0, stalled: false } }
+              ? { Assembler: { ticks_since_last_run: 0, stalled: false, capped: false, cap_override: {} } }
               : module_def_id.includes('lab')
                 ? { Lab: { ticks_since_last_run: 0, assigned_tech: null, starved: false } }
                 : { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } };
