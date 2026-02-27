@@ -172,6 +172,9 @@ pub struct ModuleState {
     pub enabled: bool,
     pub kind_state: ModuleKindState,
     pub wear: WearState,
+    /// Set each tick by power budget computation. Stalled modules skip their tick.
+    #[serde(skip, default)]
+    pub power_stalled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

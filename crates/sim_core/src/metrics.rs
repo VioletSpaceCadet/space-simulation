@@ -791,6 +791,7 @@ mod tests {
                     stalled: false,
                 }),
                 wear: crate::WearState::default(),
+                power_stalled: false,
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -952,6 +953,7 @@ mod tests {
                     stalled: true,
                 }),
                 wear: crate::WearState::default(),
+                power_stalled: false,
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -1054,6 +1056,7 @@ mod tests {
                         stalled: false,
                     }),
                     wear: crate::WearState { wear: 0.3 },
+                    power_stalled: false,
                 },
                 ModuleState {
                     id: ModuleInstanceId("mod_0002".to_string()),
@@ -1065,6 +1068,7 @@ mod tests {
                         stalled: false,
                     }),
                     wear: crate::WearState { wear: 0.7 },
+                    power_stalled: false,
                 },
             ],
         );

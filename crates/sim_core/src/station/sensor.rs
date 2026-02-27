@@ -24,7 +24,7 @@ pub(super) fn tick_sensor_array_modules(
                 return;
             };
             let module = &station.modules[module_idx];
-            if !module.enabled {
+            if !module.enabled || module.power_stalled {
                 continue;
             }
             let Some(def) = content.module_defs.get(&module.def_id) else {
@@ -151,6 +151,7 @@ mod tests {
                             ticks_since_last_run: 0,
                         }),
                         wear: WearState::default(),
+                        power_stalled: false,
                     }],
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,

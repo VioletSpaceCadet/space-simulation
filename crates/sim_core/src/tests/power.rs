@@ -44,6 +44,7 @@ fn state_with_solar_array(content: &GameContent) -> GameState {
         enabled: true,
         kind_state: ModuleKindState::SolarArray(SolarArrayState::default()),
         wear: WearState::default(),
+        power_stalled: false,
     });
     state
 }
@@ -96,6 +97,7 @@ fn power_budget_with_consumer() {
             stalled: false,
         }),
         wear: WearState::default(),
+        power_stalled: false,
     });
 
     let mut rng = make_rng();
@@ -152,6 +154,7 @@ fn power_budget_deficit_when_insufficient() {
             stalled: false,
         }),
         wear: WearState::default(),
+        power_stalled: false,
     });
 
     let mut rng = make_rng();
@@ -241,5 +244,187 @@ fn power_budget_disabled_modules_excluded() {
         station.power.generated_kw.abs() < f32::EPSILON,
         "disabled solar array should generate 0 kW, got {}",
         station.power.generated_kw
+    );
+}
+
+// --- Power stalling tests ---
+
+fn stall_content() -> GameContent {
+    let mut content = solar_array_content();
+    // Small solar array: only 15 kW (enough for one 10 kW module, not two)
+    content
+        .module_defs
+        .get_mut("module_basic_solar_array")
+        .unwrap()
+        .behavior = ModuleBehaviorDef::SolarArray(SolarArrayDef {
+        base_output_kw: 15.0,
+    });
+    // Add a sensor array (lowest priority, 8 kW)
+    content.module_defs.insert(
+        "module_sensor_array".to_string(),
+        ModuleDef {
+            id: "module_sensor_array".to_string(),
+            name: "Sensor Array".to_string(),
+            mass_kg: 2500.0,
+            volume_m3: 6.0,
+            power_consumption_per_run: 8.0,
+            wear_per_run: 0.003,
+            behavior: ModuleBehaviorDef::SensorArray(SensorArrayDef {
+                data_kind: crate::DataKind::ScanData,
+                action_key: "sensor_scan".to_string(),
+                scan_interval_ticks: 120,
+            }),
+        },
+    );
+    content
+}
+
+#[test]
+fn power_stall_lowest_priority_first() {
+    let content = stall_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Override solar array to 15 kW
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules[0] = ModuleState {
+        id: ModuleInstanceId("solar_inst_0001".to_string()),
+        def_id: "module_basic_solar_array".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::SolarArray(SolarArrayState::default()),
+        wear: WearState::default(),
+        power_stalled: false,
+    };
+
+    // Add refinery (priority 3, 10 kW) and sensor (priority 0, 8 kW)
+    // Total consumption: 18 kW, generation: 15 kW, deficit: 3 kW
+    // Sensor (lowest priority) should be stalled first
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("refinery_inst_0001".to_string()),
+        def_id: "module_basic_iron_refinery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+        }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("sensor_inst_0001".to_string()),
+        def_id: "module_sensor_array".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::SensorArray(SensorArrayState::default()),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // Solar array (idx 0) should not be stalled
+    assert!(
+        !station.modules[0].power_stalled,
+        "solar array should not be stalled"
+    );
+    // Refinery (idx 1, priority 3) should NOT be stalled
+    assert!(
+        !station.modules[1].power_stalled,
+        "refinery (higher priority) should not be stalled"
+    );
+    // Sensor (idx 2, priority 0) should be stalled
+    assert!(
+        station.modules[2].power_stalled,
+        "sensor (lowest priority) should be stalled"
+    );
+}
+
+#[test]
+fn power_stall_no_stalling_without_solar_arrays() {
+    // Station with no solar arrays should not stall modules
+    let content = solar_array_content();
+    let mut state = test_state(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    let station = state.stations.get_mut(&station_id).unwrap();
+
+    // Add just a refinery, no solar array
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("refinery_inst_0001".to_string()),
+        def_id: "module_basic_iron_refinery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+        }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    assert!(
+        !station.modules[0].power_stalled,
+        "modules should not be stalled when no solar arrays exist"
+    );
+}
+
+#[test]
+fn power_stall_clears_when_power_restored() {
+    let content = stall_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    let station = state.stations.get_mut(&station_id).unwrap();
+    // Add refinery (10 kW) and sensor (8 kW) — total 18 kW vs 15 kW solar = deficit
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("refinery_inst_0001".to_string()),
+        def_id: "module_basic_iron_refinery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+        }),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("sensor_inst_0001".to_string()),
+        def_id: "module_sensor_array".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::SensorArray(SensorArrayState::default()),
+        wear: WearState::default(),
+        power_stalled: false,
+    });
+
+    // Phase 1: tick with deficit — sensor should be stalled
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    assert!(
+        station.modules[2].power_stalled,
+        "sensor should be stalled during deficit (18 kW > 15 kW)"
+    );
+
+    // Phase 2: disable the sensor to restore surplus, then tick again
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules[2].enabled = false;
+
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let station = state.stations.get(&station_id).unwrap();
+    assert!(
+        !station.modules[1].power_stalled,
+        "refinery should not be stalled after power restored (15 kW > 10 kW)"
+    );
+    assert!(
+        station.power.deficit_kw.abs() < f32::EPSILON,
+        "no deficit expected after disabling sensor"
     );
 }

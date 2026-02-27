@@ -150,6 +150,7 @@ fn apply_commands(
                     enabled: false,
                     kind_state,
                     wear: crate::WearState::default(),
+                    power_stalled: false,
                 });
 
                 events.push(crate::emit(
