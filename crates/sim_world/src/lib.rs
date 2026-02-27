@@ -254,6 +254,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         constants,
         density_map: std::collections::HashMap::new(),
     };
+    content.constants.derive_tick_values();
     content.init_caches();
     validate_content(&content);
     Ok(content)

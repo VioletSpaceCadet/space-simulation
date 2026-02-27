@@ -83,9 +83,9 @@ pub fn base_content() -> GameContent {
             items: HashMap::new(),
         },
         constants: Constants {
-            survey_scan_ticks: 1,
-            deep_scan_ticks: 1,
-            travel_ticks_per_hop: 1,
+            survey_scan_minutes: 1,
+            deep_scan_minutes: 1,
+            travel_minutes_per_hop: 1,
             // Always detect tags so tests are predictable.
             survey_tag_detection_probability: 1.0,
             asteroid_count_per_template: 1,
@@ -93,12 +93,12 @@ pub fn base_content() -> GameContent {
             asteroid_mass_max_kg: 500.0,
             ship_cargo_capacity_m3: 20.0,
             station_cargo_capacity_m3: 10_000.0,
-            station_power_available_per_tick: 100.0,
-            mining_rate_kg_per_tick: 50.0,
-            deposit_ticks: 1, // fast for tests
+            station_power_available_per_minute: 100.0,
+            mining_rate_kg_per_minute: 50.0,
+            deposit_minutes: 1, // fast for tests
             autopilot_iron_rich_confidence_threshold: 0.7,
             autopilot_refinery_threshold_kg: 500.0,
-            research_roll_interval_ticks: 60,
+            research_roll_interval_minutes: 60,
             data_generation_peak: 100.0,
             data_generation_floor: 5.0,
             data_generation_decay_rate: 0.7,
@@ -108,9 +108,18 @@ pub fn base_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
             minutes_per_tick: 1,
+            // Derived fields — filled by derive_tick_values()
+            survey_scan_ticks: 0,
+            deep_scan_ticks: 0,
+            travel_ticks_per_hop: 0,
+            mining_rate_kg_per_tick: 0.0,
+            deposit_ticks: 0,
+            station_power_available_per_tick: 0.0,
+            research_roll_interval_ticks: 0,
         },
         density_map: HashMap::new(),
     };
+    content.constants.derive_tick_values();
     content.init_caches();
     content
 }
@@ -153,21 +162,21 @@ pub fn minimal_content() -> GameContent {
             items: HashMap::new(),
         },
         constants: Constants {
-            survey_scan_ticks: 1,
-            deep_scan_ticks: 1,
-            travel_ticks_per_hop: 1,
+            survey_scan_minutes: 1,
+            deep_scan_minutes: 1,
+            travel_minutes_per_hop: 1,
             survey_tag_detection_probability: 1.0,
             asteroid_count_per_template: 0,
-            station_power_available_per_tick: 0.0,
+            station_power_available_per_minute: 0.0,
             asteroid_mass_min_kg: 100.0,
             asteroid_mass_max_kg: 100.0,
             ship_cargo_capacity_m3: 20.0,
             station_cargo_capacity_m3: 1000.0,
-            mining_rate_kg_per_tick: 50.0,
-            deposit_ticks: 1,
+            mining_rate_kg_per_minute: 50.0,
+            deposit_minutes: 1,
             autopilot_iron_rich_confidence_threshold: 0.7,
             autopilot_refinery_threshold_kg: 500.0,
-            research_roll_interval_ticks: 60,
+            research_roll_interval_minutes: 60,
             data_generation_peak: 100.0,
             data_generation_floor: 5.0,
             data_generation_decay_rate: 0.7,
@@ -177,9 +186,18 @@ pub fn minimal_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
             minutes_per_tick: 1,
+            // Derived fields — filled by derive_tick_values()
+            survey_scan_ticks: 0,
+            deep_scan_ticks: 0,
+            travel_ticks_per_hop: 0,
+            mining_rate_kg_per_tick: 0.0,
+            deposit_ticks: 0,
+            station_power_available_per_tick: 0.0,
+            research_roll_interval_ticks: 0,
         },
         density_map: HashMap::new(),
     };
+    content.constants.derive_tick_values();
     content.init_caches();
     content
 }

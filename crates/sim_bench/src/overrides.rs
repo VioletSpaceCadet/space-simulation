@@ -116,9 +116,9 @@ fn apply_constant_override(
     value: &serde_json::Value,
 ) -> Result<()> {
     match key {
-        "survey_scan_ticks" => constants.survey_scan_ticks = as_u64(key, value)?,
-        "deep_scan_ticks" => constants.deep_scan_ticks = as_u64(key, value)?,
-        "travel_ticks_per_hop" => constants.travel_ticks_per_hop = as_u64(key, value)?,
+        "survey_scan_minutes" => constants.survey_scan_minutes = as_u64(key, value)?,
+        "deep_scan_minutes" => constants.deep_scan_minutes = as_u64(key, value)?,
+        "travel_minutes_per_hop" => constants.travel_minutes_per_hop = as_u64(key, value)?,
         "survey_tag_detection_probability" => {
             constants.survey_tag_detection_probability = as_f32(key, value)?;
         }
@@ -131,10 +131,10 @@ fn apply_constant_override(
         "station_cargo_capacity_m3" => {
             constants.station_cargo_capacity_m3 = as_f32(key, value)?;
         }
-        "mining_rate_kg_per_tick" => constants.mining_rate_kg_per_tick = as_f32(key, value)?,
-        "deposit_ticks" => constants.deposit_ticks = as_u64(key, value)?,
-        "station_power_available_per_tick" => {
-            constants.station_power_available_per_tick = as_f32(key, value)?;
+        "mining_rate_kg_per_minute" => constants.mining_rate_kg_per_minute = as_f32(key, value)?,
+        "deposit_minutes" => constants.deposit_minutes = as_u64(key, value)?,
+        "station_power_available_per_minute" => {
+            constants.station_power_available_per_minute = as_f32(key, value)?;
         }
         "autopilot_iron_rich_confidence_threshold" => {
             constants.autopilot_iron_rich_confidence_threshold = as_f32(key, value)?;
@@ -145,8 +145,8 @@ fn apply_constant_override(
         "autopilot_slag_jettison_pct" => {
             constants.autopilot_slag_jettison_pct = as_f32(key, value)?;
         }
-        "research_roll_interval_ticks" => {
-            constants.research_roll_interval_ticks = as_u64(key, value)?;
+        "research_roll_interval_minutes" => {
+            constants.research_roll_interval_minutes = as_u64(key, value)?;
         }
         "data_generation_peak" => constants.data_generation_peak = as_f32(key, value)?,
         "data_generation_floor" => constants.data_generation_floor = as_f32(key, value)?,
@@ -217,20 +217,21 @@ mod tests {
     #[test]
     fn test_apply_u64_override() {
         let mut content = test_content();
-        let overrides = HashMap::from([("survey_scan_ticks".to_string(), serde_json::json!(99))]);
+        let overrides =
+            HashMap::from([("survey_scan_minutes".to_string(), serde_json::json!(99))]);
         apply_overrides(&mut content, &overrides).unwrap();
-        assert_eq!(content.constants.survey_scan_ticks, 99);
+        assert_eq!(content.constants.survey_scan_minutes, 99);
     }
 
     #[test]
     fn test_apply_research_override() {
         let mut content = test_content();
         let overrides = HashMap::from([(
-            "research_roll_interval_ticks".to_string(),
+            "research_roll_interval_minutes".to_string(),
             serde_json::json!(120),
         )]);
         apply_overrides(&mut content, &overrides).unwrap();
-        assert_eq!(content.constants.research_roll_interval_ticks, 120);
+        assert_eq!(content.constants.research_roll_interval_minutes, 120);
     }
 
     #[test]
@@ -248,7 +249,7 @@ mod tests {
     fn test_type_mismatch_errors() {
         let mut content = test_content();
         let overrides = HashMap::from([(
-            "survey_scan_ticks".to_string(),
+            "survey_scan_minutes".to_string(),
             serde_json::json!("not_a_number"),
         )]);
         let result = apply_overrides(&mut content, &overrides);

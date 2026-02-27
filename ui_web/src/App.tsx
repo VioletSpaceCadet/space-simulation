@@ -29,7 +29,7 @@ export default function App() {
   const { layout, visiblePanels, move, togglePanel } = useLayoutState();
 
   const [ticksPerSec, setTicksPerSec] = useState(10); // default fallback
-  const [minutesPerTick, setMinutesPerTick] = useState(1);
+  const [minutesPerTick, setMinutesPerTick] = useState(60);
   const [paused, setPaused] = useState(false);
   const { displayTick, measuredTickRate } = useAnimatedTick(currentTick, ticksPerSec, paused);
 
