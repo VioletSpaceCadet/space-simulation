@@ -562,6 +562,27 @@ describe('applyEvents', () => {
       const mod = result.stations['station_001'].modules[0];
       expect(mod.kind_state).toEqual({ Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } });
     });
+
+    it('sets stalled to false on Assembler module', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_asm', def_id: 'module_assembler', enabled: true,
+          kind_state: { Assembler: { ticks_since_last_run: 0, stalled: true, capped: false, cap_override: {} } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { ModuleResumed: { station_id: 'station_001', module_id: 'mod_asm' } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.kind_state).toEqual({
+        Assembler: { ticks_since_last_run: 0, stalled: false, capped: false, cap_override: {} },
+      });
+    });
   });
 
   describe('InsufficientFunds', () => {
