@@ -204,5 +204,20 @@
         "base_output_kw": 50.0
       }
     }
+  },
+  {
+    "id": "module_basic_battery",
+    "name": "Basic Battery",
+    "mass_kg": 2000.0,
+    "volume_m3": 4.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.001,
+    "behavior": {
+      "Battery": {
+        "capacity_kwh": 100.0,
+        "charge_rate_kw": 20.0,
+        "discharge_rate_kw": 30.0
+      }
+    }
   }
 ]

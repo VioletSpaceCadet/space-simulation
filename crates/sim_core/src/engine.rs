@@ -139,6 +139,9 @@ fn apply_commands(
                         crate::ModuleBehaviorDef::SolarArray(_) => {
                             crate::ModuleKindState::SolarArray(crate::SolarArrayState::default())
                         }
+                        crate::ModuleBehaviorDef::Battery(_) => {
+                            crate::ModuleKindState::Battery(crate::BatteryState { charge_kwh: 0.0 })
+                        }
                     },
                     None => continue,
                 };

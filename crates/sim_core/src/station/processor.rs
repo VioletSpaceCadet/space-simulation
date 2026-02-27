@@ -38,7 +38,8 @@ pub(super) fn tick_station_modules(
                 | ModuleBehaviorDef::Assembler(_)
                 | ModuleBehaviorDef::Lab(_)
                 | ModuleBehaviorDef::SensorArray(_)
-                | ModuleBehaviorDef::SolarArray(_) => continue,
+                | ModuleBehaviorDef::SolarArray(_)
+                | ModuleBehaviorDef::Battery(_) => continue,
             };
             (
                 module.def_id.clone(),
@@ -82,7 +83,8 @@ pub(super) fn tick_station_modules(
                 | ModuleKindState::Assembler(_)
                 | ModuleKindState::Lab(_)
                 | ModuleKindState::SensorArray(_)
-                | ModuleKindState::SolarArray(_) => continue,
+                | ModuleKindState::SolarArray(_)
+                | ModuleKindState::Battery(_) => continue,
             }
         };
 
@@ -157,7 +159,8 @@ pub(super) fn tick_station_modules(
                 | ModuleKindState::Assembler(_)
                 | ModuleKindState::Lab(_)
                 | ModuleKindState::SensorArray(_)
-                | ModuleKindState::SolarArray(_) => false,
+                | ModuleKindState::SolarArray(_)
+                | ModuleKindState::Battery(_) => false,
             };
             let module_id = station.modules[module_idx].id.clone();
 

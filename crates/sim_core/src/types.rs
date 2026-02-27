@@ -186,6 +186,7 @@ pub enum ModuleKindState {
     Lab(LabState),
     SensorArray(SensorArrayState),
     SolarArray(SolarArrayState),
+    Battery(BatteryState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -196,6 +197,12 @@ pub struct SensorArrayState {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SolarArrayState {
     pub ticks_since_last_run: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatteryState {
+    /// Current stored energy in kWh.
+    pub charge_kwh: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -263,6 +270,12 @@ pub struct PowerState {
     pub generated_kw: f32,
     pub consumed_kw: f32,
     pub deficit_kw: f32,
+    /// Power discharged from batteries this tick (kW).
+    pub battery_discharge_kw: f32,
+    /// Power stored into batteries this tick (kW).
+    pub battery_charge_kw: f32,
+    /// Total energy stored across all batteries (kWh).
+    pub battery_stored_kwh: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -778,6 +791,7 @@ pub enum ModuleBehaviorDef {
     Lab(LabDef),
     SensorArray(SensorArrayDef),
     SolarArray(SolarArrayDef),
+    Battery(BatteryDef),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -817,6 +831,16 @@ pub struct SensorArrayDef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SolarArrayDef {
     pub base_output_kw: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatteryDef {
+    /// Maximum energy storage capacity in kWh.
+    pub capacity_kwh: f32,
+    /// Maximum charge rate in kW (how fast surplus can be stored).
+    pub charge_rate_kw: f32,
+    /// Maximum discharge rate in kW (how fast energy can be released).
+    pub discharge_rate_kw: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
