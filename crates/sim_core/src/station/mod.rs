@@ -127,6 +127,7 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
             crate::ModuleBehaviorDef::SolarArray(solar_def) => {
                 let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
                 generated_kw += solar_def.base_output_kw * solar_intensity * efficiency;
+                consumed_kw += def.power_consumption_per_run;
             }
             _ => {
                 consumed_kw += def.power_consumption_per_run;
