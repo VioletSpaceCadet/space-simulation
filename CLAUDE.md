@@ -118,6 +118,19 @@ Use the **fe-chrome-tester agent** (`.claude/agents/fe-chrome-tester`) for brows
 
 **E2E tests** (`e2e/`) are intentionally minimal — they cover SSE streaming, pause/resume, speed controls, save, and spacebar toggle. Don't add complex E2E tests; they're fragile and better covered by vitest unit tests or the sim-e2e-tester agent with Chrome.
 
+## Skills
+
+Before starting implementation work, scan `.claude/skills/` for relevant domain skills. Match the task description against skill `triggers` in frontmatter. For each matched skill:
+1. Read the skill file
+2. Follow its checklist and testing guidance
+3. Use any agents listed in its `agents` field
+
+If no skills match, read `.claude/skills/general.md`. After loading, print a brief summary:
+> Skills loaded: **frontend-dev** (task touches ui_web), **cross-layer-e2e** (spans FE + daemon)
+> Required agents: fe-chrome-tester, sim-e2e-tester
+
+See `.claude/skills/README.md` for how to add or edit skills.
+
 ## Notes
 
 - IDE: RustRover (JetBrains)
