@@ -211,7 +211,7 @@
     "mass_kg": 2000.0,
     "volume_m3": 4.0,
     "power_consumption_per_run": 0.0,
-    "wear_per_run": 0.001,
+    "wear_per_run": 0.0,
     "behavior": {
       "Battery": {
         "capacity_kwh": 100.0,
