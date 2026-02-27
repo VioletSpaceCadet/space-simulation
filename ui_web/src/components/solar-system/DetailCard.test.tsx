@@ -13,7 +13,6 @@ describe('DetailCard', () => {
       power_available_per_tick: 100,
       inventory: [{ kind: 'Material', element: 'Fe', kg: 500.0, quality: 0.85 }],
       cargo_capacity_m3: 100.0,
-      facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1.0 },
       modules: [],
       power: {
         generated_kw: 0, consumed_kw: 0, deficit_kw: 0,

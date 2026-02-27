@@ -1,16 +1,12 @@
 export interface MetaInfo {
   tick: number
   seed: number
+  schema_version: number
   content_version: string
   ticks_per_sec: number
   paused: boolean
   minutes_per_tick: number
-}
-
-export interface FacilitiesState {
-  compute_units_total: number
-  power_per_compute_unit_per_tick: number
-  efficiency: number
+  trade_unlock_tick: number
 }
 
 export interface TaskState {
@@ -20,7 +16,7 @@ export interface TaskState {
     | { DeepScan: { asteroid: string } }
     | { Mine: { asteroid: string; duration_ticks: number } }
     | { Deposit: { station: string; blocked: boolean } }
-    | { Transit: { destination: string; total_ticks: number } }
+    | { Transit: { destination: string; total_ticks: number; then: Record<string, unknown> } }
   started_tick: number
   eta_tick: number
 }
@@ -78,6 +74,8 @@ export interface MaintenanceState {
 export interface AssemblerState {
   ticks_since_last_run: number
   stalled: boolean
+  capped: boolean
+  cap_override: Record<string, number>
 }
 
 export interface LabState {
@@ -140,7 +138,6 @@ export interface StationState {
   power_available_per_tick: number
   inventory: InventoryItem[]
   cargo_capacity_m3: number
-  facilities: FacilitiesState
   modules: ModuleState[]
   power: PowerState
 }
