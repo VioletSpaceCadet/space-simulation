@@ -25,5 +25,5 @@ Any work in `sim_daemon` — HTTP endpoints, SSE streaming, command queue, alert
 - Blocking calls in async handlers freeze the tokio runtime — use `spawn_blocking` for heavy work
 - SSE serialization must match the TypeScript interfaces in `ui_web` exactly
 - `AlertEngine` state is ephemeral — alerts lost on daemon restart
-- axum 0.7 extractors: order matters, `State` must come last
+- axum 0.7 extractors: body-consuming extractors (`Json`, `Form`) must be last
 - `analytics` module aggregates over time — needs enough ticks to produce meaningful data
