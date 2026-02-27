@@ -282,6 +282,81 @@ fn compute_power_budget(
     }
 }
 
+/// Context extracted once per module, shared across the lifecycle.
+pub(crate) struct ModuleTickContext<'a> {
+    pub station_id: &'a StationId,
+    pub module_idx: usize,
+    pub module_id: &'a crate::ModuleInstanceId,
+    pub def: &'a crate::ModuleDef,
+    pub interval: u64,
+    pub power_needed: f32,
+    pub wear_per_run: f32,
+    pub efficiency: f32,
+}
+
+/// Reason a module stalled (distinct from "skipped").
+#[derive(Debug)]
+pub(crate) enum StallReason {
+    VolumeCap { shortfall_m3: f32 },
+    StockCap,
+    DataStarved,
+}
+
+/// Outcome of a module's execute() call.
+#[derive(Debug)]
+pub(crate) enum RunOutcome {
+    /// Module ran successfully — framework resets timer, applies wear.
+    Completed,
+    /// Module can't run (no inputs, no target) — no wear.
+    /// `reset_timer`: true = reset to 0, false = keep accumulating.
+    /// Module specifies intent; framework executes.
+    Skipped { reset_timer: bool },
+    /// Module is stalled — framework resets timer, manages stall flag + events.
+    Stalled(StallReason),
+}
+
+/// Extract shared module context. Returns None if the module should be skipped
+/// entirely (disabled, power-stalled, passive type, missing def).
+fn extract_context<'a>(
+    state: &'a GameState,
+    station_id: &'a StationId,
+    module_idx: usize,
+    content: &'a GameContent,
+) -> Option<ModuleTickContext<'a>> {
+    let station = state.stations.get(station_id)?;
+    let module = &station.modules[module_idx];
+
+    if !module.enabled || module.power_stalled {
+        return None;
+    }
+
+    let def = content.module_defs.get(&module.def_id)?;
+
+    let interval = match &def.behavior {
+        crate::ModuleBehaviorDef::Processor(p) => p.processing_interval_ticks,
+        crate::ModuleBehaviorDef::Assembler(a) => a.assembly_interval_ticks,
+        crate::ModuleBehaviorDef::SensorArray(s) => s.scan_interval_ticks,
+        crate::ModuleBehaviorDef::Lab(l) => l.research_interval_ticks,
+        crate::ModuleBehaviorDef::Maintenance(m) => m.repair_interval_ticks,
+        crate::ModuleBehaviorDef::Storage { .. }
+        | crate::ModuleBehaviorDef::SolarArray(_)
+        | crate::ModuleBehaviorDef::Battery(_) => return None,
+    };
+
+    let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
+
+    Some(ModuleTickContext {
+        station_id,
+        module_idx,
+        module_id: &module.id,
+        def,
+        interval,
+        power_needed: def.power_consumption_per_run,
+        wear_per_run: def.wear_per_run,
+        efficiency,
+    })
+}
+
 fn apply_wear(
     state: &mut GameState,
     station_id: &StationId,
@@ -321,5 +396,156 @@ fn apply_wear(
                 },
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod framework_tests {
+    use super::*;
+    use crate::*;
+    use std::collections::{HashMap, HashSet};
+
+    fn test_content_with_processor() -> GameContent {
+        let mut content = crate::test_fixtures::base_content();
+        content.module_defs.insert(
+            "module_refinery".to_string(),
+            ModuleDef {
+                id: "module_refinery".to_string(),
+                name: "Refinery".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 10.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.01,
+                behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                    processing_interval_ticks: 5,
+                    recipes: vec![],
+                }),
+            },
+        );
+        content
+    }
+
+    fn test_state_with_module(content: &GameContent, kind_state: ModuleKindState) -> GameState {
+        let station_id = StationId("station_test".to_string());
+        GameState {
+            meta: MetaState {
+                tick: 10,
+                seed: 42,
+                schema_version: 1,
+                content_version: content.content_version.clone(),
+            },
+            scan_sites: vec![],
+            asteroids: HashMap::new(),
+            ships: HashMap::new(),
+            stations: HashMap::from([(
+                station_id.clone(),
+                StationState {
+                    id: station_id,
+                    location_node: NodeId("node_test".to_string()),
+                    inventory: vec![],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![ModuleState {
+                        id: ModuleInstanceId("refinery_inst_0001".to_string()),
+                        def_id: "module_refinery".to_string(),
+                        enabled: true,
+                        kind_state,
+                        wear: WearState::default(),
+                        power_stalled: false,
+                    }],
+                    power: PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                },
+            )]),
+            research: ResearchState {
+                unlocked: HashSet::new(),
+                data_pool: HashMap::new(),
+                evidence: HashMap::new(),
+                action_counts: HashMap::new(),
+            },
+            balance: 0.0,
+            counters: Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 0,
+            },
+        }
+    }
+
+    #[test]
+    fn extract_context_returns_some_for_enabled_processor() {
+        let content = test_content_with_processor();
+        let state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 3,
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        let ctx = extract_context(&state, &station_id, 0, &content);
+        assert!(ctx.is_some(), "should return context for enabled processor");
+        let ctx = ctx.unwrap();
+        assert_eq!(ctx.module_idx, 0);
+        assert_eq!(ctx.interval, 5);
+        assert!((ctx.power_needed - 10.0).abs() < 1e-3);
+        assert!((ctx.wear_per_run - 0.01).abs() < 1e-3);
+        assert!((ctx.efficiency - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn extract_context_returns_none_for_disabled_module() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
+        assert!(extract_context(&state, &station_id, 0, &content).is_none());
+    }
+
+    #[test]
+    fn extract_context_returns_none_for_power_stalled() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        state.stations.get_mut(&station_id).unwrap().modules[0].power_stalled = true;
+        assert!(extract_context(&state, &station_id, 0, &content).is_none());
+    }
+
+    #[test]
+    fn extract_context_returns_none_for_storage() {
+        let content = test_content_with_processor();
+        let state = test_state_with_module(&content, ModuleKindState::Storage);
+        let station_id = StationId("station_test".to_string());
+        let mut content2 = content.clone();
+        content2.module_defs.insert(
+            "module_refinery".to_string(),
+            ModuleDef {
+                id: "module_refinery".to_string(),
+                name: "Storage".to_string(),
+                mass_kg: 1000.0,
+                volume_m3: 5.0,
+                power_consumption_per_run: 0.0,
+                wear_per_run: 0.0,
+                behavior: ModuleBehaviorDef::Storage { capacity_m3: 500.0 },
+            },
+        );
+        assert!(extract_context(&state, &station_id, 0, &content2).is_none());
     }
 }
