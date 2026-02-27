@@ -1022,6 +1022,8 @@ dependencies = [
 name = "sim_control"
 version = "0.1.0"
 dependencies = [
+ "rand",
+ "rand_chacha",
  "sim_core",
 ]
 

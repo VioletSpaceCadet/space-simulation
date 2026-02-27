@@ -812,6 +812,7 @@ mod tests {
                 power_consumption_per_run: 10.0,
                 wear_per_run: 0.01,
                 behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_minutes: 60,
                     processing_interval_ticks: 60,
                     recipes: vec![],
                 }),
@@ -975,6 +976,7 @@ mod tests {
                 power_consumption_per_run: 10.0,
                 wear_per_run: 0.01,
                 behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_minutes: 60,
                     processing_interval_ticks: 60,
                     recipes: vec![],
                 }),
@@ -1078,6 +1080,7 @@ mod tests {
                 power_consumption_per_run: 10.0,
                 wear_per_run: 0.01,
                 behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_minutes: 60,
                     processing_interval_ticks: 60,
                     recipes: vec![],
                 }),

@@ -735,6 +735,7 @@ mod tests {
                 power_consumption_per_run: 5.0,
                 wear_per_run: 0.0,
                 behavior: sim_core::ModuleBehaviorDef::Maintenance(sim_core::MaintenanceDef {
+                    repair_interval_minutes: 30,
                     repair_interval_ticks: 30,
                     wear_reduction_per_run: 0.2,
                     repair_kit_cost: 1,
@@ -1024,6 +1025,7 @@ mod tests {
                     data_consumption_per_run: 5.0,
                     research_points_per_run: 10.0,
                     accepted_data: vec![sim_core::DataKind::MiningData],
+                    research_interval_minutes: 10,
                     research_interval_ticks: 10,
                 }),
             },
@@ -1222,6 +1224,7 @@ mod tests {
                     data_consumption_per_run: 10.0,
                     research_points_per_run: 5.0,
                     accepted_data: vec![sim_core::DataKind::EngineeringData],
+                    research_interval_minutes: 1,
                     research_interval_ticks: 1,
                 }),
             },
@@ -1290,6 +1293,7 @@ mod tests {
                 power_consumption_per_run: 25.0,
                 wear_per_run: 0.02,
                 behavior: sim_core::ModuleBehaviorDef::Assembler(sim_core::AssemblerDef {
+                    assembly_interval_minutes: 1440,
                     assembly_interval_ticks: 1440,
                     recipes: vec![sim_core::RecipeDef {
                         id: "recipe_test_ship".to_string(),

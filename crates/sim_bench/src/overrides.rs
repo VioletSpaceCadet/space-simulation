@@ -32,15 +32,15 @@ fn apply_module_override(
         match (&mut module_def.behavior, behavior_type) {
             (ModuleBehaviorDef::Processor(ref mut proc_def), "processor") => {
                 match field {
-                    "processing_interval_ticks" => proc_def.processing_interval_ticks = as_u64(full_key, value)?,
+                    "processing_interval_minutes" => proc_def.processing_interval_minutes = as_u64(full_key, value)?,
                     "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
-                    _ => bail!("unknown processor field '{field}' in override key '{full_key}'. Valid fields: processing_interval_ticks, wear_per_run"),
+                    _ => bail!("unknown processor field '{field}' in override key '{full_key}'. Valid fields: processing_interval_minutes, wear_per_run"),
                 }
                 matched = true;
             }
             (ModuleBehaviorDef::Assembler(ref mut asm_def), "assembler") => {
                 match field {
-                    "assembly_interval_ticks" => asm_def.assembly_interval_ticks = as_u64(full_key, value)?,
+                    "assembly_interval_minutes" => asm_def.assembly_interval_minutes = as_u64(full_key, value)?,
                     "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
                     "max_stock" => {
                         let map: std::collections::HashMap<String, u32> = serde_json::from_value(value.clone())
@@ -50,35 +50,35 @@ fn apply_module_override(
                             .map(|(k, v)| (sim_core::ComponentId(k), v))
                             .collect();
                     }
-                    _ => bail!("unknown assembler field '{field}' in override key '{full_key}'. Valid fields: assembly_interval_ticks, wear_per_run, max_stock"),
+                    _ => bail!("unknown assembler field '{field}' in override key '{full_key}'. Valid fields: assembly_interval_minutes, wear_per_run, max_stock"),
                 }
                 matched = true;
             }
             (ModuleBehaviorDef::Lab(ref mut lab_def), "lab") => {
                 match field {
-                    "research_interval_ticks" => lab_def.research_interval_ticks = as_u64(full_key, value)?,
+                    "research_interval_minutes" => lab_def.research_interval_minutes = as_u64(full_key, value)?,
                     "data_consumption_per_run" => lab_def.data_consumption_per_run = as_f32(full_key, value)?,
                     "research_points_per_run" => lab_def.research_points_per_run = as_f32(full_key, value)?,
                     "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
-                    _ => bail!("unknown lab field '{field}' in override key '{full_key}'. Valid fields: research_interval_ticks, data_consumption_per_run, research_points_per_run, wear_per_run"),
+                    _ => bail!("unknown lab field '{field}' in override key '{full_key}'. Valid fields: research_interval_minutes, data_consumption_per_run, research_points_per_run, wear_per_run"),
                 }
                 matched = true;
             }
             (ModuleBehaviorDef::Maintenance(ref mut maint_def), "maintenance") => {
                 match field {
-                    "repair_interval_ticks" => maint_def.repair_interval_ticks = as_u64(full_key, value)?,
+                    "repair_interval_minutes" => maint_def.repair_interval_minutes = as_u64(full_key, value)?,
                     "wear_reduction_per_run" => maint_def.wear_reduction_per_run = as_f32(full_key, value)?,
                     "repair_kit_cost" => maint_def.repair_kit_cost = as_u32(full_key, value)?,
                     "repair_threshold" => maint_def.repair_threshold = as_f32(full_key, value)?,
-                    _ => bail!("unknown maintenance field '{field}' in override key '{full_key}'. Valid fields: repair_interval_ticks, wear_reduction_per_run, repair_kit_cost, repair_threshold"),
+                    _ => bail!("unknown maintenance field '{field}' in override key '{full_key}'. Valid fields: repair_interval_minutes, wear_reduction_per_run, repair_kit_cost, repair_threshold"),
                 }
                 matched = true;
             }
             (ModuleBehaviorDef::SensorArray(ref mut sensor_def), "sensor_array") => {
                 match field {
-                    "scan_interval_ticks" => sensor_def.scan_interval_ticks = as_u64(full_key, value)?,
+                    "scan_interval_minutes" => sensor_def.scan_interval_minutes = as_u64(full_key, value)?,
                     "wear_per_run" => module_def.wear_per_run = as_f32(full_key, value)?,
-                    _ => bail!("unknown sensor_array field '{field}' in override key '{full_key}'. Valid fields: scan_interval_ticks, wear_per_run"),
+                    _ => bail!("unknown sensor_array field '{field}' in override key '{full_key}'. Valid fields: scan_interval_minutes, wear_per_run"),
                 }
                 matched = true;
             }
@@ -217,8 +217,7 @@ mod tests {
     #[test]
     fn test_apply_u64_override() {
         let mut content = test_content();
-        let overrides =
-            HashMap::from([("survey_scan_minutes".to_string(), serde_json::json!(99))]);
+        let overrides = HashMap::from([("survey_scan_minutes".to_string(), serde_json::json!(99))]);
         apply_overrides(&mut content, &overrides).unwrap();
         assert_eq!(content.constants.survey_scan_minutes, 99);
     }
@@ -261,7 +260,7 @@ mod tests {
         let mut content = test_content();
         let overrides = HashMap::from([
             (
-                "module.processor.processing_interval_ticks".to_string(),
+                "module.processor.processing_interval_minutes".to_string(),
                 serde_json::json!(180),
             ),
             (
@@ -273,7 +272,7 @@ mod tests {
 
         for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Processor(ref proc_def) = module_def.behavior {
-                assert_eq!(proc_def.processing_interval_ticks, 180);
+                assert_eq!(proc_def.processing_interval_minutes, 180);
                 assert!((module_def.wear_per_run - 0.02).abs() < f32::EPSILON);
             }
         }
@@ -284,7 +283,7 @@ mod tests {
         let mut content = test_content();
         let overrides = HashMap::from([
             (
-                "module.lab.research_interval_ticks".to_string(),
+                "module.lab.research_interval_minutes".to_string(),
                 serde_json::json!(10),
             ),
             (
@@ -304,7 +303,7 @@ mod tests {
 
         for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Lab(ref lab_def) = module_def.behavior {
-                assert_eq!(lab_def.research_interval_ticks, 10);
+                assert_eq!(lab_def.research_interval_minutes, 10);
                 assert!((lab_def.data_consumption_per_run - 5.0).abs() < f32::EPSILON);
                 assert!((lab_def.research_points_per_run - 2.5).abs() < f32::EPSILON);
                 assert!((module_def.wear_per_run - 0.002).abs() < f32::EPSILON);
@@ -316,14 +315,14 @@ mod tests {
     fn test_module_assembler_override() {
         let mut content = test_content();
         let overrides = HashMap::from([(
-            "module.assembler.assembly_interval_ticks".to_string(),
+            "module.assembler.assembly_interval_minutes".to_string(),
             serde_json::json!(240),
         )]);
         apply_overrides(&mut content, &overrides).unwrap();
 
         for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Assembler(ref asm_def) = module_def.behavior {
-                assert_eq!(asm_def.assembly_interval_ticks, 240);
+                assert_eq!(asm_def.assembly_interval_minutes, 240);
             }
         }
     }
@@ -448,7 +447,7 @@ mod tests {
                 serde_json::json!(500.0),
             ),
             (
-                "module.processor.processing_interval_ticks".to_string(),
+                "module.processor.processing_interval_minutes".to_string(),
                 serde_json::json!(90),
             ),
         ]);
@@ -457,7 +456,7 @@ mod tests {
         assert!((content.constants.station_cargo_capacity_m3 - 500.0).abs() < f32::EPSILON);
         for module_def in content.module_defs.values() {
             if let ModuleBehaviorDef::Processor(ref proc_def) = module_def.behavior {
-                assert_eq!(proc_def.processing_interval_ticks, 90);
+                assert_eq!(proc_def.processing_interval_minutes, 90);
             }
         }
     }

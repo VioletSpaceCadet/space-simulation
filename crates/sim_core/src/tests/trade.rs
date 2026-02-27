@@ -84,6 +84,7 @@ fn trade_content() -> GameContent {
             power_consumption_per_run: 10.0,
             wear_per_run: 0.01,
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_minutes: 10,
                 processing_interval_ticks: 10,
                 recipes: vec![],
             }),

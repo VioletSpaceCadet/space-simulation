@@ -439,6 +439,7 @@ mod assembler_component_tests {
                 power_consumption_per_run: 10.0,
                 wear_per_run: 0.0,
                 behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                    assembly_interval_minutes: 1,
                     assembly_interval_ticks: 1,
                     recipes: vec![RecipeDef {
                         id: "recipe_hull_plate".to_string(),
@@ -722,6 +723,7 @@ mod assembler_component_tests {
                 power_consumption_per_run: 10.0,
                 wear_per_run: 0.0,
                 behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+                    assembly_interval_minutes: 1,
                     assembly_interval_ticks: 1,
                     recipes: vec![RecipeDef {
                         id: "recipe_build_ship".to_string(),

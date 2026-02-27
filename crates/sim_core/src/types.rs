@@ -796,6 +796,8 @@ pub enum ModuleBehaviorDef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssemblerDef {
+    pub assembly_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub assembly_interval_ticks: u64,
     pub recipes: Vec<RecipeDef>,
     #[serde(default)]
@@ -804,6 +806,8 @@ pub struct AssemblerDef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MaintenanceDef {
+    pub repair_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub repair_interval_ticks: u64,
     pub wear_reduction_per_run: f32,
     pub repair_kit_cost: u32,
@@ -818,6 +822,8 @@ pub struct LabDef {
     pub data_consumption_per_run: f32,
     pub research_points_per_run: f32,
     pub accepted_data: Vec<DataKind>,
+    pub research_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub research_interval_ticks: u64,
 }
 
@@ -825,6 +831,8 @@ pub struct LabDef {
 pub struct SensorArrayDef {
     pub data_kind: DataKind,
     pub action_key: String,
+    pub scan_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub scan_interval_ticks: u64,
 }
 
@@ -845,6 +853,8 @@ pub struct BatteryDef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessorDef {
+    pub processing_interval_minutes: u64,
+    #[serde(skip_deserializing, default)]
     pub processing_interval_ticks: u64,
     pub recipes: Vec<RecipeDef>,
 }
@@ -1005,6 +1015,52 @@ impl Constants {
             self.rate_per_minute_to_per_tick(self.mining_rate_kg_per_minute);
         self.station_power_available_per_tick =
             self.rate_per_minute_to_per_tick(self.station_power_available_per_minute);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Module tick derivation
+// ---------------------------------------------------------------------------
+
+/// Convert a game-time duration in minutes to ticks, rounding up (ceil division).
+fn game_minutes_to_ticks_u64(minutes: u64, minutes_per_tick: u32) -> u64 {
+    if minutes == 0 {
+        return 0;
+    }
+    minutes.div_ceil(u64::from(minutes_per_tick))
+}
+
+/// Compute derived tick-based interval fields on all module behavior defs.
+/// Must be called once after deserialization / after overrides.
+#[allow(clippy::implicit_hasher)]
+pub fn derive_module_tick_values(
+    module_defs: &mut HashMap<String, ModuleDef>,
+    minutes_per_tick: u32,
+) {
+    for def in module_defs.values_mut() {
+        match &mut def.behavior {
+            ModuleBehaviorDef::Processor(p) => {
+                p.processing_interval_ticks =
+                    game_minutes_to_ticks_u64(p.processing_interval_minutes, minutes_per_tick);
+            }
+            ModuleBehaviorDef::Assembler(a) => {
+                a.assembly_interval_ticks =
+                    game_minutes_to_ticks_u64(a.assembly_interval_minutes, minutes_per_tick);
+            }
+            ModuleBehaviorDef::Maintenance(m) => {
+                m.repair_interval_ticks =
+                    game_minutes_to_ticks_u64(m.repair_interval_minutes, minutes_per_tick);
+            }
+            ModuleBehaviorDef::Lab(l) => {
+                l.research_interval_ticks =
+                    game_minutes_to_ticks_u64(l.research_interval_minutes, minutes_per_tick);
+            }
+            ModuleBehaviorDef::SensorArray(s) => {
+                s.scan_interval_ticks =
+                    game_minutes_to_ticks_u64(s.scan_interval_minutes, minutes_per_tick);
+            }
+            _ => {}
+        }
     }
 }
 

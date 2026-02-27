@@ -82,6 +82,7 @@ mod tests {
                 behavior: ModuleBehaviorDef::SensorArray(SensorArrayDef {
                     data_kind: DataKind::ScanData,
                     action_key: "sensor_scan".to_string(),
+                    scan_interval_minutes: 5,
                     scan_interval_ticks: 5,
                 }),
             },

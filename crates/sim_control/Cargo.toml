@@ -11,3 +11,5 @@ sim_core = { path = "../sim_core" }
 
 [dev-dependencies]
 sim_core = { path = "../sim_core", features = ["test-support"] }
+rand = "0.8"
+rand_chacha = "0.3"
