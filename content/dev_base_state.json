@@ -102,7 +102,7 @@
         }
       ],
       "cargo_capacity_m3": 2000.0,
-      "power_available_per_tick": 100.0,
+      "power_available_per_tick": 6000.0,
       "modules": []
     }
   },

@@ -14,7 +14,7 @@ pub mod trade;
 mod types;
 pub mod wear;
 
-pub use engine::{tick, TRADE_UNLOCK_TICK};
+pub use engine::{tick, trade_unlock_tick};
 pub use graph::shortest_hop_count;
 pub use id::generate_uuid;
 pub use metrics::{

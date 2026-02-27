@@ -293,7 +293,7 @@ fn thruster_import_commands(
     let mut commands = Vec::new();
 
     // Gate 1: Trade unlock
-    if state.meta.tick < sim_core::TRADE_UNLOCK_TICK {
+    if state.meta.tick < sim_core::trade_unlock_tick(content.constants.minutes_per_tick) {
         return commands;
     }
 
@@ -1374,7 +1374,7 @@ mod tests {
 
         // Set high balance and advance past trade unlock
         state.balance = 10_000_000.0;
-        state.meta.tick = sim_core::TRADE_UNLOCK_TICK;
+        state.meta.tick = sim_core::trade_unlock_tick(content.constants.minutes_per_tick);
 
         (content, state)
     }

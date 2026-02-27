@@ -10,8 +10,12 @@ use crate::{
 };
 use rand::Rng;
 
-/// Trade (import/export) unlocks after 1 simulated year (365 days × 24 h × 60 min).
-pub const TRADE_UNLOCK_TICK: u64 = 525_600;
+/// Trade (import/export) unlocks after 1 simulated year.
+/// 365 days × 24 hours × 60 minutes = 525,600 game-minutes.
+pub fn trade_unlock_tick(minutes_per_tick: u32) -> u64 {
+    const YEAR_MINUTES: u64 = 365 * 24 * 60;
+    YEAR_MINUTES.div_ceil(u64::from(minutes_per_tick))
+}
 
 const MIN_UNSCANNED_SITES: usize = 5;
 const REPLENISH_BATCH_SIZE: usize = 5;
@@ -282,7 +286,7 @@ fn apply_commands(
                 station_id,
                 item_spec,
             } => {
-                if current_tick < TRADE_UNLOCK_TICK {
+                if current_tick < trade_unlock_tick(content.constants.minutes_per_tick) {
                     continue;
                 }
                 if !state.stations.contains_key(station_id) {
@@ -341,7 +345,7 @@ fn apply_commands(
                 station_id,
                 item_spec,
             } => {
-                if current_tick < TRADE_UNLOCK_TICK {
+                if current_tick < trade_unlock_tick(content.constants.minutes_per_tick) {
                     continue;
                 }
                 let Some(station) = state.stations.get(station_id) else {
