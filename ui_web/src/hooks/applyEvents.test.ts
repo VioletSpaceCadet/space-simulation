@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AsteroidState, ComponentItem, MaterialItem, OreItem, ResearchState, ShipState, SlagItem, StationState, TradeItemSpec } from '../types';
+import type { AsteroidState, ComponentItem, MaterialItem, ModuleItem, OreItem, ResearchState, ShipState, SlagItem, StationState, TradeItemSpec } from '../types';
 
 import { applyEvents } from './applyEvents';
 
@@ -469,6 +469,98 @@ describe('applyEvents', () => {
       expect(lab.kind_state).toEqual({
         Lab: { ticks_since_last_run: 3, assigned_tech: 'tech_a', starved: false },
       });
+    });
+  });
+
+  describe('ModuleUninstalled', () => {
+    it('removes module from station and adds item to inventory', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_proc', def_id: 'module_refinery', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0.2 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ModuleUninstalled: {
+            station_id: 'station_001', module_id: 'mod_proc', module_item_id: 'item_001',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      expect(result.stations['station_001'].modules).toHaveLength(0);
+      expect(result.stations['station_001'].inventory).toHaveLength(1);
+      const item = result.stations['station_001'].inventory[0] as ModuleItem;
+      expect(item.kind).toBe('Module');
+      expect(item.item_id).toBe('item_001');
+      expect(item.module_def_id).toBe('module_refinery');
+    });
+  });
+
+  describe('ModuleStalled', () => {
+    it('sets stalled to true on Processor module', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_proc', def_id: 'module_refinery', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { ModuleStalled: { station_id: 'station_001', module_id: 'mod_proc', shortfall_m3: 5.0 } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.kind_state).toEqual({ Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: true } });
+    });
+
+    it('sets stalled to true on Assembler module', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_asm', def_id: 'module_assembler', enabled: true,
+          kind_state: { Assembler: { ticks_since_last_run: 0, stalled: false, capped: false, cap_override: {} } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { ModuleStalled: { station_id: 'station_001', module_id: 'mod_asm', shortfall_m3: 3.0 } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.kind_state).toEqual({
+        Assembler: { ticks_since_last_run: 0, stalled: true, capped: false, cap_override: {} },
+      });
+    });
+  });
+
+  describe('ModuleResumed', () => {
+    it('sets stalled to false on Processor module', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_proc', def_id: 'module_refinery', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: true } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { ModuleResumed: { station_id: 'station_001', module_id: 'mod_proc' } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.kind_state).toEqual({ Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } });
     });
   });
 
