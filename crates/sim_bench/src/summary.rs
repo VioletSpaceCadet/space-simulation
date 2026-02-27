@@ -63,6 +63,10 @@ pub fn compute_summary(snapshots: &[(u64, &MetricsSnapshot)]) -> SummaryStats {
             Box::new(|s| f64::from(s.power_generated_kw)),
         ),
         (
+            "power_consumed_kw",
+            Box::new(|s| f64::from(s.power_consumed_kw)),
+        ),
+        (
             "power_deficit_kw",
             Box::new(|s| f64::from(s.power_deficit_kw)),
         ),
@@ -334,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_aggregated_metrics_has_all_20_keys() {
+    fn test_build_aggregated_metrics_has_all_24_keys() {
         let s1 = make_snapshot(100, 0.5, 2, 0, 0, 3, 0.2, 5);
         let s2 = make_snapshot(100, 0.7, 2, 1, 1, 5, 0.4, 3);
         let snapshots: Vec<&MetricsSnapshot> = vec![&s1, &s2];
