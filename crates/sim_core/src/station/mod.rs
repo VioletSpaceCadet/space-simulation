@@ -95,9 +95,9 @@ pub(crate) fn tick_stations(
 /// Compute the power budget for a station and store it in `PowerState`.
 ///
 /// Generated power = sum of all enabled solar arrays:
-///   base_output_kw * solar_intensity * wear_efficiency
+///   `base_output_kw` * `solar_intensity` * `wear_efficiency`
 ///
-/// Consumed power = sum of power_consumption_per_run for all enabled modules.
+/// Consumed power = sum of `power_consumption_per_run` for all enabled modules.
 ///
 /// Deficit = max(0, consumed - generated).
 fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: &GameContent) {
