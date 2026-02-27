@@ -83,12 +83,65 @@ pub(crate) fn tick_stations(
 ) {
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
     for station_id in &station_ids {
+        compute_power_budget(state, station_id, content);
         processor::tick_station_modules(state, station_id, content, events);
         assembler::tick_assembler_modules(state, station_id, content, rng, events);
         sensor::tick_sensor_array_modules(state, station_id, content, events);
         lab::tick_lab_modules(state, station_id, content, events);
         maintenance::tick_maintenance_modules(state, station_id, content, events);
     }
+}
+
+/// Compute the power budget for a station and store it in `PowerState`.
+///
+/// Generated power = sum of all enabled solar arrays:
+///   base_output_kw * solar_intensity * wear_efficiency
+///
+/// Consumed power = sum of power_consumption_per_run for all enabled modules.
+///
+/// Deficit = max(0, consumed - generated).
+fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: &GameContent) {
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+
+    let solar_intensity = content
+        .solar_system
+        .nodes
+        .iter()
+        .find(|n| n.id == station.location_node)
+        .map_or(1.0, |n| n.solar_intensity);
+
+    let mut generated_kw = 0.0_f32;
+    let mut consumed_kw = 0.0_f32;
+
+    for module in &station.modules {
+        if !module.enabled {
+            continue;
+        }
+        let Some(def) = content.module_defs.get(&module.def_id) else {
+            continue;
+        };
+
+        match &def.behavior {
+            crate::ModuleBehaviorDef::SolarArray(solar_def) => {
+                let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
+                generated_kw += solar_def.base_output_kw * solar_intensity * efficiency;
+            }
+            _ => {
+                consumed_kw += def.power_consumption_per_run;
+            }
+        }
+    }
+
+    let deficit_kw = (consumed_kw - generated_kw).max(0.0);
+
+    let station = state.stations.get_mut(station_id).unwrap();
+    station.power = crate::PowerState {
+        generated_kw,
+        consumed_kw,
+        deficit_kw,
+    };
 }
 
 fn apply_wear(

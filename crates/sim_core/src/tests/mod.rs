@@ -11,6 +11,7 @@ mod deposit;
 mod integration;
 mod mining;
 mod performance;
+mod power;
 mod refinery;
 mod research;
 mod survey;
