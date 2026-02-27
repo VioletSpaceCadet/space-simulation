@@ -58,6 +58,22 @@ pub fn compute_summary(snapshots: &[(u64, &MetricsSnapshot)]) -> SummaryStats {
         ),
         ("balance", Box::new(|s| s.balance)),
         ("thruster_count", Box::new(|s| f64::from(s.thruster_count))),
+        (
+            "power_generated_kw",
+            Box::new(|s| f64::from(s.power_generated_kw)),
+        ),
+        (
+            "power_consumed_kw",
+            Box::new(|s| f64::from(s.power_consumed_kw)),
+        ),
+        (
+            "power_deficit_kw",
+            Box::new(|s| f64::from(s.power_deficit_kw)),
+        ),
+        (
+            "battery_charge_pct",
+            Box::new(|s| f64::from(s.battery_charge_pct)),
+        ),
     ];
 
     let metrics = extractors
@@ -94,7 +110,7 @@ fn compute_metric_summary(name: &str, values: &[f64]) -> MetricSummary {
 
 /// Build aggregated metrics in the contract format:
 /// `{ "key": { "mean": ..., "min": ..., "max": ..., "stddev": ... }, ... }`
-/// Covers all 20 `SummaryMetrics` keys.
+/// Covers all 24 `SummaryMetrics` keys.
 pub fn build_aggregated_metrics(snapshots: &[&MetricsSnapshot]) -> serde_json::Value {
     let contract_extractors: Vec<Extractor> = vec![
         ("total_ore_kg", Box::new(|s| f64::from(s.total_ore_kg))),
@@ -156,6 +172,22 @@ pub fn build_aggregated_metrics(snapshots: &[&MetricsSnapshot]) -> serde_json::V
         ),
         ("balance", Box::new(|s| s.balance)),
         ("thruster_count", Box::new(|s| f64::from(s.thruster_count))),
+        (
+            "power_generated_kw",
+            Box::new(|s| f64::from(s.power_generated_kw)),
+        ),
+        (
+            "power_consumed_kw",
+            Box::new(|s| f64::from(s.power_consumed_kw)),
+        ),
+        (
+            "power_deficit_kw",
+            Box::new(|s| f64::from(s.power_deficit_kw)),
+        ),
+        (
+            "battery_charge_pct",
+            Box::new(|s| f64::from(s.battery_charge_pct)),
+        ),
     ];
 
     let mut map = serde_json::Map::new();
@@ -253,6 +285,10 @@ mod tests {
             repair_kits_remaining: repair_kits,
             balance: 0.0,
             thruster_count: 0,
+            power_generated_kw: 0.0,
+            power_consumed_kw: 0.0,
+            power_deficit_kw: 0.0,
+            battery_charge_pct: 0.0,
         }
     }
 
@@ -302,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_aggregated_metrics_has_all_20_keys() {
+    fn test_build_aggregated_metrics_has_all_24_keys() {
         let s1 = make_snapshot(100, 0.5, 2, 0, 0, 3, 0.2, 5);
         let s2 = make_snapshot(100, 0.7, 2, 1, 1, 5, 0.4, 3);
         let snapshots: Vec<&MetricsSnapshot> = vec![&s1, &s2];
@@ -330,8 +366,12 @@ mod tests {
             "scan_sites_remaining",
             "balance",
             "thruster_count",
+            "power_generated_kw",
+            "power_consumed_kw",
+            "power_deficit_kw",
+            "battery_charge_pct",
         ];
-        assert_eq!(obj.len(), 20);
+        assert_eq!(obj.len(), 24);
         for key in &expected_keys {
             let entry = obj
                 .get(*key)
