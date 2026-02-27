@@ -287,7 +287,7 @@ pub struct StationState {
     pub power_available_per_tick: f32,
     pub modules: Vec<ModuleState>,
     /// Computed fresh each tick — not persisted across ticks.
-    #[serde(skip, default)]
+    #[serde(skip_deserializing, default)]
     pub power: PowerState,
     /// Cached inventory volume. Set to `None` when inventory changes;
     /// recomputed lazily via [`StationState::used_volume_m3`].
