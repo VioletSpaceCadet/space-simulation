@@ -821,6 +821,58 @@ export function applyEvents(
         // No state change — event appears in the event feed for visibility
         break;
 
+      case 'TaskStarted': {
+        const { ship_id, task_kind, target } = event as {
+          ship_id: string
+          task_kind: string
+          target: string | null
+        };
+        if (updatedShips[ship_id]) {
+          updatedShips = {
+            ...updatedShips,
+            [ship_id]: {
+              ...updatedShips[ship_id],
+              task: buildTaskStub(task_kind, target, evt.tick),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'TaskCompleted': {
+        const { ship_id } = event as { ship_id: string };
+        if (updatedShips[ship_id]) {
+          updatedShips = {
+            ...updatedShips,
+            [ship_id]: { ...updatedShips[ship_id], task: null },
+          };
+        }
+        break;
+      }
+
+      case 'ShipArrived': {
+        const { ship_id, node } = event as { ship_id: string; node: string };
+        if (updatedShips[ship_id]) {
+          updatedShips = {
+            ...updatedShips,
+            [ship_id]: { ...updatedShips[ship_id], location_node: node },
+          };
+        }
+        break;
+      }
+
+      case 'DataGenerated': {
+        const { kind, amount } = event as { kind: string; amount: number };
+        updatedResearch = {
+          ...updatedResearch,
+          data_pool: {
+            ...updatedResearch.data_pool,
+            [kind]: (updatedResearch.data_pool[kind] ?? 0) + amount,
+          },
+        };
+        break;
+      }
+
       // Events intentionally not handled (informational / debug-only):
       // ResearchRoll, AlertRaised, AlertCleared, PowerConsumed
       default:
@@ -828,54 +880,6 @@ export function applyEvents(
           console.warn(`[applyEvents] Unhandled event type: ${eventKey}`, event);
         }
         break;
-    }
-
-    if (e['TaskStarted']) {
-      const { ship_id, task_kind, target } = e['TaskStarted'] as {
-        ship_id: string
-        task_kind: string
-        target: string | null
-      };
-      if (updatedShips[ship_id]) {
-        updatedShips = {
-          ...updatedShips,
-          [ship_id]: {
-            ...updatedShips[ship_id],
-            task: buildTaskStub(task_kind, target, evt.tick),
-          },
-        };
-      }
-    }
-
-    if (e['TaskCompleted']) {
-      const { ship_id } = e['TaskCompleted'] as { ship_id: string };
-      if (updatedShips[ship_id]) {
-        updatedShips = {
-          ...updatedShips,
-          [ship_id]: { ...updatedShips[ship_id], task: null },
-        };
-      }
-    }
-
-    if (e['ShipArrived']) {
-      const { ship_id, node } = e['ShipArrived'] as { ship_id: string; node: string };
-      if (updatedShips[ship_id]) {
-        updatedShips = {
-          ...updatedShips,
-          [ship_id]: { ...updatedShips[ship_id], location_node: node },
-        };
-      }
-    }
-
-    if (e['DataGenerated']) {
-      const { kind, amount } = e['DataGenerated'] as { kind: string; amount: number };
-      updatedResearch = {
-        ...updatedResearch,
-        data_pool: {
-          ...updatedResearch.data_pool,
-          [kind]: (updatedResearch.data_pool[kind] ?? 0) + amount,
-        },
-      };
     }
   }
 

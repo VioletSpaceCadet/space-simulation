@@ -15,16 +15,16 @@ ALLOW_LIST="AlertCleared AlertRaised PowerConsumed ResearchRoll"
 
 # --- Extract Event variants from Rust enum ---
 rust_variants=$(
-  sed -n '/^pub enum Event/,/^}/p' "$TYPES_RS" \
+  sed -n '/^pub enum Event {/,/^}/p' "$TYPES_RS" \
     | grep -oE '^\s+[A-Z][A-Za-z]+\s*\{' \
     | grep -oE '[A-Z][A-Za-z]+' \
     | sort -u
 )
 
 # --- Extract handled event keys from TypeScript ---
+# Matches case 'EventName': in the switch statement
 ts_handled=$(
   grep -oE "case '[A-Za-z]+'" "$APPLY_EVENTS_TS" | grep -oE "'[A-Za-z]+'" | tr -d "'"
-  grep -oE "e\['[A-Za-z]+'\]" "$APPLY_EVENTS_TS" | grep -oE "'[A-Za-z]+'" | tr -d "'"
 )
 ts_handled=$(echo "$ts_handled" | sort -u)
 
