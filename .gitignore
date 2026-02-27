@@ -41,6 +41,10 @@ mcp_advisor/node_modules/
 mcp_advisor/dist/
 content/advisor_proposals/
 
+# Coverage reports
+lcov.info
+ui_web/coverage/
+
 # E2E tests
 e2e/node_modules/
 e2e/test-results/
