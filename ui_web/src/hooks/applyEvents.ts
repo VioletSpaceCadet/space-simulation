@@ -177,6 +177,27 @@ export function applyEvents(
         break;
       }
 
+      case 'ModuleUninstalled': {
+        const { station_id, module_id, module_item_id } = event as {
+          station_id: string
+          module_id: string
+          module_item_id: string
+        };
+        if (updatedStations[station_id]) {
+          const station = updatedStations[station_id];
+          const removed = station.modules.find((m) => m.id === module_id);
+          const updatedModules = station.modules.filter((m) => m.id !== module_id);
+          const updatedInventory = removed
+            ? [...station.inventory, { kind: 'Module' as const, item_id: module_item_id, module_def_id: removed.def_id }]
+            : station.inventory;
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: { ...station, modules: updatedModules, inventory: updatedInventory },
+          };
+        }
+        break;
+      }
+
       case 'ModuleToggled': {
         const { station_id, module_id, enabled } = event as {
           station_id: string
@@ -380,6 +401,58 @@ export function applyEvents(
         }
         break;
       }
+
+      case 'ModuleStalled': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Processor' in ks) {
+                  return { ...m, kind_state: { Processor: { ...ks.Processor, stalled: true } } };
+                }
+                if (typeof ks === 'object' && 'Assembler' in ks) {
+                  return { ...m, kind_state: { Assembler: { ...ks.Assembler, stalled: true } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'ModuleResumed': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Processor' in ks) {
+                  return { ...m, kind_state: { Processor: { ...ks.Processor, stalled: false } } };
+                }
+                if (typeof ks === 'object' && 'Assembler' in ks) {
+                  return { ...m, kind_state: { Assembler: { ...ks.Assembler, stalled: false } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'ModuleAwaitingTech':
+        // Informational — displayed in event feed, no state mutation needed
+        break;
 
       case 'MaintenanceRan': {
         const { station_id, target_module_id, wear_after, repair_kits_remaining } = event as {
