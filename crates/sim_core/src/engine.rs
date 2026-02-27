@@ -115,16 +115,17 @@ fn apply_commands(
                                 ticks_since_last_run: 0,
                                 stalled: false,
                             }),
-                            "Processor",
+                            crate::BehaviorType::Processor,
                         ),
-                        crate::ModuleBehaviorDef::Storage { .. } => {
-                            (crate::ModuleKindState::Storage, "Storage")
-                        }
+                        crate::ModuleBehaviorDef::Storage { .. } => (
+                            crate::ModuleKindState::Storage,
+                            crate::BehaviorType::Storage,
+                        ),
                         crate::ModuleBehaviorDef::Maintenance(_) => (
                             crate::ModuleKindState::Maintenance(crate::MaintenanceState {
                                 ticks_since_last_run: 0,
                             }),
-                            "Maintenance",
+                            crate::BehaviorType::Maintenance,
                         ),
                         crate::ModuleBehaviorDef::Assembler(_) => (
                             crate::ModuleKindState::Assembler(crate::AssemblerState {
@@ -133,7 +134,7 @@ fn apply_commands(
                                 capped: false,
                                 cap_override: std::collections::HashMap::new(),
                             }),
-                            "Assembler",
+                            crate::BehaviorType::Assembler,
                         ),
                         crate::ModuleBehaviorDef::Lab(_) => (
                             crate::ModuleKindState::Lab(crate::LabState {
@@ -141,21 +142,21 @@ fn apply_commands(
                                 assigned_tech: None,
                                 starved: false,
                             }),
-                            "Lab",
+                            crate::BehaviorType::Lab,
                         ),
                         crate::ModuleBehaviorDef::SensorArray(_) => (
                             crate::ModuleKindState::SensorArray(crate::SensorArrayState::default()),
-                            "SensorArray",
+                            crate::BehaviorType::SensorArray,
                         ),
                         crate::ModuleBehaviorDef::SolarArray(_) => (
                             crate::ModuleKindState::SolarArray(crate::SolarArrayState::default()),
-                            "SolarArray",
+                            crate::BehaviorType::SolarArray,
                         ),
                         crate::ModuleBehaviorDef::Battery(_) => (
                             crate::ModuleKindState::Battery(crate::BatteryState {
                                 charge_kwh: 0.0,
                             }),
-                            "Battery",
+                            crate::BehaviorType::Battery,
                         ),
                     },
                     None => continue,
@@ -179,7 +180,7 @@ fn apply_commands(
                         module_id,
                         module_item_id: item_id,
                         module_def_id,
-                        behavior_type: behavior_type.to_string(),
+                        behavior_type,
                     },
                 ));
             }

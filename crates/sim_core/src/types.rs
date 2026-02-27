@@ -472,6 +472,18 @@ pub struct EventEnvelope {
     pub event: Event,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BehaviorType {
+    Processor,
+    Storage,
+    Maintenance,
+    Assembler,
+    Lab,
+    SensorArray,
+    SolarArray,
+    Battery,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
     TaskStarted {
@@ -527,7 +539,7 @@ pub enum Event {
         module_id: ModuleInstanceId,
         module_item_id: ModuleItemId,
         module_def_id: String,
-        behavior_type: String,
+        behavior_type: BehaviorType,
     },
     ModuleUninstalled {
         station_id: StationId,
