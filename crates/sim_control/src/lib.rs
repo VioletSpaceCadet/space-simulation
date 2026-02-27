@@ -280,7 +280,7 @@ const AUTOPILOT_BUDGET_CAP_FRACTION: f64 = 0.05;
 /// Emits Import commands for thrusters when a shipyard is ready and conditions are met.
 ///
 /// Guards (VIO-41):
-/// 1. Trade must be unlocked (tick >= `TRADE_UNLOCK_TICK`).
+/// 1. Trade must be unlocked (tick >= `trade_unlock_tick()`).
 /// 2. `tech_ship_construction` must be researched.
 /// 3. Station must have fewer thrusters than the shipyard recipe requires.
 /// 4. Budget cap: import cost must be < `AUTOPILOT_BUDGET_CAP_FRACTION` of current balance.
@@ -293,7 +293,7 @@ fn thruster_import_commands(
     let mut commands = Vec::new();
 
     // Gate 1: Trade unlock
-    if state.meta.tick < sim_core::TRADE_UNLOCK_TICK {
+    if state.meta.tick < sim_core::trade_unlock_tick(content.constants.minutes_per_tick) {
         return commands;
     }
 
@@ -1374,7 +1374,7 @@ mod tests {
 
         // Set high balance and advance past trade unlock
         state.balance = 10_000_000.0;
-        state.meta.tick = sim_core::TRADE_UNLOCK_TICK;
+        state.meta.tick = sim_core::trade_unlock_tick(content.constants.minutes_per_tick);
 
         (content, state)
     }
