@@ -967,7 +967,7 @@ impl Constants {
         if minutes == 0 {
             return 0;
         }
-        (minutes + mpt - 1) / mpt
+        minutes.div_ceil(mpt)
     }
 
     /// Convert a per-minute rate to a per-tick rate.
