@@ -714,6 +714,12 @@ pub struct SolarSystemDef {
 pub struct NodeDef {
     pub id: NodeId,
     pub name: String,
+    #[serde(default = "default_solar_intensity")]
+    pub solar_intensity: f32,
+}
+
+fn default_solar_intensity() -> f32 {
+    1.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

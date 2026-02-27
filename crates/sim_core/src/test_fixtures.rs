@@ -36,6 +36,7 @@ pub fn base_content() -> GameContent {
             nodes: vec![NodeDef {
                 id: NodeId("node_test".to_string()),
                 name: "Test Node".to_string(),
+                solar_intensity: 1.0,
             }],
             edges: vec![],
         },

@@ -4,6 +4,7 @@ fn node(id: &str) -> NodeDef {
     NodeDef {
         id: NodeId(id.to_string()),
         name: id.to_string(),
+        solar_intensity: 1.0,
     }
 }
 
@@ -68,4 +69,18 @@ fn test_bidirectional() {
     let ac = shortest_hop_count(&nid("A"), &nid("C"), &solar);
     let ca = shortest_hop_count(&nid("C"), &nid("A"), &solar);
     assert_eq!(ac, ca);
+}
+
+#[test]
+fn test_solar_intensity_default() {
+    let json = r#"{"id": "node_x", "name": "X"}"#;
+    let node: NodeDef = serde_json::from_str(json).unwrap();
+    assert!((node.solar_intensity - 1.0).abs() < f32::EPSILON);
+}
+
+#[test]
+fn test_solar_intensity_explicit() {
+    let json = r#"{"id": "node_x", "name": "X", "solar_intensity": 0.4}"#;
+    let node: NodeDef = serde_json::from_str(json).unwrap();
+    assert!((node.solar_intensity - 0.4).abs() < f32::EPSILON);
 }
