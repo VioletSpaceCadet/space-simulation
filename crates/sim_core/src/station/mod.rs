@@ -284,9 +284,9 @@ fn compute_power_budget(
 
 /// Context extracted once per module, shared across the lifecycle.
 pub(crate) struct ModuleTickContext<'a> {
-    pub station_id: &'a StationId,
+    pub station_id: StationId,
     pub module_idx: usize,
-    pub module_id: &'a crate::ModuleInstanceId,
+    pub module_id: crate::ModuleInstanceId,
     pub def: &'a crate::ModuleDef,
     pub interval: u64,
     pub power_needed: f32,
@@ -318,8 +318,8 @@ pub(crate) enum RunOutcome {
 /// Extract shared module context. Returns None if the module should be skipped
 /// entirely (disabled, power-stalled, passive type, missing def).
 fn extract_context<'a>(
-    state: &'a GameState,
-    station_id: &'a StationId,
+    state: &GameState,
+    station_id: &StationId,
     module_idx: usize,
     content: &'a GameContent,
 ) -> Option<ModuleTickContext<'a>> {
@@ -346,9 +346,9 @@ fn extract_context<'a>(
     let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
 
     Some(ModuleTickContext {
-        station_id,
+        station_id: station_id.clone(),
         module_idx,
-        module_id: &module.id,
+        module_id: module.id.clone(),
         def,
         interval,
         power_needed: def.power_consumption_per_run,
@@ -395,6 +395,263 @@ fn apply_wear(
                     module_id: mid,
                 },
             ));
+        }
+    }
+}
+
+/// Increment timer and check if the module should run this tick.
+/// Returns true if: timer >= interval AND station has enough power.
+fn should_run(state: &mut GameState, ctx: &ModuleTickContext) -> bool {
+    let ticks = {
+        let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+            return false;
+        };
+        let module = &mut station.modules[ctx.module_idx];
+        match &mut module.kind_state {
+            crate::ModuleKindState::Processor(s) => {
+                s.ticks_since_last_run += 1;
+                s.ticks_since_last_run
+            }
+            crate::ModuleKindState::Assembler(s) => {
+                s.ticks_since_last_run += 1;
+                s.ticks_since_last_run
+            }
+            crate::ModuleKindState::SensorArray(s) => {
+                s.ticks_since_last_run += 1;
+                s.ticks_since_last_run
+            }
+            crate::ModuleKindState::Lab(s) => {
+                s.ticks_since_last_run += 1;
+                s.ticks_since_last_run
+            }
+            crate::ModuleKindState::Maintenance(s) => {
+                s.ticks_since_last_run += 1;
+                s.ticks_since_last_run
+            }
+            _ => return false,
+        }
+    };
+
+    if ticks < ctx.interval {
+        return false;
+    }
+
+    let Some(station) = state.stations.get(&ctx.station_id) else {
+        return false;
+    };
+    station.power_available_per_tick >= ctx.power_needed
+}
+
+/// Reset the ticks_since_last_run to 0 for any module kind.
+fn reset_timer(state: &mut GameState, ctx: &ModuleTickContext) {
+    let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+        return;
+    };
+    let module = &mut station.modules[ctx.module_idx];
+    match &mut module.kind_state {
+        crate::ModuleKindState::Processor(s) => s.ticks_since_last_run = 0,
+        crate::ModuleKindState::Assembler(s) => s.ticks_since_last_run = 0,
+        crate::ModuleKindState::SensorArray(s) => s.ticks_since_last_run = 0,
+        crate::ModuleKindState::Lab(s) => s.ticks_since_last_run = 0,
+        crate::ModuleKindState::Maintenance(s) => s.ticks_since_last_run = 0,
+        _ => {}
+    }
+}
+
+/// Handle the stall transition: set the appropriate stall flag and emit an event
+/// only on the transition from not-stalled to stalled.
+fn handle_stall_transition(
+    state: &mut GameState,
+    ctx: &ModuleTickContext,
+    reason: &StallReason,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    // Read old flags and set new flags in one borrow scope
+    let transitioned = {
+        let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+            return;
+        };
+        let module = &mut station.modules[ctx.module_idx];
+
+        match reason {
+            StallReason::VolumeCap { .. } => {
+                let was_stalled = match &module.kind_state {
+                    crate::ModuleKindState::Processor(s) => s.stalled,
+                    crate::ModuleKindState::Assembler(s) => s.stalled,
+                    _ => false,
+                };
+                match &mut module.kind_state {
+                    crate::ModuleKindState::Processor(s) => s.stalled = true,
+                    crate::ModuleKindState::Assembler(s) => s.stalled = true,
+                    _ => {}
+                }
+                !was_stalled
+            }
+            StallReason::StockCap => {
+                let was_capped = match &module.kind_state {
+                    crate::ModuleKindState::Assembler(s) => s.capped,
+                    _ => false,
+                };
+                if let crate::ModuleKindState::Assembler(s) = &mut module.kind_state {
+                    s.capped = true;
+                }
+                !was_capped
+            }
+            StallReason::DataStarved => {
+                let was_starved = match &module.kind_state {
+                    crate::ModuleKindState::Lab(s) => s.starved,
+                    _ => false,
+                };
+                if let crate::ModuleKindState::Lab(s) = &mut module.kind_state {
+                    s.starved = true;
+                }
+                !was_starved
+            }
+        }
+    };
+
+    // Emit event outside the station borrow
+    if transitioned {
+        let event = match reason {
+            StallReason::VolumeCap { shortfall_m3 } => Event::ModuleStalled {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+                shortfall_m3: *shortfall_m3,
+            },
+            StallReason::StockCap => Event::AssemblerCapped {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+            },
+            StallReason::DataStarved => Event::LabStarved {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+            },
+        };
+        events.push(crate::emit(&mut state.counters, current_tick, event));
+    }
+}
+
+/// If the module was stalled, clear all stall flags and emit resume events.
+fn handle_resume_if_stalled(
+    state: &mut GameState,
+    ctx: &ModuleTickContext,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    // Clear flags and collect which events to emit
+    let mut emit_resumed = false;
+    let mut emit_uncapped = false;
+    let mut emit_lab_resumed = false;
+
+    {
+        let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+            return;
+        };
+        let module = &mut station.modules[ctx.module_idx];
+
+        match &mut module.kind_state {
+            crate::ModuleKindState::Processor(s) => {
+                if s.stalled {
+                    s.stalled = false;
+                    emit_resumed = true;
+                }
+            }
+            crate::ModuleKindState::Assembler(s) => {
+                if s.stalled {
+                    s.stalled = false;
+                    emit_resumed = true;
+                }
+                if s.capped {
+                    s.capped = false;
+                    emit_uncapped = true;
+                }
+            }
+            crate::ModuleKindState::Lab(s) => {
+                if s.starved {
+                    s.starved = false;
+                    emit_lab_resumed = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Emit events outside the station borrow
+    if emit_resumed {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::ModuleResumed {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+            },
+        ));
+    }
+    if emit_uncapped {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::AssemblerUncapped {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+            },
+        ));
+    }
+    if emit_lab_resumed {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::LabResumed {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+            },
+        ));
+    }
+}
+
+/// Apply the outcome of a module run: timer reset, wear, stall transitions, volume cache.
+fn apply_run_result(
+    state: &mut GameState,
+    ctx: &ModuleTickContext,
+    outcome: RunOutcome,
+    events: &mut Vec<EventEnvelope>,
+) {
+    match outcome {
+        RunOutcome::Completed => {
+            // Clear stall flag if was stalled, emit resume event
+            handle_resume_if_stalled(state, ctx, events);
+            // Reset timer
+            reset_timer(state, ctx);
+            // Apply wear
+            apply_wear(
+                state,
+                &ctx.station_id,
+                ctx.module_idx,
+                ctx.wear_per_run,
+                events,
+            );
+            // Invalidate volume cache (inventory may have changed)
+            if let Some(station) = state.stations.get_mut(&ctx.station_id) {
+                station.invalidate_volume_cache();
+            }
+        }
+        RunOutcome::Skipped {
+            reset_timer: should_reset,
+        } => {
+            if should_reset {
+                reset_timer(state, ctx);
+            }
+            // No wear, no stall changes
+        }
+        RunOutcome::Stalled(reason) => {
+            // Set stall flag, emit stall event on transition
+            handle_stall_transition(state, ctx, &reason, events);
+            // Reset timer
+            reset_timer(state, ctx);
+            // No wear
         }
     }
 }
@@ -547,5 +804,232 @@ mod framework_tests {
             },
         );
         assert!(extract_context(&state, &station_id, 0, &content2).is_none());
+    }
+
+    // ── Task 2: should_run() tests ──────────────────────────────────────
+
+    #[test]
+    fn should_run_returns_false_before_interval() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 2, // interval is 5, after increment = 3
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        assert!(!should_run(&mut state, &ctx));
+    }
+
+    #[test]
+    fn should_run_returns_true_at_interval() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 4, // after increment = 5 = interval
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        assert!(should_run(&mut state, &ctx));
+    }
+
+    #[test]
+    fn should_run_returns_false_when_insufficient_power() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 4,
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .power_available_per_tick = 5.0;
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        assert!(!should_run(&mut state, &ctx));
+    }
+
+    // ── Task 2: apply_run_result() tests ────────────────────────────────
+
+    #[test]
+    fn apply_run_result_completed_resets_timer_and_applies_wear() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 5,
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        let mut events = Vec::new();
+        apply_run_result(&mut state, &ctx, RunOutcome::Completed, &mut events);
+
+        let station = state.stations.get(&station_id).unwrap();
+        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+            assert_eq!(ps.ticks_since_last_run, 0);
+        }
+        assert!((station.modules[0].wear.wear - 0.01).abs() < 1e-6);
+        assert!(events
+            .iter()
+            .any(|e| matches!(&e.event, Event::WearAccumulated { .. })));
+    }
+
+    #[test]
+    fn apply_run_result_skipped_keep_does_not_reset_timer_or_wear() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 5,
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        let mut events = Vec::new();
+        apply_run_result(
+            &mut state,
+            &ctx,
+            RunOutcome::Skipped { reset_timer: false },
+            &mut events,
+        );
+
+        let station = state.stations.get(&station_id).unwrap();
+        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+            assert_eq!(ps.ticks_since_last_run, 5);
+        }
+        assert!((station.modules[0].wear.wear).abs() < 1e-6);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn apply_run_result_skipped_reset_resets_timer_but_no_wear() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 5,
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        let mut events = Vec::new();
+        apply_run_result(
+            &mut state,
+            &ctx,
+            RunOutcome::Skipped { reset_timer: true },
+            &mut events,
+        );
+
+        let station = state.stations.get(&station_id).unwrap();
+        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+            assert_eq!(ps.ticks_since_last_run, 0);
+        }
+        assert!((station.modules[0].wear.wear).abs() < 1e-6);
+        assert!(events.is_empty());
+    }
+
+    // ── Task 3: stall transition tests ──────────────────────────────────
+
+    #[test]
+    fn stall_transition_emits_module_stalled_event() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 5,
+                stalled: false,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        let mut events = Vec::new();
+
+        apply_run_result(
+            &mut state,
+            &ctx,
+            RunOutcome::Stalled(StallReason::VolumeCap { shortfall_m3: 5.0 }),
+            &mut events,
+        );
+
+        let station = state.stations.get(&station_id).unwrap();
+        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+            assert!(ps.stalled, "should be stalled after VolumeCap");
+        }
+        assert!(events
+            .iter()
+            .any(|e| matches!(&e.event, Event::ModuleStalled { .. })));
+    }
+
+    #[test]
+    fn stall_does_not_re_emit_when_already_stalled() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 5,
+                stalled: true,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        let mut events = Vec::new();
+
+        apply_run_result(
+            &mut state,
+            &ctx,
+            RunOutcome::Stalled(StallReason::VolumeCap { shortfall_m3: 5.0 }),
+            &mut events,
+        );
+
+        assert!(!events
+            .iter()
+            .any(|e| matches!(&e.event, Event::ModuleStalled { .. })));
+    }
+
+    #[test]
+    fn completed_after_stall_emits_resumed_and_clears_flag() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 5,
+                stalled: true,
+            }),
+        );
+        let station_id = StationId("station_test".to_string());
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        let mut events = Vec::new();
+
+        apply_run_result(&mut state, &ctx, RunOutcome::Completed, &mut events);
+
+        let station = state.stations.get(&station_id).unwrap();
+        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+            assert!(!ps.stalled, "should be un-stalled after Completed");
+        }
+        assert!(events
+            .iter()
+            .any(|e| matches!(&e.event, Event::ModuleResumed { .. })));
     }
 }
