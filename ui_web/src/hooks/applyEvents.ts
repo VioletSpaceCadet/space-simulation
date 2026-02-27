@@ -424,7 +424,10 @@ export function applyEvents(
                 if (m.id !== module_id) {return m;}
                 const ks = m.kind_state;
                 if (typeof ks === 'object' && 'Lab' in ks) {
-                  return { ...m, kind_state: { Lab: { ...ks.Lab, ticks_since_last_run: 0, assigned_tech: tech_id, starved: false } } };
+                  return {
+                    ...m,
+                    kind_state: { Lab: { ...ks.Lab, ticks_since_last_run: 0, assigned_tech: tech_id, starved: false } },
+                  };
                 }
                 return m;
               }),
