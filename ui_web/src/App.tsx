@@ -43,7 +43,7 @@ export default function App() {
     fetchMeta()
       .then((meta) => {
         setTicksPerSec(meta.ticks_per_sec);
-        setMinutesPerTick(meta.minutes_per_tick ?? 1);
+        setMinutesPerTick(meta.minutes_per_tick);
         setPaused(meta.paused);
       })
       .catch(() => {});
