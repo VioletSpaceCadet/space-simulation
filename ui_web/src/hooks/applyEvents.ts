@@ -1,12 +1,23 @@
-import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
+import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, PowerState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
+
+const MODULE_KIND_STATE_MAP: Record<string, ModuleKindState> = {
+  Processor: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+  Storage: 'Storage',
+  Maintenance: { Maintenance: { ticks_since_last_run: 0 } },
+  Assembler: { Assembler: { ticks_since_last_run: 0, stalled: false, capped: false, cap_override: {} } },
+  Lab: { Lab: { ticks_since_last_run: 0, assigned_tech: null, starved: false } },
+  SensorArray: { SensorArray: { ticks_since_last_run: 0 } },
+  SolarArray: { SolarArray: { ticks_since_last_run: 0 } },
+  Battery: { Battery: { charge_kwh: 0 } },
+};
 
 function buildTaskStub(taskKind: string, target: string | null, tick: number): TaskState {
   const kindMap: Record<string, Record<string, unknown>> = {
     Survey: target ? { Survey: { site: target } } : { Idle: {} },
     DeepScan: target ? { DeepScan: { asteroid: target } } : { Idle: {} },
     Mine: target ? { Mine: { asteroid: target, duration_ticks: 0 } } : { Idle: {} },
-    Deposit: target ? { Deposit: { station: target } } : { Idle: {} },
-    Transit: target ? { Transit: { destination: target, total_ticks: 0 } } : { Idle: {} },
+    Deposit: target ? { Deposit: { station: target, blocked: false } } : { Idle: {} },
+    Transit: target ? { Transit: { destination: target, total_ticks: 0, then: { Idle: {} } } } : { Idle: {} },
   };
   return {
     kind: (kindMap[taskKind] ?? { Idle: {} }) as TaskState['kind'],
@@ -129,21 +140,20 @@ export function applyEvents(
       }
 
       case 'ModuleInstalled': {
-        const { station_id, module_id, module_item_id, module_def_id } = event as {
+        const { station_id, module_id, module_item_id, module_def_id, behavior_type } = event as {
           station_id: string
           module_id: string
           module_item_id: string
           module_def_id: string
+          behavior_type: string
         };
         if (updatedStations[station_id]) {
           const station = updatedStations[station_id];
-          const kindState: ModuleKindState = module_def_id.includes('maintenance')
-            ? { Maintenance: { ticks_since_last_run: 0 } }
-            : module_def_id.includes('assembler')
-              ? { Assembler: { ticks_since_last_run: 0, stalled: false } }
-              : module_def_id.includes('lab')
-                ? { Lab: { ticks_since_last_run: 0, assigned_tech: null, starved: false } }
-                : { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } };
+          let kindState: ModuleKindState = MODULE_KIND_STATE_MAP[behavior_type];
+          if (!kindState) {
+            console.warn(`[applyEvents] Unknown behavior_type "${behavior_type}" for module ${module_id}, defaulting to Processor`);
+            kindState = { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } };
+          }
           updatedStations = {
             ...updatedStations,
             [station_id]: {
@@ -162,6 +172,27 @@ export function applyEvents(
                 },
               ],
             },
+          };
+        }
+        break;
+      }
+
+      case 'ModuleUninstalled': {
+        const { station_id, module_id, module_item_id } = event as {
+          station_id: string
+          module_id: string
+          module_item_id: string
+        };
+        if (updatedStations[station_id]) {
+          const station = updatedStations[station_id];
+          const removed = station.modules.find((m) => m.id === module_id);
+          const updatedModules = station.modules.filter((m) => m.id !== module_id);
+          const updatedInventory = removed
+            ? [...station.inventory, { kind: 'Module' as const, item_id: module_item_id, module_def_id: removed.def_id }]
+            : station.inventory;
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: { ...station, modules: updatedModules, inventory: updatedInventory },
           };
         }
         break;
@@ -371,6 +402,136 @@ export function applyEvents(
         break;
       }
 
+      case 'ModuleStalled': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Processor' in ks) {
+                  return { ...m, kind_state: { Processor: { ...ks.Processor, stalled: true } } };
+                }
+                if (typeof ks === 'object' && 'Assembler' in ks) {
+                  return { ...m, kind_state: { Assembler: { ...ks.Assembler, stalled: true } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'ModuleResumed': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Processor' in ks) {
+                  return { ...m, kind_state: { Processor: { ...ks.Processor, stalled: false } } };
+                }
+                if (typeof ks === 'object' && 'Assembler' in ks) {
+                  return { ...m, kind_state: { Assembler: { ...ks.Assembler, stalled: false } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'ModuleAwaitingTech':
+        // Informational — displayed in event feed, no state mutation needed
+        break;
+
+      case 'AssemblerCapped': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Assembler' in ks) {
+                  return { ...m, kind_state: { Assembler: { ...ks.Assembler, capped: true } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'AssemblerUncapped': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Assembler' in ks) {
+                  return { ...m, kind_state: { Assembler: { ...ks.Assembler, capped: false } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'DepositBlocked': {
+        const { ship_id } = event as { ship_id: string; station_id: string; shortfall_m3: number };
+        if (updatedShips[ship_id]?.task) {
+          const task = updatedShips[ship_id].task!;
+          const kind = task.kind;
+          if (typeof kind === 'object' && 'Deposit' in kind) {
+            updatedShips = {
+              ...updatedShips,
+              [ship_id]: {
+                ...updatedShips[ship_id],
+                task: { ...task, kind: { Deposit: { ...kind.Deposit, blocked: true } } },
+              },
+            };
+          }
+        }
+        break;
+      }
+
+      case 'DepositUnblocked': {
+        const { ship_id } = event as { ship_id: string; station_id: string };
+        if (updatedShips[ship_id]?.task) {
+          const task = updatedShips[ship_id].task!;
+          const kind = task.kind;
+          if (typeof kind === 'object' && 'Deposit' in kind) {
+            updatedShips = {
+              ...updatedShips,
+              [ship_id]: {
+                ...updatedShips[ship_id],
+                task: { ...task, kind: { Deposit: { ...kind.Deposit, blocked: false } } },
+              },
+            };
+          }
+        }
+        break;
+      }
+
       case 'MaintenanceRan': {
         const { station_id, target_module_id, wear_after, repair_kits_remaining } = event as {
           station_id: string
@@ -394,6 +555,76 @@ export function applyEvents(
           updatedStations = {
             ...updatedStations,
             [station_id]: { ...station, modules: updatedModules, inventory: updatedInventory },
+          };
+        }
+        break;
+      }
+
+      case 'LabRan': {
+        const { station_id, module_id, tech_id } = event as {
+          station_id: string
+          module_id: string
+          tech_id: string
+        };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Lab' in ks) {
+                  return {
+                    ...m,
+                    kind_state: { Lab: { ...ks.Lab, ticks_since_last_run: 0, assigned_tech: tech_id, starved: false } },
+                  };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'LabStarved': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Lab' in ks) {
+                  return { ...m, kind_state: { Lab: { ...ks.Lab, starved: true } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'LabResumed': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Lab' in ks) {
+                  return { ...m, kind_state: { Lab: { ...ks.Lab, starved: false } } };
+                }
+                return m;
+              }),
+            },
           };
         }
         break;
@@ -575,57 +806,83 @@ export function applyEvents(
         break;
       }
 
-      case 'InsufficientFunds':
-        // No state change — event appears in the event feed for visibility
+      case 'PowerStateUpdated': {
+        const { station_id, power } = event as { station_id: string; power: PowerState };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: { ...updatedStations[station_id], power },
+          };
+        }
         break;
-    }
+      }
 
-    if (e['TaskStarted']) {
-      const { ship_id, task_kind, target } = e['TaskStarted'] as {
-        ship_id: string
-        task_kind: string
-        target: string | null
-      };
-      if (updatedShips[ship_id]) {
-        updatedShips = {
-          ...updatedShips,
-          [ship_id]: {
-            ...updatedShips[ship_id],
-            task: buildTaskStub(task_kind, target, evt.tick),
+      case 'InsufficientFunds':
+      case 'AlertRaised':
+      case 'AlertCleared':
+      case 'ResearchRoll':
+      case 'PowerConsumed':
+        // Informational — no sim state mutation needed in the UI
+        break;
+
+      case 'TaskStarted': {
+        const { ship_id, task_kind, target } = event as {
+          ship_id: string
+          task_kind: string
+          target: string | null
+        };
+        if (updatedShips[ship_id]) {
+          updatedShips = {
+            ...updatedShips,
+            [ship_id]: {
+              ...updatedShips[ship_id],
+              task: buildTaskStub(task_kind, target, evt.tick),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'TaskCompleted': {
+        const { ship_id } = event as { ship_id: string };
+        if (updatedShips[ship_id]) {
+          updatedShips = {
+            ...updatedShips,
+            [ship_id]: { ...updatedShips[ship_id], task: null },
+          };
+        }
+        break;
+      }
+
+      case 'ShipArrived': {
+        const { ship_id, node } = event as { ship_id: string; node: string };
+        if (updatedShips[ship_id]) {
+          updatedShips = {
+            ...updatedShips,
+            [ship_id]: { ...updatedShips[ship_id], location_node: node },
+          };
+        }
+        break;
+      }
+
+      case 'DataGenerated': {
+        const { kind, amount } = event as { kind: string; amount: number };
+        updatedResearch = {
+          ...updatedResearch,
+          data_pool: {
+            ...updatedResearch.data_pool,
+            [kind]: (updatedResearch.data_pool[kind] ?? 0) + amount,
           },
         };
+        break;
       }
-    }
 
-    if (e['TaskCompleted']) {
-      const { ship_id } = e['TaskCompleted'] as { ship_id: string };
-      if (updatedShips[ship_id]) {
-        updatedShips = {
-          ...updatedShips,
-          [ship_id]: { ...updatedShips[ship_id], task: null },
-        };
-      }
-    }
-
-    if (e['ShipArrived']) {
-      const { ship_id, node } = e['ShipArrived'] as { ship_id: string; node: string };
-      if (updatedShips[ship_id]) {
-        updatedShips = {
-          ...updatedShips,
-          [ship_id]: { ...updatedShips[ship_id], location_node: node },
-        };
-      }
-    }
-
-    if (e['DataGenerated']) {
-      const { kind, amount } = e['DataGenerated'] as { kind: string; amount: number };
-      updatedResearch = {
-        ...updatedResearch,
-        data_pool: {
-          ...updatedResearch.data_pool,
-          [kind]: (updatedResearch.data_pool[kind] ?? 0) + amount,
-        },
-      };
+      // Truly unknown event type — log in dev to catch new daemon events that need handlers
+      default:
+        if (import.meta.env.DEV) {
+          console.warn(`[applyEvents] Unhandled event type: ${eventKey}`, event);
+        }
+        break;
     }
   }
 

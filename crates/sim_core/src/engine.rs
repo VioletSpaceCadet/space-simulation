@@ -107,45 +107,57 @@ fn apply_commands(
                 state.counters.next_module_instance_id += 1;
                 let module_id = crate::ModuleInstanceId(module_id_str);
 
-                let kind_state = match content.module_defs.get(&module_def_id) {
+                let (kind_state, behavior_type) = match content.module_defs.get(&module_def_id) {
                     Some(def) => match &def.behavior {
-                        crate::ModuleBehaviorDef::Processor(_) => {
+                        crate::ModuleBehaviorDef::Processor(_) => (
                             crate::ModuleKindState::Processor(crate::ProcessorState {
                                 threshold_kg: 0.0,
                                 ticks_since_last_run: 0,
                                 stalled: false,
-                            })
-                        }
-                        crate::ModuleBehaviorDef::Storage { .. } => crate::ModuleKindState::Storage,
-                        crate::ModuleBehaviorDef::Maintenance(_) => {
+                            }),
+                            crate::BehaviorType::Processor,
+                        ),
+                        crate::ModuleBehaviorDef::Storage { .. } => (
+                            crate::ModuleKindState::Storage,
+                            crate::BehaviorType::Storage,
+                        ),
+                        crate::ModuleBehaviorDef::Maintenance(_) => (
                             crate::ModuleKindState::Maintenance(crate::MaintenanceState {
                                 ticks_since_last_run: 0,
-                            })
-                        }
-                        crate::ModuleBehaviorDef::Assembler(_) => {
+                            }),
+                            crate::BehaviorType::Maintenance,
+                        ),
+                        crate::ModuleBehaviorDef::Assembler(_) => (
                             crate::ModuleKindState::Assembler(crate::AssemblerState {
                                 ticks_since_last_run: 0,
                                 stalled: false,
                                 capped: false,
                                 cap_override: std::collections::HashMap::new(),
-                            })
-                        }
-                        crate::ModuleBehaviorDef::Lab(_) => {
+                            }),
+                            crate::BehaviorType::Assembler,
+                        ),
+                        crate::ModuleBehaviorDef::Lab(_) => (
                             crate::ModuleKindState::Lab(crate::LabState {
                                 ticks_since_last_run: 0,
                                 assigned_tech: None,
                                 starved: false,
-                            })
-                        }
-                        crate::ModuleBehaviorDef::SensorArray(_) => {
-                            crate::ModuleKindState::SensorArray(crate::SensorArrayState::default())
-                        }
-                        crate::ModuleBehaviorDef::SolarArray(_) => {
-                            crate::ModuleKindState::SolarArray(crate::SolarArrayState::default())
-                        }
-                        crate::ModuleBehaviorDef::Battery(_) => {
-                            crate::ModuleKindState::Battery(crate::BatteryState { charge_kwh: 0.0 })
-                        }
+                            }),
+                            crate::BehaviorType::Lab,
+                        ),
+                        crate::ModuleBehaviorDef::SensorArray(_) => (
+                            crate::ModuleKindState::SensorArray(crate::SensorArrayState::default()),
+                            crate::BehaviorType::SensorArray,
+                        ),
+                        crate::ModuleBehaviorDef::SolarArray(_) => (
+                            crate::ModuleKindState::SolarArray(crate::SolarArrayState::default()),
+                            crate::BehaviorType::SolarArray,
+                        ),
+                        crate::ModuleBehaviorDef::Battery(_) => (
+                            crate::ModuleKindState::Battery(crate::BatteryState {
+                                charge_kwh: 0.0,
+                            }),
+                            crate::BehaviorType::Battery,
+                        ),
                     },
                     None => continue,
                 };
@@ -168,6 +180,7 @@ fn apply_commands(
                         module_id,
                         module_item_id: item_id,
                         module_def_id,
+                        behavior_type,
                     },
                 ));
             }

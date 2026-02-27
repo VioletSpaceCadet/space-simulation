@@ -77,6 +77,10 @@ jobs:
       - name: Test with coverage
         run: npm run test:coverage
 
+      - name: Event sync check
+        working-directory: .
+        run: ./scripts/ci_event_sync.sh
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
