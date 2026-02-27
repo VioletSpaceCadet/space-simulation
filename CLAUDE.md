@@ -112,7 +112,7 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 ## Simulation Testing & Balance Analysis
 
-Use the **sim-e2e-tester agent** (`.claude/agents/sim-e2e-tester`) for balance analysis, bulk simulation runs, E2E diagnostics, and ad-hoc UI testing via Chrome (`--chrome` flag). It has full docs on MCP tools, diagnostic methodology, and testing workflows.
+Use the **sim-e2e-tester agent** (`.claude/agents/sim-e2e-tester`) for balance analysis, bulk simulation runs, E2E diagnostics, and ad-hoc UI testing. For browser-based UI testing, run Claude Code with the `--chrome` flag — this enables the Claude in Chrome MCP tools (screenshot, click, navigate, etc.) which the agent uses to interact with the UI at `localhost:5173`. It has full docs on MCP tools, diagnostic methodology, and testing workflows.
 
 **E2E tests** (`e2e/`) are intentionally minimal — they cover SSE streaming, pause/resume, speed controls, save, and spacebar toggle. Don't add complex E2E tests; they're fragile and better covered by vitest unit tests or the sim-e2e-tester agent with Chrome.
 
