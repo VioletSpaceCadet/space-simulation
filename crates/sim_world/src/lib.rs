@@ -476,6 +476,7 @@ mod tests {
         content.solar_system.nodes.push(NodeDef {
             id: NodeId("node_a".to_string()),
             name: "A".to_string(),
+            solar_intensity: 1.0,
         });
         content.solar_system.edges.push((
             NodeId("node_a".to_string()),

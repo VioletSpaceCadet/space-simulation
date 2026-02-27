@@ -1,9 +1,9 @@
 {
   "nodes": [
-    { "id": "node_earth_orbit", "name": "Earth Orbit" },
-    { "id": "node_belt_inner",  "name": "Inner Belt" },
-    { "id": "node_belt_mid",    "name": "Mid Belt" },
-    { "id": "node_belt_outer",  "name": "Outer Belt" }
+    { "id": "node_earth_orbit", "name": "Earth Orbit",  "solar_intensity": 1.00 },
+    { "id": "node_belt_inner",  "name": "Inner Belt",   "solar_intensity": 0.40 },
+    { "id": "node_belt_mid",    "name": "Mid Belt",     "solar_intensity": 0.20 },
+    { "id": "node_belt_outer",  "name": "Outer Belt",   "solar_intensity": 0.08 }
   ],
   "edges": [
     ["node_earth_orbit", "node_belt_inner"],
