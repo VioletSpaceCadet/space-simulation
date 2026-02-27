@@ -130,7 +130,6 @@ describe('FleetPanel', () => {
         power_available_per_tick: 100,
         inventory: [{ kind: 'Material', element: 'Fe', kg: 500.0, quality: 0.85 }],
         cargo_capacity_m3: 100.0,
-        facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1.0 },
         modules: [
           {
             id: 'mod_001',
@@ -178,7 +177,6 @@ describe('FleetPanel', () => {
           { kind: 'Component', component_id: 'repair_kit', count: 3, quality: 1.0 },
         ],
         cargo_capacity_m3: 100.0,
-        facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1.0 },
         modules: [],
         power: zeroPower,
       },
@@ -214,7 +212,6 @@ describe('FleetPanel', () => {
         power_available_per_tick: 100,
         inventory: [],
         cargo_capacity_m3: 100.0,
-        facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1.0 },
         modules: [
           {
             id: 'mod_001',

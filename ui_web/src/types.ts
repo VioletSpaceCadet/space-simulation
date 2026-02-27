@@ -1,7 +1,7 @@
 export interface MetaInfo {
   tick: number
   seed: number
-  schema_version: number
+  schema_version?: number
   content_version: string
   ticks_per_sec: number
   paused: boolean
