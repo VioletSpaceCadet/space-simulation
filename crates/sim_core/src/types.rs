@@ -182,10 +182,16 @@ pub enum ModuleKindState {
     Assembler(AssemblerState),
     Lab(LabState),
     SensorArray(SensorArrayState),
+    SolarArray(SolarArrayState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SensorArrayState {
+    pub ticks_since_last_run: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SolarArrayState {
     pub ticks_since_last_run: u64,
 }
 
@@ -758,6 +764,7 @@ pub enum ModuleBehaviorDef {
     Assembler(AssemblerDef),
     Lab(LabDef),
     SensorArray(SensorArrayDef),
+    SolarArray(SolarArrayDef),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -792,6 +799,11 @@ pub struct SensorArrayDef {
     pub data_kind: DataKind,
     pub action_key: String,
     pub scan_interval_ticks: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SolarArrayDef {
+    pub base_output_kw: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

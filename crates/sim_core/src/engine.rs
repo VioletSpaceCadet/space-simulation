@@ -136,6 +136,9 @@ fn apply_commands(
                         crate::ModuleBehaviorDef::SensorArray(_) => {
                             crate::ModuleKindState::SensorArray(crate::SensorArrayState::default())
                         }
+                        crate::ModuleBehaviorDef::SolarArray(_) => {
+                            crate::ModuleKindState::SolarArray(crate::SolarArrayState::default())
+                        }
                     },
                     None => continue,
                 };
