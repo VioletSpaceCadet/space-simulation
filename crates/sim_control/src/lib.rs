@@ -280,7 +280,7 @@ const AUTOPILOT_BUDGET_CAP_FRACTION: f64 = 0.05;
 /// Emits Import commands for thrusters when a shipyard is ready and conditions are met.
 ///
 /// Guards (VIO-41):
-/// 1. Trade must be unlocked (tick >= `TRADE_UNLOCK_TICK`).
+/// 1. Trade must be unlocked (tick >= `trade_unlock_tick()`).
 /// 2. `tech_ship_construction` must be researched.
 /// 3. Station must have fewer thrusters than the shipyard recipe requires.
 /// 4. Budget cap: import cost must be < `AUTOPILOT_BUDGET_CAP_FRACTION` of current balance.
