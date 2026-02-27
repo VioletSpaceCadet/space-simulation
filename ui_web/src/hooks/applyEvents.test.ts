@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AsteroidState, ComponentItem, MaterialItem, ModuleItem, OreItem, ResearchState, ShipState, SlagItem, StationState, TradeItemSpec } from '../types';
+import type { AsteroidState, ComponentItem, MaterialItem, ModuleItem, OreItem, ResearchState, ScanSite, ShipState, SlagItem, StationState, TradeItemSpec } from '../types';
 
 import { applyEvents } from './applyEvents';
 
@@ -709,6 +709,757 @@ describe('applyEvents', () => {
 
       expect(result.balance).toBe(defaultBalance);
       expect(result.stations['station_001'].inventory).toHaveLength(0);
+    });
+  });
+
+  describe('AsteroidDiscovered', () => {
+    it('adds a new asteroid to state', () => {
+      const events = [{
+        id: 'e1', tick: 5,
+        event: { AsteroidDiscovered: { asteroid_id: 'ast_new', location_node: 'node_b' } },
+      }];
+
+      const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
+
+      expect(result.asteroids['ast_new']).toBeDefined();
+      expect(result.asteroids['ast_new'].id).toBe('ast_new');
+      expect(result.asteroids['ast_new'].location_node).toBe('node_b');
+      expect(result.asteroids['ast_new'].knowledge.tag_beliefs).toEqual([]);
+      expect(result.asteroids['ast_new'].knowledge.composition).toBeNull();
+    });
+
+    it('does not overwrite an existing asteroid', () => {
+      const existing = makeAsteroid({ id: 'ast_001', mass_kg: 999 });
+      const events = [{
+        id: 'e1', tick: 5,
+        event: { AsteroidDiscovered: { asteroid_id: 'ast_001', location_node: 'node_b' } },
+      }];
+
+      const result = applyEvents(
+        { ast_001: existing }, {}, {}, emptyResearch, [], defaultBalance, events,
+      );
+
+      expect(result.asteroids['ast_001'].mass_kg).toBe(999);
+    });
+  });
+
+  describe('ModuleInstalled', () => {
+    it('adds Processor module and removes item from inventory', () => {
+      const station = makeStation({
+        inventory: [
+          { kind: 'Module', item_id: 'item_ref', module_def_id: 'module_refinery' } as ModuleItem,
+        ],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ModuleInstalled: {
+            station_id: 'station_001', module_id: 'mod_1',
+            module_item_id: 'item_ref', module_def_id: 'module_refinery',
+            behavior_type: 'Processor',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+
+      expect(result.stations['station_001'].modules).toHaveLength(1);
+      expect(result.stations['station_001'].modules[0].id).toBe('mod_1');
+      expect(result.stations['station_001'].modules[0].def_id).toBe('module_refinery');
+      expect(result.stations['station_001'].modules[0].enabled).toBe(false);
+      expect(result.stations['station_001'].modules[0].kind_state).toEqual({
+        Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false },
+      });
+      expect(result.stations['station_001'].inventory).toHaveLength(0);
+    });
+
+    it('assigns correct kind_state for each behavior_type', () => {
+      const behaviorTypes: Record<string, unknown> = {
+        Processor: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+        Storage: 'Storage',
+        Maintenance: { Maintenance: { ticks_since_last_run: 0 } },
+        Assembler: {
+          Assembler: { ticks_since_last_run: 0, stalled: false, capped: false, cap_override: {} },
+        },
+        Lab: { Lab: { ticks_since_last_run: 0, assigned_tech: null, starved: false } },
+        SensorArray: { SensorArray: { ticks_since_last_run: 0 } },
+        SolarArray: { SolarArray: { ticks_since_last_run: 0 } },
+        Battery: { Battery: { charge_kwh: 0 } },
+      };
+
+      for (const [behaviorType, expectedKindState] of Object.entries(behaviorTypes)) {
+        const station = makeStation();
+        const events = [{
+          id: 'e1', tick: 10,
+          event: {
+            ModuleInstalled: {
+              station_id: 'station_001', module_id: `mod_${behaviorType}`,
+              module_item_id: 'item_1', module_def_id: `module_${behaviorType}`,
+              behavior_type: behaviorType,
+            },
+          },
+        }];
+
+        const result = applyEvents(
+          {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+        );
+        expect(result.stations['station_001'].modules[0].kind_state).toEqual(expectedKindState);
+      }
+    });
+
+    it('falls back to Processor for unknown behavior_type', () => {
+      const station = makeStation();
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ModuleInstalled: {
+            station_id: 'station_001', module_id: 'mod_unknown',
+            module_item_id: 'item_1', module_def_id: 'module_custom',
+            behavior_type: 'UnknownType',
+          },
+        },
+      }];
+
+      const result = applyEvents(
+        {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+      );
+      expect(result.stations['station_001'].modules[0].kind_state).toEqual({
+        Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false },
+      });
+    });
+  });
+
+  describe('ModuleToggled', () => {
+    it('toggles module enabled to true', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_1', def_id: 'module_refinery', enabled: false,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { ModuleToggled: { station_id: 'station_001', module_id: 'mod_1', enabled: true } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      expect(result.stations['station_001'].modules[0].enabled).toBe(true);
+    });
+
+    it('toggles module enabled to false', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_1', def_id: 'module_refinery', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { ModuleToggled: { station_id: 'station_001', module_id: 'mod_1', enabled: false } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      expect(result.stations['station_001'].modules[0].enabled).toBe(false);
+    });
+  });
+
+  describe('ModuleThresholdSet', () => {
+    it('updates threshold_kg on Processor module', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_1', def_id: 'module_refinery', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ModuleThresholdSet: {
+            station_id: 'station_001', module_id: 'mod_1', threshold_kg: 500,
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.kind_state).toEqual({
+        Processor: { threshold_kg: 500, ticks_since_last_run: 0, stalled: false },
+      });
+    });
+
+    it('ignores non-Processor modules', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_1', def_id: 'module_storage', enabled: true,
+          kind_state: 'Storage',
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ModuleThresholdSet: {
+            station_id: 'station_001', module_id: 'mod_1', threshold_kg: 500,
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      expect(result.stations['station_001'].modules[0].kind_state).toBe('Storage');
+    });
+  });
+
+  describe('RefineryRan', () => {
+    it('consumes ore, produces material and slag', () => {
+      const station = makeStation({
+        inventory: [makeOreLot({ lot_id: 'lot_1', kg: 100 })],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          RefineryRan: {
+            station_id: 'station_001', module_id: 'mod_1',
+            ore_consumed_kg: 30, material_produced_kg: 20,
+            material_quality: 0.8, slag_produced_kg: 10,
+            material_element: 'Fe',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const inv = result.stations['station_001'].inventory;
+
+      // Ore reduced
+      const ore = inv.find((i) => i.kind === 'Ore');
+      expect(ore).toBeDefined();
+      expect(ore!.kg).toBe(70);
+
+      // Material produced
+      const mat = inv.find((i) => i.kind === 'Material') as MaterialItem;
+      expect(mat).toBeDefined();
+      expect(mat.element).toBe('Fe');
+      expect(mat.kg).toBe(20);
+      expect(mat.quality).toBe(0.8);
+
+      // Slag produced
+      const slag = inv.find((i) => i.kind === 'Slag');
+      expect(slag).toBeDefined();
+      expect(slag!.kg).toBe(10);
+    });
+
+    it('merges material with existing stock', () => {
+      const station = makeStation({
+        inventory: [
+          makeOreLot({ kg: 100 }),
+          { kind: 'Material', element: 'Fe', kg: 50, quality: 1.0 },
+        ],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          RefineryRan: {
+            station_id: 'station_001', module_id: 'mod_1',
+            ore_consumed_kg: 20, material_produced_kg: 10,
+            material_quality: 0.5, slag_produced_kg: 0,
+            material_element: 'Fe',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const mat = result.stations['station_001'].inventory.find(
+        (i) => i.kind === 'Material',
+      ) as MaterialItem;
+      expect(mat.kg).toBe(60);
+      // Weighted average quality: (50*1.0 + 10*0.5) / 60
+      expect(mat.quality).toBeCloseTo((50 + 5) / 60);
+    });
+
+    it('removes ore lot when fully consumed', () => {
+      const station = makeStation({
+        inventory: [makeOreLot({ kg: 30 })],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          RefineryRan: {
+            station_id: 'station_001', module_id: 'mod_1',
+            ore_consumed_kg: 30, material_produced_kg: 20,
+            material_quality: 1.0, slag_produced_kg: 5,
+            material_element: 'Fe',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const ores = result.stations['station_001'].inventory.filter((i) => i.kind === 'Ore');
+      expect(ores).toHaveLength(0);
+    });
+  });
+
+  describe('AssemblerRan', () => {
+    it('consumes material and produces component', () => {
+      const station = makeStation({
+        inventory: [{ kind: 'Material', element: 'Fe', kg: 100, quality: 1.0 }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          AssemblerRan: {
+            station_id: 'station_001', module_id: 'mod_1',
+            material_consumed_kg: 20, material_element: 'Fe',
+            component_produced_id: 'thruster', component_produced_count: 1,
+            component_quality: 0.9,
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const inv = result.stations['station_001'].inventory;
+
+      const mat = inv.find((i) => i.kind === 'Material') as MaterialItem;
+      expect(mat.kg).toBe(80);
+
+      const comp = inv.find((i) => i.kind === 'Component') as ComponentItem;
+      expect(comp.component_id).toBe('thruster');
+      expect(comp.count).toBe(1);
+      expect(comp.quality).toBe(0.9);
+    });
+
+    it('merges component with existing stock', () => {
+      const station = makeStation({
+        inventory: [
+          { kind: 'Material', element: 'Fe', kg: 100, quality: 1.0 },
+          { kind: 'Component', component_id: 'thruster', count: 3, quality: 1.0 },
+        ],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          AssemblerRan: {
+            station_id: 'station_001', module_id: 'mod_1',
+            material_consumed_kg: 20, material_element: 'Fe',
+            component_produced_id: 'thruster', component_produced_count: 2,
+            component_quality: 0.9,
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const comp = result.stations['station_001'].inventory.find(
+        (i) => i.kind === 'Component',
+      ) as ComponentItem;
+      expect(comp.count).toBe(5);
+    });
+  });
+
+  describe('WearAccumulated', () => {
+    it('updates module wear value', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_1', def_id: 'module_refinery', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0.1 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          WearAccumulated: {
+            station_id: 'station_001', module_id: 'mod_1', wear_after: 0.25,
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      expect(result.stations['station_001'].modules[0].wear).toEqual({ wear: 0.25 });
+    });
+  });
+
+  describe('ModuleAutoDisabled', () => {
+    it('sets module enabled to false', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_1', def_id: 'module_refinery', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 1.0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ModuleAutoDisabled: {
+            station_id: 'station_001', module_id: 'mod_1', reason: 'WearLimit',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      expect(result.stations['station_001'].modules[0].enabled).toBe(false);
+    });
+  });
+
+  describe('MaintenanceRan', () => {
+    it('reduces target module wear and updates repair kit count', () => {
+      const station = makeStation({
+        modules: [
+          {
+            id: 'mod_maint', def_id: 'module_maintenance', enabled: true,
+            kind_state: { Maintenance: { ticks_since_last_run: 0 } },
+            wear: { wear: 0 },
+          },
+          {
+            id: 'mod_ref', def_id: 'module_refinery', enabled: true,
+            kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+            wear: { wear: 0.5 },
+          },
+        ],
+        inventory: [
+          { kind: 'Component', component_id: 'repair_kit', count: 10, quality: 1.0 },
+        ],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          MaintenanceRan: {
+            station_id: 'station_001', module_id: 'mod_maint',
+            target_module_id: 'mod_ref', wear_after: 0.3,
+            repair_kits_remaining: 9,
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+
+      // Target module wear reduced
+      const refinery = result.stations['station_001'].modules.find((m) => m.id === 'mod_ref')!;
+      expect(refinery.wear).toEqual({ wear: 0.3 });
+
+      // Repair kit count updated
+      const kits = result.stations['station_001'].inventory.find(
+        (i) => i.kind === 'Component' && (i as ComponentItem).component_id === 'repair_kit',
+      ) as ComponentItem;
+      expect(kits.count).toBe(9);
+    });
+  });
+
+  describe('ShipConstructed', () => {
+    it('adds a new ship to state', () => {
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ShipConstructed: {
+            ship_id: 'ship_new', station_id: 'station_001',
+            location_node: 'node_a', cargo_capacity_m3: 30,
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
+
+      expect(result.ships['ship_new']).toBeDefined();
+      expect(result.ships['ship_new'].id).toBe('ship_new');
+      expect(result.ships['ship_new'].location_node).toBe('node_a');
+      expect(result.ships['ship_new'].cargo_capacity_m3).toBe(30);
+      expect(result.ships['ship_new'].inventory).toEqual([]);
+      expect(result.ships['ship_new'].task).toBeNull();
+    });
+  });
+
+  describe('TechUnlocked', () => {
+    it('adds tech_id to research unlocked list', () => {
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { TechUnlocked: { tech_id: 'tech_advanced_mining' } },
+      }];
+
+      const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.research.unlocked).toContain('tech_advanced_mining');
+    });
+
+    it('appends to existing unlocked list', () => {
+      const research: ResearchState = {
+        ...emptyResearch,
+        unlocked: ['tech_basic'],
+      };
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { TechUnlocked: { tech_id: 'tech_advanced' } },
+      }];
+
+      const result = applyEvents({}, {}, {}, research, [], defaultBalance, events);
+      expect(result.research.unlocked).toEqual(['tech_basic', 'tech_advanced']);
+    });
+  });
+
+  describe('ScanSiteSpawned', () => {
+    it('adds a new scan site', () => {
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ScanSiteSpawned: {
+            site_id: 'site_1', node: 'node_a', template_id: 'template_iron',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.scanSites).toHaveLength(1);
+      expect(result.scanSites[0]).toEqual({
+        id: 'site_1', node: 'node_a', template_id: 'template_iron',
+      });
+    });
+
+    it('appends to existing scan sites', () => {
+      const existingSites: ScanSite[] = [
+        { id: 'site_0', node: 'node_b', template_id: 'template_gold' },
+      ];
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ScanSiteSpawned: {
+            site_id: 'site_1', node: 'node_a', template_id: 'template_iron',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, {}, emptyResearch, existingSites, defaultBalance, events);
+      expect(result.scanSites).toHaveLength(2);
+    });
+  });
+
+  describe('ScanResult', () => {
+    it('updates asteroid tag_beliefs', () => {
+      const asteroid = makeAsteroid();
+      const tags: [string, number][] = [['metallic', 0.8], ['icy', 0.2]];
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { ScanResult: { asteroid_id: 'ast_001', tags } },
+      }];
+
+      const result = applyEvents(
+        { ast_001: asteroid }, {}, {}, emptyResearch, [], defaultBalance, events,
+      );
+      expect(result.asteroids['ast_001'].knowledge.tag_beliefs).toEqual(tags);
+    });
+  });
+
+  describe('CompositionMapped', () => {
+    it('updates asteroid composition', () => {
+      const asteroid = makeAsteroid();
+      const composition = { Fe: 0.6, Si: 0.3, Ni: 0.1 };
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { CompositionMapped: { asteroid_id: 'ast_001', composition } },
+      }];
+
+      const result = applyEvents(
+        { ast_001: asteroid }, {}, {}, emptyResearch, [], defaultBalance, events,
+      );
+      expect(result.asteroids['ast_001'].knowledge.composition).toEqual(composition);
+    });
+  });
+
+  describe('TaskStarted', () => {
+    it('assigns a Mine task to the ship', () => {
+      const ship = makeShip();
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          TaskStarted: {
+            ship_id: 'ship_0001', task_kind: 'Mine', target: 'ast_001',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      const task = result.ships['ship_0001'].task!;
+      expect(task.started_tick).toBe(10);
+      expect(task.kind).toEqual({ Mine: { asteroid: 'ast_001', duration_ticks: 0 } });
+    });
+
+    it('assigns a Survey task to the ship', () => {
+      const ship = makeShip();
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          TaskStarted: {
+            ship_id: 'ship_0001', task_kind: 'Survey', target: 'site_1',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_0001'].task!.kind).toEqual({ Survey: { site: 'site_1' } });
+    });
+
+    it('assigns a DeepScan task to the ship', () => {
+      const ship = makeShip();
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          TaskStarted: {
+            ship_id: 'ship_0001', task_kind: 'DeepScan', target: 'ast_001',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_0001'].task!.kind).toEqual({ DeepScan: { asteroid: 'ast_001' } });
+    });
+
+    it('assigns a Deposit task to the ship', () => {
+      const ship = makeShip();
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          TaskStarted: {
+            ship_id: 'ship_0001', task_kind: 'Deposit', target: 'station_001',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_0001'].task!.kind).toEqual({
+        Deposit: { station: 'station_001', blocked: false },
+      });
+    });
+
+    it('assigns a Transit task to the ship', () => {
+      const ship = makeShip();
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          TaskStarted: {
+            ship_id: 'ship_0001', task_kind: 'Transit', target: 'node_b',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_0001'].task!.kind).toEqual({
+        Transit: { destination: 'node_b', total_ticks: 0, then: { Idle: {} } },
+      });
+    });
+
+    it('falls back to Idle for unknown task kind', () => {
+      const ship = makeShip();
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          TaskStarted: {
+            ship_id: 'ship_0001', task_kind: 'UnknownTask', target: null,
+          },
+        },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_0001'].task!.kind).toEqual({ Idle: {} });
+    });
+  });
+
+  describe('TaskCompleted', () => {
+    it('clears the ship task', () => {
+      const ship = makeShip({
+        task: {
+          kind: { Mine: { asteroid: 'ast_001', duration_ticks: 10 } },
+          started_tick: 5, eta_tick: 15,
+        },
+      });
+
+      const events = [{
+        id: 'e1', tick: 15,
+        event: { TaskCompleted: { ship_id: 'ship_0001', task_kind: 'Mine' } },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_0001'].task).toBeNull();
+    });
+  });
+
+  describe('ShipArrived', () => {
+    it('updates ship location_node', () => {
+      const ship = makeShip({ location_node: 'node_a' });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { ShipArrived: { ship_id: 'ship_0001', node: 'node_b' } },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_0001'].location_node).toBe('node_b');
+    });
+  });
+
+  describe('DataGenerated', () => {
+    it('adds to research data pool', () => {
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { DataGenerated: { kind: 'Materials', amount: 5.0 } },
+      }];
+
+      const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.research.data_pool['Materials']).toBe(5.0);
+    });
+
+    it('accumulates with existing data', () => {
+      const research: ResearchState = {
+        ...emptyResearch,
+        data_pool: { Materials: 3.0 },
+      };
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { DataGenerated: { kind: 'Materials', amount: 7.0 } },
+      }];
+
+      const result = applyEvents({}, {}, {}, research, [], defaultBalance, events);
+      expect(result.research.data_pool['Materials']).toBe(10.0);
+    });
+  });
+
+  describe('ModuleAwaitingTech', () => {
+    it('is a no-op (informational event)', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_1', def_id: 'module_refinery', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ModuleAwaitingTech: {
+            station_id: 'station_001', module_id: 'mod_1', tech_id: 'tech_advanced',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      // State should be unchanged
+      expect(result.stations['station_001'].modules[0].enabled).toBe(true);
+      expect(result.stations['station_001'].modules[0].kind_state).toEqual({
+        Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false },
+      });
     });
   });
 });
