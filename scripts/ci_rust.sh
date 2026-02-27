@@ -10,10 +10,15 @@ cargo fmt --check
 echo "  cargo clippy..."
 cargo clippy -- -D warnings
 
-echo "  cargo llvm-cov (test + coverage, fail-under-lines 83)..."
-cargo llvm-cov --ignore-filename-regex 'tests/|test_helpers|fixtures' --fail-under-lines 83
+IGNORE_RE='tests/|test_helpers|fixtures'
+
+echo "  cargo llvm-cov (test + coverage)..."
+cargo llvm-cov --ignore-filename-regex "$IGNORE_RE"
 
 echo "  generating lcov report..."
-cargo llvm-cov report --ignore-filename-regex 'tests/|test_helpers|fixtures' --lcov --output-path lcov.info
+cargo llvm-cov report --ignore-filename-regex "$IGNORE_RE" --lcov --output-path lcov.info
+
+echo "  checking coverage threshold (83% lines)..."
+cargo llvm-cov report --ignore-filename-regex "$IGNORE_RE" --fail-under-lines 83
 
 echo "=== Rust CI passed ==="

@@ -34,10 +34,14 @@ jobs:
         run: cargo clippy -- -D warnings
 
       - name: Test with coverage
-        run: cargo llvm-cov --ignore-filename-regex 'tests/|test_helpers|fixtures' --fail-under-lines 83
+        run: cargo llvm-cov --ignore-filename-regex 'tests/|test_helpers|fixtures'
 
       - name: Generate LCOV report
+        if: always()
         run: cargo llvm-cov report --ignore-filename-regex 'tests/|test_helpers|fixtures' --lcov --output-path lcov.info
+
+      - name: Check coverage threshold (83% lines)
+        run: cargo llvm-cov report --ignore-filename-regex 'tests/|test_helpers|fixtures' --fail-under-lines 83
 
       - uses: actions/upload-artifact@v4
         if: always()
