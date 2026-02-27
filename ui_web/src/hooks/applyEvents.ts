@@ -16,7 +16,7 @@ function buildTaskStub(taskKind: string, target: string | null, tick: number): T
     Survey: target ? { Survey: { site: target } } : { Idle: {} },
     DeepScan: target ? { DeepScan: { asteroid: target } } : { Idle: {} },
     Mine: target ? { Mine: { asteroid: target, duration_ticks: 0 } } : { Idle: {} },
-    Deposit: target ? { Deposit: { station: target } } : { Idle: {} },
+    Deposit: target ? { Deposit: { station: target, blocked: false } } : { Idle: {} },
     Transit: target ? { Transit: { destination: target, total_ticks: 0, then: { Idle: {} } } } : { Idle: {} },
   };
   return {
@@ -453,6 +453,84 @@ export function applyEvents(
       case 'ModuleAwaitingTech':
         // Informational — displayed in event feed, no state mutation needed
         break;
+
+      case 'AssemblerCapped': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Assembler' in ks) {
+                  return { ...m, kind_state: { Assembler: { ...ks.Assembler, capped: true } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'AssemblerUncapped': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Assembler' in ks) {
+                  return { ...m, kind_state: { Assembler: { ...ks.Assembler, capped: false } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'DepositBlocked': {
+        const { ship_id } = event as { ship_id: string; station_id: string; shortfall_m3: number };
+        if (updatedShips[ship_id]?.task) {
+          const task = updatedShips[ship_id].task!;
+          const kind = task.kind;
+          if (typeof kind === 'object' && 'Deposit' in kind) {
+            updatedShips = {
+              ...updatedShips,
+              [ship_id]: {
+                ...updatedShips[ship_id],
+                task: { ...task, kind: { Deposit: { ...kind.Deposit, blocked: true } } },
+              },
+            };
+          }
+        }
+        break;
+      }
+
+      case 'DepositUnblocked': {
+        const { ship_id } = event as { ship_id: string; station_id: string };
+        if (updatedShips[ship_id]?.task) {
+          const task = updatedShips[ship_id].task!;
+          const kind = task.kind;
+          if (typeof kind === 'object' && 'Deposit' in kind) {
+            updatedShips = {
+              ...updatedShips,
+              [ship_id]: {
+                ...updatedShips[ship_id],
+                task: { ...task, kind: { Deposit: { ...kind.Deposit, blocked: false } } },
+              },
+            };
+          }
+        }
+        break;
+      }
 
       case 'MaintenanceRan': {
         const { station_id, target_module_id, wear_after, repair_kits_remaining } = event as {
