@@ -1,11 +1,10 @@
-use super::{apply_wear, MIN_MEANINGFUL_KG, TECH_SHIP_CONSTRUCTION};
+use super::{MIN_MEANINGFUL_KG, TECH_SHIP_CONSTRUCTION};
 use crate::{
     Event, EventEnvelope, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
-    ModuleBehaviorDef, ModuleKindState, OutputSpec, PrincipalId, QualityFormula, RecipeDef, ShipId,
-    ShipState, StationId, TechId,
+    ModuleBehaviorDef, OutputSpec, PrincipalId, QualityFormula, RecipeDef, ShipId, ShipState,
+    StationId, TechId,
 };
 
-#[allow(clippy::too_many_lines)]
 pub(super) fn tick_assembler_modules(
     state: &mut GameState,
     station_id: &StationId,
@@ -13,387 +12,240 @@ pub(super) fn tick_assembler_modules(
     rng: &mut impl rand::Rng,
     events: &mut Vec<EventEnvelope>,
 ) {
-    let current_tick = state.meta.tick;
     let module_count = state
         .stations
         .get(station_id)
         .map_or(0, |s| s.modules.len());
 
     for module_idx in 0..module_count {
-        // Extract module info and assembler def
-        let (assembler_def, power_needed, wear_per_run) = {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            let module = &station.modules[module_idx];
-            if !module.enabled || module.power_stalled {
-                continue;
-            }
-            let Some(def) = content.module_defs.get(&module.def_id) else {
-                continue;
-            };
-            let ModuleBehaviorDef::Assembler(assembler_def) = &def.behavior else {
-                continue;
-            };
-            (
-                assembler_def.clone(),
-                def.power_consumption_per_run,
-                def.wear_per_run,
-            )
-        };
-
-        // Tick timer; skip if interval not reached
-        {
-            let Some(station) = state.stations.get_mut(station_id) else {
-                return;
-            };
-            if let ModuleKindState::Assembler(asmb) = &mut station.modules[module_idx].kind_state {
-                asmb.ticks_since_last_run += 1;
-                if asmb.ticks_since_last_run < assembler_def.assembly_interval_ticks {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-        }
-
-        // Check power budget
-        {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            if station.power_available_per_tick < power_needed {
-                continue;
-            }
-        }
-
-        let Some(recipe) = assembler_def.recipes.first() else {
+        let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
             continue;
         };
 
-        // Check input availability
-        let input_available = {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            recipe
-                .inputs
-                .iter()
-                .all(|input| match (&input.filter, &input.amount) {
-                    (InputFilter::Element(el), InputAmount::Kg(required_kg)) => {
-                        let available_kg: f32 = station
-                            .inventory
-                            .iter()
-                            .filter_map(|item| match item {
-                                InventoryItem::Material { element, kg, .. } if element == el => {
-                                    Some(*kg)
-                                }
-                                _ => None,
-                            })
-                            .sum();
-                        available_kg >= *required_kg
-                    }
-                    (InputFilter::Component(cid), InputAmount::Count(required)) => {
-                        let available: u32 = station
-                            .inventory
-                            .iter()
-                            .filter_map(|item| match item {
-                                InventoryItem::Component {
-                                    component_id,
-                                    count,
-                                    ..
-                                } if component_id.0 == cid.0 => Some(*count),
-                                _ => None,
-                            })
-                            .sum();
-                        available >= *required
-                    }
-                    _ => false,
-                })
+        let ModuleBehaviorDef::Assembler(_) = &ctx.def.behavior else {
+            continue;
+        };
+        let assembler_def = if let ModuleBehaviorDef::Assembler(ad) = &ctx.def.behavior {
+            ad.clone()
+        } else {
+            continue;
         };
 
-        if !input_available {
-            // Reset timer so it retries next interval
-            if let Some(station) = state.stations.get_mut(station_id) {
-                if let ModuleKindState::Assembler(asmb) =
-                    &mut station.modules[module_idx].kind_state
-                {
-                    asmb.ticks_since_last_run = 0;
-                }
-            }
+        if !super::should_run(state, &ctx) {
             continue;
         }
 
-        // Stock cap check: skip if any output component is at or above its cap
-        let (is_capped, was_capped) = {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            let was_capped = match &station.modules[module_idx].kind_state {
-                ModuleKindState::Assembler(asmb) => asmb.capped,
-                _ => false,
-            };
-
-            let cap_override = match &station.modules[module_idx].kind_state {
-                ModuleKindState::Assembler(asmb) => asmb.cap_override.clone(),
-                _ => std::collections::HashMap::new(),
-            };
-
-            let is_capped = recipe.outputs.iter().any(|output| {
-                if let OutputSpec::Component { component_id, .. } = output {
-                    let effective_cap = cap_override
-                        .get(component_id)
-                        .copied()
-                        .or_else(|| assembler_def.max_stock.get(component_id).copied());
-
-                    if let Some(cap) = effective_cap {
-                        let current_count: u32 = station
-                            .inventory
-                            .iter()
-                            .filter_map(|item| match item {
-                                InventoryItem::Component {
-                                    component_id: cid,
-                                    count,
-                                    ..
-                                } if cid == component_id => Some(*count),
-                                _ => None,
-                            })
-                            .sum();
-                        current_count >= cap
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            });
-
-            (is_capped, was_capped)
-        };
-
-        if is_capped {
-            if !was_capped {
-                let module_id = state.stations.get(station_id).unwrap().modules[module_idx]
-                    .id
-                    .clone();
-                if let Some(station) = state.stations.get_mut(station_id) {
-                    if let ModuleKindState::Assembler(asmb) =
-                        &mut station.modules[module_idx].kind_state
-                    {
-                        asmb.capped = true;
-                    }
-                }
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    Event::AssemblerCapped {
-                        station_id: station_id.clone(),
-                        module_id,
-                    },
-                ));
-            }
-            continue;
-        }
-
-        if was_capped {
-            let module_id = state.stations.get(station_id).unwrap().modules[module_idx]
-                .id
-                .clone();
-            if let Some(station) = state.stations.get_mut(station_id) {
-                if let ModuleKindState::Assembler(asmb) =
-                    &mut station.modules[module_idx].kind_state
-                {
-                    asmb.capped = false;
-                }
-            }
-            events.push(crate::emit(
-                &mut state.counters,
-                current_tick,
-                Event::AssemblerUncapped {
-                    station_id: station_id.clone(),
-                    module_id,
-                },
-            ));
-        }
-
-        // Tech gate: if recipe has OutputSpec::Ship output, require tech_ship_construction
-        let has_ship_output = recipe
-            .outputs
-            .iter()
-            .any(|o| matches!(o, OutputSpec::Ship { .. }));
-        if has_ship_output
-            && !state
-                .research
-                .unlocked
-                .contains(&TechId(TECH_SHIP_CONSTRUCTION.to_string()))
-        {
-            // Only emit the event once per stall (when timer first reaches the interval)
-            let first_trigger = {
-                let station = state.stations.get(station_id).unwrap();
-                match &station.modules[module_idx].kind_state {
-                    ModuleKindState::Assembler(asmb) => {
-                        asmb.ticks_since_last_run == assembler_def.assembly_interval_ticks
-                    }
-                    _ => false,
-                }
-            };
-            if first_trigger {
-                let module_id = state.stations.get(station_id).unwrap().modules[module_idx]
-                    .id
-                    .clone();
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    Event::ModuleAwaitingTech {
-                        station_id: station_id.clone(),
-                        module_id,
-                        tech_id: TechId(TECH_SHIP_CONSTRUCTION.to_string()),
-                    },
-                ));
-            }
-            // Don't reset timer — let it stay above interval so we only emit once
-            continue;
-        }
-
-        // Capacity pre-check: estimate net volume change (output volume minus consumed component volume).
-        // OutputSpec::Ship is not stored in station inventory, so it has no volume impact here.
-        let output_volume = {
-            let mut produced_volume = 0.0_f32;
-            for output in &recipe.outputs {
-                if let OutputSpec::Component { component_id, .. } = output {
-                    let comp_volume = content
-                        .component_defs
-                        .iter()
-                        .find(|c| c.id == component_id.0)
-                        .map_or(0.0, |c| c.volume_m3);
-                    produced_volume += comp_volume;
-                }
-            }
-            let mut consumed_volume = 0.0_f32;
-            for input in &recipe.inputs {
-                if let (InputFilter::Component(cid), InputAmount::Count(count)) =
-                    (&input.filter, &input.amount)
-                {
-                    let comp_volume = content
-                        .component_defs
-                        .iter()
-                        .find(|c| c.id == cid.0)
-                        .map_or(0.0, |c| c.volume_m3);
-                    consumed_volume += comp_volume * *count as f32;
-                }
-            }
-            (produced_volume - consumed_volume).max(0.0)
-        };
-
-        let was_stalled = {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            match &station.modules[module_idx].kind_state {
-                ModuleKindState::Assembler(asmb) => asmb.stalled,
-                _ => false,
-            }
-        };
-
-        let module_id = state.stations.get(station_id).unwrap().modules[module_idx]
-            .id
-            .clone();
-
-        {
-            let current_used = state
-                .stations
-                .get_mut(station_id)
-                .unwrap()
-                .used_volume_m3(content);
-            let station = state.stations.get(station_id).unwrap();
-            let capacity = station.cargo_capacity_m3;
-            let shortfall = (current_used + output_volume) - capacity;
-
-            if shortfall > 0.0 {
-                let station_mut = state.stations.get_mut(station_id).unwrap();
-                if let ModuleKindState::Assembler(asmb) =
-                    &mut station_mut.modules[module_idx].kind_state
-                {
-                    asmb.stalled = true;
-                    asmb.ticks_since_last_run = 0;
-                }
-                if !was_stalled {
-                    events.push(crate::emit(
-                        &mut state.counters,
-                        current_tick,
-                        Event::ModuleStalled {
-                            station_id: station_id.clone(),
-                            module_id,
-                            shortfall_m3: shortfall,
-                        },
-                    ));
-                }
-                continue;
-            }
-
-            // Space available — resume if previously stalled
-            if was_stalled {
-                let station_mut = state.stations.get_mut(station_id).unwrap();
-                if let ModuleKindState::Assembler(asmb) =
-                    &mut station_mut.modules[module_idx].kind_state
-                {
-                    asmb.stalled = false;
-                }
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    Event::ModuleResumed {
-                        station_id: station_id.clone(),
-                        module_id: module_id.clone(),
-                    },
-                ));
-            }
-        }
-
-        // Execute assembler run
-        resolve_assembler_run(
-            state,
-            station_id,
-            module_idx,
-            recipe,
-            wear_per_run,
-            content,
-            rng,
-            events,
-        );
-
-        // Inventory changed — invalidate cached volume.
-        if let Some(station) = state.stations.get_mut(station_id) {
-            station.invalidate_volume_cache();
-        }
-
-        // Reset timer
-        if let Some(station) = state.stations.get_mut(station_id) {
-            if let ModuleKindState::Assembler(asmb) = &mut station.modules[module_idx].kind_state {
-                asmb.ticks_since_last_run = 0;
-            }
-        }
+        let outcome = execute(&ctx, &assembler_def, state, content, rng, events);
+        super::apply_run_result(state, &ctx, outcome, events);
     }
 }
 
-#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
-fn resolve_assembler_run(
+/// Assembler-specific logic. Returns a `RunOutcome` for the framework to apply.
+#[allow(clippy::too_many_lines)]
+fn execute(
+    ctx: &super::ModuleTickContext,
+    assembler_def: &crate::AssemblerDef,
     state: &mut GameState,
-    station_id: &StationId,
-    module_idx: usize,
+    content: &GameContent,
+    rng: &mut impl rand::Rng,
+    events: &mut Vec<EventEnvelope>,
+) -> super::RunOutcome {
+    let Some(recipe) = assembler_def.recipes.first() else {
+        return super::RunOutcome::Skipped { reset_timer: true };
+    };
+
+    // Check input availability
+    let input_available = {
+        let Some(station) = state.stations.get(&ctx.station_id) else {
+            return super::RunOutcome::Skipped { reset_timer: true };
+        };
+        recipe
+            .inputs
+            .iter()
+            .all(|input| match (&input.filter, &input.amount) {
+                (InputFilter::Element(el), InputAmount::Kg(required_kg)) => {
+                    let available_kg: f32 = station
+                        .inventory
+                        .iter()
+                        .filter_map(|item| match item {
+                            InventoryItem::Material { element, kg, .. } if element == el => {
+                                Some(*kg)
+                            }
+                            _ => None,
+                        })
+                        .sum();
+                    available_kg >= *required_kg
+                }
+                (InputFilter::Component(cid), InputAmount::Count(required)) => {
+                    let available: u32 = station
+                        .inventory
+                        .iter()
+                        .filter_map(|item| match item {
+                            InventoryItem::Component {
+                                component_id,
+                                count,
+                                ..
+                            } if component_id.0 == cid.0 => Some(*count),
+                            _ => None,
+                        })
+                        .sum();
+                    available >= *required
+                }
+                _ => false,
+            })
+    };
+
+    if !input_available {
+        return super::RunOutcome::Skipped { reset_timer: true };
+    }
+
+    // Stock cap check
+    let is_capped = {
+        let Some(station) = state.stations.get(&ctx.station_id) else {
+            return super::RunOutcome::Skipped { reset_timer: true };
+        };
+
+        let cap_override = match &station.modules[ctx.module_idx].kind_state {
+            crate::ModuleKindState::Assembler(asmb) => asmb.cap_override.clone(),
+            _ => std::collections::HashMap::new(),
+        };
+
+        recipe.outputs.iter().any(|output| {
+            if let OutputSpec::Component { component_id, .. } = output {
+                let effective_cap = cap_override
+                    .get(component_id)
+                    .copied()
+                    .or_else(|| assembler_def.max_stock.get(component_id).copied());
+
+                if let Some(cap) = effective_cap {
+                    let current_count: u32 = station
+                        .inventory
+                        .iter()
+                        .filter_map(|item| match item {
+                            InventoryItem::Component {
+                                component_id: cid,
+                                count,
+                                ..
+                            } if cid == component_id => Some(*count),
+                            _ => None,
+                        })
+                        .sum();
+                    current_count >= cap
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        })
+    };
+
+    if is_capped {
+        return super::RunOutcome::Stalled(super::StallReason::StockCap);
+    }
+
+    // Tech gate: if recipe has ship output, require tech_ship_construction
+    let has_ship_output = recipe
+        .outputs
+        .iter()
+        .any(|o| matches!(o, OutputSpec::Ship { .. }));
+    if has_ship_output
+        && !state
+            .research
+            .unlocked
+            .contains(&TechId(TECH_SHIP_CONSTRUCTION.to_string()))
+    {
+        // Only emit ModuleAwaitingTech once — when timer first reaches the interval.
+        // should_run() incremented the timer; if it equals exactly the interval,
+        // this is the first time we've reached it.
+        let first_trigger = {
+            let station = state.stations.get(&ctx.station_id).unwrap();
+            match &station.modules[ctx.module_idx].kind_state {
+                crate::ModuleKindState::Assembler(asmb) => {
+                    asmb.ticks_since_last_run == assembler_def.assembly_interval_ticks
+                }
+                _ => false,
+            }
+        };
+        if first_trigger {
+            let current_tick = state.meta.tick;
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::ModuleAwaitingTech {
+                    station_id: ctx.station_id.clone(),
+                    module_id: ctx.module_id.clone(),
+                    tech_id: TechId(TECH_SHIP_CONSTRUCTION.to_string()),
+                },
+            ));
+        }
+        // Don't reset timer — let it stay above interval so we only emit once
+        return super::RunOutcome::Skipped { reset_timer: false };
+    }
+
+    // Capacity pre-check: estimate net volume change
+    let output_volume = {
+        let mut produced_volume = 0.0_f32;
+        for output in &recipe.outputs {
+            if let OutputSpec::Component { component_id, .. } = output {
+                let comp_volume = content
+                    .component_defs
+                    .iter()
+                    .find(|c| c.id == component_id.0)
+                    .map_or(0.0, |c| c.volume_m3);
+                produced_volume += comp_volume;
+            }
+        }
+        let mut consumed_volume = 0.0_f32;
+        for input in &recipe.inputs {
+            if let (InputFilter::Component(cid), InputAmount::Count(count)) =
+                (&input.filter, &input.amount)
+            {
+                let comp_volume = content
+                    .component_defs
+                    .iter()
+                    .find(|c| c.id == cid.0)
+                    .map_or(0.0, |c| c.volume_m3);
+                consumed_volume += comp_volume * *count as f32;
+            }
+        }
+        (produced_volume - consumed_volume).max(0.0)
+    };
+
+    let current_used = state
+        .stations
+        .get_mut(&ctx.station_id)
+        .unwrap()
+        .used_volume_m3(content);
+    let capacity = state
+        .stations
+        .get(&ctx.station_id)
+        .unwrap()
+        .cargo_capacity_m3;
+    let shortfall = (current_used + output_volume) - capacity;
+
+    if shortfall > 0.0 {
+        return super::RunOutcome::Stalled(super::StallReason::VolumeCap {
+            shortfall_m3: shortfall,
+        });
+    }
+
+    // All checks passed — execute the assembler run
+    resolve_assembler_run(ctx, state, recipe, content, rng, events);
+
+    super::RunOutcome::Completed
+}
+
+#[allow(clippy::too_many_lines)]
+fn resolve_assembler_run(
+    ctx: &super::ModuleTickContext,
+    state: &mut GameState,
     recipe: &RecipeDef,
-    wear_per_run: f32,
     content: &GameContent,
     rng: &mut impl rand::Rng,
     events: &mut Vec<EventEnvelope>,
 ) {
     let current_tick = state.meta.tick;
-
-    let module_id = state
-        .stations
-        .get(station_id)
-        .map(|s| s.modules[module_idx].id.clone())
-        .unwrap();
 
     // Consume inputs
     let mut consumed_element = String::new();
@@ -407,7 +259,7 @@ fn resolve_assembler_run(
                 consumed_element.clone_from(&element_id);
                 let mut remaining = *required_kg;
 
-                if let Some(station) = state.stations.get_mut(station_id) {
+                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                     for item in &mut station.inventory {
                         if remaining <= 0.0 {
                             break;
@@ -432,7 +284,7 @@ fn resolve_assembler_run(
             }
             (InputFilter::Component(cid), InputAmount::Count(required)) => {
                 let mut remaining = *required;
-                if let Some(station) = state.stations.get_mut(station_id) {
+                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                     for item in &mut station.inventory {
                         if remaining == 0 {
                             break;
@@ -481,7 +333,7 @@ fn resolve_assembler_run(
 
                 let produced_count = 1_u32;
 
-                if let Some(station) = state.stations.get_mut(station_id) {
+                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                     let existing = station.inventory.iter_mut().find(|i| {
                         matches!(i, InventoryItem::Component { component_id: cid, quality: q, .. }
                             if cid.0 == component_id.0 && (*q - quality).abs() < 1e-3)
@@ -501,8 +353,8 @@ fn resolve_assembler_run(
                     &mut state.counters,
                     current_tick,
                     Event::AssemblerRan {
-                        station_id: station_id.clone(),
-                        module_id: module_id.clone(),
+                        station_id: ctx.station_id.clone(),
+                        module_id: ctx.module_id.clone(),
                         recipe_id: recipe.id.clone(),
                         material_consumed_kg: consumed_kg,
                         material_element: consumed_element.clone(),
@@ -517,7 +369,7 @@ fn resolve_assembler_run(
                 let ship_id = ShipId(format!("ship_{uuid}"));
                 let location_node = state
                     .stations
-                    .get(station_id)
+                    .get(&ctx.station_id)
                     .unwrap()
                     .location_node
                     .clone();
@@ -534,7 +386,7 @@ fn resolve_assembler_run(
                     &mut state.counters,
                     current_tick,
                     Event::ShipConstructed {
-                        station_id: station_id.clone(),
+                        station_id: ctx.station_id.clone(),
                         ship_id,
                         location_node,
                         cargo_capacity_m3: f64::from(*cargo_capacity_m3),
@@ -552,9 +404,6 @@ fn resolve_assembler_run(
         &format!("assemble_{}", recipe.id),
         &content.constants,
     );
-
-    // Accumulate wear
-    apply_wear(state, station_id, module_idx, wear_per_run, events);
 }
 
 #[cfg(test)]

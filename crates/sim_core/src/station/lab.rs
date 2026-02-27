@@ -3,224 +3,126 @@ use crate::{
 };
 use std::collections::HashMap;
 
-use super::apply_wear;
-
-#[allow(clippy::too_many_lines)]
 pub(super) fn tick_lab_modules(
     state: &mut GameState,
     station_id: &StationId,
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) {
-    let current_tick = state.meta.tick;
     let module_count = state
         .stations
         .get(station_id)
         .map_or(0, |s| s.modules.len());
 
     for module_idx in 0..module_count {
-        // Extract lab def and module info
-        let (lab_def, power_needed, wear_per_run) = {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            let module = &station.modules[module_idx];
-            if !module.enabled || module.power_stalled {
-                continue;
-            }
-            let Some(def) = content.module_defs.get(&module.def_id) else {
-                continue;
-            };
-            let ModuleBehaviorDef::Lab(lab_def) = &def.behavior else {
-                continue;
-            };
-            (
-                lab_def.clone(),
-                def.power_consumption_per_run,
-                def.wear_per_run,
-            )
-        };
-
-        // Tick timer; skip if interval not reached
-        {
-            let Some(station) = state.stations.get_mut(station_id) else {
-                return;
-            };
-            if let ModuleKindState::Lab(ls) = &mut station.modules[module_idx].kind_state {
-                ls.ticks_since_last_run += 1;
-                if ls.ticks_since_last_run < lab_def.research_interval_ticks {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-        }
-
-        // Check power budget
-        {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            if station.power_available_per_tick < power_needed {
-                continue;
-            }
-        }
-
-        // Check assigned_tech — if None, reset timer and skip
-        let assigned_tech = {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            if let ModuleKindState::Lab(ls) = &station.modules[module_idx].kind_state {
-                ls.assigned_tech.clone()
-            } else {
-                continue;
-            }
-        };
-
-        let Some(tech_id) = assigned_tech else {
-            // No tech assigned — reset timer and skip
-            if let Some(station) = state.stations.get_mut(station_id) {
-                if let ModuleKindState::Lab(ls) = &mut station.modules[module_idx].kind_state {
-                    ls.ticks_since_last_run = 0;
-                }
-            }
+        let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
             continue;
         };
 
-        // Skip if assigned tech is already unlocked
-        if state.research.unlocked.contains(&tech_id) {
-            if let Some(station) = state.stations.get_mut(station_id) {
-                if let ModuleKindState::Lab(ls) = &mut station.modules[module_idx].kind_state {
-                    ls.ticks_since_last_run = 0;
-                }
-            }
+        let ModuleBehaviorDef::Lab(_) = &ctx.def.behavior else {
             continue;
-        }
-
-        // Sum available data from data_pool for the lab's accepted_data kinds
-        let available_data: f32 = lab_def
-            .accepted_data
-            .iter()
-            .map(|kind| state.research.data_pool.get(kind).copied().unwrap_or(0.0))
-            .sum();
-
-        let module_id = state
-            .stations
-            .get(station_id)
-            .map(|s| s.modules[module_idx].id.clone())
-            .unwrap();
-
-        let was_starved = {
-            let station = state.stations.get(station_id).unwrap();
-            if let ModuleKindState::Lab(ls) = &station.modules[module_idx].kind_state {
-                ls.starved
-            } else {
-                false
-            }
+        };
+        // Clone the lab def to release borrow on ctx.def
+        let lab_def = if let ModuleBehaviorDef::Lab(ld) = &ctx.def.behavior {
+            ld.clone()
+        } else {
+            continue;
         };
 
-        if available_data <= 0.0 {
-            // Starved
-            if let Some(station) = state.stations.get_mut(station_id) {
-                if let ModuleKindState::Lab(ls) = &mut station.modules[module_idx].kind_state {
-                    if !ls.starved {
-                        ls.starved = true;
-                        events.push(crate::emit(
-                            &mut state.counters,
-                            current_tick,
-                            Event::LabStarved {
-                                station_id: station_id.clone(),
-                                module_id: module_id.clone(),
-                            },
-                        ));
-                    }
-                    ls.ticks_since_last_run = 0;
-                }
-            }
+        if !super::should_run(state, &ctx) {
             continue;
         }
 
-        // If was starved and data now available: resume
-        if was_starved {
-            if let Some(station) = state.stations.get_mut(station_id) {
-                if let ModuleKindState::Lab(ls) = &mut station.modules[module_idx].kind_state {
-                    ls.starved = false;
-                }
-            }
-            events.push(crate::emit(
-                &mut state.counters,
-                current_tick,
-                Event::LabResumed {
-                    station_id: station_id.clone(),
-                    module_id: module_id.clone(),
-                },
-            ));
-        }
-
-        // Consume data proportionally from accepted kinds
-        let to_consume = available_data.min(lab_def.data_consumption_per_run);
-        let ratio = to_consume / lab_def.data_consumption_per_run;
-
-        // Consume proportionally from each accepted kind
-        let mut consumed_total = 0.0_f32;
-        if available_data > 0.0 {
-            for kind in &lab_def.accepted_data {
-                let pool_amount = state.research.data_pool.get(kind).copied().unwrap_or(0.0);
-                let fraction = pool_amount / available_data;
-                let take = to_consume * fraction;
-                if let Some(pool_val) = state.research.data_pool.get_mut(kind) {
-                    let actual_take = take.min(*pool_val);
-                    *pool_val -= actual_take;
-                    consumed_total += actual_take;
-                }
-            }
-        }
-
-        // Compute wear efficiency
-        let wear_value = state
-            .stations
-            .get(station_id)
-            .map_or(0.0, |s| s.modules[module_idx].wear.wear);
-        let efficiency = crate::wear::wear_efficiency(wear_value, &content.constants);
-
-        // Compute points
-        let points = lab_def.research_points_per_run * ratio * efficiency;
-
-        // Add points to evidence[tech_id].points[domain]
-        let progress = state
-            .research
-            .evidence
-            .entry(tech_id.clone())
-            .or_insert_with(|| crate::DomainProgress {
-                points: HashMap::new(),
-            });
-        *progress.points.entry(lab_def.domain.clone()).or_insert(0.0) += points;
-
-        // Emit LabRan event
-        events.push(crate::emit(
-            &mut state.counters,
-            current_tick,
-            Event::LabRan {
-                station_id: station_id.clone(),
-                module_id: module_id.clone(),
-                tech_id,
-                data_consumed: consumed_total,
-                points_produced: points,
-                domain: lab_def.domain.clone(),
-            },
-        ));
-
-        // Reset timer
-        if let Some(station) = state.stations.get_mut(station_id) {
-            if let ModuleKindState::Lab(ls) = &mut station.modules[module_idx].kind_state {
-                ls.ticks_since_last_run = 0;
-            }
-        }
-
-        // Apply wear
-        apply_wear(state, station_id, module_idx, wear_per_run, events);
+        let outcome = execute(&ctx, &lab_def, state, content, events);
+        super::apply_run_result(state, &ctx, outcome, events);
     }
+}
+
+fn execute(
+    ctx: &super::ModuleTickContext,
+    lab_def: &crate::LabDef,
+    state: &mut GameState,
+    _content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) -> super::RunOutcome {
+    let current_tick = state.meta.tick;
+
+    // Check assigned_tech
+    let assigned_tech = {
+        let Some(station) = state.stations.get(&ctx.station_id) else {
+            return super::RunOutcome::Skipped { reset_timer: true };
+        };
+        if let ModuleKindState::Lab(ls) = &station.modules[ctx.module_idx].kind_state {
+            ls.assigned_tech.clone()
+        } else {
+            return super::RunOutcome::Skipped { reset_timer: true };
+        }
+    };
+
+    let Some(tech_id) = assigned_tech else {
+        return super::RunOutcome::Skipped { reset_timer: true };
+    };
+
+    // Skip if tech already unlocked
+    if state.research.unlocked.contains(&tech_id) {
+        return super::RunOutcome::Skipped { reset_timer: true };
+    }
+
+    // Sum available data
+    let available_data: f32 = lab_def
+        .accepted_data
+        .iter()
+        .map(|kind| state.research.data_pool.get(kind).copied().unwrap_or(0.0))
+        .sum();
+
+    if available_data <= 0.0 {
+        return super::RunOutcome::Stalled(super::StallReason::DataStarved);
+    }
+
+    // Consume data proportionally
+    let to_consume = available_data.min(lab_def.data_consumption_per_run);
+    let ratio = to_consume / lab_def.data_consumption_per_run;
+
+    let mut consumed_total = 0.0_f32;
+    for kind in &lab_def.accepted_data {
+        let pool_amount = state.research.data_pool.get(kind).copied().unwrap_or(0.0);
+        let fraction = pool_amount / available_data;
+        let take = to_consume * fraction;
+        if let Some(pool_val) = state.research.data_pool.get_mut(kind) {
+            let actual_take = take.min(*pool_val);
+            *pool_val -= actual_take;
+            consumed_total += actual_take;
+        }
+    }
+
+    // Use ctx.efficiency instead of recomputing wear efficiency
+    let points = lab_def.research_points_per_run * ratio * ctx.efficiency;
+
+    // Add points to evidence
+    let progress = state
+        .research
+        .evidence
+        .entry(tech_id.clone())
+        .or_insert_with(|| crate::DomainProgress {
+            points: HashMap::new(),
+        });
+    *progress.points.entry(lab_def.domain.clone()).or_insert(0.0) += points;
+
+    // Emit LabRan event
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::LabRan {
+            station_id: ctx.station_id.clone(),
+            module_id: ctx.module_id.clone(),
+            tech_id,
+            data_consumed: consumed_total,
+            points_produced: points,
+            domain: lab_def.domain.clone(),
+        },
+    ));
+
+    super::RunOutcome::Completed
 }
 
 #[cfg(test)]
