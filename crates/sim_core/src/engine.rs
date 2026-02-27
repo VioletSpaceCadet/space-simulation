@@ -136,6 +136,12 @@ fn apply_commands(
                         crate::ModuleBehaviorDef::SensorArray(_) => {
                             crate::ModuleKindState::SensorArray(crate::SensorArrayState::default())
                         }
+                        crate::ModuleBehaviorDef::SolarArray(_) => {
+                            crate::ModuleKindState::SolarArray(crate::SolarArrayState::default())
+                        }
+                        crate::ModuleBehaviorDef::Battery(_) => {
+                            crate::ModuleKindState::Battery(crate::BatteryState { charge_kwh: 0.0 })
+                        }
                     },
                     None => continue,
                 };
@@ -147,6 +153,7 @@ fn apply_commands(
                     enabled: false,
                     kind_state,
                     wear: crate::WearState::default(),
+                    power_stalled: false,
                 });
 
                 events.push(crate::emit(

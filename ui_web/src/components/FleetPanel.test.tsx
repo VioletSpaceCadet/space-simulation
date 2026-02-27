@@ -1,9 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import type { ShipState, StationState } from '../types';
+import type { PowerState, ShipState, StationState } from '../types';
 
 import { FleetPanel } from './FleetPanel';
+
+const zeroPower: PowerState = {
+  generated_kw: 0, consumed_kw: 0, deficit_kw: 0,
+  battery_discharge_kw: 0, battery_charge_kw: 0, battery_stored_kwh: 0,
+};
 
 const mockShips: Record<string, ShipState> = {
   ship_0001: {
@@ -36,6 +41,7 @@ const mockStations: Record<string, StationState> = {
     cargo_capacity_m3: 100.0,
     facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1.0 },
     modules: [],
+    power: zeroPower,
   },
 };
 
@@ -135,6 +141,7 @@ describe('FleetPanel', () => {
             wear: { wear: 0.3 },
           },
         ],
+        power: zeroPower,
       },
     };
     render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
@@ -174,6 +181,7 @@ describe('FleetPanel', () => {
         cargo_capacity_m3: 100.0,
         facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1.0 },
         modules: [],
+        power: zeroPower,
       },
     };
     render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
@@ -217,6 +225,7 @@ describe('FleetPanel', () => {
             wear: { wear: 0.65 },
           },
         ],
+        power: zeroPower,
       },
     };
     render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);

@@ -55,7 +55,7 @@ For each ticket in execution order:
 ### 3d. CI + Review
 - Watch CI: `gh pr checks <PR_NUMBER> --watch`
 - If CI fails: read the failed logs with `gh run view <RUN_ID> --log-failed`, fix the issue, push, and watch again.
-- Once CI passes: **dispatch the pr-reviewer agent** using the Task tool (subagent_type: "pr-reviewer") to perform a thorough code review.
+- Once CI passes: **dispatch the pr-reviewer agent** using the Task tool (subagent_type: "pr-reviewer"). Do NOT use model: "haiku" — the reviewer must use the default model to ensure it posts its review comment on the PR via `gh pr review`.
 - If the reviewer finds Important or Critical issues: fix them, push, wait for CI, and request another review.
 - Once the review is clean: squash merge the PR.
   ```

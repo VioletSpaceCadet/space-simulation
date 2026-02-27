@@ -54,6 +54,10 @@ pub struct SummaryMetrics {
     pub scan_sites_remaining: u32,
     pub balance: f64,
     pub thruster_count: u32,
+    pub power_generated_kw: f64,
+    pub power_consumed_kw: f64,
+    pub power_deficit_kw: f64,
+    pub battery_charge_pct: f64,
 }
 
 impl SummaryMetrics {
@@ -79,6 +83,10 @@ impl SummaryMetrics {
             scan_sites_remaining: snapshot.scan_sites_remaining,
             balance: snapshot.balance,
             thruster_count: snapshot.thruster_count,
+            power_generated_kw: f64::from(snapshot.power_generated_kw),
+            power_consumed_kw: f64::from(snapshot.power_consumed_kw),
+            power_deficit_kw: f64::from(snapshot.power_deficit_kw),
+            battery_charge_pct: f64::from(snapshot.battery_charge_pct),
         }
     }
 }
@@ -156,6 +164,10 @@ mod tests {
             repair_kits_remaining: 5,
             balance: 0.0,
             thruster_count: 0,
+            power_generated_kw: 0.0,
+            power_consumed_kw: 0.0,
+            power_deficit_kw: 0.0,
+            battery_charge_pct: 0.0,
         }
     }
 

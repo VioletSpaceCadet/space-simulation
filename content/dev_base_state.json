@@ -80,6 +80,21 @@
           "module_def_id": "module_shipyard"
         },
         {
+          "kind": "Module",
+          "item_id": "module_item_0009",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0010",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0011",
+          "module_def_id": "module_basic_battery"
+        },
+        {
           "kind": "Material",
           "element": "Fe",
           "kg": 500.0,

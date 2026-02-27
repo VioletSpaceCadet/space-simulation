@@ -172,6 +172,9 @@ pub struct ModuleState {
     pub enabled: bool,
     pub kind_state: ModuleKindState,
     pub wear: WearState,
+    /// Set each tick by power budget computation. Stalled modules skip their tick.
+    #[serde(skip, default)]
+    pub power_stalled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,11 +185,24 @@ pub enum ModuleKindState {
     Assembler(AssemblerState),
     Lab(LabState),
     SensorArray(SensorArrayState),
+    SolarArray(SolarArrayState),
+    Battery(BatteryState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SensorArrayState {
     pub ticks_since_last_run: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SolarArrayState {
+    pub ticks_since_last_run: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatteryState {
+    /// Current stored energy in kWh.
+    pub charge_kwh: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -249,6 +265,19 @@ pub struct ShipState {
     pub task: Option<TaskState>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PowerState {
+    pub generated_kw: f32,
+    pub consumed_kw: f32,
+    pub deficit_kw: f32,
+    /// Power discharged from batteries this tick (kW).
+    pub battery_discharge_kw: f32,
+    /// Power stored into batteries this tick (kW).
+    pub battery_charge_kw: f32,
+    /// Total energy stored across all batteries (kWh).
+    pub battery_stored_kwh: f32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StationState {
     pub id: StationId,
@@ -257,6 +286,9 @@ pub struct StationState {
     pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
     pub modules: Vec<ModuleState>,
+    /// Computed fresh each tick — not persisted across ticks.
+    #[serde(skip_deserializing, default)]
+    pub power: PowerState,
     /// Cached inventory volume. Set to `None` when inventory changes;
     /// recomputed lazily via [`StationState::used_volume_m3`].
     #[serde(skip, default)]
@@ -714,6 +746,12 @@ pub struct SolarSystemDef {
 pub struct NodeDef {
     pub id: NodeId,
     pub name: String,
+    #[serde(default = "default_solar_intensity")]
+    pub solar_intensity: f32,
+}
+
+fn default_solar_intensity() -> f32 {
+    1.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -752,6 +790,8 @@ pub enum ModuleBehaviorDef {
     Assembler(AssemblerDef),
     Lab(LabDef),
     SensorArray(SensorArrayDef),
+    SolarArray(SolarArrayDef),
+    Battery(BatteryDef),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -786,6 +826,21 @@ pub struct SensorArrayDef {
     pub data_kind: DataKind,
     pub action_key: String,
     pub scan_interval_ticks: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SolarArrayDef {
+    pub base_output_kw: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatteryDef {
+    /// Maximum energy storage capacity in kWh.
+    pub capacity_kwh: f32,
+    /// Maximum charge rate in kW (how fast surplus can be stored).
+    pub charge_rate_kw: f32,
+    /// Maximum discharge rate in kW (how fast energy can be released).
+    pub discharge_rate_kw: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

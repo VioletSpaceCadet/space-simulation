@@ -17,10 +17,12 @@ fn test_shortest_hop_count_adjacent() {
             NodeDef {
                 id: NodeId("a".to_string()),
                 name: "A".to_string(),
+                solar_intensity: 1.0,
             },
             NodeDef {
                 id: NodeId("b".to_string()),
                 name: "B".to_string(),
+                solar_intensity: 1.0,
             },
         ],
         edges: vec![(NodeId("a".to_string()), NodeId("b".to_string()))],
@@ -50,14 +52,17 @@ fn test_shortest_hop_count_two_hops() {
             NodeDef {
                 id: NodeId("a".to_string()),
                 name: "A".to_string(),
+                solar_intensity: 1.0,
             },
             NodeDef {
                 id: NodeId("b".to_string()),
                 name: "B".to_string(),
+                solar_intensity: 1.0,
             },
             NodeDef {
                 id: NodeId("c".to_string()),
                 name: "C".to_string(),
+                solar_intensity: 1.0,
             },
         ],
         edges: vec![
@@ -82,10 +87,12 @@ fn test_shortest_hop_count_no_path() {
             NodeDef {
                 id: NodeId("a".to_string()),
                 name: "A".to_string(),
+                solar_intensity: 1.0,
             },
             NodeDef {
                 id: NodeId("b".to_string()),
                 name: "B".to_string(),
+                solar_intensity: 1.0,
             },
         ],
         edges: vec![],
@@ -111,10 +118,12 @@ fn transit_moves_ship_and_starts_next_task() {
             NodeDef {
                 id: node_a.clone(),
                 name: "A".to_string(),
+                solar_intensity: 1.0,
             },
             NodeDef {
                 id: node_b.clone(),
                 name: "B".to_string(),
+                solar_intensity: 1.0,
             },
         ],
         edges: vec![(node_a.clone(), node_b.clone())],
@@ -160,6 +169,7 @@ fn transit_moves_ship_and_starts_next_task() {
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
                 modules: vec![],
+                power: PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
         )]),

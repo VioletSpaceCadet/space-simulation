@@ -262,6 +262,10 @@ mod tests {
             repair_kits_remaining: 0,
             balance: 0.0,
             thruster_count: 0,
+            power_generated_kw: 0.0,
+            power_consumed_kw: 0.0,
+            power_deficit_kw: 0.0,
+            battery_charge_pct: 0.0,
         }
     }
 

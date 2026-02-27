@@ -26,7 +26,7 @@ pub(super) fn tick_assembler_modules(
                 return;
             };
             let module = &station.modules[module_idx];
-            if !module.enabled {
+            if !module.enabled || module.power_stalled {
                 continue;
             }
             let Some(def) = content.module_defs.get(&module.def_id) else {
@@ -658,7 +658,9 @@ mod assembler_component_tests {
                             cap_override: HashMap::new(),
                         }),
                         wear: WearState::default(),
+                        power_stalled: false,
                     }],
+                    power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
             )]),
@@ -938,7 +940,9 @@ mod assembler_component_tests {
                             cap_override: HashMap::new(),
                         }),
                         wear: WearState::default(),
+                        power_stalled: false,
                     }],
+                    power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
             )]),

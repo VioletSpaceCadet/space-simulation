@@ -15,6 +15,8 @@
     "module_exploration_lab":       { "base_price_per_unit": 2500000.0,  "importable": true,  "exportable": true },
     "module_materials_lab":         { "base_price_per_unit": 2500000.0,  "importable": true,  "exportable": true },
     "module_engineering_lab":       { "base_price_per_unit": 2500000.0,  "importable": true,  "exportable": true },
-    "module_shipyard":              { "base_price_per_unit": 10000000.0, "importable": true,  "exportable": true }
+    "module_shipyard":              { "base_price_per_unit": 10000000.0, "importable": true,  "exportable": true },
+    "module_basic_solar_array":     { "base_price_per_unit": 1800000.0,  "importable": true,  "exportable": true },
+    "module_basic_battery":         { "base_price_per_unit": 2200000.0,  "importable": true,  "exportable": true }
   }
 }

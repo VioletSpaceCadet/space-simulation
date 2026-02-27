@@ -6,8 +6,9 @@ use serde::Deserialize;
 use sim_core::{
     AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, GameContent, GameState,
     InputFilter, InventoryItem, MetaState, ModuleBehaviorDef, ModuleDef, ModuleItemId, NodeId,
-    OutputSpec, PricingTable, PrincipalId, QualityFormula, ResearchState, ScanSite, ShipId,
-    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId, YieldFormula,
+    OutputSpec, PowerState, PricingTable, PrincipalId, QualityFormula, ResearchState, ScanSite,
+    ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId,
+    YieldFormula,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -299,6 +300,18 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
                 item_id: ModuleItemId("module_item_0008".to_string()),
                 module_def_id: "module_shipyard".to_string(),
             },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0009".to_string()),
+                module_def_id: "module_basic_solar_array".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0010".to_string()),
+                module_def_id: "module_basic_solar_array".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0011".to_string()),
+                module_def_id: "module_basic_battery".to_string(),
+            },
             InventoryItem::Material {
                 element: "Fe".to_string(),
                 kg: 500.0,
@@ -308,6 +321,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         modules: vec![],
+        power: PowerState::default(),
         cached_inventory_volume_m3: None,
     };
     let ship_id = ShipId("ship_0001".to_string());
@@ -476,6 +490,7 @@ mod tests {
         content.solar_system.nodes.push(NodeDef {
             id: NodeId("node_a".to_string()),
             name: "A".to_string(),
+            solar_intensity: 1.0,
         });
         content.solar_system.edges.push((
             NodeId("node_a".to_string()),
@@ -639,6 +654,7 @@ mod tests {
                     cargo_capacity_m3: 1000.0,
                     power_available_per_tick: 100.0,
                     modules: vec![],
+                    power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
             )]),

@@ -25,7 +25,7 @@ pub(super) fn tick_station_modules(
                 return;
             };
             let module = &station.modules[module_idx];
-            if !module.enabled {
+            if !module.enabled || module.power_stalled {
                 continue;
             }
             let Some(def) = content.module_defs.get(&module.def_id) else {
@@ -37,7 +37,9 @@ pub(super) fn tick_station_modules(
                 | ModuleBehaviorDef::Maintenance(_)
                 | ModuleBehaviorDef::Assembler(_)
                 | ModuleBehaviorDef::Lab(_)
-                | ModuleBehaviorDef::SensorArray(_) => continue,
+                | ModuleBehaviorDef::SensorArray(_)
+                | ModuleBehaviorDef::SolarArray(_)
+                | ModuleBehaviorDef::Battery(_) => continue,
             };
             (
                 module.def_id.clone(),
@@ -80,7 +82,9 @@ pub(super) fn tick_station_modules(
                 | ModuleKindState::Maintenance(_)
                 | ModuleKindState::Assembler(_)
                 | ModuleKindState::Lab(_)
-                | ModuleKindState::SensorArray(_) => continue,
+                | ModuleKindState::SensorArray(_)
+                | ModuleKindState::SolarArray(_)
+                | ModuleKindState::Battery(_) => continue,
             }
         };
 
@@ -154,7 +158,9 @@ pub(super) fn tick_station_modules(
                 | ModuleKindState::Maintenance(_)
                 | ModuleKindState::Assembler(_)
                 | ModuleKindState::Lab(_)
-                | ModuleKindState::SensorArray(_) => false,
+                | ModuleKindState::SensorArray(_)
+                | ModuleKindState::SolarArray(_)
+                | ModuleKindState::Battery(_) => false,
             };
             let module_id = station.modules[module_idx].id.clone();
 
