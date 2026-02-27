@@ -99,7 +99,7 @@ export type ModuleKindState =
   | { Assembler: AssemblerState }
   | { Lab: LabState }
   | { SensorArray: SensorArrayState }
-  | { SolarArray: Record<string, never> }
+  | { SolarArray: SensorArrayState }
   | { Battery: BatteryState }
   | 'Storage'
 

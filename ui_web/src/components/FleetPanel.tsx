@@ -396,7 +396,7 @@ function PowerBar({ power }: { power: PowerState }) {
 function StationDetail({ station }: { station: StationState }) {
   return (
     <div className="space-y-3 text-[11px] w-fit">
-      {station.power && <PowerBar power={station.power} />}
+      <PowerBar power={station.power} />
       <div className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2">
         <div>
           <div className="text-label text-[10px] uppercase tracking-wider mb-1">Inventory</div>
