@@ -993,7 +993,7 @@ impl Constants {
     }
 
     /// Compute derived tick-based fields from game-time minutes fields.
-    /// Must be called once after deserialization (in load_content / after overrides).
+    /// Must be called once after deserialization (in `load_content` / after overrides).
     pub fn derive_tick_values(&mut self) {
         self.survey_scan_ticks = self.game_minutes_to_ticks(self.survey_scan_minutes);
         self.deep_scan_ticks = self.game_minutes_to_ticks(self.deep_scan_minutes);
