@@ -1,9 +1,7 @@
 use crate::{
     research::generate_data, Event, EventEnvelope, GameContent, GameState, ModuleBehaviorDef,
-    ModuleKindState, StationId,
+    StationId,
 };
-
-use super::apply_wear;
 
 pub(super) fn tick_sensor_array_modules(
     state: &mut GameState,
@@ -11,90 +9,58 @@ pub(super) fn tick_sensor_array_modules(
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) {
-    let current_tick = state.meta.tick;
     let module_count = state
         .stations
         .get(station_id)
         .map_or(0, |s| s.modules.len());
 
     for module_idx in 0..module_count {
-        // Extract sensor array def and module info
-        let (sensor_def, power_needed, wear_per_run) = {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            let module = &station.modules[module_idx];
-            if !module.enabled || module.power_stalled {
-                continue;
-            }
-            let Some(def) = content.module_defs.get(&module.def_id) else {
-                continue;
-            };
-            let ModuleBehaviorDef::SensorArray(sensor_def) = &def.behavior else {
-                continue;
-            };
-            (
-                sensor_def.clone(),
-                def.power_consumption_per_run,
-                def.wear_per_run,
-            )
+        let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
+            continue;
         };
 
-        // Tick timer; skip if interval not reached
-        {
-            let Some(station) = state.stations.get_mut(station_id) else {
-                return;
-            };
-            if let ModuleKindState::SensorArray(ss) = &mut station.modules[module_idx].kind_state {
-                ss.ticks_since_last_run += 1;
-                if ss.ticks_since_last_run < sensor_def.scan_interval_ticks {
-                    continue;
-                }
-            } else {
-                continue;
-            }
+        // Only process sensor arrays
+        let ModuleBehaviorDef::SensorArray(sensor_def) = &ctx.def.behavior else {
+            continue;
+        };
+        // Clone the def to release the borrow on ctx.def before mutating state
+        let sensor_def = sensor_def.clone();
+
+        if !super::should_run(state, &ctx) {
+            continue;
         }
 
-        // Check power budget
-        {
-            let Some(station) = state.stations.get(station_id) else {
-                return;
-            };
-            if station.power_available_per_tick < power_needed {
-                continue;
-            }
-        }
-
-        // Reset timer
-        {
-            let Some(station) = state.stations.get_mut(station_id) else {
-                return;
-            };
-            if let ModuleKindState::SensorArray(ss) = &mut station.modules[module_idx].kind_state {
-                ss.ticks_since_last_run = 0;
-            }
-        }
-
-        // Generate data using diminishing returns
-        let amount = generate_data(
-            &mut state.research,
-            sensor_def.data_kind.clone(),
-            &sensor_def.action_key,
-            &content.constants,
-        );
-
-        events.push(crate::emit(
-            &mut state.counters,
-            current_tick,
-            Event::DataGenerated {
-                kind: sensor_def.data_kind.clone(),
-                amount,
-            },
-        ));
-
-        // Accumulate wear
-        apply_wear(state, station_id, module_idx, wear_per_run, events);
+        let outcome = execute(&ctx, &sensor_def, state, content, events);
+        super::apply_run_result(state, &ctx, outcome, events);
     }
+}
+
+fn execute(
+    _ctx: &super::ModuleTickContext,
+    sensor_def: &crate::SensorArrayDef,
+    state: &mut GameState,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) -> super::RunOutcome {
+    let current_tick = state.meta.tick;
+
+    let amount = generate_data(
+        &mut state.research,
+        sensor_def.data_kind.clone(),
+        &sensor_def.action_key,
+        &content.constants,
+    );
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::DataGenerated {
+            kind: sensor_def.data_kind.clone(),
+            amount,
+        },
+    ));
+
+    super::RunOutcome::Completed
 }
 
 #[cfg(test)]
