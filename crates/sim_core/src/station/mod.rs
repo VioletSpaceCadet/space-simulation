@@ -83,7 +83,7 @@ pub(crate) fn tick_stations(
 ) {
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
     for station_id in &station_ids {
-        compute_power_budget(state, station_id, content);
+        compute_power_budget(state, station_id, content, events);
         processor::tick_station_modules(state, station_id, content, events);
         assembler::tick_assembler_modules(state, station_id, content, rng, events);
         sensor::tick_sensor_array_modules(state, station_id, content, events);
@@ -177,7 +177,12 @@ fn apply_battery_buffering(
 /// Batteries buffer power: surplus charges them, deficit discharges them.
 /// Wear reduces effective battery capacity.
 /// Modules are only stalled when batteries cannot cover the remaining deficit.
-fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: &GameContent) {
+fn compute_power_budget(
+    state: &mut GameState,
+    station_id: &StationId,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
@@ -194,6 +199,7 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
     let mut has_power_infrastructure = false;
     let mut consumers: Vec<(usize, u8, f32)> = Vec::new();
     let mut batteries: Vec<(usize, crate::BatteryDef, f32, f32)> = Vec::new();
+    let mut wear_targets: Vec<(usize, f32)> = Vec::new();
 
     for (idx, module) in station.modules.iter().enumerate() {
         if !module.enabled {
@@ -209,6 +215,9 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
                 let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
                 generated_kw += solar_def.base_output_kw * solar_intensity * efficiency;
                 consumed_kw += def.power_consumption_per_run;
+                if def.wear_per_run > 0.0 {
+                    wear_targets.push((idx, def.wear_per_run));
+                }
             }
             crate::ModuleBehaviorDef::Battery(battery_def) => {
                 has_power_infrastructure = true;
@@ -266,6 +275,11 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
         battery_charge_kw,
         battery_stored_kwh,
     };
+
+    // Apply wear to solar arrays (and any other power infrastructure with wear).
+    for (module_idx, wear_per_run) in wear_targets {
+        apply_wear(state, station_id, module_idx, wear_per_run, events);
+    }
 }
 
 fn apply_wear(
