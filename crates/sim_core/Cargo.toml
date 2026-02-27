@@ -2,6 +2,7 @@
 name = "sim_core"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 [features]
 test-support = ["rand_chacha"]
