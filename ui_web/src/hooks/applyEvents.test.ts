@@ -585,6 +585,92 @@ describe('applyEvents', () => {
     });
   });
 
+  describe('AssemblerCapped', () => {
+    it('sets capped to true on assembler module', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_asm', def_id: 'module_assembler', enabled: true,
+          kind_state: { Assembler: { ticks_since_last_run: 0, stalled: false, capped: false, cap_override: {} } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { AssemblerCapped: { station_id: 'station_001', module_id: 'mod_asm' } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.kind_state).toEqual({
+        Assembler: { ticks_since_last_run: 0, stalled: false, capped: true, cap_override: {} },
+      });
+    });
+  });
+
+  describe('AssemblerUncapped', () => {
+    it('sets capped to false on assembler module', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_asm', def_id: 'module_assembler', enabled: true,
+          kind_state: { Assembler: { ticks_since_last_run: 0, stalled: false, capped: true, cap_override: {} } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { AssemblerUncapped: { station_id: 'station_001', module_id: 'mod_asm' } },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.kind_state).toEqual({
+        Assembler: { ticks_since_last_run: 0, stalled: false, capped: false, cap_override: {} },
+      });
+    });
+  });
+
+  describe('DepositBlocked', () => {
+    it('sets blocked to true on ship deposit task', () => {
+      const ship = makeShip({
+        task: {
+          kind: { Deposit: { station: 'station_001', blocked: false } },
+          started_tick: 5, eta_tick: 10,
+        },
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { DepositBlocked: { ship_id: 'ship_0001', station_id: 'station_001', shortfall_m3: 5.0 } },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      const task = result.ships['ship_0001'].task!;
+      expect(task.kind).toEqual({ Deposit: { station: 'station_001', blocked: true } });
+    });
+  });
+
+  describe('DepositUnblocked', () => {
+    it('sets blocked to false on ship deposit task', () => {
+      const ship = makeShip({
+        task: {
+          kind: { Deposit: { station: 'station_001', blocked: true } },
+          started_tick: 5, eta_tick: 10,
+        },
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: { DepositUnblocked: { ship_id: 'ship_0001', station_id: 'station_001' } },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      const task = result.ships['ship_0001'].task!;
+      expect(task.kind).toEqual({ Deposit: { station: 'station_001', blocked: false } });
+    });
+  });
+
   describe('InsufficientFunds', () => {
     it('does not change state', () => {
       const station = makeStation();
