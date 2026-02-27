@@ -68,12 +68,15 @@ Issues tracked in Linear (VioletSpaceCadet workspace, MCP integration configured
 
 ### Feature Development (Multi-Ticket Projects)
 
+Use the `/project-implementation <project>` command to run the full workflow end-to-end. It reads Linear tickets, creates branches, implements code, dispatches the pr-reviewer agent, merges ticket PRs, and delivers a final PR for owner approval. See `.claude/commands/project-implementation.md` for the full process.
+
+Manual summary of the branching model:
+
 1. **Create a feature branch** from main: `feat/<project-name>`
 2. **Each ticket gets its own branch** off the feature branch: `feat/<project>/<ticket-id>-<short-name>`
-3. **PR per ticket into the feature branch** — standard Claude review process applies
-4. **Claude auto-merges ticket PRs** after CI passes and review is clean (squash merge)
-5. **Final PR from feature branch into main** — merge main into feature branch first to resolve conflicts, then requires owner (@VioletSpaceCadet) approval
-6. **Clean up** — delete feature branch and sub-branches after merge
+3. **PR per ticket into the feature branch** — pr-reviewer agent reviews, Claude auto-merges after CI + clean review (squash merge)
+4. **Final PR from feature branch into main** — merge main into feature branch first to resolve conflicts, then requires owner (@VioletSpaceCadet) approval
+5. **Clean up** — delete feature branch and sub-branches after merge
 
 ### Small Changes (Single-Ticket)
 
@@ -83,18 +86,13 @@ Branch from main (`fix/<ticket-id>-<short-name>` or `chore/<short-name>`), PR di
 
 **Branch protection on `main`:** Direct pushes blocked, required CI checks ("Rust", "Web", "Bench smoke"), CODEOWNERS review required, stale reviews dismissed.
 
-**Mandatory Claude Code PR review:**
-1. Watch CI: `gh pr checks N --watch`
-2. If fails: `gh run view RUN_ID --log-failed`, fix, push, watch again
-3. Once green: fresh review via `gh pr diff N`
-4. Post review: `gh pr review N --comment` — must start with "Claude Code Review -- No issues found." or "Claude Code Review -- Issues found:"
-5. Do NOT use backticks in review comment bodies (causes permission prompts)
+**PR reviews use the `pr-reviewer` agent** (`.claude/agents/pr-reviewer`). Dispatch it via the Task tool after CI passes. It handles the full review: reads the diff, checks for issues, and posts a review comment on the PR.
 
 **Creating a PR:** Push branch, `gh pr create`. Include Summary + Test plan. Use `--base feat/project-name` when targeting a feature branch.
 
 **Two merge paths:**
-- **PR into feature branch:** Claude auto-merges after CI green + review (`gh pr merge --squash`)
-- **PR into main:** Claude reviews but NEVER merges — owner must approve and merge
+- **PR into feature branch:** Claude auto-merges after CI green + pr-reviewer clean (`gh pr merge --squash`)
+- **PR into main:** pr-reviewer reviews but Claude NEVER merges — owner must approve and merge
 
 **NEVER push directly to main.**
 
@@ -109,8 +107,8 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 **Always squash merge. Never push directly to main.**
 
-- **Ticket PR into feature branch:** CI pass → Claude review → Claude runs `gh pr merge --squash`
-- **PR into main:** CI pass → Claude review → Owner approves and squash merges
+- **Ticket PR into feature branch:** CI pass → pr-reviewer agent → Claude runs `gh pr merge --squash`
+- **PR into main:** CI pass → pr-reviewer agent → Owner approves and squash merges
 
 ## Balance Advisor (MCP)
 
