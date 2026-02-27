@@ -807,6 +807,27 @@ describe('applyEvents', () => {
         expect(result.stations['station_001'].modules[0].kind_state).toEqual(expectedKindState);
       }
     });
+
+    it('falls back to Processor for unknown behavior_type', () => {
+      const station = makeStation();
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ModuleInstalled: {
+            station_id: 'station_001', module_id: 'mod_unknown',
+            module_item_id: 'item_1', module_def_id: 'module_custom',
+            behavior_type: 'UnknownType',
+          },
+        },
+      }];
+
+      const result = applyEvents(
+        {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+      );
+      expect(result.stations['station_001'].modules[0].kind_state).toEqual({
+        Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false },
+      });
+    });
   });
 
   describe('ModuleToggled', () => {
@@ -1288,6 +1309,21 @@ describe('applyEvents', () => {
 
       const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
       expect(result.ships['ship_0001'].task!.kind).toEqual({ Survey: { site: 'site_1' } });
+    });
+
+    it('assigns a DeepScan task to the ship', () => {
+      const ship = makeShip();
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          TaskStarted: {
+            ship_id: 'ship_0001', task_kind: 'DeepScan', target: 'ast_001',
+          },
+        },
+      }];
+
+      const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_0001'].task!.kind).toEqual({ DeepScan: { asteroid: 'ast_001' } });
     });
 
     it('assigns a Deposit task to the ship', () => {
