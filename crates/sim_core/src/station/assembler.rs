@@ -159,7 +159,9 @@ fn execute(
         // should_run() incremented the timer; if it equals exactly the interval,
         // this is the first time we've reached it.
         let first_trigger = {
-            let station = state.stations.get(&ctx.station_id).unwrap();
+            let Some(station) = state.stations.get(&ctx.station_id) else {
+                return super::RunOutcome::Skipped { reset_timer: false };
+            };
             match &station.modules[ctx.module_idx].kind_state {
                 crate::ModuleKindState::Assembler(asmb) => {
                     asmb.ticks_since_last_run == assembler_def.assembly_interval_ticks
@@ -212,16 +214,11 @@ fn execute(
         (produced_volume - consumed_volume).max(0.0)
     };
 
-    let current_used = state
-        .stations
-        .get_mut(&ctx.station_id)
-        .unwrap()
-        .used_volume_m3(content);
-    let capacity = state
-        .stations
-        .get(&ctx.station_id)
-        .unwrap()
-        .cargo_capacity_m3;
+    let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+        return super::RunOutcome::Skipped { reset_timer: true };
+    };
+    let current_used = station.used_volume_m3(content);
+    let capacity = station.cargo_capacity_m3;
     let shortfall = (current_used + output_volume) - capacity;
 
     if shortfall > 0.0 {
@@ -367,12 +364,10 @@ fn resolve_assembler_run(
             OutputSpec::Ship { cargo_capacity_m3 } => {
                 let uuid = crate::generate_uuid(rng);
                 let ship_id = ShipId(format!("ship_{uuid}"));
-                let location_node = state
-                    .stations
-                    .get(&ctx.station_id)
-                    .unwrap()
-                    .location_node
-                    .clone();
+                let Some(station) = state.stations.get(&ctx.station_id) else {
+                    return;
+                };
+                let location_node = station.location_node.clone();
                 let ship = ShipState {
                     id: ship_id.clone(),
                     location_node: location_node.clone(),

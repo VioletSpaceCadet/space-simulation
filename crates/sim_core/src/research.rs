@@ -70,7 +70,9 @@ pub(crate) fn advance_research(
     eligible.sort_by(|a, b| a.0.cmp(&b.0));
 
     for tech_id in eligible {
-        let tech_def = content.techs.iter().find(|t| t.id == tech_id).unwrap();
+        let Some(tech_def) = content.techs.iter().find(|t| t.id == tech_id) else {
+            continue;
+        };
         let progress = state.research.evidence.get(&tech_id);
 
         // Compute domain sufficiency

@@ -87,11 +87,15 @@ fn execute(
 
     // Warm the volume cache
     {
-        let station_mut = state.stations.get_mut(&ctx.station_id).unwrap();
+        let Some(station_mut) = state.stations.get_mut(&ctx.station_id) else {
+            return super::RunOutcome::Skipped { reset_timer: false };
+        };
         let _ = station_mut.used_volume_m3(content);
     }
 
-    let station = state.stations.get(&ctx.station_id).unwrap();
+    let Some(station) = state.stations.get(&ctx.station_id) else {
+        return super::RunOutcome::Skipped { reset_timer: false };
+    };
     let (peeked_kg, lots) = peek_ore_fifo_with_lots(&station.inventory, rate_kg, |item| {
         matches_input_filter(item, input_filter.as_ref())
     });

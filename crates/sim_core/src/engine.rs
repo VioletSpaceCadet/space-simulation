@@ -162,7 +162,9 @@ fn apply_commands(
                     None => continue,
                 };
 
-                let station = state.stations.get_mut(station_id).unwrap();
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
                 station.modules.push(crate::ModuleState {
                     id: module_id.clone(),
                     def_id: module_def_id.clone(),
@@ -201,7 +203,9 @@ fn apply_commands(
                 ));
                 state.counters.next_module_instance_id += 1;
 
-                let station = state.stations.get_mut(station_id).unwrap();
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
                 station.inventory.push(InventoryItem::Module {
                     item_id: item_id.clone(),
                     module_def_id: module.def_id.clone(),
@@ -330,7 +334,9 @@ fn apply_commands(
                 // Check cargo capacity
                 let new_items = trade::create_inventory_items(item_spec, rng);
                 let new_volume = inventory_volume_m3(&new_items, content);
-                let station = state.stations.get_mut(station_id).unwrap();
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
                 let current_volume = station.used_volume_m3(content);
                 let cargo_cap = station.cargo_capacity_m3;
                 if current_volume + new_volume > cargo_cap {
@@ -339,7 +345,9 @@ fn apply_commands(
 
                 // Execute import
                 state.balance -= cost;
-                let station = state.stations.get_mut(station_id).unwrap();
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
                 trade::merge_into_inventory(&mut station.inventory, new_items);
                 station.invalidate_volume_cache();
 
@@ -378,7 +386,9 @@ fn apply_commands(
                 }
 
                 // Execute export
-                let station = state.stations.get_mut(station_id).unwrap();
+                let Some(station) = state.stations.get_mut(station_id) else {
+                    continue;
+                };
                 if !trade::remove_inventory_items(&mut station.inventory, item_spec) {
                     continue;
                 }
