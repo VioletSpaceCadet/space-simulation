@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 import { useSortableData } from '../hooks/useSortableData';
-import type { ComponentItem, InventoryItem, MaterialItem, ModuleItem, ModuleState, OreItem, ShipState, SlagItem, StationState } from '../types';
+import type { ComponentItem, InventoryItem, MaterialItem, ModuleItem, ModuleState, OreItem, PowerState, ShipState, SlagItem, StationState } from '../types';
 
 import { SortIndicator } from './SortIndicator';
 
@@ -360,28 +360,64 @@ function ModuleCard({ module: m }: { module: ModuleState }) {
   );
 }
 
+function PowerBar({ power }: { power: PowerState }) {
+  const { generated_kw, consumed_kw, deficit_kw, battery_stored_kwh } = power;
+  const usagePct = generated_kw > 0 ? Math.min(consumed_kw / generated_kw, 1) : (consumed_kw > 0 ? 1 : 0);
+  const hasDeficit = deficit_kw > 0;
+
+  return (
+    <div className="text-[11px]">
+      <div className="text-label text-[10px] uppercase tracking-wider mb-1">Power</div>
+      <div className="flex items-center gap-2 mb-1">
+        <div className="flex-1 h-2 bg-surface rounded overflow-hidden">
+          <div
+            className={`h-full rounded transition-all ${hasDeficit ? 'bg-red-400' : 'bg-green-400'}`}
+            style={{ width: `${Math.round(usagePct * 100)}%` }}
+          />
+        </div>
+        <span className="text-dim whitespace-nowrap">
+          {consumed_kw.toFixed(0)} / {generated_kw.toFixed(0)} kW
+        </span>
+      </div>
+      {hasDeficit && (
+        <div className="text-red-400 text-[10px]">
+          Deficit: {deficit_kw.toFixed(0)} kW — modules stalled
+        </div>
+      )}
+      {battery_stored_kwh > 0 && (
+        <div className="text-dim text-[10px]">
+          Battery: {battery_stored_kwh.toFixed(1)} kWh
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StationDetail({ station }: { station: StationState }) {
   return (
-    <div className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2 text-[11px] w-fit">
-      <div>
-        <div className="text-label text-[10px] uppercase tracking-wider mb-1">Inventory</div>
-        {station.inventory.length === 0 ? (
-          <span className="text-faint">empty</span>
-        ) : (
-          <InventoryDisplay inventory={station.inventory} />
-        )}
-      </div>
-      <div>
-        <div className="text-label text-[10px] uppercase tracking-wider mb-1">Modules</div>
-        {station.modules.length === 0 ? (
-          <span className="text-faint">none installed</span>
-        ) : (
-          <div className="space-y-2">
-            {station.modules.map((m) => (
-              <ModuleCard key={m.id} module={m} />
-            ))}
-          </div>
-        )}
+    <div className="space-y-3 text-[11px] w-fit">
+      <PowerBar power={station.power} />
+      <div className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2">
+        <div>
+          <div className="text-label text-[10px] uppercase tracking-wider mb-1">Inventory</div>
+          {station.inventory.length === 0 ? (
+            <span className="text-faint">empty</span>
+          ) : (
+            <InventoryDisplay inventory={station.inventory} />
+          )}
+        </div>
+        <div>
+          <div className="text-label text-[10px] uppercase tracking-wider mb-1">Modules</div>
+          {station.modules.length === 0 ? (
+            <span className="text-faint">none installed</span>
+          ) : (
+            <div className="space-y-2">
+              {station.modules.map((m) => (
+                <ModuleCard key={m.id} module={m} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

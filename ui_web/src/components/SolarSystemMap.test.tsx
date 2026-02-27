@@ -6,12 +6,13 @@ import type { SimSnapshot } from '../types';
 import { SolarSystemMap } from './SolarSystemMap';
 
 const emptySnapshot: SimSnapshot = {
-  meta: { tick: 100, seed: 42, content_version: '0.0.1' },
+  meta: { tick: 100, seed: 42, content_version: '0.0.1', ticks_per_sec: 10, paused: false },
   scan_sites: [],
   asteroids: {},
   ships: {},
   stations: {},
   research: { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} },
+  balance: 0,
 };
 
 describe('SolarSystemMap', () => {
@@ -30,9 +31,14 @@ describe('SolarSystemMap', () => {
           id: 'station_001',
           location_node: 'node_earth_orbit',
           power_available_per_tick: 100,
-          cargo: {},
+          inventory: [],
           cargo_capacity_m3: 10000,
           facilities: { compute_units_total: 10, power_per_compute_unit_per_tick: 1, efficiency: 1 },
+          modules: [],
+          power: {
+            generated_kw: 0, consumed_kw: 0, deficit_kw: 0,
+            battery_discharge_kw: 0, battery_charge_kw: 0, battery_stored_kwh: 0,
+          },
         },
       },
     };
@@ -51,7 +57,7 @@ describe('SolarSystemMap', () => {
           id: 'ship_001',
           location_node: 'node_earth_orbit',
           owner: 'player',
-          cargo: {},
+          inventory: [],
           cargo_capacity_m3: 20,
           task: null,
         },

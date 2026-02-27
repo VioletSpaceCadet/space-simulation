@@ -85,11 +85,22 @@ export interface LabState {
   starved: boolean
 }
 
+export interface BatteryState {
+  charge_kwh: number
+}
+
+export interface SensorArrayState {
+  ticks_since_last_run: number
+}
+
 export type ModuleKindState =
   | { Processor: ProcessorState }
   | { Maintenance: MaintenanceState }
   | { Assembler: AssemblerState }
   | { Lab: LabState }
+  | { SensorArray: SensorArrayState }
+  | { SolarArray: SensorArrayState }
+  | { Battery: BatteryState }
   | 'Storage'
 
 export interface WearState {
@@ -113,6 +124,15 @@ export interface ShipState {
   task: TaskState | null
 }
 
+export interface PowerState {
+  generated_kw: number
+  consumed_kw: number
+  deficit_kw: number
+  battery_discharge_kw: number
+  battery_charge_kw: number
+  battery_stored_kwh: number
+}
+
 export interface StationState {
   id: string
   location_node: string
@@ -121,6 +141,7 @@ export interface StationState {
   cargo_capacity_m3: number
   facilities: FacilitiesState
   modules: ModuleState[]
+  power: PowerState
 }
 
 export interface AsteroidKnowledge {
