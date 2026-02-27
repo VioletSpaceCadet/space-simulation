@@ -122,3 +122,5 @@ Use the **fe-chrome-tester agent** (`.claude/agents/fe-chrome-tester`) for brows
 
 - IDE: RustRover (JetBrains)
 - Mutation testing with `cargo-mutants`
+- **`cargo` is on PATH.** Never prefix with `PATH=`, `export PATH=`, or `~/.cargo/bin/`. Just use `cargo test`, `cargo build`, etc. For worktrees use `--manifest-path`. The PreToolUse hook (`check-bash.sh`) enforces this.
+- **For `gh pr` bodies**, use `--body-file /tmp/pr-body.md` instead of inline `--body`. Claude Code blocks `$()`, `${}`, and quoted flag-like strings in inline text.

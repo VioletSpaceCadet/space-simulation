@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/check-gh-pr.sh",
+            "command": ".claude/hooks/check-bash.sh",
             "timeout": 5
           }
         ]

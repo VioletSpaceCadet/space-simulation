@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# PreToolUse hook: catches Bash patterns that Claude Code's safety checks block.
-# Claude Code has multiple hardcoded safety checks on Bash commands. This hook
-# warns BEFORE the command is sent, so you can fix the approach instead of retrying.
+# PreToolUse hook: catches Bash anti-patterns before they cause problems.
 #
-# Known blocked patterns:
-# 1. $() or ${} — "Command contains $() command substitution"
-# 2. "---" or "--flag" — "Command contains quoted characters in flag names"
-# 3. Quotes near dashes — "Command contains empty quotes before dash (potential bypass)"
+# Guards against:
+# 1. $() or ${} in gh pr commands — Claude Code blocks command substitution
+# 2. "---" or "--flag" — Claude Code blocks quoted characters in flag names
+# 3. Long inline --body on gh pr — likely to hit various safety checks
+# 4. PATH-prefixed cargo commands — unnecessary and creates approval sprawl
 #
-# For complex gh pr bodies: ALWAYS use --body-file with a temp file instead of inline strings.
+# For complex gh pr bodies: use --body-file with a temp file.
 set -euo pipefail
 
 INPUT=$(cat)
@@ -47,8 +46,6 @@ if echo "$CMD" | grep -qE '"--[^"]*"'; then
 fi
 
 # --- Check 3: gh pr commands with long/complex --body content ---
-# If the --body value is longer than 200 chars, it's likely to trigger one of
-# Claude Code's safety checks. Recommend --body-file preemptively.
 if [[ "$CMD" =~ ^gh\ pr ]]; then
   BODY_CONTENT=$(echo "$CMD" | sed -n "s/.*--body[= ]*'\(.*\)'/\1/p")
   if [[ -z "$BODY_CONTENT" ]]; then
@@ -60,4 +57,24 @@ if [[ "$CMD" =~ ^gh\ pr ]]; then
     echo "$BODY_FILE_HINT"
     exit 2
   fi
+fi
+
+# --- Check 4: PATH-prefixed cargo commands ---
+# cargo is on PATH. Prefixing with PATH= or ~/.cargo/bin creates unique command
+# strings that each require separate user approval. Just use "cargo" directly.
+if [[ "$CMD" =~ (PATH=|\.cargo/bin/cargo|export\ PATH=).*cargo ]]; then
+  echo "STOP: Do not prefix cargo commands with PATH or use ~/.cargo/bin/cargo."
+  echo "cargo is already on PATH. Each unique command string requires separate approval."
+  echo ""
+  echo "Instead of:"
+  echo "  PATH=\"\$HOME/.cargo/bin:\$PATH\" cargo test"
+  echo "  ~/.cargo/bin/cargo test"
+  echo "  export PATH=\"...\" && cargo test"
+  echo ""
+  echo "Just use:"
+  echo "  cargo test"
+  echo "  cargo build"
+  echo "  cargo clippy"
+  echo "  cargo test --manifest-path /path/Cargo.toml   (for worktrees)"
+  exit 2
 fi
