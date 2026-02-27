@@ -88,6 +88,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
                 modules: vec![],
+                power: PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
         )]),

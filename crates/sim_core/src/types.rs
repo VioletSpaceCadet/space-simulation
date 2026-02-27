@@ -255,6 +255,13 @@ pub struct ShipState {
     pub task: Option<TaskState>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PowerState {
+    pub generated_kw: f32,
+    pub consumed_kw: f32,
+    pub deficit_kw: f32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StationState {
     pub id: StationId,
@@ -263,6 +270,9 @@ pub struct StationState {
     pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
     pub modules: Vec<ModuleState>,
+    /// Computed fresh each tick — not persisted across ticks.
+    #[serde(skip, default)]
+    pub power: PowerState,
     /// Cached inventory volume. Set to `None` when inventory changes;
     /// recomputed lazily via [`StationState::used_volume_m3`].
     #[serde(skip, default)]
