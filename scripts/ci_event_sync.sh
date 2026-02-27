@@ -22,9 +22,11 @@ rust_variants=$(
 )
 
 # --- Extract handled event keys from TypeScript ---
-# Matches case 'EventName': in the switch statement
+# Matches handler map keys (e.g., AsteroidDiscovered: handleAsteroidDiscovered)
+# or case 'EventName': in a switch statement
 ts_handled=$(
-  grep -oE "case '[A-Za-z]+'" "$APPLY_EVENTS_TS" | grep -oE "'[A-Za-z]+'" | tr -d "'"
+  grep -oE "[A-Za-z]+: (handle[A-Za-z]+|noOp)" "$APPLY_EVENTS_TS" | grep -oE "^[A-Za-z]+"
+  grep -oE "case '[A-Za-z]+'" "$APPLY_EVENTS_TS" | grep -oE "'[A-Za-z]+'" | tr -d "'" || true
 )
 ts_handled=$(echo "$ts_handled" | sort -u)
 
