@@ -142,18 +142,15 @@ fn compute_power_budget(state: &mut GameState, station_id: &StationId, content: 
             continue;
         };
 
-        match &def.behavior {
-            crate::ModuleBehaviorDef::SolarArray(solar_def) => {
-                has_solar_arrays = true;
-                let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
-                generated_kw += solar_def.base_output_kw * solar_intensity * efficiency;
-                consumed_kw += def.power_consumption_per_run;
-            }
-            _ => {
-                consumed_kw += def.power_consumption_per_run;
-                if let Some(priority) = power_priority(&def.behavior) {
-                    consumers.push((idx, priority, def.power_consumption_per_run));
-                }
+        if let crate::ModuleBehaviorDef::SolarArray(solar_def) = &def.behavior {
+            has_solar_arrays = true;
+            let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
+            generated_kw += solar_def.base_output_kw * solar_intensity * efficiency;
+            consumed_kw += def.power_consumption_per_run;
+        } else {
+            consumed_kw += def.power_consumption_per_run;
+            if let Some(priority) = power_priority(&def.behavior) {
+                consumers.push((idx, priority, def.power_consumption_per_run));
             }
         }
     }
