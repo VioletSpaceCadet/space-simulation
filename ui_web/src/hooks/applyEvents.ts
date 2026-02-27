@@ -409,6 +409,73 @@ export function applyEvents(
         break;
       }
 
+      case 'LabRan': {
+        const { station_id, module_id, tech_id } = event as {
+          station_id: string
+          module_id: string
+          tech_id: string
+        };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Lab' in ks) {
+                  return { ...m, kind_state: { Lab: { ...ks.Lab, ticks_since_last_run: 0, assigned_tech: tech_id, starved: false } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'LabStarved': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Lab' in ks) {
+                  return { ...m, kind_state: { Lab: { ...ks.Lab, starved: true } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
+      case 'LabResumed': {
+        const { station_id, module_id } = event as { station_id: string; module_id: string };
+        if (updatedStations[station_id]) {
+          updatedStations = {
+            ...updatedStations,
+            [station_id]: {
+              ...updatedStations[station_id],
+              modules: updatedStations[station_id].modules.map((m) => {
+                if (m.id !== module_id) {return m;}
+                const ks = m.kind_state;
+                if (typeof ks === 'object' && 'Lab' in ks) {
+                  return { ...m, kind_state: { Lab: { ...ks.Lab, starved: false } } };
+                }
+                return m;
+              }),
+            },
+          };
+        }
+        break;
+      }
+
       case 'ScanResult': {
         const { asteroid_id, tags } = event as { asteroid_id: string; tags: [string, number][] };
         if (updatedAsteroids[asteroid_id]) {
