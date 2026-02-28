@@ -810,8 +810,8 @@ pub struct ElementDef {
 pub struct ThermalDef {
     /// Heat capacity in J/K. Higher values mean slower temperature changes.
     pub heat_capacity_j_per_k: f32,
-    /// Passive cooling coefficient (0.0–1.0). Fraction of temp delta above sink
-    /// dissipated per tick without a radiator.
+    /// Passive cooling coefficient (W/K). Scales heat loss via Newton's law of
+    /// cooling: `Q_loss = coeff * dt_s * (T - T_sink) / 1000`.
     pub passive_cooling_coefficient: f32,
     /// Maximum safe temperature in milli-Kelvin before overheat consequences.
     pub max_temp_mk: u32,
