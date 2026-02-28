@@ -80,7 +80,6 @@ pub(crate) fn tick_thermal(state: &mut GameState, station_id: &StationId, conten
             .unwrap_or_default();
 
         let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
-        let _ = module_index; // used only for future extensibility
         *radiator_cooling_by_group.entry(group_key).or_default() +=
             radiator_def.cooling_capacity_w * efficiency;
     }
@@ -698,6 +697,47 @@ mod tests {
         assert!(
             temp_worn > temp_pristine,
             "worn radiator should be less effective: worn={temp_worn}, pristine={temp_pristine}"
+        );
+    }
+
+    #[test]
+    fn disabled_radiator_contributes_zero_cooling() {
+        let mut content = thermal_test_content();
+        let station_id = StationId("station_test".to_string());
+
+        // State without radiator (passive cooling only)
+        let mut state_no_radiator = thermal_test_state(&content, 2_000_000);
+        tick_thermal(&mut state_no_radiator, &station_id, &content);
+        let temp_no_radiator = state_no_radiator.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+
+        // State with disabled radiator — should be identical to no radiator
+        let mut state_disabled = thermal_test_state(&content, 2_000_000);
+        add_radiator(
+            &mut content,
+            &mut state_disabled,
+            &station_id,
+            "a",
+            1000.0,
+            0.0,
+        );
+        // Disable the radiator
+        let station = state_disabled.stations.get_mut(&station_id).unwrap();
+        station.modules.last_mut().unwrap().enabled = false;
+
+        tick_thermal(&mut state_disabled, &station_id, &content);
+        let temp_disabled = state_disabled.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+
+        assert_eq!(
+            temp_no_radiator, temp_disabled,
+            "disabled radiator should not contribute cooling"
         );
     }
 }
