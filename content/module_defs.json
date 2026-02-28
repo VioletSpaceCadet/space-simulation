@@ -273,5 +273,24 @@
       "max_temp_mk": 2500000,
       "thermal_group": "default"
     }
+  },
+  {
+    "id": "module_basic_radiator",
+    "name": "Basic Radiator",
+    "mass_kg": 800.0,
+    "volume_m3": 15.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.001,
+    "behavior": {
+      "Radiator": {
+        "cooling_capacity_w": 500.0
+      }
+    },
+    "thermal": {
+      "heat_capacity_j_per_k": 10000.0,
+      "passive_cooling_coefficient": 10.0,
+      "max_temp_mk": 3000000,
+      "thermal_group": "default"
+    }
   }
 ]

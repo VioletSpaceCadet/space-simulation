@@ -1200,6 +1200,69 @@ fn smelter_processes_less_ore_than_cold_refinery() {
     );
 }
 
+// ── Radiator content tests (VIO-208) ────────────────────────────
+
+#[test]
+fn radiator_module_exists_with_correct_properties() {
+    let content = load_test_content();
+    let radiator = content
+        .module_defs
+        .get("module_basic_radiator")
+        .expect("module_basic_radiator must exist");
+
+    let radiator_def = match &radiator.behavior {
+        ModuleBehaviorDef::Radiator(r) => r,
+        _ => panic!("radiator must be a Radiator behavior"),
+    };
+
+    assert!(
+        radiator_def.cooling_capacity_w > 0.0,
+        "cooling capacity must be positive"
+    );
+    assert_eq!(radiator_def.cooling_capacity_w, 500.0);
+    assert_eq!(
+        radiator.power_consumption_per_run, 0.0,
+        "radiator is passive"
+    );
+
+    let thermal = radiator
+        .thermal
+        .as_ref()
+        .expect("radiator must have thermal def for group assignment");
+    assert_eq!(
+        thermal.thermal_group.as_deref(),
+        Some("default"),
+        "radiator must be in 'default' thermal group"
+    );
+}
+
+#[test]
+fn smelter_and_radiator_share_thermal_group() {
+    let content = load_test_content();
+    let smelter = content
+        .module_defs
+        .get("module_basic_smelter")
+        .expect("module_basic_smelter must exist");
+    let radiator = content
+        .module_defs
+        .get("module_basic_radiator")
+        .expect("module_basic_radiator must exist");
+
+    let smelter_group = smelter
+        .thermal
+        .as_ref()
+        .and_then(|t| t.thermal_group.as_deref());
+    let radiator_group = radiator
+        .thermal
+        .as_ref()
+        .and_then(|t| t.thermal_group.as_deref());
+
+    assert_eq!(
+        smelter_group, radiator_group,
+        "smelter and radiator must share the same thermal group"
+    );
+}
+
 #[test]
 fn thermal_modules_have_valid_thermal_defs() {
     let content = load_test_content();
