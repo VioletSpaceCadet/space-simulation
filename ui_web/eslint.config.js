@@ -5,6 +5,8 @@ import reactPlugin from 'eslint-plugin-react';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import importX from 'eslint-plugin-import-x';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
+import testingLibrary from 'eslint-plugin-testing-library';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
@@ -16,6 +18,7 @@ export default defineConfig([
       tseslint.configs.recommended,
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
+      jsxA11y.flatConfigs.recommended,
     ],
     plugins: {
       'import-x': importX,
@@ -24,6 +27,10 @@ export default defineConfig([
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.browser,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     settings: {
       'import-x/resolver': {
@@ -64,7 +71,13 @@ export default defineConfig([
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
+
+      // --- Async safety (type-checked) ---
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': ['error', {
+        checksVoidReturn: { attributes: false },
+      }],
 
       // --- Imports ---
       'import-x/order': [
@@ -80,6 +93,24 @@ export default defineConfig([
       // --- React ---
       'react/self-closing-comp': 'error',
       'react/jsx-boolean-value': ['error', 'never'],
+    },
+  },
+
+  // --- Test files: Testing Library rules + disable type-checked rules ---
+  {
+    files: ['**/*.test.{ts,tsx}'],
+    extends: [testingLibrary.configs['flat/react']],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/no-misused-promises': 'off',
+      // Disabled — 63 existing violations. Track cleanup in a follow-up ticket.
+      'testing-library/no-node-access': 'off',
+      'testing-library/no-container': 'off',
     },
   },
 ]);
