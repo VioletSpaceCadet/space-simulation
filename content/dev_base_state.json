@@ -95,6 +95,26 @@
           "module_def_id": "module_basic_battery"
         },
         {
+          "kind": "Module",
+          "item_id": "module_item_0012",
+          "module_def_id": "module_basic_smelter"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0013",
+          "module_def_id": "module_basic_radiator"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0014",
+          "module_def_id": "module_basic_radiator"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0015",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
           "kind": "Material",
           "element": "Fe",
           "kg": 500.0,
