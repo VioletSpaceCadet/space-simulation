@@ -819,6 +819,7 @@ mod tests {
                     processing_interval_ticks: 60,
                     recipes: vec![],
                 }),
+                thermal: None,
             },
         )]);
 
@@ -985,6 +986,7 @@ mod tests {
                     processing_interval_ticks: 60,
                     recipes: vec![],
                 }),
+                thermal: None,
             },
         )]);
 
@@ -1090,6 +1092,7 @@ mod tests {
                     processing_interval_ticks: 60,
                     recipes: vec![],
                 }),
+                thermal: None,
             },
         )]);
 
@@ -1160,6 +1163,7 @@ mod tests {
                     charge_rate_kw: 20.0,
                     discharge_rate_kw: 30.0,
                 }),
+                thermal: None,
             },
         );
         let mut state = empty_state();

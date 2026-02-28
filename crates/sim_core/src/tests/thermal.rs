@@ -226,6 +226,71 @@ fn material_thermal_backward_compat_missing_field() {
     }
 }
 
+// --- ThermalDef on ModuleDef tests ---
+
+#[test]
+fn thermal_def_round_trip() {
+    let thermal_def = ThermalDef {
+        heat_capacity_j_per_k: 500.0,
+        passive_cooling_coefficient: 0.05,
+        max_temp_mk: 2_500_000,
+        operating_min_mk: Some(1_000_000),
+        operating_max_mk: Some(2_000_000),
+        thermal_group: Some("smelting".to_string()),
+    };
+
+    let json = serde_json::to_string(&thermal_def).unwrap();
+    let deserialized: ThermalDef = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, thermal_def);
+}
+
+#[test]
+fn module_def_thermal_none_backward_compat() {
+    // Old module_defs.json entry without "thermal" field
+    let json = r#"{
+        "id": "mod_test",
+        "name": "Test Module",
+        "mass_kg": 1000.0,
+        "volume_m3": 5.0,
+        "power_consumption_per_run": 10.0,
+        "wear_per_run": 0.01,
+        "behavior": {"Storage": {"capacity_m3": 100.0}}
+    }"#;
+
+    let module_def: ModuleDef = serde_json::from_str(json).unwrap();
+    assert_eq!(module_def.thermal, None);
+}
+
+#[test]
+fn module_def_with_thermal_parses() {
+    let json = r#"{
+        "id": "mod_smelter",
+        "name": "Iron Smelter",
+        "mass_kg": 5000.0,
+        "volume_m3": 10.0,
+        "power_consumption_per_run": 100.0,
+        "wear_per_run": 0.02,
+        "behavior": {"Storage": {"capacity_m3": 50.0}},
+        "thermal": {
+            "heat_capacity_j_per_k": 500.0,
+            "passive_cooling_coefficient": 0.05,
+            "max_temp_mk": 2500000,
+            "operating_min_mk": 1000000,
+            "operating_max_mk": 2000000,
+            "thermal_group": "smelting"
+        }
+    }"#;
+
+    let module_def: ModuleDef = serde_json::from_str(json).unwrap();
+    let thermal = module_def.thermal.unwrap();
+    assert!((thermal.heat_capacity_j_per_k - 500.0).abs() < f32::EPSILON);
+    assert!((thermal.passive_cooling_coefficient - 0.05).abs() < f32::EPSILON);
+    assert_eq!(thermal.max_temp_mk, 2_500_000);
+    assert_eq!(thermal.operating_min_mk, Some(1_000_000));
+    assert_eq!(thermal.operating_max_mk, Some(2_000_000));
+    assert_eq!(thermal.thermal_group, Some("smelting".to_string()));
+}
+
 // --- Element thermal properties tests ---
 
 #[test]

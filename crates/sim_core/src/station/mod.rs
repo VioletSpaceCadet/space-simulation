@@ -699,6 +699,7 @@ mod framework_tests {
                     processing_interval_ticks: 5,
                     recipes: vec![],
                 }),
+                thermal: None,
             },
         );
         content
@@ -824,6 +825,7 @@ mod framework_tests {
                 power_consumption_per_run: 0.0,
                 wear_per_run: 0.0,
                 behavior: ModuleBehaviorDef::Storage { capacity_m3: 500.0 },
+                thermal: None,
             },
         );
         assert!(extract_context(&state, &station_id, 0, &content2).is_none());

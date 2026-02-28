@@ -456,6 +456,7 @@ mod assembler_component_tests {
                     }],
                     max_stock: HashMap::new(),
                 }),
+                thermal: None,
             },
         );
         content
@@ -741,6 +742,7 @@ mod assembler_component_tests {
                     }],
                     max_stock: HashMap::new(),
                 }),
+                thermal: None,
             },
         );
         content

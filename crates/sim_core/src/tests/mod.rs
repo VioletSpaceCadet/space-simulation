@@ -141,6 +141,7 @@ fn refinery_content() -> GameContent {
                     efficiency: 1.0,
                 }],
             }),
+            thermal: None,
         },
     )]);
     content
@@ -206,6 +207,7 @@ fn assembler_content() -> GameContent {
                     efficiency: 1.0,
                 }],
             }),
+            thermal: None,
         },
     )]);
     content.component_defs = vec![crate::ComponentDef {
@@ -265,6 +267,7 @@ fn maintenance_content() -> GameContent {
                 repair_kit_cost: 1,
                 repair_threshold: 0.0,
             }),
+            thermal: None,
         },
     );
     content

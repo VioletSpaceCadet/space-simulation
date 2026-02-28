@@ -802,6 +802,30 @@ pub struct ElementDef {
     pub specific_heat_j_per_kg_k: Option<u32>,
 }
 
+/// Content-driven thermal properties for a module.
+///
+/// Defines heat capacity, passive cooling rate, maximum operating temperature,
+/// and optional thermal group assignment for shared radiator cooling.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThermalDef {
+    /// Heat capacity in J/K. Higher values mean slower temperature changes.
+    pub heat_capacity_j_per_k: f32,
+    /// Passive cooling coefficient (0.0–1.0). Fraction of temp delta above sink
+    /// dissipated per tick without a radiator.
+    pub passive_cooling_coefficient: f32,
+    /// Maximum safe temperature in milli-Kelvin before overheat consequences.
+    pub max_temp_mk: u32,
+    /// Minimum operating temperature in milli-Kelvin. `None` means no lower bound.
+    #[serde(default)]
+    pub operating_min_mk: Option<u32>,
+    /// Maximum operating temperature in milli-Kelvin. `None` means no upper bound.
+    #[serde(default)]
+    pub operating_max_mk: Option<u32>,
+    /// Thermal group for shared radiator cooling. Modules in the same group share radiators.
+    #[serde(default)]
+    pub thermal_group: Option<ThermalGroupId>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleDef {
     pub id: String,
@@ -812,6 +836,9 @@ pub struct ModuleDef {
     #[serde(default)]
     pub wear_per_run: f32,
     pub behavior: ModuleBehaviorDef,
+    /// Thermal properties. `None` for modules with no thermal behavior.
+    #[serde(default)]
+    pub thermal: Option<ThermalDef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

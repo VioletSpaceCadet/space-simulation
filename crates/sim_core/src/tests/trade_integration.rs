@@ -80,6 +80,7 @@ fn economy_content() -> GameContent {
                 }],
                 max_stock: HashMap::new(),
             }),
+            thermal: None,
         },
     )]);
 

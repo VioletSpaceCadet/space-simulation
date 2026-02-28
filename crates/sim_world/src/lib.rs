@@ -549,6 +549,7 @@ mod tests {
                         efficiency: 1.0,
                     }],
                 }),
+                thermal: None,
             },
         );
         validate_content(&content);
@@ -631,6 +632,7 @@ mod tests {
                         efficiency: 1.0,
                     }],
                 }),
+                thermal: None,
             },
         );
         validate_content(&content);

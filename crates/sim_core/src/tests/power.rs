@@ -14,6 +14,7 @@ fn solar_array_content() -> GameContent {
             behavior: ModuleBehaviorDef::SolarArray(SolarArrayDef {
                 base_output_kw: 50.0,
             }),
+            thermal: None,
         },
     );
     content.module_defs.insert(
@@ -30,6 +31,7 @@ fn solar_array_content() -> GameContent {
                 processing_interval_ticks: 60,
                 recipes: vec![],
             }),
+            thermal: None,
         },
     );
     content
@@ -142,6 +144,7 @@ fn power_budget_deficit_when_insufficient() {
                 processing_interval_ticks: 60,
                 recipes: vec![],
             }),
+            thermal: None,
         },
     );
 
@@ -280,6 +283,7 @@ fn stall_content() -> GameContent {
                 scan_interval_minutes: 120,
                 scan_interval_ticks: 120,
             }),
+            thermal: None,
         },
     );
     content
@@ -459,6 +463,7 @@ fn battery_content() -> GameContent {
                 charge_rate_kw: 20.0,
                 discharge_rate_kw: 30.0,
             }),
+            thermal: None,
         },
     );
     content
@@ -521,6 +526,7 @@ fn battery_discharges_to_cover_deficit() {
                 processing_interval_ticks: 60,
                 recipes: vec![],
             }),
+            thermal: None,
         },
     );
 
@@ -603,6 +609,7 @@ fn battery_partial_discharge_then_stall() {
                 processing_interval_ticks: 60,
                 recipes: vec![],
             }),
+            thermal: None,
         },
     );
 
