@@ -185,6 +185,7 @@ mod tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
+                        thermal: None,
                     }],
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,

@@ -171,6 +171,7 @@ fn apply_commands(
                     enabled: false,
                     kind_state,
                     wear: crate::WearState::default(),
+                    thermal: None,
                     power_stalled: false,
                 });
 

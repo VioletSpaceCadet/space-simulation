@@ -707,6 +707,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -924,6 +925,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState { wear: 1.0 },
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1085,6 +1087,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1124,6 +1127,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1177,6 +1181,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1255,6 +1260,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1361,6 +1367,7 @@ mod tests {
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
+            thermal: None,
         });
 
         // Add 5000 kg Fe to station inventory
