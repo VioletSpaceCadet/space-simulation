@@ -1,4 +1,9 @@
-import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, PowerState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
+import type { z } from 'zod';
+
+import type { AsteroidState, ComponentItem, MaterialItem, ModuleKindState, PowerState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
+
+import { eventSchemas } from './eventSchemas';
+import type { EventType } from './eventSchemas';
 
 /** Mutable state bundle threaded through event handlers. */
 interface SimState {
@@ -10,7 +15,8 @@ interface SimState {
   balance: number;
 }
 
-type EventHandler = (state: SimState, event: Record<string, unknown>, tick: number) => SimState;
+/** Infer the parsed payload type from a Zod schema in eventSchemas. */
+type EventPayload<K extends EventType> = z.infer<(typeof eventSchemas)[K]>;
 
 const MODULE_KIND_STATE_MAP: Record<string, ModuleKindState> = {
   Processor: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
@@ -39,17 +45,17 @@ function buildTaskStub(taskKind: string, target: string | null, tick: number): T
 }
 
 /** Convert a TradeItemSpec (serde-tagged union) into an InventoryItem for the UI. */
-function tradeItemToInventory(itemSpec: TradeItemSpec): InventoryItem {
+function tradeItemToInventory(itemSpec: TradeItemSpec) {
   if ('Material' in itemSpec) {
     const { element, kg } = itemSpec.Material;
-    return { kind: 'Material', element, kg, quality: 1.0 };
+    return { kind: 'Material' as const, element, kg, quality: 1.0 };
   }
   if ('Component' in itemSpec) {
     const { component_id, count } = itemSpec.Component;
-    return { kind: 'Component', component_id, count, quality: 1.0 };
+    return { kind: 'Component' as const, component_id, count, quality: 1.0 };
   }
   const { module_def_id } = itemSpec.Module;
-  return { kind: 'Module', item_id: `imported_${module_def_id}_${Date.now()}`, module_def_id };
+  return { kind: 'Module' as const, item_id: `imported_${module_def_id}_${Date.now()}`, module_def_id };
 }
 
 // --- Helper: update a single module's kind_state within a station ---
@@ -76,16 +82,15 @@ function mapStationModule(
 
 // --- Individual event handlers ---
 
-function handleAsteroidDiscovered(state: SimState, event: Record<string, unknown>): SimState {
-  const { asteroid_id, location_node } = event as { asteroid_id: string; location_node: string };
-  if (state.asteroids[asteroid_id]) {return state;}
+function handleAsteroidDiscovered(state: SimState, event: EventPayload<'AsteroidDiscovered'>): SimState {
+  if (state.asteroids[event.asteroid_id]) {return state;}
   return {
     ...state,
     asteroids: {
       ...state.asteroids,
-      [asteroid_id]: {
-        id: asteroid_id,
-        location_node,
+      [event.asteroid_id]: {
+        id: event.asteroid_id,
+        location_node: event.location_node,
         anomaly_tags: [],
         knowledge: { tag_beliefs: [], composition: null },
       },
@@ -93,87 +98,71 @@ function handleAsteroidDiscovered(state: SimState, event: Record<string, unknown
   };
 }
 
-function handleOreMined(state: SimState, event: Record<string, unknown>): SimState {
-  const { ship_id, asteroid_id, ore_lot, asteroid_remaining_kg } = event as {
-    ship_id: string
-    asteroid_id: string
-    ore_lot: ShipState['inventory'][number]
-    asteroid_remaining_kg: number
-  };
+function handleOreMined(state: SimState, event: EventPayload<'OreMined'>): SimState {
   let { asteroids, ships } = state;
-  if (asteroid_remaining_kg <= 0) {
+  if (event.asteroid_remaining_kg <= 0) {
     asteroids = Object.fromEntries(
-      Object.entries(asteroids).filter(([id]) => id !== asteroid_id)
+      Object.entries(asteroids).filter(([id]) => id !== event.asteroid_id)
     );
-  } else if (asteroids[asteroid_id]) {
+  } else if (asteroids[event.asteroid_id]) {
     asteroids = {
       ...asteroids,
-      [asteroid_id]: { ...asteroids[asteroid_id], mass_kg: asteroid_remaining_kg },
+      [event.asteroid_id]: { ...asteroids[event.asteroid_id], mass_kg: event.asteroid_remaining_kg },
     };
   }
-  if (ships[ship_id]) {
+  if (ships[event.ship_id]) {
     ships = {
       ...ships,
-      [ship_id]: {
-        ...ships[ship_id],
-        inventory: [...ships[ship_id].inventory, ore_lot],
+      [event.ship_id]: {
+        ...ships[event.ship_id],
+        inventory: [...ships[event.ship_id].inventory, event.ore_lot as ShipState['inventory'][number]],
       },
     };
   }
   return { ...state, asteroids, ships };
 }
 
-function handleOreDeposited(state: SimState, event: Record<string, unknown>): SimState {
-  const { ship_id, station_id, items } = event as {
-    ship_id: string
-    station_id: string
-    items: StationState['inventory']
-  };
+function handleOreDeposited(state: SimState, event: EventPayload<'OreDeposited'>): SimState {
   let { ships, stations } = state;
-  if (ships[ship_id]) {
-    ships = { ...ships, [ship_id]: { ...ships[ship_id], inventory: [] } };
+  if (ships[event.ship_id]) {
+    ships = { ...ships, [event.ship_id]: { ...ships[event.ship_id], inventory: [] } };
   }
-  if (stations[station_id]) {
+  if (stations[event.station_id]) {
     stations = {
       ...stations,
-      [station_id]: {
-        ...stations[station_id],
-        inventory: [...stations[station_id].inventory, ...items],
+      [event.station_id]: {
+        ...stations[event.station_id],
+        inventory: [...stations[event.station_id].inventory, ...event.items as StationState['inventory']],
       },
     };
   }
   return { ...state, ships, stations };
 }
 
-function handleModuleInstalled(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id, module_item_id, module_def_id, behavior_type } = event as {
-    station_id: string
-    module_id: string
-    module_item_id: string
-    module_def_id: string
-    behavior_type: string
-  };
-  if (!state.stations[station_id]) {return state;}
-  const station = state.stations[station_id];
-  let kindState: ModuleKindState = MODULE_KIND_STATE_MAP[behavior_type];
+function handleModuleInstalled(state: SimState, event: EventPayload<'ModuleInstalled'>): SimState {
+  if (!state.stations[event.station_id]) {return state;}
+  const station = state.stations[event.station_id];
+  let kindState: ModuleKindState = MODULE_KIND_STATE_MAP[event.behavior_type];
   if (!kindState) {
-    console.warn(`[applyEvents] Unknown behavior_type "${behavior_type}" for module ${module_id}, defaulting to Processor`);
+    console.warn(
+      `[applyEvents] Unknown behavior_type "${event.behavior_type}" for module ${event.module_id}, defaulting to Processor`
+    );
     kindState = { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } };
   }
   return {
     ...state,
     stations: {
       ...state.stations,
-      [station_id]: {
+      [event.station_id]: {
         ...station,
         inventory: station.inventory.filter(
-          (i) => !(i.kind === 'Module' && i.item_id === module_item_id)
+          (i) => !(i.kind === 'Module' && i.item_id === event.module_item_id)
         ),
         modules: [
           ...station.modules,
           {
-            id: module_id,
-            def_id: module_def_id,
+            id: event.module_id,
+            def_id: event.module_def_id,
             enabled: false,
             kind_state: kindState,
             wear: { wear: 0 },
@@ -184,65 +173,43 @@ function handleModuleInstalled(state: SimState, event: Record<string, unknown>):
   };
 }
 
-function handleModuleUninstalled(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id, module_item_id } = event as {
-    station_id: string
-    module_id: string
-    module_item_id: string
-  };
-  if (!state.stations[station_id]) {return state;}
-  const station = state.stations[station_id];
-  const removed = station.modules.find((m) => m.id === module_id);
-  const updatedModules = station.modules.filter((m) => m.id !== module_id);
+function handleModuleUninstalled(state: SimState, event: EventPayload<'ModuleUninstalled'>): SimState {
+  if (!state.stations[event.station_id]) {return state;}
+  const station = state.stations[event.station_id];
+  const removed = station.modules.find((m) => m.id === event.module_id);
+  const updatedModules = station.modules.filter((m) => m.id !== event.module_id);
   const updatedInventory = removed
-    ? [...station.inventory, { kind: 'Module' as const, item_id: module_item_id, module_def_id: removed.def_id }]
+    ? [...station.inventory, { kind: 'Module' as const, item_id: event.module_item_id, module_def_id: removed.def_id }]
     : station.inventory;
   return {
     ...state,
     stations: {
       ...state.stations,
-      [station_id]: { ...station, modules: updatedModules, inventory: updatedInventory },
+      [event.station_id]: { ...station, modules: updatedModules, inventory: updatedInventory },
     },
   };
 }
 
-function handleModuleToggled(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id, enabled } = event as {
-    station_id: string; module_id: string; enabled: boolean
-  };
-  return mapStationModule(state, station_id, module_id, (m) => ({ ...m, enabled }));
+function handleModuleToggled(state: SimState, event: EventPayload<'ModuleToggled'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => ({ ...m, enabled: event.enabled }));
 }
 
-function handleModuleThresholdSet(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id, threshold_kg } = event as {
-    station_id: string; module_id: string; threshold_kg: number
-  };
-  return mapStationModule(state, station_id, module_id, (m) => {
+function handleModuleThresholdSet(state: SimState, event: EventPayload<'ModuleThresholdSet'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
     const ks = m.kind_state;
     if (typeof ks === 'object' && 'Processor' in ks) {
-      return { ...m, kind_state: { Processor: { ...ks.Processor, threshold_kg } } };
+      return { ...m, kind_state: { Processor: { ...ks.Processor, threshold_kg: event.threshold_kg } } };
     }
     return m;
   });
 }
 
-function handleRefineryRan(state: SimState, event: Record<string, unknown>): SimState {
-  const {
-    station_id, ore_consumed_kg, material_produced_kg,
-    material_quality, slag_produced_kg, material_element,
-  } = event as {
-    station_id: string
-    ore_consumed_kg: number
-    material_produced_kg: number
-    material_quality: number
-    slag_produced_kg: number
-    material_element: string
-  };
-  if (!state.stations[station_id]) {return state;}
-  let stationInv = [...state.stations[station_id].inventory];
+function handleRefineryRan(state: SimState, event: EventPayload<'RefineryRan'>): SimState {
+  if (!state.stations[event.station_id]) {return state;}
+  let stationInv = [...state.stations[event.station_id].inventory];
 
   // Consume ore FIFO
-  let remaining = ore_consumed_kg;
+  let remaining = event.ore_consumed_kg;
   stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
     if (remaining > 0 && item.kind === 'Ore') {
       const take = Math.min(item.kg, remaining);
@@ -257,29 +224,34 @@ function handleRefineryRan(state: SimState, event: Record<string, unknown>): Sim
   }, []);
 
   // Merge material into existing lot or push new
-  if (material_produced_kg > 0.001) {
-    const matIndex = stationInv.findIndex((i) => i.kind === 'Material' && i.element === material_element);
+  if (event.material_produced_kg > 0.001) {
+    const matIndex = stationInv.findIndex((i) => i.kind === 'Material' && i.element === event.material_element);
     if (matIndex >= 0) {
       const existing = stationInv[matIndex] as MaterialItem;
-      const total = existing.kg + material_produced_kg;
+      const total = existing.kg + event.material_produced_kg;
       stationInv[matIndex] = {
         ...existing,
         kg: total,
-        quality: (existing.kg * existing.quality + material_produced_kg * material_quality) / total,
+        quality: (existing.kg * existing.quality + event.material_produced_kg * event.material_quality) / total,
       };
     } else {
-      stationInv.push({ kind: 'Material', element: material_element, kg: material_produced_kg, quality: material_quality });
+      stationInv.push({
+        kind: 'Material',
+        element: event.material_element,
+        kg: event.material_produced_kg,
+        quality: event.material_quality,
+      });
     }
   }
 
   // Blend or add slag
-  if (slag_produced_kg > 0.001) {
+  if (event.slag_produced_kg > 0.001) {
     const existingIndex = stationInv.findIndex((i) => i.kind === 'Slag');
     if (existingIndex >= 0) {
       const existing = stationInv[existingIndex] as SlagItem;
-      stationInv[existingIndex] = { ...existing, kg: existing.kg + slag_produced_kg };
+      stationInv[existingIndex] = { ...existing, kg: existing.kg + event.slag_produced_kg };
     } else {
-      stationInv.push({ kind: 'Slag', kg: slag_produced_kg, composition: {} });
+      stationInv.push({ kind: 'Slag', kg: event.slag_produced_kg, composition: {} });
     }
   }
 
@@ -287,30 +259,19 @@ function handleRefineryRan(state: SimState, event: Record<string, unknown>): Sim
     ...state,
     stations: {
       ...state.stations,
-      [station_id]: { ...state.stations[station_id], inventory: stationInv },
+      [event.station_id]: { ...state.stations[event.station_id], inventory: stationInv },
     },
   };
 }
 
-function handleAssemblerRan(state: SimState, event: Record<string, unknown>): SimState {
-  const {
-    station_id, material_consumed_kg, material_element,
-    component_produced_id, component_produced_count, component_quality,
-  } = event as {
-    station_id: string
-    material_consumed_kg: number
-    material_element: string
-    component_produced_id: string
-    component_produced_count: number
-    component_quality: number
-  };
-  if (!state.stations[station_id]) {return state;}
-  let stationInv = [...state.stations[station_id].inventory];
+function handleAssemblerRan(state: SimState, event: EventPayload<'AssemblerRan'>): SimState {
+  if (!state.stations[event.station_id]) {return state;}
+  let stationInv = [...state.stations[event.station_id].inventory];
 
   // Consume material
-  let remaining = material_consumed_kg;
+  let remaining = event.material_consumed_kg;
   stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
-    if (remaining > 0 && item.kind === 'Material' && item.element === material_element) {
+    if (remaining > 0 && item.kind === 'Material' && item.element === event.material_element) {
       const take = Math.min(item.kg, remaining);
       remaining -= take;
       if (item.kg - take > 0.001) {
@@ -324,17 +285,17 @@ function handleAssemblerRan(state: SimState, event: Record<string, unknown>): Si
 
   // Merge or create component
   const compIndex = stationInv.findIndex(
-    (i) => i.kind === 'Component' && (i as ComponentItem).component_id === component_produced_id
+    (i) => i.kind === 'Component' && (i as ComponentItem).component_id === event.component_produced_id
   );
   if (compIndex >= 0) {
     const existing = stationInv[compIndex] as ComponentItem;
-    stationInv[compIndex] = { ...existing, count: existing.count + component_produced_count };
+    stationInv[compIndex] = { ...existing, count: existing.count + event.component_produced_count };
   } else {
     stationInv.push({
       kind: 'Component',
-      component_id: component_produced_id,
-      count: component_produced_count,
-      quality: component_quality,
+      component_id: event.component_produced_id,
+      count: event.component_produced_count,
+      quality: event.component_quality,
     });
   }
 
@@ -342,26 +303,23 @@ function handleAssemblerRan(state: SimState, event: Record<string, unknown>): Si
     ...state,
     stations: {
       ...state.stations,
-      [station_id]: { ...state.stations[station_id], inventory: stationInv },
+      [event.station_id]: { ...state.stations[event.station_id], inventory: stationInv },
     },
   };
 }
 
-function handleWearAccumulated(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id, wear_after } = event as {
-    station_id: string; module_id: string; wear_after: number
-  };
-  return mapStationModule(state, station_id, module_id, (m) => ({ ...m, wear: { wear: wear_after } }));
+function handleWearAccumulated(state: SimState, event: EventPayload<'WearAccumulated'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => (
+    { ...m, wear: { wear: event.wear_after } }
+  ));
 }
 
-function handleModuleAutoDisabled(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id } = event as { station_id: string; module_id: string };
-  return mapStationModule(state, station_id, module_id, (m) => ({ ...m, enabled: false }));
+function handleModuleAutoDisabled(state: SimState, event: EventPayload<'ModuleAutoDisabled'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => ({ ...m, enabled: false }));
 }
 
-function handleModuleStalled(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id } = event as { station_id: string; module_id: string };
-  return mapStationModule(state, station_id, module_id, (m) => {
+function handleModuleStalled(state: SimState, event: EventPayload<'ModuleStalled'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
     const ks = m.kind_state;
     if (typeof ks === 'object' && 'Processor' in ks) {
       return { ...m, kind_state: { Processor: { ...ks.Processor, stalled: true } } };
@@ -373,9 +331,8 @@ function handleModuleStalled(state: SimState, event: Record<string, unknown>): S
   });
 }
 
-function handleModuleResumed(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id } = event as { station_id: string; module_id: string };
-  return mapStationModule(state, station_id, module_id, (m) => {
+function handleModuleResumed(state: SimState, event: EventPayload<'ModuleResumed'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
     const ks = m.kind_state;
     if (typeof ks === 'object' && 'Processor' in ks) {
       return { ...m, kind_state: { Processor: { ...ks.Processor, stalled: false } } };
@@ -387,9 +344,8 @@ function handleModuleResumed(state: SimState, event: Record<string, unknown>): S
   });
 }
 
-function handleAssemblerCapped(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id } = event as { station_id: string; module_id: string };
-  return mapStationModule(state, station_id, module_id, (m) => {
+function handleAssemblerCapped(state: SimState, event: EventPayload<'AssemblerCapped'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
     const ks = m.kind_state;
     if (typeof ks === 'object' && 'Assembler' in ks) {
       return { ...m, kind_state: { Assembler: { ...ks.Assembler, capped: true } } };
@@ -398,9 +354,8 @@ function handleAssemblerCapped(state: SimState, event: Record<string, unknown>):
   });
 }
 
-function handleAssemblerUncapped(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id } = event as { station_id: string; module_id: string };
-  return mapStationModule(state, station_id, module_id, (m) => {
+function handleAssemblerUncapped(state: SimState, event: EventPayload<'AssemblerUncapped'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
     const ks = m.kind_state;
     if (typeof ks === 'object' && 'Assembler' in ks) {
       return { ...m, kind_state: { Assembler: { ...ks.Assembler, capped: false } } };
@@ -409,18 +364,17 @@ function handleAssemblerUncapped(state: SimState, event: Record<string, unknown>
   });
 }
 
-function handleDepositBlocked(state: SimState, event: Record<string, unknown>): SimState {
-  const { ship_id } = event as { ship_id: string };
-  if (!state.ships[ship_id]?.task) {return state;}
-  const task = state.ships[ship_id].task!;
+function handleDepositBlocked(state: SimState, event: EventPayload<'DepositBlocked'>): SimState {
+  if (!state.ships[event.ship_id]?.task) {return state;}
+  const task = state.ships[event.ship_id].task!;
   const kind = task.kind;
   if (typeof kind === 'object' && 'Deposit' in kind) {
     return {
       ...state,
       ships: {
         ...state.ships,
-        [ship_id]: {
-          ...state.ships[ship_id],
+        [event.ship_id]: {
+          ...state.ships[event.ship_id],
           task: { ...task, kind: { Deposit: { ...kind.Deposit, blocked: true } } },
         },
       },
@@ -429,18 +383,17 @@ function handleDepositBlocked(state: SimState, event: Record<string, unknown>): 
   return state;
 }
 
-function handleDepositUnblocked(state: SimState, event: Record<string, unknown>): SimState {
-  const { ship_id } = event as { ship_id: string };
-  if (!state.ships[ship_id]?.task) {return state;}
-  const task = state.ships[ship_id].task!;
+function handleDepositUnblocked(state: SimState, event: EventPayload<'DepositUnblocked'>): SimState {
+  if (!state.ships[event.ship_id]?.task) {return state;}
+  const task = state.ships[event.ship_id].task!;
   const kind = task.kind;
   if (typeof kind === 'object' && 'Deposit' in kind) {
     return {
       ...state,
       ships: {
         ...state.ships,
-        [ship_id]: {
-          ...state.ships[ship_id],
+        [event.ship_id]: {
+          ...state.ships[event.ship_id],
           task: { ...task, kind: { Deposit: { ...kind.Deposit, blocked: false } } },
         },
       },
@@ -449,21 +402,15 @@ function handleDepositUnblocked(state: SimState, event: Record<string, unknown>)
   return state;
 }
 
-function handleMaintenanceRan(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, target_module_id, wear_after, repair_kits_remaining } = event as {
-    station_id: string
-    target_module_id: string
-    wear_after: number
-    repair_kits_remaining: number
-  };
-  if (!state.stations[station_id]) {return state;}
-  const station = state.stations[station_id];
+function handleMaintenanceRan(state: SimState, event: EventPayload<'MaintenanceRan'>): SimState {
+  if (!state.stations[event.station_id]) {return state;}
+  const station = state.stations[event.station_id];
   const updatedModules = station.modules.map((m) =>
-    m.id === target_module_id ? { ...m, wear: { wear: wear_after } } : m
+    m.id === event.target_module_id ? { ...m, wear: { wear: event.wear_after } } : m
   );
   const updatedInventory = station.inventory.map((item) => {
     if (item.kind === 'Component' && (item as ComponentItem).component_id === 'repair_kit') {
-      return { ...item, count: repair_kits_remaining } as ComponentItem;
+      return { ...item, count: event.repair_kits_remaining } as ComponentItem;
     }
     return item;
   });
@@ -471,30 +418,26 @@ function handleMaintenanceRan(state: SimState, event: Record<string, unknown>): 
     ...state,
     stations: {
       ...state.stations,
-      [station_id]: { ...station, modules: updatedModules, inventory: updatedInventory },
+      [event.station_id]: { ...station, modules: updatedModules, inventory: updatedInventory },
     },
   };
 }
 
-function handleLabRan(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id, tech_id } = event as {
-    station_id: string; module_id: string; tech_id: string
-  };
-  return mapStationModule(state, station_id, module_id, (m) => {
+function handleLabRan(state: SimState, event: EventPayload<'LabRan'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
     const ks = m.kind_state;
     if (typeof ks === 'object' && 'Lab' in ks) {
       return {
         ...m,
-        kind_state: { Lab: { ...ks.Lab, ticks_since_last_run: 0, assigned_tech: tech_id, starved: false } },
+        kind_state: { Lab: { ...ks.Lab, ticks_since_last_run: 0, assigned_tech: event.tech_id, starved: false } },
       };
     }
     return m;
   });
 }
 
-function handleLabStarved(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id } = event as { station_id: string; module_id: string };
-  return mapStationModule(state, station_id, module_id, (m) => {
+function handleLabStarved(state: SimState, event: EventPayload<'LabStarved'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
     const ks = m.kind_state;
     if (typeof ks === 'object' && 'Lab' in ks) {
       return { ...m, kind_state: { Lab: { ...ks.Lab, starved: true } } };
@@ -503,9 +446,8 @@ function handleLabStarved(state: SimState, event: Record<string, unknown>): SimS
   });
 }
 
-function handleLabResumed(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, module_id } = event as { station_id: string; module_id: string };
-  return mapStationModule(state, station_id, module_id, (m) => {
+function handleLabResumed(state: SimState, event: EventPayload<'LabResumed'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
     const ks = m.kind_state;
     if (typeof ks === 'object' && 'Lab' in ks) {
       return { ...m, kind_state: { Lab: { ...ks.Lab, starved: false } } };
@@ -514,77 +456,70 @@ function handleLabResumed(state: SimState, event: Record<string, unknown>): SimS
   });
 }
 
-function handleScanResult(state: SimState, event: Record<string, unknown>): SimState {
-  const { asteroid_id, tags } = event as { asteroid_id: string; tags: [string, number][] };
-  if (!state.asteroids[asteroid_id]) {return state;}
+function handleScanResult(state: SimState, event: EventPayload<'ScanResult'>): SimState {
+  if (!state.asteroids[event.asteroid_id]) {return state;}
   return {
     ...state,
     asteroids: {
       ...state.asteroids,
-      [asteroid_id]: {
-        ...state.asteroids[asteroid_id],
-        knowledge: { ...state.asteroids[asteroid_id].knowledge, tag_beliefs: tags },
+      [event.asteroid_id]: {
+        ...state.asteroids[event.asteroid_id],
+        knowledge: { ...state.asteroids[event.asteroid_id].knowledge, tag_beliefs: event.tags },
       },
     },
   };
 }
 
-function handleCompositionMapped(state: SimState, event: Record<string, unknown>): SimState {
-  const { asteroid_id, composition } = event as { asteroid_id: string; composition: Record<string, number> };
-  if (!state.asteroids[asteroid_id]) {return state;}
+function handleCompositionMapped(state: SimState, event: EventPayload<'CompositionMapped'>): SimState {
+  if (!state.asteroids[event.asteroid_id]) {return state;}
   return {
     ...state,
     asteroids: {
       ...state.asteroids,
-      [asteroid_id]: {
-        ...state.asteroids[asteroid_id],
-        knowledge: { ...state.asteroids[asteroid_id].knowledge, composition },
+      [event.asteroid_id]: {
+        ...state.asteroids[event.asteroid_id],
+        knowledge: { ...state.asteroids[event.asteroid_id].knowledge, composition: event.composition },
       },
     },
   };
 }
 
-function handleTechUnlocked(state: SimState, event: Record<string, unknown>): SimState {
-  const { tech_id } = event as { tech_id: string };
+function handleTechUnlocked(state: SimState, event: EventPayload<'TechUnlocked'>): SimState {
   return {
     ...state,
-    research: { ...state.research, unlocked: [...state.research.unlocked, tech_id] },
+    research: { ...state.research, unlocked: [...state.research.unlocked, event.tech_id] },
   };
 }
 
-function handleScanSiteSpawned(state: SimState, event: Record<string, unknown>): SimState {
-  const { site_id, node, template_id } = event as { site_id: string; node: string; template_id: string };
-  return { ...state, scanSites: [...state.scanSites, { id: site_id, node, template_id }] };
+function handleScanSiteSpawned(state: SimState, event: EventPayload<'ScanSiteSpawned'>): SimState {
+  return {
+    ...state,
+    scanSites: [...state.scanSites, { id: event.site_id, node: event.node, template_id: event.template_id }],
+  };
 }
 
-function handleShipConstructed(state: SimState, event: Record<string, unknown>): SimState {
-  const { ship_id, location_node, cargo_capacity_m3 } = event as {
-    ship_id: string; location_node: string; cargo_capacity_m3: number
-  };
+function handleShipConstructed(state: SimState, event: EventPayload<'ShipConstructed'>): SimState {
   return {
     ...state,
     ships: {
       ...state.ships,
-      [ship_id]: {
-        id: ship_id,
-        location_node,
+      [event.ship_id]: {
+        id: event.ship_id,
+        location_node: event.location_node,
         owner: 'principal_autopilot',
         inventory: [],
-        cargo_capacity_m3,
+        cargo_capacity_m3: event.cargo_capacity_m3,
         task: null,
       },
     },
   };
 }
 
-function handleItemImported(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, item_spec, balance_after } = event as {
-    station_id: string; item_spec: TradeItemSpec; balance_after: number
-  };
-  let updatedState = { ...state, balance: balance_after };
-  if (!state.stations[station_id]) {return updatedState;}
-  const station = state.stations[station_id];
-  const newItem = tradeItemToInventory(item_spec);
+function handleItemImported(state: SimState, event: EventPayload<'ItemImported'>): SimState {
+  let updatedState = { ...state, balance: event.balance_after };
+  if (!state.stations[event.station_id]) {return updatedState;}
+  const station = state.stations[event.station_id];
+  const newItem = tradeItemToInventory(event.item_spec as TradeItemSpec);
   const stationInv = [...station.inventory];
   let merged = false;
   if (newItem.kind === 'Material') {
@@ -611,22 +546,20 @@ function handleItemImported(state: SimState, event: Record<string, unknown>): Si
     ...updatedState,
     stations: {
       ...state.stations,
-      [station_id]: { ...station, inventory: stationInv },
+      [event.station_id]: { ...station, inventory: stationInv },
     },
   };
   return updatedState;
 }
 
-function handleItemExported(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, item_spec, balance_after } = event as {
-    station_id: string; item_spec: TradeItemSpec; balance_after: number
-  };
-  let updatedState = { ...state, balance: balance_after };
-  if (!state.stations[station_id]) {return updatedState;}
-  const station = state.stations[station_id];
+function handleItemExported(state: SimState, event: EventPayload<'ItemExported'>): SimState {
+  const itemSpec = event.item_spec as TradeItemSpec;
+  let updatedState = { ...state, balance: event.balance_after };
+  if (!state.stations[event.station_id]) {return updatedState;}
+  const station = state.stations[event.station_id];
   let stationInv = [...station.inventory];
-  if ('Material' in item_spec) {
-    const { element, kg } = item_spec.Material;
+  if ('Material' in itemSpec) {
+    const { element, kg } = itemSpec.Material;
     let remaining = kg;
     stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
       if (remaining > 0 && item.kind === 'Material' && item.element === element) {
@@ -640,8 +573,8 @@ function handleItemExported(state: SimState, event: Record<string, unknown>): Si
       acc.push(item);
       return acc;
     }, []);
-  } else if ('Component' in item_spec) {
-    const { component_id, count } = item_spec.Component;
+  } else if ('Component' in itemSpec) {
+    const { component_id, count } = itemSpec.Component;
     let remaining = count;
     stationInv = stationInv.reduce<typeof stationInv>((acc, item) => {
       if (remaining > 0 && item.kind === 'Component' && (item as ComponentItem).component_id === component_id) {
@@ -655,8 +588,8 @@ function handleItemExported(state: SimState, event: Record<string, unknown>): Si
       acc.push(item);
       return acc;
     }, []);
-  } else if ('Module' in item_spec) {
-    const { module_def_id } = item_spec.Module;
+  } else if ('Module' in itemSpec) {
+    const { module_def_id } = itemSpec.Module;
     const moduleIndex = stationInv.findIndex(
       (i) => i.kind === 'Module' && i.module_def_id === module_def_id
     );
@@ -666,78 +599,70 @@ function handleItemExported(state: SimState, event: Record<string, unknown>): Si
     ...updatedState,
     stations: {
       ...state.stations,
-      [station_id]: { ...station, inventory: stationInv },
+      [event.station_id]: { ...station, inventory: stationInv },
     },
   };
   return updatedState;
 }
 
-function handleSlagJettisoned(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id } = event as { station_id: string };
-  if (!state.stations[station_id]) {return state;}
-  const station = state.stations[station_id];
+function handleSlagJettisoned(state: SimState, event: EventPayload<'SlagJettisoned'>): SimState {
+  if (!state.stations[event.station_id]) {return state;}
+  const station = state.stations[event.station_id];
   return {
     ...state,
     stations: {
       ...state.stations,
-      [station_id]: { ...station, inventory: station.inventory.filter((i) => i.kind !== 'Slag') },
+      [event.station_id]: { ...station, inventory: station.inventory.filter((i) => i.kind !== 'Slag') },
     },
   };
 }
 
-function handlePowerStateUpdated(state: SimState, event: Record<string, unknown>): SimState {
-  const { station_id, power } = event as { station_id: string; power: PowerState };
-  if (!state.stations[station_id]) {return state;}
+function handlePowerStateUpdated(state: SimState, event: EventPayload<'PowerStateUpdated'>): SimState {
+  if (!state.stations[event.station_id]) {return state;}
   return {
     ...state,
     stations: {
       ...state.stations,
-      [station_id]: { ...state.stations[station_id], power },
+      [event.station_id]: { ...state.stations[event.station_id], power: event.power as PowerState },
     },
   };
 }
 
-function handleTaskStarted(state: SimState, event: Record<string, unknown>, tick: number): SimState {
-  const { ship_id, task_kind, target } = event as {
-    ship_id: string; task_kind: string; target: string | null
-  };
-  if (!state.ships[ship_id]) {return state;}
+function handleTaskStarted(state: SimState, event: EventPayload<'TaskStarted'>, tick: number): SimState {
+  if (!state.ships[event.ship_id]) {return state;}
   return {
     ...state,
     ships: {
       ...state.ships,
-      [ship_id]: { ...state.ships[ship_id], task: buildTaskStub(task_kind, target, tick) },
+      [event.ship_id]: { ...state.ships[event.ship_id], task: buildTaskStub(event.task_kind, event.target, tick) },
     },
   };
 }
 
-function handleTaskCompleted(state: SimState, event: Record<string, unknown>): SimState {
-  const { ship_id } = event as { ship_id: string };
-  if (!state.ships[ship_id]) {return state;}
+function handleTaskCompleted(state: SimState, event: EventPayload<'TaskCompleted'>): SimState {
+  if (!state.ships[event.ship_id]) {return state;}
   return {
     ...state,
-    ships: { ...state.ships, [ship_id]: { ...state.ships[ship_id], task: null } },
+    ships: { ...state.ships, [event.ship_id]: { ...state.ships[event.ship_id], task: null } },
   };
 }
 
-function handleShipArrived(state: SimState, event: Record<string, unknown>): SimState {
-  const { ship_id, node } = event as { ship_id: string; node: string };
-  if (!state.ships[ship_id]) {return state;}
+function handleShipArrived(state: SimState, event: EventPayload<'ShipArrived'>): SimState {
+  if (!state.ships[event.ship_id]) {return state;}
   return {
     ...state,
-    ships: { ...state.ships, [ship_id]: { ...state.ships[ship_id], location_node: node } },
+    ships: { ...state.ships, [event.ship_id]: { ...state.ships[event.ship_id], location_node: event.node } },
   };
 }
 
-function handleDataGenerated(state: SimState, event: Record<string, unknown>): SimState {
-  const { kind, amount } = event as { kind: string; amount: number };
+function handleDataGenerated(state: SimState, event: EventPayload<'DataGenerated'>): SimState {
   return {
     ...state,
     research: {
       ...state.research,
       data_pool: {
         ...state.research.data_pool,
-        [kind]: (state.research.data_pool[kind] ?? 0) + amount,
+        [event.kind]: (state.research.data_pool[event.kind] ?? 0) + event.amount,
       },
     },
   };
@@ -748,8 +673,11 @@ function noOp(state: SimState): SimState {
   return state;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyEventHandler = (state: SimState, event: any, tick: number) => SimState;
+
 /** Handler lookup table — maps event type names to their handler functions. */
-const EVENT_HANDLERS: Record<string, EventHandler> = {
+const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   AsteroidDiscovered: handleAsteroidDiscovered,
   OreMined: handleOreMined,
   OreDeposited: handleOreDeposited,
@@ -820,13 +748,31 @@ export function applyEvents(
   for (const evt of events) {
     const e = evt.event;
     const eventKey = Object.keys(e)[0];
-    const event = e[eventKey] as Record<string, unknown>;
 
     const handler = EVENT_HANDLERS[eventKey];
-    if (handler) {
-      state = handler(state, event, evt.tick);
-    } else if (import.meta.env.DEV) {
-      console.warn(`[applyEvents] Unhandled event type: ${eventKey}`, event);
+    if (!handler) {
+      if (import.meta.env.DEV) {
+        console.warn(`[applyEvents] Unhandled event type: ${eventKey}`, e[eventKey]);
+      }
+      continue;
+    }
+
+    // Validate event payload against Zod schema
+    const schema = eventSchemas[eventKey as EventType];
+    if (schema) {
+      const result = schema.safeParse(e[eventKey]);
+      if (!result.success) {
+        console.error(
+          `[applyEvents] Invalid ${eventKey} event payload:`,
+          result.error.issues,
+          e[eventKey],
+        );
+        continue;
+      }
+      state = handler(state, result.data, evt.tick);
+    } else {
+      // No schema defined — pass raw data (shouldn't happen if schemas are exhaustive)
+      state = handler(state, e[eventKey], evt.tick);
     }
   }
 
