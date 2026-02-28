@@ -7,7 +7,7 @@
 //!
 //! Floats appear only in content definitions and these conversion boundaries.
 
-use crate::Constants;
+use crate::{Constants, RecipeThermalReq};
 
 /// Seconds per tick, derived from `minutes_per_tick`.
 #[inline]
@@ -43,6 +43,50 @@ pub fn heat_to_temp_delta_mk(heat_j: i64, capacity_j_per_k: f32) -> i32 {
     let delta_k = heat_j as f64 / f64::from(capacity_j_per_k);
     let delta_milli_kelvin = delta_k * 1000.0;
     delta_milli_kelvin.clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32
+}
+
+/// Efficiency scaling based on temperature (affects material yield).
+///
+/// - Below `min_temp_mk`: 0.0 (caller should stall instead of calling this)
+/// - `min_temp_mk` → `optimal_min_mk`: linear ramp from 0.8 to 1.0
+/// - `optimal_min_mk` and above: 1.0
+#[inline]
+pub fn thermal_efficiency(temp_mk: u32, req: &RecipeThermalReq) -> f32 {
+    if temp_mk < req.min_temp_mk {
+        return 0.0;
+    }
+    if temp_mk >= req.optimal_min_mk {
+        return 1.0;
+    }
+    // Linear interpolation: min→optimal_min maps to 0.8→1.0
+    let range = req.optimal_min_mk - req.min_temp_mk;
+    if range == 0 {
+        return 1.0;
+    }
+    let progress = (temp_mk - req.min_temp_mk) as f32 / range as f32;
+    0.8 + 0.2 * progress
+}
+
+/// Quality scaling based on temperature.
+///
+/// - Below `optimal_max_mk`: 1.0
+/// - `optimal_max_mk` → `max_temp_mk`: linear ramp from 1.0 to 0.6
+/// - Above `max_temp_mk`: 0.3
+#[inline]
+pub fn thermal_quality_factor(temp_mk: u32, req: &RecipeThermalReq) -> f32 {
+    if temp_mk <= req.optimal_max_mk {
+        return 1.0;
+    }
+    if temp_mk >= req.max_temp_mk {
+        return 0.3;
+    }
+    // Linear interpolation: optimal_max→max maps to 1.0→0.6
+    let range = req.max_temp_mk - req.optimal_max_mk;
+    if range == 0 {
+        return 1.0;
+    }
+    let progress = (temp_mk - req.optimal_max_mk) as f32 / range as f32;
+    1.0 - 0.4 * progress
 }
 
 #[cfg(test)]
@@ -105,5 +149,105 @@ mod tests {
         assert_eq!(heat, 600_000);
         let delta = heat_to_temp_delta_mk(heat, 500.0);
         assert_eq!(delta, 1_200_000); // 1200 K rise per tick
+    }
+
+    // ── thermal_efficiency tests ─────────────────────────────────────
+
+    fn smelter_req() -> RecipeThermalReq {
+        RecipeThermalReq {
+            min_temp_mk: 1_000_000,    // 1000K
+            optimal_min_mk: 1_500_000, // 1500K
+            optimal_max_mk: 2_000_000, // 2000K
+            max_temp_mk: 2_500_000,    // 2500K
+            heat_per_run_j: 50_000,
+        }
+    }
+
+    #[test]
+    fn efficiency_below_min_is_zero() {
+        let req = smelter_req();
+        assert!((thermal_efficiency(500_000, &req)).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn efficiency_at_min_is_80_percent() {
+        let req = smelter_req();
+        assert!((thermal_efficiency(1_000_000, &req) - 0.8).abs() < 1e-5);
+    }
+
+    #[test]
+    fn efficiency_midway_ramp() {
+        let req = smelter_req();
+        // Midpoint of min→optimal_min = 1_250_000 → 0.9
+        assert!((thermal_efficiency(1_250_000, &req) - 0.9).abs() < 1e-5);
+    }
+
+    #[test]
+    fn efficiency_at_optimal_min_is_100_percent() {
+        let req = smelter_req();
+        assert!((thermal_efficiency(1_500_000, &req) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn efficiency_above_optimal_is_100_percent() {
+        let req = smelter_req();
+        assert!((thermal_efficiency(2_200_000, &req) - 1.0).abs() < f32::EPSILON);
+    }
+
+    // ── thermal_quality_factor tests ─────────────────────────────────
+
+    #[test]
+    fn quality_below_optimal_max_is_100_percent() {
+        let req = smelter_req();
+        assert!((thermal_quality_factor(1_800_000, &req) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn quality_at_optimal_max_is_100_percent() {
+        let req = smelter_req();
+        assert!((thermal_quality_factor(2_000_000, &req) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn quality_midway_degradation() {
+        let req = smelter_req();
+        // Midpoint of optimal_max→max = 2_250_000 → 0.8
+        assert!((thermal_quality_factor(2_250_000, &req) - 0.8).abs() < 1e-5);
+    }
+
+    #[test]
+    fn quality_at_max_is_60_percent() {
+        let req = smelter_req();
+        assert!((thermal_quality_factor(2_500_000, &req) - 0.3).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn quality_above_max_is_30_percent() {
+        let req = smelter_req();
+        assert!((thermal_quality_factor(3_000_000, &req) - 0.3).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn efficiency_zero_range_returns_one() {
+        let req = RecipeThermalReq {
+            min_temp_mk: 1_000_000,
+            optimal_min_mk: 1_000_000, // same as min
+            optimal_max_mk: 2_000_000,
+            max_temp_mk: 2_500_000,
+            heat_per_run_j: 0,
+        };
+        assert!((thermal_efficiency(1_000_000, &req) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn quality_zero_range_returns_one() {
+        let req = RecipeThermalReq {
+            min_temp_mk: 1_000_000,
+            optimal_min_mk: 1_500_000,
+            optimal_max_mk: 2_000_000,
+            max_temp_mk: 2_000_000, // same as optimal_max
+            heat_per_run_j: 0,
+        };
+        assert!((thermal_quality_factor(2_000_000, &req) - 1.0).abs() < f32::EPSILON);
     }
 }

@@ -718,6 +718,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   TaskCompleted: handleTaskCompleted,
   ShipArrived: handleShipArrived,
   DataGenerated: handleDataGenerated,
+  ProcessorTooCold: noOp,
 };
 
 export function applyEvents(
