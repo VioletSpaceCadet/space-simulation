@@ -1099,3 +1099,175 @@ fn maintenance_repair_threshold_is_valid() {
         }
     }
 }
+
+// ── Smelter content tests (VIO-206) ─────────────────────────────
+
+#[test]
+fn smelter_module_exists_and_has_thermal_def() {
+    let content = load_test_content();
+    let smelter = content
+        .module_defs
+        .get("module_basic_smelter")
+        .expect("module_basic_smelter must exist");
+
+    assert!(
+        matches!(&smelter.behavior, ModuleBehaviorDef::Processor(_)),
+        "smelter must be a Processor"
+    );
+
+    let thermal = smelter
+        .thermal
+        .as_ref()
+        .expect("smelter must have thermal def");
+    assert!(
+        thermal.heat_capacity_j_per_k > 0.0,
+        "heat capacity must be positive"
+    );
+    assert!(
+        thermal.passive_cooling_coefficient > 0.0,
+        "passive cooling must be positive"
+    );
+    assert!(thermal.max_temp_mk > 0, "max_temp_mk must be set");
+    assert_eq!(
+        thermal.thermal_group.as_deref(),
+        Some("default"),
+        "smelter must be in 'default' thermal group"
+    );
+}
+
+#[test]
+fn smelter_recipe_has_thermal_requirement() {
+    let content = load_test_content();
+    let smelter = content
+        .module_defs
+        .get("module_basic_smelter")
+        .expect("module_basic_smelter must exist");
+
+    let processor = match &smelter.behavior {
+        ModuleBehaviorDef::Processor(p) => p,
+        _ => panic!("smelter must be a Processor"),
+    };
+
+    assert!(!processor.recipes.is_empty(), "smelter must have recipes");
+    let recipe = &processor.recipes[0];
+
+    let thermal_req = recipe
+        .thermal_req
+        .as_ref()
+        .expect("smelter recipe must have thermal_req");
+
+    assert_eq!(thermal_req.min_temp_mk, 1_800_000);
+    assert_eq!(thermal_req.optimal_min_mk, 1_850_000);
+    assert_eq!(thermal_req.optimal_max_mk, 1_950_000);
+    assert_eq!(thermal_req.max_temp_mk, 2_100_000);
+    assert!(
+        thermal_req.heat_per_run_j > 0,
+        "smelting must be exothermic"
+    );
+}
+
+#[test]
+fn smelter_processes_less_ore_than_cold_refinery() {
+    let content = load_test_content();
+    let smelter = content
+        .module_defs
+        .get("module_basic_smelter")
+        .expect("module_basic_smelter must exist");
+    let refinery = content
+        .module_defs
+        .get("module_basic_iron_refinery")
+        .expect("module_basic_iron_refinery must exist");
+
+    let smelter_input_kg = match &smelter.behavior {
+        ModuleBehaviorDef::Processor(p) => match &p.recipes[0].inputs[0].amount {
+            sim_core::InputAmount::Kg(kg) => *kg,
+            _ => panic!("expected Kg input"),
+        },
+        _ => panic!("expected Processor"),
+    };
+
+    let refinery_input_kg = match &refinery.behavior {
+        ModuleBehaviorDef::Processor(p) => match &p.recipes[0].inputs[0].amount {
+            sim_core::InputAmount::Kg(kg) => *kg,
+            _ => panic!("expected Kg input"),
+        },
+        _ => panic!("expected Processor"),
+    };
+
+    assert!(
+        smelter_input_kg < refinery_input_kg,
+        "smelter should process less ore per run ({smelter_input_kg} kg) than cold refinery ({refinery_input_kg} kg)"
+    );
+}
+
+#[test]
+fn thermal_modules_have_valid_thermal_defs() {
+    let content = load_test_content();
+    for module_def in content.module_defs.values() {
+        if let Some(thermal) = &module_def.thermal {
+            assert!(
+                thermal.heat_capacity_j_per_k > 0.0,
+                "module '{}' has non-positive heat_capacity_j_per_k: {}",
+                module_def.id,
+                thermal.heat_capacity_j_per_k
+            );
+            assert!(
+                thermal.passive_cooling_coefficient >= 0.0,
+                "module '{}' has negative passive_cooling_coefficient: {}",
+                module_def.id,
+                thermal.passive_cooling_coefficient
+            );
+            assert!(
+                thermal.max_temp_mk > 0,
+                "module '{}' has zero max_temp_mk",
+                module_def.id
+            );
+        }
+    }
+}
+
+#[test]
+fn thermal_recipe_requirements_are_consistent() {
+    let content = load_test_content();
+    for module_def in content.module_defs.values() {
+        if let ModuleBehaviorDef::Processor(processor) = &module_def.behavior {
+            for recipe in &processor.recipes {
+                if let Some(req) = &recipe.thermal_req {
+                    assert!(
+                        req.min_temp_mk <= req.optimal_min_mk,
+                        "module '{}' recipe '{}': min_temp_mk ({}) > optimal_min_mk ({})",
+                        module_def.id,
+                        recipe.id,
+                        req.min_temp_mk,
+                        req.optimal_min_mk
+                    );
+                    assert!(
+                        req.optimal_min_mk <= req.optimal_max_mk,
+                        "module '{}' recipe '{}': optimal_min_mk ({}) > optimal_max_mk ({})",
+                        module_def.id,
+                        recipe.id,
+                        req.optimal_min_mk,
+                        req.optimal_max_mk
+                    );
+                    assert!(
+                        req.optimal_max_mk <= req.max_temp_mk,
+                        "module '{}' recipe '{}': optimal_max_mk ({}) > max_temp_mk ({})",
+                        module_def.id,
+                        recipe.id,
+                        req.optimal_max_mk,
+                        req.max_temp_mk
+                    );
+
+                    // If module has thermal def, recipe max should be within module max
+                    if let Some(thermal) = &module_def.thermal {
+                        assert!(
+                            req.max_temp_mk <= thermal.max_temp_mk,
+                            "module '{}' recipe '{}': recipe max_temp_mk ({}) exceeds module max_temp_mk ({})",
+                            module_def.id, recipe.id, req.max_temp_mk, thermal.max_temp_mk
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
