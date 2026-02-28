@@ -115,7 +115,7 @@ function handleOreMined(state: SimState, event: EventPayload<'OreMined'>): SimSt
       ...ships,
       [event.ship_id]: {
         ...ships[event.ship_id],
-        inventory: [...ships[event.ship_id].inventory, event.ore_lot as ShipState['inventory'][number]],
+        inventory: [...ships[event.ship_id].inventory, event.ore_lot as unknown as ShipState['inventory'][number]],
       },
     };
   }
@@ -132,7 +132,7 @@ function handleOreDeposited(state: SimState, event: EventPayload<'OreDeposited'>
       ...stations,
       [event.station_id]: {
         ...stations[event.station_id],
-        inventory: [...stations[event.station_id].inventory, ...event.items as StationState['inventory']],
+        inventory: [...stations[event.station_id].inventory, ...event.items as unknown as StationState['inventory']],
       },
     };
   }
