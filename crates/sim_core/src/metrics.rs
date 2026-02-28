@@ -126,6 +126,7 @@ impl InventoryAccumulator {
                     element,
                     kg,
                     quality,
+                    ..
                 } => {
                     self.total_material_kg += kg;
                     if element == crate::ELEMENT_FE {
@@ -703,6 +704,7 @@ mod tests {
                     element: "Fe".to_string(),
                     kg: 500.0,
                     quality: 0.8,
+                    thermal: None,
                 },
                 InventoryItem::Slag {
                     kg: 200.0,
@@ -817,6 +819,7 @@ mod tests {
                     processing_interval_ticks: 60,
                     recipes: vec![],
                 }),
+                thermal: None,
             },
         )]);
 
@@ -840,6 +843,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -895,6 +899,7 @@ mod tests {
                     element: "Fe".to_string(),
                     kg: 300.0,
                     quality: 0.9,
+                    thermal: None,
                 },
             ],
             vec![],
@@ -981,6 +986,7 @@ mod tests {
                     processing_interval_ticks: 60,
                     recipes: vec![],
                 }),
+                thermal: None,
             },
         )]);
 
@@ -1003,6 +1009,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -1085,6 +1092,7 @@ mod tests {
                     processing_interval_ticks: 60,
                     recipes: vec![],
                 }),
+                thermal: None,
             },
         )]);
 
@@ -1107,6 +1115,7 @@ mod tests {
                     }),
                     wear: crate::WearState { wear: 0.3 },
                     power_stalled: false,
+                    thermal: None,
                 },
                 ModuleState {
                     id: ModuleInstanceId("mod_0002".to_string()),
@@ -1119,6 +1128,7 @@ mod tests {
                     }),
                     wear: crate::WearState { wear: 0.7 },
                     power_stalled: false,
+                    thermal: None,
                 },
             ],
         );
@@ -1153,6 +1163,7 @@ mod tests {
                     charge_rate_kw: 20.0,
                     discharge_rate_kw: 30.0,
                 }),
+                thermal: None,
             },
         );
         let mut state = empty_state();
@@ -1174,6 +1185,7 @@ mod tests {
             kind_state: ModuleKindState::Battery(crate::BatteryState { charge_kwh: 50.0 }),
             wear: crate::WearState::default(),
             power_stalled: false,
+            thermal: None,
         });
         state.stations.insert(station.id.clone(), station);
 

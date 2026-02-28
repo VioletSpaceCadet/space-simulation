@@ -22,5 +22,10 @@
   "wear_band_critical_threshold": 0.8,
   "wear_band_degraded_efficiency": 0.75,
   "wear_band_critical_efficiency": 0.5,
-  "minutes_per_tick": 60
+  "minutes_per_tick": 60,
+  "thermal_sink_temp_mk": 293000,
+  "thermal_overheat_warning_offset_mk": 200000,
+  "thermal_overheat_critical_offset_mk": 500000,
+  "thermal_wear_multiplier_warning": 2.0,
+  "thermal_wear_multiplier_critical": 4.0
 }

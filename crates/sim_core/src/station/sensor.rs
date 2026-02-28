@@ -85,6 +85,7 @@ mod tests {
                     scan_interval_minutes: 5,
                     scan_interval_ticks: 5,
                 }),
+                thermal: None,
             },
         );
         content
@@ -119,6 +120,7 @@ mod tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
+                        thermal: None,
                     }],
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,

@@ -153,6 +153,9 @@ pub enum InventoryItem {
         element: ElementId,
         kg: f32,
         quality: f32,
+        /// Per-batch thermal properties. `None` for non-thermal materials.
+        #[serde(default)]
+        thermal: Option<MaterialThermalProps>,
     },
     Component {
         component_id: ComponentId,
@@ -172,6 +175,9 @@ pub struct ModuleState {
     pub enabled: bool,
     pub kind_state: ModuleKindState,
     pub wear: WearState,
+    /// Per-module thermal state. None for non-thermal modules.
+    #[serde(default)]
+    pub thermal: Option<ThermalState>,
     /// Set each tick by power budget computation. Stalled modules skip their tick.
     #[serde(skip, default)]
     pub power_stalled: bool,
@@ -785,6 +791,39 @@ pub struct ElementDef {
     pub display_name: String,
     #[serde(default)]
     pub refined_name: Option<String>,
+    /// Melting point in milli-Kelvin. `None` for non-thermal elements (ore, slag).
+    #[serde(default)]
+    pub melting_point_mk: Option<u32>,
+    /// Latent heat of fusion in J/kg. `None` for non-thermal elements.
+    #[serde(default)]
+    pub latent_heat_j_per_kg: Option<u32>,
+    /// Specific heat capacity in J/(kg*K). `None` for non-thermal elements.
+    #[serde(default)]
+    pub specific_heat_j_per_kg_k: Option<u32>,
+}
+
+/// Content-driven thermal properties for a module.
+///
+/// Defines heat capacity, passive cooling rate, maximum operating temperature,
+/// and optional thermal group assignment for shared radiator cooling.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThermalDef {
+    /// Heat capacity in J/K. Higher values mean slower temperature changes.
+    pub heat_capacity_j_per_k: f32,
+    /// Passive cooling coefficient (0.0–1.0). Fraction of temp delta above sink
+    /// dissipated per tick without a radiator.
+    pub passive_cooling_coefficient: f32,
+    /// Maximum safe temperature in milli-Kelvin before overheat consequences.
+    pub max_temp_mk: u32,
+    /// Minimum operating temperature in milli-Kelvin. `None` means no lower bound.
+    #[serde(default)]
+    pub operating_min_mk: Option<u32>,
+    /// Maximum operating temperature in milli-Kelvin. `None` means no upper bound.
+    #[serde(default)]
+    pub operating_max_mk: Option<u32>,
+    /// Thermal group for shared radiator cooling. Modules in the same group share radiators.
+    #[serde(default)]
+    pub thermal_group: Option<ThermalGroupId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -797,6 +836,9 @@ pub struct ModuleDef {
     #[serde(default)]
     pub wear_per_run: f32,
     pub behavior: ModuleBehaviorDef,
+    /// Thermal properties. `None` for modules with no thermal behavior.
+    #[serde(default)]
+    pub thermal: Option<ThermalDef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -986,6 +1028,22 @@ pub struct Constants {
     /// Game-time minutes per simulation tick. Production = 60 (1 tick = 1 hour).
     /// Test fixtures use 1 to preserve existing assertions.
     pub minutes_per_tick: u32,
+    // Thermal system
+    /// Ambient/radiator sink temperature in milli-Kelvin (20 C, not cosmic background).
+    #[serde(default = "default_thermal_sink_temp_mk")]
+    pub thermal_sink_temp_mk: u32,
+    /// Offset above max operating temp that triggers overheat warning.
+    #[serde(default = "default_thermal_overheat_warning_offset_mk")]
+    pub thermal_overheat_warning_offset_mk: u32,
+    /// Offset above max operating temp that triggers overheat critical.
+    #[serde(default = "default_thermal_overheat_critical_offset_mk")]
+    pub thermal_overheat_critical_offset_mk: u32,
+    /// Wear rate multiplier when module is in overheat warning zone.
+    #[serde(default = "default_thermal_wear_multiplier_warning")]
+    pub thermal_wear_multiplier_warning: f32,
+    /// Wear rate multiplier when module is in overheat critical zone.
+    #[serde(default = "default_thermal_wear_multiplier_critical")]
+    pub thermal_wear_multiplier_critical: f32,
 
     // -- Derived tick fields (computed at load time, not in JSON) --
     #[serde(skip_deserializing, default)]
@@ -1097,6 +1155,83 @@ impl Default for WearState {
 
 fn default_slag_jettison_pct() -> f32 {
     0.75
+}
+
+/// 20 °C in milli-Kelvin — shared default for ambient/sink temperature.
+pub const DEFAULT_AMBIENT_TEMP_MK: u32 = 293_000;
+
+fn default_thermal_sink_temp_mk() -> u32 {
+    DEFAULT_AMBIENT_TEMP_MK
+}
+fn default_thermal_overheat_warning_offset_mk() -> u32 {
+    200_000
+}
+fn default_thermal_overheat_critical_offset_mk() -> u32 {
+    500_000
+}
+fn default_thermal_wear_multiplier_warning() -> f32 {
+    2.0
+}
+fn default_thermal_wear_multiplier_critical() -> f32 {
+    4.0
+}
+
+// ---------------------------------------------------------------------------
+// Thermal system
+// ---------------------------------------------------------------------------
+
+/// String alias for grouping modules into thermal groups.
+/// Modules in the same group share radiator cooling.
+pub type ThermalGroupId = String;
+
+/// Per-module thermal state, tracked in milli-Kelvin for deterministic integer arithmetic.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ThermalState {
+    /// Temperature in milli-Kelvin (e.g. `293_000` = 20 C ambient).
+    pub temp_mk: u32,
+    /// Which thermal group this module belongs to (shared with `ThermalDef`).
+    pub thermal_group: Option<ThermalGroupId>,
+}
+
+impl Default for ThermalState {
+    fn default() -> Self {
+        Self {
+            temp_mk: DEFAULT_AMBIENT_TEMP_MK,
+            thermal_group: None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Material thermal properties
+// ---------------------------------------------------------------------------
+
+/// Phase of a material batch (solid or liquid).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Phase {
+    Solid,
+    Liquid,
+}
+
+/// Thermal properties attached to a `Material` inventory item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MaterialThermalProps {
+    /// Temperature in milli-Kelvin.
+    pub temp_mk: u32,
+    /// Current phase of the material batch.
+    pub phase: Phase,
+    /// Latent heat buffer in joules (tracks energy absorbed/released during phase change).
+    pub latent_heat_buffer_j: i64,
+}
+
+impl Default for MaterialThermalProps {
+    fn default() -> Self {
+        Self {
+            temp_mk: DEFAULT_AMBIENT_TEMP_MK,
+            phase: Phase::Solid,
+            latent_heat_buffer_j: 0,
+        }
+    }
 }
 
 #[cfg(test)]

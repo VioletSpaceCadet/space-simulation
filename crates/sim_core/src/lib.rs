@@ -11,6 +11,7 @@ pub mod metrics;
 mod research;
 mod station;
 pub(crate) mod tasks;
+pub mod thermal;
 pub mod trade;
 mod types;
 pub mod wear;

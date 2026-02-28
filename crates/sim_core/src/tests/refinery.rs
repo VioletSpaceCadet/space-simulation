@@ -78,6 +78,7 @@ fn test_refinery_skips_when_below_threshold() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        thermal: None,
     });
     station.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_0001".to_string()),
@@ -292,6 +293,7 @@ fn test_storage_pressure_cascade() {
             element: "Fe".to_string(),
             kg: 1200.0,
             quality: 0.5,
+            thermal: None,
         });
 
     tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);

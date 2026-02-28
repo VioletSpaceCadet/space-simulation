@@ -707,6 +707,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -741,6 +742,7 @@ mod tests {
                     repair_kit_cost: 1,
                     repair_threshold: 0.0,
                 }),
+                thermal: None,
             },
         );
         let mut state = autopilot_state(&content);
@@ -924,6 +926,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState { wear: 1.0 },
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1028,6 +1031,7 @@ mod tests {
                     research_interval_minutes: 10,
                     research_interval_ticks: 10,
                 }),
+                thermal: None,
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -1085,6 +1089,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1124,6 +1129,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1177,6 +1183,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1227,6 +1234,7 @@ mod tests {
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
                 }),
+                thermal: None,
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -1255,6 +1263,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             });
 
         let mut autopilot = AutopilotController;
@@ -1316,6 +1325,7 @@ mod tests {
                     }],
                     max_stock: HashMap::new(),
                 }),
+                thermal: None,
             },
         );
 
@@ -1361,6 +1371,7 @@ mod tests {
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
+            thermal: None,
         });
 
         // Add 5000 kg Fe to station inventory
@@ -1368,6 +1379,7 @@ mod tests {
             element: "Fe".to_string(),
             kg: 5000.0,
             quality: 1.0,
+            thermal: None,
         });
 
         // Unlock tech_ship_construction

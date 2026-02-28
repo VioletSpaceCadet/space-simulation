@@ -29,6 +29,9 @@ fn replenish_test_content() -> GameContent {
             density_kg_per_m3: 3000.0,
             display_name: "Raw Ore".to_string(),
             refined_name: None,
+            melting_point_mk: None,
+            latent_heat_j_per_kg: None,
+            specific_heat_j_per_kg_k: None,
         }],
         module_defs: HashMap::new(),
         component_defs: vec![],
@@ -62,6 +65,12 @@ fn replenish_test_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
             minutes_per_tick: 1,
+            // Thermal system
+            thermal_sink_temp_mk: 293_000,
+            thermal_overheat_warning_offset_mk: 200_000,
+            thermal_overheat_critical_offset_mk: 500_000,
+            thermal_wear_multiplier_warning: 2.0,
+            thermal_wear_multiplier_critical: 4.0,
             // Derived fields — filled by derive_tick_values()
             survey_scan_ticks: 0,
             deep_scan_ticks: 0,
@@ -201,6 +210,7 @@ fn jettison_slag_removes_all_slag_and_emits_event() {
         element: "Fe".to_string(),
         kg: 200.0,
         quality: 0.8,
+        thermal: None,
     });
 
     let cmd = CommandEnvelope {

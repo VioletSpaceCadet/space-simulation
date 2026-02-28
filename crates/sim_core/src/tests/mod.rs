@@ -15,6 +15,7 @@ mod power;
 mod refinery;
 mod research;
 mod survey;
+mod thermal;
 mod transit;
 mod wear;
 
@@ -140,6 +141,7 @@ fn refinery_content() -> GameContent {
                     efficiency: 1.0,
                 }],
             }),
+            thermal: None,
         },
     )]);
     content
@@ -161,6 +163,7 @@ fn state_with_refinery(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        thermal: None,
     });
 
     station.inventory.push(InventoryItem::Ore {
@@ -204,6 +207,7 @@ fn assembler_content() -> GameContent {
                     efficiency: 1.0,
                 }],
             }),
+            thermal: None,
         },
     )]);
     content.component_defs = vec![crate::ComponentDef {
@@ -232,12 +236,14 @@ fn state_with_assembler(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        thermal: None,
     });
 
     station.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 500.0,
         quality: 0.7,
+        thermal: None,
     });
 
     state
@@ -261,6 +267,7 @@ fn maintenance_content() -> GameContent {
                 repair_kit_cost: 1,
                 repair_threshold: 0.0,
             }),
+            thermal: None,
         },
     );
     content
@@ -280,6 +287,7 @@ fn state_with_maintenance(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        thermal: None,
     });
 
     station.inventory.push(InventoryItem::Component {

@@ -89,6 +89,7 @@ fn production_like_content() -> GameContent {
                 scan_interval_minutes: 120,
                 scan_interval_ticks: 2, // 120 / 60
             }),
+            thermal: None,
         },
     );
 
@@ -110,6 +111,7 @@ fn production_like_content() -> GameContent {
                 research_interval_minutes: 60,
                 research_interval_ticks: 1, // 60 / 60
             }),
+            thermal: None,
         },
     );
 
@@ -131,6 +133,7 @@ fn production_like_content() -> GameContent {
                 research_interval_minutes: 60,
                 research_interval_ticks: 1,
             }),
+            thermal: None,
         },
     );
 
@@ -152,6 +155,7 @@ fn production_like_content() -> GameContent {
                 research_interval_minutes: 60,
                 research_interval_ticks: 1,
             }),
+            thermal: None,
         },
     );
 
@@ -192,6 +196,7 @@ fn production_like_content() -> GameContent {
                     efficiency: 1.0,
                 }],
             }),
+            thermal: None,
         },
     );
 
@@ -222,6 +227,7 @@ fn production_like_content() -> GameContent {
                 }],
                 max_stock: HashMap::from([(ComponentId("repair_kit".to_string()), 50)]),
             }),
+            thermal: None,
         },
     );
 
@@ -242,6 +248,7 @@ fn production_like_content() -> GameContent {
                 repair_kit_cost: 1,
                 repair_threshold: 0.1,
             }),
+            thermal: None,
         },
     );
 
@@ -455,6 +462,7 @@ fn sensor_data_generation_rate_at_mpt_60() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        thermal: None,
     });
 
     // Run 10 ticks (no autopilot needed)
@@ -517,6 +525,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
                 }],
                 max_stock: HashMap::new(),
             }),
+            thermal: None,
         },
     );
 
@@ -571,6 +580,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
         element: "Fe".to_string(),
         kg: 50_000.0,
         quality: 0.8,
+        thermal: None,
     });
 
     // Run enough ticks for import (travel ~48 ticks) + assembly (336 ticks) + margin

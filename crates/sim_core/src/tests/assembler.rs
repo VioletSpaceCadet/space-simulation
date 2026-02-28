@@ -73,6 +73,7 @@ fn test_assembler_skips_insufficient_material() {
             element: "Fe".to_string(),
             kg: 50.0,
             quality: 0.7,
+            thermal: None,
         });
 
     let mut rng = make_rng();

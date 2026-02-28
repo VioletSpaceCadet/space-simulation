@@ -323,6 +323,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
                 element: "Fe".to_string(),
                 kg: 500.0,
                 quality: 0.7,
+                thermal: None,
             },
         ],
         cargo_capacity_m3: c.station_cargo_capacity_m3,
@@ -548,6 +549,7 @@ mod tests {
                         efficiency: 1.0,
                     }],
                 }),
+                thermal: None,
             },
         );
         validate_content(&content);
@@ -630,6 +632,7 @@ mod tests {
                         efficiency: 1.0,
                     }],
                 }),
+                thermal: None,
             },
         );
         validate_content(&content);
@@ -659,6 +662,7 @@ mod tests {
                         element: "Unobtanium".to_string(),
                         kg: 100.0,
                         quality: 1.0,
+                        thermal: None,
                     }],
                     cargo_capacity_m3: 1000.0,
                     power_available_per_tick: 100.0,
