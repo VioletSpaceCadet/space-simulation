@@ -115,8 +115,13 @@ fn apply_passive_cooling(
     let delta_mk =
         thermal::heat_to_temp_delta_mk(-cooling_j_i64, thermal_def.heat_capacity_j_per_k);
 
+    // Passive cooling always produces a non-positive delta.
+    debug_assert!(
+        delta_mk <= 0,
+        "passive cooling delta must be <= 0, got {delta_mk}"
+    );
+
     // Apply delta, clamping to [sink_temp, T_MAX_ABSOLUTE].
-    // delta_mk is always negative (cooling), so unsigned_abs branch handles it.
     let new_temp = if delta_mk < 0 {
         current_temp_mk.saturating_sub(delta_mk.unsigned_abs())
     } else {
