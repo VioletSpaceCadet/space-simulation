@@ -130,7 +130,8 @@ fn execute(
     let lot_refs: Vec<(&HashMap<String, f32>, f32)> =
         lots.iter().map(|(comp, kg)| (comp, *kg)).collect();
     let avg_composition = weighted_composition(&lot_refs);
-    let output_volume = estimate_output_volume_m3(recipe, &avg_composition, peeked_kg, content);
+    let output_volume =
+        estimate_output_volume_m3(recipe, &avg_composition, peeked_kg, content) * thermal_eff;
 
     let current_used = station
         .cached_inventory_volume_m3
@@ -222,14 +223,15 @@ fn resolve_processor_run(
                     YieldFormula::FixedFraction(f) => *f,
                 };
                 material_kg = consumed_kg * yield_frac * efficiency * thermal_efficiency;
-                material_quality = match quality_formula {
+                let base_quality = match quality_formula {
                     QualityFormula::ElementFractionTimesMultiplier {
                         element: el,
                         multiplier,
                     } => (avg_composition.get(el).copied().unwrap_or(0.0) * multiplier)
                         .clamp(0.0, 1.0),
                     QualityFormula::Fixed(q) => *q,
-                } * thermal_quality;
+                };
+                material_quality = base_quality * thermal_quality;
                 if material_kg > MIN_MEANINGFUL_KG {
                     if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                         merge_material_lot(
