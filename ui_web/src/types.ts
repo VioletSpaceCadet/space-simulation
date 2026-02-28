@@ -100,6 +100,7 @@ export type ModuleKindState =
   | { SensorArray: SensorArrayState }
   | { SolarArray: SensorArrayState }
   | { Battery: BatteryState }
+  | { Radiator: Record<string, never> }
   | 'Storage'
 
 export interface WearState {

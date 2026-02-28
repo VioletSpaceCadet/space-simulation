@@ -193,6 +193,7 @@ pub enum ModuleKindState {
     SensorArray(SensorArrayState),
     SolarArray(SolarArrayState),
     Battery(BatteryState),
+    Radiator(RadiatorState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -210,6 +211,9 @@ pub struct BatteryState {
     /// Current stored energy in kWh.
     pub charge_kwh: f32,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RadiatorState {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessorState {
@@ -488,6 +492,7 @@ pub enum BehaviorType {
     SensorArray,
     SolarArray,
     Battery,
+    Radiator,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -857,6 +862,7 @@ pub enum ModuleBehaviorDef {
     SensorArray(SensorArrayDef),
     SolarArray(SolarArrayDef),
     Battery(BatteryDef),
+    Radiator(RadiatorDef),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -914,6 +920,12 @@ pub struct BatteryDef {
     pub charge_rate_kw: f32,
     /// Maximum discharge rate in kW (how fast energy can be released).
     pub discharge_rate_kw: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RadiatorDef {
+    /// Maximum cooling capacity in Watts.
+    pub cooling_capacity_w: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -59,10 +59,61 @@ pub(crate) fn tick_thermal(state: &mut GameState, station_id: &StationId, conten
         modules.sort_by(|a, b| a.0.cmp(&b.0));
     }
 
+    // Build a map of group_key → total radiator cooling capacity (W), adjusted for wear.
+    // Radiators are identified by their ModuleBehaviorDef::Radiator variant.
+    let mut radiator_cooling_by_group: BTreeMap<String, f32> = BTreeMap::new();
+    for (module_index, module) in station.modules.iter().enumerate() {
+        if !module.enabled {
+            continue;
+        }
+        let Some(def) = content.module_defs.get(&module.def_id) else {
+            continue;
+        };
+        let crate::ModuleBehaviorDef::Radiator(ref radiator_def) = def.behavior else {
+            continue;
+        };
+        // Radiator must have thermal state to belong to a group.
+        let group_key = module
+            .thermal
+            .as_ref()
+            .and_then(|t| t.thermal_group.clone())
+            .unwrap_or_default();
+
+        let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
+        let _ = module_index; // used only for future extensibility
+        *radiator_cooling_by_group.entry(group_key).or_default() +=
+            radiator_def.cooling_capacity_w * efficiency;
+    }
+
     // Apply passive cooling to each module.
     for modules in groups.values() {
         for &(_, module_index) in modules {
             apply_passive_cooling(state, station_id, module_index, content, dt_s, sink_temp_mk);
+        }
+    }
+
+    // Apply radiator cooling per group: distribute total cooling energy evenly across
+    // all thermal modules in the group.
+    for (group_key, modules) in &groups {
+        let total_radiator_w = radiator_cooling_by_group
+            .get(group_key)
+            .copied()
+            .unwrap_or(0.0);
+        if total_radiator_w <= 0.0 || modules.is_empty() {
+            continue;
+        }
+        let total_cooling_j = f64::from(total_radiator_w) * dt_s;
+        let per_module_cooling_j = total_cooling_j / modules.len() as f64;
+
+        for &(_, module_index) in modules {
+            apply_radiator_cooling(
+                state,
+                station_id,
+                module_index,
+                content,
+                per_module_cooling_j,
+                sink_temp_mk,
+            );
         }
     }
 }
@@ -131,6 +182,61 @@ fn apply_passive_cooling(
     let clamped_temp = new_temp.clamp(sink_temp_mk, T_MAX_ABSOLUTE_MK);
 
     // Write the updated temperature.
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return;
+    };
+    if let Some(ref mut thermal) = station.modules[module_index].thermal {
+        thermal.temp_mk = clamped_temp;
+    }
+}
+
+/// Apply radiator cooling to a single module.
+///
+/// Removes `cooling_j` of heat energy from the module, converting to a temperature
+/// delta via the module's heat capacity. Temperature is clamped to \[`sink_temp`, `T_MAX`\].
+fn apply_radiator_cooling(
+    state: &mut GameState,
+    station_id: &StationId,
+    module_index: usize,
+    content: &GameContent,
+    cooling_j: f64,
+    sink_temp_mk: u32,
+) {
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+    let module = &station.modules[module_index];
+
+    let Some(ref thermal_state) = module.thermal else {
+        return;
+    };
+    let Some(def) = content.module_defs.get(&module.def_id) else {
+        return;
+    };
+    let Some(ref thermal_def) = def.thermal else {
+        return;
+    };
+
+    let current_temp_mk = thermal_state.temp_mk;
+
+    // No cooling below sink temperature.
+    if current_temp_mk <= sink_temp_mk {
+        return;
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    let cooling_j_i64 = cooling_j.clamp(0.0, i64::MAX as f64) as i64;
+    let delta_mk =
+        thermal::heat_to_temp_delta_mk(-cooling_j_i64, thermal_def.heat_capacity_j_per_k);
+
+    let new_temp = if delta_mk < 0 {
+        current_temp_mk.saturating_sub(delta_mk.unsigned_abs())
+    } else {
+        #[allow(clippy::cast_sign_loss)]
+        current_temp_mk.saturating_add(delta_mk.cast_unsigned())
+    };
+    let clamped_temp = new_temp.clamp(sink_temp_mk, T_MAX_ABSOLUTE_MK);
+
     let Some(station) = state.stations.get_mut(station_id) else {
         return;
     };
@@ -402,5 +508,196 @@ mod tests {
         let reactor_temp = station.modules[1].thermal.as_ref().unwrap().temp_mk;
         assert!(smelter_temp < 600_000, "smelter should have cooled");
         assert!(reactor_temp < 600_000, "reactor should have cooled");
+    }
+
+    // ── Radiator cooling tests ───────────────────────────────────────
+
+    /// Helper: add a radiator module def and instance to content + state.
+    fn add_radiator(
+        content: &mut GameContent,
+        state: &mut GameState,
+        station_id: &StationId,
+        radiator_id: &str,
+        cooling_capacity_w: f32,
+        wear: f32,
+    ) {
+        let def_id = format!("module_radiator_{radiator_id}");
+        content.module_defs.insert(
+            def_id.clone(),
+            ModuleDef {
+                id: def_id.clone(),
+                name: format!("Radiator {radiator_id}"),
+                mass_kg: 200.0,
+                volume_m3: 2.0,
+                power_consumption_per_run: 0.0,
+                wear_per_run: 0.0,
+                behavior: ModuleBehaviorDef::Radiator(RadiatorDef { cooling_capacity_w }),
+                thermal: Some(ThermalDef {
+                    heat_capacity_j_per_k: 100.0,
+                    passive_cooling_coefficient: 0.0,
+                    max_temp_mk: 5_000_000,
+                    operating_min_mk: None,
+                    operating_max_mk: None,
+                    thermal_group: Some("smelting".to_string()),
+                }),
+            },
+        );
+        let station = state.stations.get_mut(station_id).unwrap();
+        station.modules.push(ModuleState {
+            id: ModuleInstanceId(format!("radiator_{radiator_id}")),
+            def_id,
+            enabled: true,
+            kind_state: ModuleKindState::Radiator(RadiatorState::default()),
+            wear: WearState { wear },
+            power_stalled: false,
+            thermal: Some(ThermalState {
+                temp_mk: DEFAULT_AMBIENT_TEMP_MK,
+                thermal_group: Some("smelting".to_string()),
+            }),
+        });
+    }
+
+    #[test]
+    fn radiator_cools_thermal_group() {
+        let mut content = thermal_test_content();
+        let station_id = StationId("station_test".to_string());
+
+        // Smelter at 2000K (2_000_000 mK).
+        let mut state_with_radiator = thermal_test_state(&content, 2_000_000);
+        add_radiator(
+            &mut content,
+            &mut state_with_radiator,
+            &station_id,
+            "a",
+            1000.0,
+            0.0,
+        );
+
+        // Baseline: same setup without radiator.
+        let content_baseline = thermal_test_content();
+        let mut state_no_radiator = thermal_test_state(&content_baseline, 2_000_000);
+
+        // Run one tick on each.
+        tick_thermal(&mut state_with_radiator, &station_id, &content);
+        tick_thermal(&mut state_no_radiator, &station_id, &content_baseline);
+
+        let temp_with = state_with_radiator
+            .stations
+            .get(&station_id)
+            .unwrap()
+            .modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+        let temp_without = state_no_radiator.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+
+        assert!(
+            temp_with < temp_without,
+            "radiator should cool more than passive alone: with={temp_with}, without={temp_without}"
+        );
+    }
+
+    #[test]
+    fn multiple_radiators_stack() {
+        let mut content_one = thermal_test_content();
+        let station_id = StationId("station_test".to_string());
+
+        let mut state_one = thermal_test_state(&content_one, 2_000_000);
+        add_radiator(
+            &mut content_one,
+            &mut state_one,
+            &station_id,
+            "a",
+            1000.0,
+            0.0,
+        );
+
+        let mut content_two = thermal_test_content();
+        let mut state_two = thermal_test_state(&content_two, 2_000_000);
+        add_radiator(
+            &mut content_two,
+            &mut state_two,
+            &station_id,
+            "a",
+            1000.0,
+            0.0,
+        );
+        add_radiator(
+            &mut content_two,
+            &mut state_two,
+            &station_id,
+            "b",
+            1000.0,
+            0.0,
+        );
+
+        tick_thermal(&mut state_one, &station_id, &content_one);
+        tick_thermal(&mut state_two, &station_id, &content_two);
+
+        let temp_one = state_one.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+        let temp_two = state_two.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+
+        assert!(
+            temp_two < temp_one,
+            "two radiators should cool more than one: two={temp_two}, one={temp_one}"
+        );
+    }
+
+    #[test]
+    fn worn_radiator_less_effective() {
+        let mut content_pristine = thermal_test_content();
+        let station_id = StationId("station_test".to_string());
+        let mut state_pristine = thermal_test_state(&content_pristine, 2_000_000);
+        add_radiator(
+            &mut content_pristine,
+            &mut state_pristine,
+            &station_id,
+            "a",
+            1000.0,
+            0.0,
+        );
+
+        let mut content_worn = thermal_test_content();
+        let mut state_worn = thermal_test_state(&content_worn, 2_000_000);
+        add_radiator(
+            &mut content_worn,
+            &mut state_worn,
+            &station_id,
+            "a",
+            1000.0,
+            0.6, // degraded wear band
+        );
+
+        tick_thermal(&mut state_pristine, &station_id, &content_pristine);
+        tick_thermal(&mut state_worn, &station_id, &content_worn);
+
+        let temp_pristine = state_pristine.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+        let temp_worn = state_worn.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+
+        assert!(
+            temp_worn > temp_pristine,
+            "worn radiator should be less effective: worn={temp_worn}, pristine={temp_pristine}"
+        );
     }
 }

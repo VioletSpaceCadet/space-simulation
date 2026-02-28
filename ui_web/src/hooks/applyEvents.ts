@@ -27,6 +27,7 @@ const MODULE_KIND_STATE_MAP: Record<string, ModuleKindState> = {
   SensorArray: { SensorArray: { ticks_since_last_run: 0 } },
   SolarArray: { SolarArray: { ticks_since_last_run: 0 } },
   Battery: { Battery: { charge_kwh: 0 } },
+  Radiator: { Radiator: {} },
 };
 
 function buildTaskStub(taskKind: string, target: string | null, tick: number): TaskState {

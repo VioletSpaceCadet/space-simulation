@@ -99,12 +99,19 @@ fn apply_module_override(
                 }
                 matched = true;
             }
+            (ModuleBehaviorDef::Radiator(ref mut radiator_def), "radiator") => {
+                match field {
+                    "cooling_capacity_w" => radiator_def.cooling_capacity_w = as_f32(full_key, value)?,
+                    _ => bail!("unknown radiator field '{field}' in override key '{full_key}'. Valid fields: cooling_capacity_w"),
+                }
+                matched = true;
+            }
             _ => {}
         }
     }
 
     if !matched {
-        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance, sensor_array, solar_array, battery");
+        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance, sensor_array, solar_array, battery, radiator");
     }
 
     Ok(())
