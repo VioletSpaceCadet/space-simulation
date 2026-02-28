@@ -1019,6 +1019,7 @@ describe('applyEvents', () => {
         event: {
           AssemblerRan: {
             station_id: 'station_001', module_id: 'mod_1',
+            recipe_id: 'recipe_thruster',
             material_consumed_kg: 20, material_element: 'Fe',
             component_produced_id: 'thruster', component_produced_count: 1,
             component_quality: 0.9,
@@ -1051,6 +1052,7 @@ describe('applyEvents', () => {
         event: {
           AssemblerRan: {
             station_id: 'station_001', module_id: 'mod_1',
+            recipe_id: 'recipe_thruster',
             material_consumed_kg: 20, material_element: 'Fe',
             component_produced_id: 'thruster', component_produced_count: 2,
             component_quality: 0.9,
@@ -1080,7 +1082,7 @@ describe('applyEvents', () => {
         id: 'e1', tick: 10,
         event: {
           WearAccumulated: {
-            station_id: 'station_001', module_id: 'mod_1', wear_after: 0.25,
+            station_id: 'station_001', module_id: 'mod_1', wear_before: 0.1, wear_after: 0.25,
           },
         },
       }];
@@ -1138,8 +1140,8 @@ describe('applyEvents', () => {
         id: 'e1', tick: 10,
         event: {
           MaintenanceRan: {
-            station_id: 'station_001', module_id: 'mod_maint',
-            target_module_id: 'mod_ref', wear_after: 0.3,
+            station_id: 'station_001',
+            target_module_id: 'mod_ref', wear_before: 0.5, wear_after: 0.3,
             repair_kits_remaining: 9,
           },
         },
@@ -1387,7 +1389,7 @@ describe('applyEvents', () => {
 
       const events = [{
         id: 'e1', tick: 15,
-        event: { TaskCompleted: { ship_id: 'ship_0001', task_kind: 'Mine' } },
+        event: { TaskCompleted: { ship_id: 'ship_0001', task_kind: 'Mine', target: 'ast_001' } },
       }];
 
       const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
@@ -1460,6 +1462,85 @@ describe('applyEvents', () => {
       expect(result.stations['station_001'].modules[0].kind_state).toEqual({
         Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false },
       });
+    });
+  });
+
+  describe('Zod validation', () => {
+    it('skips event with invalid payload and logs error', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          AsteroidDiscovered: {
+            asteroid_id: 123, // should be string, not number
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
+
+      // State unchanged — invalid event was skipped
+      expect(Object.keys(result.asteroids)).toHaveLength(0);
+
+      // Error was logged
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid AsteroidDiscovered event payload'),
+        expect.anything(),
+        expect.anything(),
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    it('skips event missing required fields', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ModuleToggled: { station_id: 'station_001' },
+        },
+      }];
+
+      const station = makeStation({
+        modules: [{
+          id: 'mod_1', def_id: 'module_refinery', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+
+      // Module still enabled — event was skipped
+      expect(result.stations['station_001'].modules[0].enabled).toBe(true);
+      expect(errorSpy).toHaveBeenCalled();
+
+      errorSpy.mockRestore();
+    });
+
+    it('processes valid events normally after skipping invalid ones', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const events = [
+        {
+          id: 'e1', tick: 10,
+          event: { TechUnlocked: { tech_id: 42 } }, // invalid: number instead of string
+        },
+        {
+          id: 'e2', tick: 10,
+          event: { TechUnlocked: { tech_id: 'tech_valid' } }, // valid
+        },
+      ];
+
+      const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
+
+      // Only the valid event was applied
+      expect(result.research.unlocked).toEqual(['tech_valid']);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+
+      errorSpy.mockRestore();
     });
   });
 });
