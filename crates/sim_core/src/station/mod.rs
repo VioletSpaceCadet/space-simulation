@@ -320,9 +320,15 @@ pub(crate) struct ModuleTickContext<'a> {
 /// Reason a module stalled (distinct from "skipped").
 #[derive(Debug)]
 pub(crate) enum StallReason {
-    VolumeCap { shortfall_m3: f32 },
+    VolumeCap {
+        shortfall_m3: f32,
+    },
     StockCap,
     DataStarved,
+    TooCold {
+        current_temp_mk: u32,
+        required_temp_mk: u32,
+    },
 }
 
 /// Outcome of a module's `execute()` call.
@@ -532,6 +538,16 @@ fn handle_stall_transition(
                 }
                 !was_starved
             }
+            StallReason::TooCold { .. } => {
+                let was_stalled = match &module.kind_state {
+                    crate::ModuleKindState::Processor(s) => s.stalled,
+                    _ => false,
+                };
+                if let crate::ModuleKindState::Processor(s) = &mut module.kind_state {
+                    s.stalled = true;
+                }
+                !was_stalled
+            }
         }
     };
 
@@ -550,6 +566,15 @@ fn handle_stall_transition(
             StallReason::DataStarved => Event::LabStarved {
                 station_id: ctx.station_id.clone(),
                 module_id: ctx.module_id.clone(),
+            },
+            StallReason::TooCold {
+                current_temp_mk,
+                required_temp_mk,
+            } => Event::ProcessorTooCold {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+                current_temp_mk: *current_temp_mk,
+                required_temp_mk: *required_temp_mk,
             },
         };
         events.push(crate::emit(&mut state.counters, current_tick, event));

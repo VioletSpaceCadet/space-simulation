@@ -698,6 +698,12 @@ pub enum Event {
         station_id: StationId,
         power: PowerState,
     },
+    ProcessorTooCold {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        current_temp_mk: u32,
+        required_temp_mk: u32,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -918,12 +924,28 @@ pub struct ProcessorDef {
     pub recipes: Vec<RecipeDef>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RecipeThermalReq {
+    /// Below this temperature the processor stalls (`TooCold`).
+    pub min_temp_mk: u32,
+    /// Between `min_temp_mk` and `optimal_min_mk`: efficiency ramps 80%→100%.
+    pub optimal_min_mk: u32,
+    /// Between `optimal_min_mk` and `optimal_max_mk`: 100% efficiency, 100% quality.
+    pub optimal_max_mk: u32,
+    /// Between `optimal_max_mk` and `max_temp_mk`: quality degrades 100%→60%.
+    pub max_temp_mk: u32,
+    /// Heat generated (positive = exothermic) or absorbed (negative = endothermic) per run, in Joules.
+    pub heat_per_run_j: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecipeDef {
     pub id: String,
     pub inputs: Vec<RecipeInput>,
     pub outputs: Vec<OutputSpec>,
     pub efficiency: f32,
+    #[serde(default)]
+    pub thermal_req: Option<RecipeThermalReq>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
