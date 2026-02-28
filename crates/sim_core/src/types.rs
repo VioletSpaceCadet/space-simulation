@@ -992,6 +992,22 @@ pub struct Constants {
     /// Game-time minutes per simulation tick. Production = 60 (1 tick = 1 hour).
     /// Test fixtures use 1 to preserve existing assertions.
     pub minutes_per_tick: u32,
+    // Thermal system
+    /// Ambient/radiator sink temperature in milli-Kelvin (20 C, not cosmic background).
+    #[serde(default = "default_thermal_sink_temp_mk")]
+    pub thermal_sink_temp_mk: u32,
+    /// Offset above max operating temp that triggers overheat warning.
+    #[serde(default = "default_thermal_overheat_warning_offset_mk")]
+    pub thermal_overheat_warning_offset_mk: u32,
+    /// Offset above max operating temp that triggers overheat critical.
+    #[serde(default = "default_thermal_overheat_critical_offset_mk")]
+    pub thermal_overheat_critical_offset_mk: u32,
+    /// Wear rate multiplier when module is in overheat warning zone.
+    #[serde(default = "default_thermal_wear_multiplier_warning")]
+    pub thermal_wear_multiplier_warning: f32,
+    /// Wear rate multiplier when module is in overheat critical zone.
+    #[serde(default = "default_thermal_wear_multiplier_critical")]
+    pub thermal_wear_multiplier_critical: f32,
 
     // -- Derived tick fields (computed at load time, not in JSON) --
     #[serde(skip_deserializing, default)]
@@ -1103,6 +1119,22 @@ impl Default for WearState {
 
 fn default_slag_jettison_pct() -> f32 {
     0.75
+}
+
+fn default_thermal_sink_temp_mk() -> u32 {
+    293_000
+}
+fn default_thermal_overheat_warning_offset_mk() -> u32 {
+    200_000
+}
+fn default_thermal_overheat_critical_offset_mk() -> u32 {
+    500_000
+}
+fn default_thermal_wear_multiplier_warning() -> f32 {
+    2.0
+}
+fn default_thermal_wear_multiplier_critical() -> f32 {
+    4.0
 }
 
 // ---------------------------------------------------------------------------
