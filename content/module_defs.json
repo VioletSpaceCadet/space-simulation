@@ -219,5 +219,59 @@
         "discharge_rate_kw": 30.0
       }
     }
+  },
+  {
+    "id": "module_basic_smelter",
+    "name": "Basic Smelter",
+    "mass_kg": 6000.0,
+    "volume_m3": 12.0,
+    "power_consumption_per_run": 30.0,
+    "wear_per_run": 0.015,
+    "behavior": {
+      "Processor": {
+        "processing_interval_minutes": 60,
+        "recipes": [
+          {
+            "id": "recipe_smelt_iron",
+            "inputs": [
+              {
+                "filter": { "ItemKind": "Ore" },
+                "amount": { "Kg": 500.0 }
+              }
+            ],
+            "outputs": [
+              {
+                "Material": {
+                  "element": "Fe",
+                  "yield_formula": { "ElementFraction": { "element": "Fe" } },
+                  "quality_formula": {
+                    "ElementFractionTimesMultiplier": { "element": "Fe", "multiplier": 1.0 }
+                  }
+                }
+              },
+              {
+                "Slag": {
+                  "yield_formula": { "FixedFraction": 1.0 }
+                }
+              }
+            ],
+            "efficiency": 1.0,
+            "thermal_req": {
+              "min_temp_mk": 1800000,
+              "optimal_min_mk": 1850000,
+              "optimal_max_mk": 1950000,
+              "max_temp_mk": 2100000,
+              "heat_per_run_j": 50000000
+            }
+          }
+        ]
+      }
+    },
+    "thermal": {
+      "heat_capacity_j_per_k": 50000.0,
+      "passive_cooling_coefficient": 5.0,
+      "max_temp_mk": 2500000,
+      "thermal_group": "default"
+    }
   }
 ]
