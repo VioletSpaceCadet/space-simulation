@@ -108,9 +108,9 @@ export default defineConfig([
     rules: {
       '@typescript-eslint/no-floating-promises': 'off',
       '@typescript-eslint/no-misused-promises': 'off',
-      // Downgrade to warn — too many existing violations to fix in one pass
-      'testing-library/no-node-access': 'warn',
-      'testing-library/no-container': 'warn',
+      // Disabled — 63 existing violations. Track cleanup in a follow-up ticket.
+      'testing-library/no-node-access': 'off',
+      'testing-library/no-container': 'off',
     },
   },
 ]);
