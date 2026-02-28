@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import type { AsteroidState, ComponentItem, MaterialItem, ModuleKindState, PowerState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
+import type { AsteroidState, ComponentItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
 
 import { eventSchemas } from './eventSchemas';
 import type { EventType } from './eventSchemas';
@@ -115,7 +115,7 @@ function handleOreMined(state: SimState, event: EventPayload<'OreMined'>): SimSt
       ...ships,
       [event.ship_id]: {
         ...ships[event.ship_id],
-        inventory: [...ships[event.ship_id].inventory, event.ore_lot as unknown as ShipState['inventory'][number]],
+        inventory: [...ships[event.ship_id].inventory, event.ore_lot],
       },
     };
   }
@@ -132,7 +132,7 @@ function handleOreDeposited(state: SimState, event: EventPayload<'OreDeposited'>
       ...stations,
       [event.station_id]: {
         ...stations[event.station_id],
-        inventory: [...stations[event.station_id].inventory, ...event.items as unknown as StationState['inventory']],
+        inventory: [...stations[event.station_id].inventory, ...event.items],
       },
     };
   }
@@ -519,7 +519,7 @@ function handleItemImported(state: SimState, event: EventPayload<'ItemImported'>
   let updatedState = { ...state, balance: event.balance_after };
   if (!state.stations[event.station_id]) {return updatedState;}
   const station = state.stations[event.station_id];
-  const newItem = tradeItemToInventory(event.item_spec as TradeItemSpec);
+  const newItem = tradeItemToInventory(event.item_spec);
   const stationInv = [...station.inventory];
   let merged = false;
   if (newItem.kind === 'Material') {
@@ -553,7 +553,7 @@ function handleItemImported(state: SimState, event: EventPayload<'ItemImported'>
 }
 
 function handleItemExported(state: SimState, event: EventPayload<'ItemExported'>): SimState {
-  const itemSpec = event.item_spec as TradeItemSpec;
+  const itemSpec = event.item_spec;
   let updatedState = { ...state, balance: event.balance_after };
   if (!state.stations[event.station_id]) {return updatedState;}
   const station = state.stations[event.station_id];
@@ -623,7 +623,7 @@ function handlePowerStateUpdated(state: SimState, event: EventPayload<'PowerStat
     ...state,
     stations: {
       ...state.stations,
-      [event.station_id]: { ...state.stations[event.station_id], power: event.power as PowerState },
+      [event.station_id]: { ...state.stations[event.station_id], power: event.power },
     },
   };
 }

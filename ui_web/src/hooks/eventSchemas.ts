@@ -17,9 +17,47 @@ const powerStateSchema = z.object({
   battery_stored_kwh: z.number(),
 });
 
-const inventoryItemSchema = z.object({
-  kind: z.string(),
-}).passthrough();
+const oreItemSchema = z.object({
+  kind: z.literal('Ore'),
+  lot_id: z.string(),
+  asteroid_id: z.string(),
+  kg: z.number(),
+  composition: z.record(z.string(), z.number()),
+});
+
+const slagItemSchema = z.object({
+  kind: z.literal('Slag'),
+  kg: z.number(),
+  composition: z.record(z.string(), z.number()),
+});
+
+const materialItemSchema = z.object({
+  kind: z.literal('Material'),
+  element: z.string(),
+  kg: z.number(),
+  quality: z.number(),
+});
+
+const componentItemSchema = z.object({
+  kind: z.literal('Component'),
+  component_id: z.string(),
+  count: z.number(),
+  quality: z.number(),
+});
+
+const moduleItemSchema = z.object({
+  kind: z.literal('Module'),
+  item_id: z.string(),
+  module_def_id: z.string(),
+});
+
+const inventoryItemSchema = z.discriminatedUnion('kind', [
+  oreItemSchema,
+  slagItemSchema,
+  materialItemSchema,
+  componentItemSchema,
+  moduleItemSchema,
+]);
 
 // --- Per-event payload schemas ---
 
