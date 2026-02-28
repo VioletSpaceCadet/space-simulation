@@ -3,6 +3,7 @@ mod lab;
 mod maintenance;
 mod processor;
 mod sensor;
+pub(crate) mod thermal;
 
 use crate::{
     tasks::element_density, Event, EventEnvelope, GameContent, GameState, InputFilter,
@@ -89,6 +90,7 @@ pub(crate) fn tick_stations(
         sensor::tick_sensor_array_modules(state, station_id, content, events);
         lab::tick_lab_modules(state, station_id, content, events);
         maintenance::tick_maintenance_modules(state, station_id, content, events);
+        thermal::tick_thermal(state, station_id, content);
     }
 }
 
