@@ -16,6 +16,7 @@ use std::collections::HashMap;
 
 /// Full-featured content: `deep_scan_v1` tech, `iron_rich` template, ore/Fe/Si/slag elements,
 /// single-node solar system, compressed durations for fast tests.
+#[allow(clippy::too_many_lines)] // struct-literal fixture, splitting reduces readability
 pub fn base_content() -> GameContent {
     let mut content = GameContent {
         content_version: "test".to_string(),

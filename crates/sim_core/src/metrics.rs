@@ -626,6 +626,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::float_cmp)]
+    #[allow(clippy::cognitive_complexity)] // exhaustive field-by-field assertions
     fn test_empty_state_all_zeros() {
         let content = empty_content();
         let state = empty_state();
