@@ -29,6 +29,9 @@ saves/
 .worktrees/
 .claude/worktrees/
 
+# Agent memory (per-session, not shared)
+.claude/agent-memory/
+
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
