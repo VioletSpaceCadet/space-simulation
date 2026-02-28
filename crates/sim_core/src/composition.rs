@@ -90,6 +90,7 @@ pub(crate) fn merge_material_lot(
             element,
             kg,
             quality,
+            thermal: None,
         });
     }
 }
@@ -151,6 +152,7 @@ mod tests {
                 element,
                 kg,
                 quality,
+                ..
             } => {
                 assert_eq!(element, "Fe");
                 assert!((kg - 50.0).abs() < 1e-6);
@@ -166,6 +168,7 @@ mod tests {
             element: "Fe".to_string(),
             kg: 30.0,
             quality: 0.9,
+            thermal: None,
         }];
         merge_material_lot(&mut inventory, "Fe".to_string(), 20.0, 0.9);
 
@@ -182,6 +185,7 @@ mod tests {
             element: "Fe".to_string(),
             kg: 30.0,
             quality: 0.9,
+            thermal: None,
         }];
         merge_material_lot(&mut inventory, "Fe".to_string(), 20.0, 0.5);
 

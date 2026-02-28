@@ -483,6 +483,7 @@ mod assembler_component_tests {
                             element: "Fe".to_string(),
                             kg: 200.0,
                             quality: 0.8,
+                            thermal: None,
                         },
                         InventoryItem::Component {
                             component_id: ComponentId("thruster".to_string()),
@@ -767,6 +768,7 @@ mod assembler_component_tests {
                             element: "Fe".to_string(),
                             kg: 200.0,
                             quality: 0.8,
+                            thermal: None,
                         },
                         InventoryItem::Component {
                             component_id: ComponentId("thruster".to_string()),

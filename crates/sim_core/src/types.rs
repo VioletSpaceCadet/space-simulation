@@ -153,6 +153,9 @@ pub enum InventoryItem {
         element: ElementId,
         kg: f32,
         quality: f32,
+        /// Per-batch thermal properties. `None` for non-thermal materials.
+        #[serde(default)]
+        thermal: Option<MaterialThermalProps>,
     },
     Component {
         component_id: ComponentId,
@@ -1124,6 +1127,38 @@ impl Default for ThermalState {
         Self {
             temp_mk: 293_000, // 20°C ambient
             thermal_group: None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Material thermal properties
+// ---------------------------------------------------------------------------
+
+/// Phase of a material batch (solid or liquid).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Phase {
+    Solid,
+    Liquid,
+}
+
+/// Thermal properties attached to a `Material` inventory item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MaterialThermalProps {
+    /// Temperature in milli-Kelvin.
+    pub temp_mk: u32,
+    /// Current phase of the material batch.
+    pub phase: Phase,
+    /// Latent heat buffer in joules (tracks energy absorbed/released during phase change).
+    pub latent_heat_buffer_j: i64,
+}
+
+impl Default for MaterialThermalProps {
+    fn default() -> Self {
+        Self {
+            temp_mk: 293_000, // 20°C ambient
+            phase: Phase::Solid,
+            latent_heat_buffer_j: 0,
         }
     }
 }

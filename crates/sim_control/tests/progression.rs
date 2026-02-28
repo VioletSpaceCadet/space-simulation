@@ -572,6 +572,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
         element: "Fe".to_string(),
         kg: 50_000.0,
         quality: 0.8,
+        thermal: None,
     });
 
     // Run enough ticks for import (travel ~48 ticks) + assembly (336 ticks) + margin

@@ -71,3 +71,62 @@ fn thermal_state_default_values() {
     assert_eq!(thermal.temp_mk, 293_000);
     assert_eq!(thermal.thermal_group, None);
 }
+
+// --- MaterialThermalProps tests ---
+
+#[test]
+fn material_thermal_none_round_trip() {
+    let item = InventoryItem::Material {
+        element: "Fe".to_string(),
+        kg: 100.0,
+        quality: 0.9,
+        thermal: None,
+    };
+
+    let json = serde_json::to_string(&item).unwrap();
+    let deserialized: InventoryItem = serde_json::from_str(&json).unwrap();
+    if let InventoryItem::Material { thermal, .. } = deserialized {
+        assert_eq!(thermal, None);
+    } else {
+        panic!("expected Material variant");
+    }
+}
+
+#[test]
+fn material_thermal_some_round_trip() {
+    let props = MaterialThermalProps {
+        temp_mk: 1_800_000,
+        phase: Phase::Liquid,
+        latent_heat_buffer_j: 5_000,
+    };
+    let item = InventoryItem::Material {
+        element: "Fe".to_string(),
+        kg: 100.0,
+        quality: 0.9,
+        thermal: Some(props),
+    };
+
+    let json = serde_json::to_string(&item).unwrap();
+    let deserialized: InventoryItem = serde_json::from_str(&json).unwrap();
+    if let InventoryItem::Material { thermal, .. } = deserialized {
+        let t = thermal.unwrap();
+        assert_eq!(t.temp_mk, 1_800_000);
+        assert_eq!(t.phase, Phase::Liquid);
+        assert_eq!(t.latent_heat_buffer_j, 5_000);
+    } else {
+        panic!("expected Material variant");
+    }
+}
+
+#[test]
+fn material_thermal_backward_compat_missing_field() {
+    // Old save file: Material without "thermal" field (internally tagged with "kind")
+    let json = r#"{"kind":"Material","element":"Fe","kg":100.0,"quality":0.9}"#;
+
+    let deserialized: InventoryItem = serde_json::from_str(json).unwrap();
+    if let InventoryItem::Material { thermal, .. } = deserialized {
+        assert_eq!(thermal, None);
+    } else {
+        panic!("expected Material variant");
+    }
+}

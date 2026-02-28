@@ -89,6 +89,7 @@ pub fn create_inventory_items(item_spec: &TradeItemSpec, rng: &mut impl Rng) -> 
                 element: element.clone(),
                 kg: *kg,
                 quality: 1.0,
+                thermal: None,
             }]
         }
         TradeItemSpec::Component {
@@ -235,6 +236,7 @@ pub fn merge_into_inventory(inventory: &mut Vec<InventoryItem>, new_items: Vec<I
                 element,
                 kg,
                 quality,
+                ..
             } => {
                 let existing = inventory.iter_mut().find(|item| {
                     matches!(item, InventoryItem::Material { element: el, quality: q, .. }
