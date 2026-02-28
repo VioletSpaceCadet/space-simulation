@@ -5,10 +5,13 @@
 //! `minimal_content()` provides the bare minimum for content-validation tests.
 
 use crate::{
-    AnomalyTag, AsteroidTemplateDef, Constants, Counters, DataKind, ElementDef, GameContent,
-    GameState, MetaState, NodeDef, NodeId, PricingTable, PrincipalId, ResearchState, ScanSite,
-    ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechEffect,
-    TechId,
+    AnomalyTag, AsteroidId, AsteroidTemplateDef, Constants, Counters, DataKind, ElementDef,
+    GameContent, GameState, InputAmount, InputFilter, ItemKind, LotId, MetaState, ModuleDef,
+    ModuleInstanceId, ModuleKindState, ModuleState, NodeDef, NodeId, OutputSpec, PricingTable,
+    PrincipalId, ProcessorDef, ProcessorState, QualityFormula, RadiatorDef, RadiatorState,
+    RecipeDef, RecipeThermalReq, ResearchState, ScanSite, ShipId, ShipState, SiteId,
+    SolarSystemDef, StationId, StationState, TechDef, TechEffect, TechId, ThermalDef, ThermalState,
+    WearState, YieldFormula,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -300,4 +303,285 @@ pub fn base_state(content: &GameContent) -> GameState {
 /// Deterministic RNG seeded with 42.
 pub fn make_rng() -> ChaCha8Rng {
     ChaCha8Rng::seed_from_u64(42)
+}
+
+// ── Thermal test fixtures (VIO-209) ─────────────────────────────
+
+/// Content with smelter and radiator module defs, plus a solar array for power.
+/// Uses `base_content()` and adds thermal module definitions.
+#[allow(clippy::too_many_lines)]
+pub fn thermal_content() -> GameContent {
+    let mut content = base_content();
+
+    content.module_defs.insert(
+        "module_basic_smelter".to_string(),
+        ModuleDef {
+            id: "module_basic_smelter".to_string(),
+            name: "Basic Smelter".to_string(),
+            mass_kg: 6000.0,
+            volume_m3: 12.0,
+            power_consumption_per_run: 30.0,
+            wear_per_run: 0.015,
+            behavior: crate::ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_minutes: 1,
+                processing_interval_ticks: 1,
+                recipes: vec![RecipeDef {
+                    id: "recipe_smelt_iron".to_string(),
+                    inputs: vec![crate::RecipeInput {
+                        filter: InputFilter::ItemKind(ItemKind::Ore),
+                        amount: InputAmount::Kg(500.0),
+                    }],
+                    outputs: vec![
+                        OutputSpec::Material {
+                            element: "Fe".to_string(),
+                            yield_formula: YieldFormula::ElementFraction {
+                                element: "Fe".to_string(),
+                            },
+                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                                element: "Fe".to_string(),
+                                multiplier: 1.0,
+                            },
+                        },
+                        OutputSpec::Slag {
+                            yield_formula: YieldFormula::FixedFraction(1.0),
+                        },
+                    ],
+                    efficiency: 1.0,
+                    thermal_req: Some(RecipeThermalReq {
+                        min_temp_mk: 1_800_000,
+                        optimal_min_mk: 1_850_000,
+                        optimal_max_mk: 1_950_000,
+                        max_temp_mk: 2_100_000,
+                        heat_per_run_j: 50_000_000,
+                    }),
+                }],
+            }),
+            thermal: Some(ThermalDef {
+                heat_capacity_j_per_k: 50_000.0,
+                passive_cooling_coefficient: 5.0,
+                max_temp_mk: 2_500_000,
+                operating_min_mk: None,
+                operating_max_mk: None,
+                thermal_group: Some("default".to_string()),
+            }),
+        },
+    );
+
+    content.module_defs.insert(
+        "module_basic_radiator".to_string(),
+        ModuleDef {
+            id: "module_basic_radiator".to_string(),
+            name: "Basic Radiator".to_string(),
+            mass_kg: 800.0,
+            volume_m3: 15.0,
+            power_consumption_per_run: 0.0,
+            wear_per_run: 0.001,
+            behavior: crate::ModuleBehaviorDef::Radiator(RadiatorDef {
+                cooling_capacity_w: 500.0,
+            }),
+            thermal: Some(ThermalDef {
+                heat_capacity_j_per_k: 10_000.0,
+                passive_cooling_coefficient: 10.0,
+                max_temp_mk: 3_000_000,
+                operating_min_mk: None,
+                operating_max_mk: None,
+                thermal_group: Some("default".to_string()),
+            }),
+        },
+    );
+
+    content
+}
+
+fn smelter_module(temp_mk: u32) -> ModuleState {
+    ModuleState {
+        id: ModuleInstanceId("mod_smelter_001".to_string()),
+        def_id: "module_basic_smelter".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 500.0,
+            ticks_since_last_run: 100,
+            stalled: false,
+        }),
+        wear: WearState::default(),
+        thermal: Some(ThermalState {
+            temp_mk,
+            thermal_group: Some("default".to_string()),
+        }),
+        power_stalled: false,
+    }
+}
+
+fn radiator_module() -> ModuleState {
+    ModuleState {
+        id: ModuleInstanceId("mod_radiator_001".to_string()),
+        def_id: "module_basic_radiator".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Radiator(RadiatorState::default()),
+        wear: WearState::default(),
+        thermal: Some(ThermalState {
+            temp_mk: 293_000,
+            thermal_group: Some("default".to_string()),
+        }),
+        power_stalled: false,
+    }
+}
+
+fn second_radiator_module() -> ModuleState {
+    let mut module = radiator_module();
+    module.id = ModuleInstanceId("mod_radiator_002".to_string());
+    module
+}
+
+fn ore_inventory() -> Vec<crate::InventoryItem> {
+    vec![crate::InventoryItem::Ore {
+        lot_id: LotId("lot_thermal_001".to_string()),
+        asteroid_id: AsteroidId("ast_thermal_001".to_string()),
+        kg: 5000.0,
+        composition: HashMap::from([("Fe".to_string(), 0.7), ("Si".to_string(), 0.3)]),
+    }]
+}
+
+/// Station with a smelter module at ambient temperature (293K).
+/// Includes ore inventory for processing and enough power for the smelter.
+pub fn state_with_smelter(content: &GameContent) -> GameState {
+    let mut state = base_state(content);
+    let station = state
+        .stations
+        .get_mut(&StationId("station_earth_orbit".to_string()))
+        .unwrap();
+    station.modules.push(smelter_module(293_000));
+    station.inventory = ore_inventory();
+    state
+}
+
+/// Station with a smelter at the given temperature (milli-Kelvin).
+/// Includes ore inventory for processing.
+pub fn state_with_smelter_at_temp(content: &GameContent, temp_mk: u32) -> GameState {
+    let mut state = base_state(content);
+    let station = state
+        .stations
+        .get_mut(&StationId("station_earth_orbit".to_string()))
+        .unwrap();
+    station.modules.push(smelter_module(temp_mk));
+    station.inventory = ore_inventory();
+    state
+}
+
+/// Station with a single radiator module.
+pub fn state_with_radiator(content: &GameContent) -> GameState {
+    let mut state = base_state(content);
+    let station = state
+        .stations
+        .get_mut(&StationId("station_earth_orbit".to_string()))
+        .unwrap();
+    station.modules.push(radiator_module());
+    state
+}
+
+/// Station with a smelter (at ambient) + 2 radiators, plus ore inventory.
+/// The common thermal test setup.
+pub fn state_with_smelter_and_radiators(content: &GameContent) -> GameState {
+    let mut state = base_state(content);
+    let station = state
+        .stations
+        .get_mut(&StationId("station_earth_orbit".to_string()))
+        .unwrap();
+    station.modules.push(smelter_module(293_000));
+    station.modules.push(radiator_module());
+    station.modules.push(second_radiator_module());
+    station.inventory = ore_inventory();
+    state
+}
+
+#[cfg(test)]
+mod thermal_fixture_tests {
+    use super::*;
+
+    #[test]
+    fn smelter_fixture_ticks_without_panic() {
+        let content = thermal_content();
+        let mut state = state_with_smelter(&content);
+        let mut rng = make_rng();
+        for _ in 0..10 {
+            crate::tick(
+                &mut state,
+                &[],
+                &content,
+                &mut rng,
+                crate::EventLevel::Normal,
+            );
+        }
+    }
+
+    #[test]
+    fn radiator_fixture_ticks_without_panic() {
+        let content = thermal_content();
+        let mut state = state_with_radiator(&content);
+        let mut rng = make_rng();
+        for _ in 0..10 {
+            crate::tick(
+                &mut state,
+                &[],
+                &content,
+                &mut rng,
+                crate::EventLevel::Normal,
+            );
+        }
+    }
+
+    #[test]
+    fn smelter_and_radiators_fixture_ticks_without_panic() {
+        let content = thermal_content();
+        let mut state = state_with_smelter_and_radiators(&content);
+        let mut rng = make_rng();
+        for _ in 0..10 {
+            crate::tick(
+                &mut state,
+                &[],
+                &content,
+                &mut rng,
+                crate::EventLevel::Normal,
+            );
+        }
+    }
+
+    #[test]
+    fn cold_smelter_stalls() {
+        let content = thermal_content();
+        let mut state = state_with_smelter(&content);
+        let mut rng = make_rng();
+        let events = crate::tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            crate::EventLevel::Normal,
+        );
+
+        // Smelter at 293K should stall (requires 1800K min)
+        let has_too_cold = events
+            .iter()
+            .any(|e| matches!(&e.event, crate::Event::ProcessorTooCold { .. }));
+        assert!(has_too_cold, "cold smelter should emit ProcessorTooCold");
+    }
+
+    #[test]
+    fn hot_smelter_runs() {
+        let content = thermal_content();
+        let mut state = state_with_smelter_at_temp(&content, 1_900_000);
+        let mut rng = make_rng();
+        let events = crate::tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            crate::EventLevel::Normal,
+        );
+
+        let has_produced = events
+            .iter()
+            .any(|e| matches!(&e.event, crate::Event::RefineryRan { .. }));
+        assert!(has_produced, "hot smelter should run and produce output");
+    }
 }
