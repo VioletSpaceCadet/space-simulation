@@ -16,12 +16,13 @@ pub fn dt_seconds(constants: &Constants) -> f64 {
 }
 
 /// Convert a power draw (Watts = J/s) over one tick into heat energy (Joules).
+///
+/// Clamps to `i64` range before casting to prevent undefined overflow.
 #[inline]
+#[allow(clippy::cast_possible_truncation)] // safe: clamped to i64 range
 pub fn power_to_heat_j(watts: f32, dt_s: f64) -> i64 {
-    #[allow(clippy::cast_possible_truncation)] // intentional float→int boundary
-    {
-        (f64::from(watts) * dt_s) as i64
-    }
+    let joules = f64::from(watts) * dt_s;
+    joules.clamp(i64::MIN as f64, i64::MAX as f64) as i64
 }
 
 /// Convert heat energy (Joules) into a temperature delta (milli-Kelvin),
@@ -29,7 +30,9 @@ pub fn power_to_heat_j(watts: f32, dt_s: f64) -> i64 {
 ///
 /// Returns a signed delta: positive heat raises temperature, negative lowers it.
 /// Panics in debug if `capacity_j_per_k` is zero.
+/// Clamps to `i32` range before casting to prevent undefined overflow.
 #[inline]
+#[allow(clippy::cast_possible_truncation)] // safe: clamped to i32 range
 pub fn heat_to_temp_delta_mk(heat_j: i64, capacity_j_per_k: f32) -> i32 {
     debug_assert!(
         capacity_j_per_k > 0.0,
@@ -38,10 +41,8 @@ pub fn heat_to_temp_delta_mk(heat_j: i64, capacity_j_per_k: f32) -> i32 {
     // delta_K = heat_j / capacity_j_per_k
     // delta_mK = delta_K * 1000
     let delta_k = heat_j as f64 / f64::from(capacity_j_per_k);
-    #[allow(clippy::cast_possible_truncation)] // intentional float→int boundary
-    {
-        (delta_k * 1000.0) as i32
-    }
+    let delta_milli_kelvin = delta_k * 1000.0;
+    delta_milli_kelvin.clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32
 }
 
 #[cfg(test)]
