@@ -346,6 +346,7 @@ fn export_material_removes_from_inventory_and_adds_revenue() {
         element: "Fe".to_string(),
         kg: 100.0,
         quality: 1.0,
+        thermal: None,
     });
 
     let cmd = make_command(Command::Export {
@@ -488,6 +489,7 @@ fn export_more_than_available_is_rejected() {
         element: "Fe".to_string(),
         kg: 100.0,
         quality: 1.0,
+        thermal: None,
     });
 
     let cmd = make_command(Command::Export {
@@ -538,6 +540,7 @@ fn import_merges_material_with_existing() {
         element: "Fe".to_string(),
         kg: 50.0,
         quality: 1.0,
+        thermal: None,
     });
 
     let cmd = make_command(Command::Import {
@@ -621,6 +624,7 @@ fn export_rejected_before_trade_unlock_tick() {
         element: "Fe".to_string(),
         kg: 500.0,
         quality: 0.7,
+        thermal: None,
     });
     let balance_before = state.balance;
 

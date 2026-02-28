@@ -201,6 +201,7 @@ fn jettison_slag_removes_all_slag_and_emits_event() {
         element: "Fe".to_string(),
         kg: 200.0,
         quality: 0.8,
+        thermal: None,
     });
 
     let cmd = CommandEnvelope {

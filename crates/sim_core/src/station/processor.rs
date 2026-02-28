@@ -391,6 +391,7 @@ mod tests {
                 element: "Fe".to_string(),
                 kg: 100.0,
                 quality: 0.8,
+                thermal: None,
             },
         ];
 

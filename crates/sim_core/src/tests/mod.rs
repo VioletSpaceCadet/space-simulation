@@ -241,6 +241,7 @@ fn state_with_assembler(content: &GameContent) -> GameState {
         element: "Fe".to_string(),
         kg: 500.0,
         quality: 0.7,
+        thermal: None,
     });
 
     state

@@ -1375,6 +1375,7 @@ mod tests {
             element: "Fe".to_string(),
             kg: 5000.0,
             quality: 1.0,
+            thermal: None,
         });
 
         // Unlock tech_ship_construction

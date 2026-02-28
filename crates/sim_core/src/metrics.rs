@@ -126,6 +126,7 @@ impl InventoryAccumulator {
                     element,
                     kg,
                     quality,
+                    ..
                 } => {
                     self.total_material_kg += kg;
                     if element == crate::ELEMENT_FE {
@@ -703,6 +704,7 @@ mod tests {
                     element: "Fe".to_string(),
                     kg: 500.0,
                     quality: 0.8,
+                    thermal: None,
                 },
                 InventoryItem::Slag {
                     kg: 200.0,
@@ -896,6 +898,7 @@ mod tests {
                     element: "Fe".to_string(),
                     kg: 300.0,
                     quality: 0.9,
+                    thermal: None,
                 },
             ],
             vec![],
