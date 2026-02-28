@@ -149,6 +149,7 @@ mod tests {
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
                 }),
+                thermal: None,
             },
         );
         content

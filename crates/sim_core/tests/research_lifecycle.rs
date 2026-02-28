@@ -29,6 +29,7 @@ fn full_research_lifecycle() {
                 research_interval_minutes: 1,
                 research_interval_ticks: 1,
             }),
+            thermal: None,
         },
     );
 
@@ -103,6 +104,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
                 research_interval_minutes: 1,
                 research_interval_ticks: 1,
             }),
+            thermal: None,
         },
     );
 

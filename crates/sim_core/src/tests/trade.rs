@@ -88,6 +88,7 @@ fn trade_content() -> GameContent {
                 processing_interval_ticks: 10,
                 recipes: vec![],
             }),
+            thermal: None,
         },
     )]);
     content

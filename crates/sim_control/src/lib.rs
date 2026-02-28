@@ -742,6 +742,7 @@ mod tests {
                     repair_kit_cost: 1,
                     repair_threshold: 0.0,
                 }),
+                thermal: None,
             },
         );
         let mut state = autopilot_state(&content);
@@ -1030,6 +1031,7 @@ mod tests {
                     research_interval_minutes: 10,
                     research_interval_ticks: 10,
                 }),
+                thermal: None,
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -1232,6 +1234,7 @@ mod tests {
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
                 }),
+                thermal: None,
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -1322,6 +1325,7 @@ mod tests {
                     }],
                     max_stock: HashMap::new(),
                 }),
+                thermal: None,
             },
         );
 

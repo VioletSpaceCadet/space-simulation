@@ -85,6 +85,7 @@ mod tests {
                     scan_interval_minutes: 5,
                     scan_interval_ticks: 5,
                 }),
+                thermal: None,
             },
         );
         content
