@@ -307,8 +307,9 @@ pub fn make_rng() -> ChaCha8Rng {
 
 // ── Thermal test fixtures (VIO-209) ─────────────────────────────
 
-/// Content with smelter and radiator module defs, plus a solar array for power.
+/// Content with smelter and radiator module defs.
 /// Uses `base_content()` and adds thermal module definitions.
+/// Power is inherited from `base_state()` (`power_available_per_tick: 100.0`).
 #[allow(clippy::too_many_lines)]
 pub fn thermal_content() -> GameContent {
     let mut content = base_content();
@@ -443,7 +444,7 @@ fn ore_inventory() -> Vec<crate::InventoryItem> {
 }
 
 /// Station with a smelter module at ambient temperature (293K).
-/// Includes ore inventory for processing and enough power for the smelter.
+/// Includes ore inventory for processing. Power from `base_state()` defaults.
 pub fn state_with_smelter(content: &GameContent) -> GameState {
     let mut state = base_state(content);
     let station = state
