@@ -1143,7 +1143,7 @@ pub enum Phase {
 }
 
 /// Thermal properties attached to a `Material` inventory item.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MaterialThermalProps {
     /// Temperature in milli-Kelvin.
     pub temp_mk: u32,
@@ -1151,6 +1151,16 @@ pub struct MaterialThermalProps {
     pub phase: Phase,
     /// Latent heat buffer in joules (tracks energy absorbed/released during phase change).
     pub latent_heat_buffer_j: i64,
+}
+
+impl Default for MaterialThermalProps {
+    fn default() -> Self {
+        Self {
+            temp_mk: 293_000, // 20°C ambient
+            phase: Phase::Solid,
+            latent_heat_buffer_j: 0,
+        }
+    }
 }
 
 #[cfg(test)]
