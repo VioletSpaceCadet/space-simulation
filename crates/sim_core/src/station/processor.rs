@@ -801,4 +801,25 @@ mod tests {
             "should run without thermal_req regardless of temperature"
         );
     }
+
+    #[test]
+    fn thermal_recipe_without_thermal_state_stalls() {
+        // Module has a thermal recipe but no ThermalState → temp defaults to 0 → TooCold
+        let content = thermal_processor_content();
+        let mut state = thermal_processor_state(&content, 1_800_000);
+        let station_id = StationId("station_test".to_string());
+
+        // Remove ThermalState from the module
+        state.stations.get_mut(&station_id).unwrap().modules[0].thermal = None;
+
+        let mut events = Vec::new();
+        tick_station_modules(&mut state, &station_id, &content, &mut events);
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(&e.event, Event::ProcessorTooCold { .. })),
+            "missing ThermalState with thermal recipe should stall as TooCold"
+        );
+    }
 }

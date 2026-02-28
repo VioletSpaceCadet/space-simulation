@@ -1322,6 +1322,7 @@ mod tests {
                             cargo_capacity_m3: 50.0,
                         }],
                         efficiency: 1.0,
+                        thermal_req: None,
                     }],
                     max_stock: HashMap::new(),
                 }),

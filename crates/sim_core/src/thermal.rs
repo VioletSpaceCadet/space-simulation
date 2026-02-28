@@ -77,7 +77,7 @@ pub fn thermal_quality_factor(temp_mk: u32, req: &RecipeThermalReq) -> f32 {
     if temp_mk <= req.optimal_max_mk {
         return 1.0;
     }
-    if temp_mk >= req.max_temp_mk {
+    if temp_mk > req.max_temp_mk {
         return 0.3;
     }
     // Linear interpolation: optimal_max→max maps to 1.0→0.6
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn quality_at_max_is_60_percent() {
         let req = smelter_req();
-        assert!((thermal_quality_factor(2_500_000, &req) - 0.3).abs() < f32::EPSILON);
+        assert!((thermal_quality_factor(2_500_000, &req) - 0.6).abs() < f32::EPSILON);
     }
 
     #[test]
