@@ -1,7 +1,7 @@
 //! Progression regression tests.
 //!
 //! These tests run the full tick loop with autopilot at production time scale
-//! (minutes_per_tick = 60) and verify that game milestones are reached within
+//! (`minutes_per_tick` = 60) and verify that game milestones are reached within
 //! expected tick windows. They catch rate/timing regressions from content
 //! rescaling or time-scale changes.
 
@@ -12,8 +12,9 @@ use sim_core::test_fixtures::{base_content, base_state};
 use sim_core::*;
 use std::collections::HashMap;
 
-/// Build content that mimics production: minutes_per_tick=60, full tech tree,
+/// Build content that mimics production: `minutes_per_tick=60`, full tech tree,
 /// all module types, sensor array for data generation, labs for evidence.
+#[allow(clippy::too_many_lines)] // large fixture building full production content
 fn production_like_content() -> GameContent {
     let mut content = base_content();
 
@@ -324,7 +325,7 @@ fn run_with_autopilot(
 // Milestone tests
 // ---------------------------------------------------------------------------
 
-/// Verify derive_tick_values converts minutes to ticks correctly at mpt=60.
+/// Verify `derive_tick_values` converts minutes to ticks correctly at mpt=60.
 #[test]
 fn derive_tick_values_produces_correct_ticks_at_mpt_60() {
     let content = production_like_content();
@@ -378,7 +379,7 @@ fn derive_tick_values_produces_correct_ticks_at_mpt_60() {
     }
 }
 
-/// After 500 ticks at mpt=60 (~20 days), deep_scan_v1 should be unlocked.
+/// After 500 ticks at mpt=60 (~20 days), `deep_scan_v1` should be unlocked.
 /// This catches regressions where research evidence generation is broken.
 #[test]
 fn deep_scan_unlocks_within_500_ticks() {
@@ -433,7 +434,7 @@ fn full_tech_tree_unlocks_within_1000_ticks() {
 }
 
 /// Sensor generates data at the expected rate given the interval.
-/// At mpt=60 with scan_interval_minutes=120, sensors fire every 2 ticks.
+/// At mpt=60 with `scan_interval_minutes=120`, sensors fire every 2 ticks.
 /// After 10 ticks, sensor should have generated data 5 times.
 #[test]
 fn sensor_data_generation_rate_at_mpt_60() {
@@ -584,8 +585,8 @@ fn ships_built_after_tech_unlock_and_trade_available() {
     );
 }
 
-/// Lab per-run amounts should NOT be scaled by minutes_per_tick.
-/// data_consumption_per_run and research_points_per_run are per-execution
+/// Lab per-run amounts should NOT be scaled by `minutes_per_tick`.
+/// `data_consumption_per_run` and `research_points_per_run` are per-execution
 /// constants, not rates. This catches the VIO-187 double-scaling bug.
 #[test]
 fn lab_per_run_amounts_are_not_time_scaled() {
