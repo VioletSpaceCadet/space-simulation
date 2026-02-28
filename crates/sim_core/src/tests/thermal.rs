@@ -225,3 +225,23 @@ fn material_thermal_backward_compat_missing_field() {
         panic!("expected Material variant");
     }
 }
+
+// --- Element thermal properties tests ---
+
+#[test]
+fn element_fe_has_thermal_props() {
+    let content = crate::test_fixtures::base_content();
+    let fe = content.elements.iter().find(|e| e.id == "Fe").unwrap();
+    assert_eq!(fe.melting_point_mk, Some(1_811_000));
+    assert_eq!(fe.latent_heat_j_per_kg, Some(247_000));
+    assert_eq!(fe.specific_heat_j_per_kg_k, Some(449));
+}
+
+#[test]
+fn element_ore_has_no_thermal_props() {
+    let content = crate::test_fixtures::base_content();
+    let ore = content.elements.iter().find(|e| e.id == "ore").unwrap();
+    assert_eq!(ore.melting_point_mk, None);
+    assert_eq!(ore.latent_heat_j_per_kg, None);
+    assert_eq!(ore.specific_heat_j_per_kg_k, None);
+}

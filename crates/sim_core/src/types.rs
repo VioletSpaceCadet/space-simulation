@@ -791,6 +791,15 @@ pub struct ElementDef {
     pub display_name: String,
     #[serde(default)]
     pub refined_name: Option<String>,
+    /// Melting point in milli-Kelvin. `None` for non-thermal elements (ore, slag).
+    #[serde(default)]
+    pub melting_point_mk: Option<u32>,
+    /// Latent heat of fusion in J/kg. `None` for non-thermal elements.
+    #[serde(default)]
+    pub latent_heat_j_per_kg: Option<u32>,
+    /// Specific heat capacity in J/(kg*K). `None` for non-thermal elements.
+    #[serde(default)]
+    pub specific_heat_j_per_kg_k: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
