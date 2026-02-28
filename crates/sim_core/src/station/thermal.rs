@@ -62,7 +62,7 @@ pub(crate) fn tick_thermal(state: &mut GameState, station_id: &StationId, conten
     // Build a map of group_key → total radiator cooling capacity (W), adjusted for wear.
     // Radiators are identified by their ModuleBehaviorDef::Radiator variant.
     let mut radiator_cooling_by_group: BTreeMap<String, f32> = BTreeMap::new();
-    for (module_index, module) in station.modules.iter().enumerate() {
+    for module in &station.modules {
         if !module.enabled {
             continue;
         }
