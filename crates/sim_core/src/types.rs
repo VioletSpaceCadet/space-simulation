@@ -1157,8 +1157,11 @@ fn default_slag_jettison_pct() -> f32 {
     0.75
 }
 
+/// 20 °C in milli-Kelvin — shared default for ambient/sink temperature.
+pub const DEFAULT_AMBIENT_TEMP_MK: u32 = 293_000;
+
 fn default_thermal_sink_temp_mk() -> u32 {
-    293_000
+    DEFAULT_AMBIENT_TEMP_MK
 }
 fn default_thermal_overheat_warning_offset_mk() -> u32 {
     200_000
@@ -1193,7 +1196,7 @@ pub struct ThermalState {
 impl Default for ThermalState {
     fn default() -> Self {
         Self {
-            temp_mk: 293_000, // 20°C ambient
+            temp_mk: DEFAULT_AMBIENT_TEMP_MK,
             thermal_group: None,
         }
     }
@@ -1224,7 +1227,7 @@ pub struct MaterialThermalProps {
 impl Default for MaterialThermalProps {
     fn default() -> Self {
         Self {
-            temp_mk: 293_000, // 20°C ambient
+            temp_mk: DEFAULT_AMBIENT_TEMP_MK,
             phase: Phase::Solid,
             latent_heat_buffer_j: 0,
         }
