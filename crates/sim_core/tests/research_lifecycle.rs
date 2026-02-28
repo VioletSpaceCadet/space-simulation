@@ -63,6 +63,7 @@ fn full_research_lifecycle() {
             }),
             wear: WearState::default(),
             power_stalled: false,
+            thermal: None,
         });
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
@@ -129,6 +130,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
             }),
             wear: WearState::default(),
             power_stalled: false,
+            thermal: None,
         });
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);

@@ -172,6 +172,9 @@ pub struct ModuleState {
     pub enabled: bool,
     pub kind_state: ModuleKindState,
     pub wear: WearState,
+    /// Per-module thermal state. None for non-thermal modules.
+    #[serde(default)]
+    pub thermal: Option<ThermalState>,
     /// Set each tick by power budget computation. Stalled modules skip their tick.
     #[serde(skip, default)]
     pub power_stalled: bool,
@@ -1097,6 +1100,32 @@ impl Default for WearState {
 
 fn default_slag_jettison_pct() -> f32 {
     0.75
+}
+
+// ---------------------------------------------------------------------------
+// Thermal system
+// ---------------------------------------------------------------------------
+
+/// String alias for grouping modules into thermal groups.
+/// Modules in the same group share radiator cooling.
+pub type ThermalGroupId = String;
+
+/// Per-module thermal state, tracked in milli-Kelvin for deterministic integer arithmetic.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ThermalState {
+    /// Temperature in milli-Kelvin (e.g. `293_000` = 20 C ambient).
+    pub temp_mk: u32,
+    /// Which thermal group this module belongs to (shared with `ThermalDef`).
+    pub thermal_group: Option<ThermalGroupId>,
+}
+
+impl Default for ThermalState {
+    fn default() -> Self {
+        Self {
+            temp_mk: 293_000, // 20°C ambient
+            thermal_group: None,
+        }
+    }
 }
 
 #[cfg(test)]

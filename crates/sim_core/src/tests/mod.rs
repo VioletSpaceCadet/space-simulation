@@ -15,6 +15,7 @@ mod power;
 mod refinery;
 mod research;
 mod survey;
+mod thermal;
 mod transit;
 mod wear;
 
@@ -161,6 +162,7 @@ fn state_with_refinery(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        thermal: None,
     });
 
     station.inventory.push(InventoryItem::Ore {
@@ -232,6 +234,7 @@ fn state_with_assembler(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        thermal: None,
     });
 
     station.inventory.push(InventoryItem::Material {
@@ -280,6 +283,7 @@ fn state_with_maintenance(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        thermal: None,
     });
 
     station.inventory.push(InventoryItem::Component {

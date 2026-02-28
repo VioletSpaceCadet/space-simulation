@@ -840,6 +840,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -1003,6 +1004,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
+                thermal: None,
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -1107,6 +1109,7 @@ mod tests {
                     }),
                     wear: crate::WearState { wear: 0.3 },
                     power_stalled: false,
+                    thermal: None,
                 },
                 ModuleState {
                     id: ModuleInstanceId("mod_0002".to_string()),
@@ -1119,6 +1122,7 @@ mod tests {
                     }),
                     wear: crate::WearState { wear: 0.7 },
                     power_stalled: false,
+                    thermal: None,
                 },
             ],
         );
@@ -1174,6 +1178,7 @@ mod tests {
             kind_state: ModuleKindState::Battery(crate::BatteryState { charge_kwh: 50.0 }),
             wear: crate::WearState::default(),
             power_stalled: false,
+            thermal: None,
         });
         state.stations.insert(station.id.clone(), station);
 
