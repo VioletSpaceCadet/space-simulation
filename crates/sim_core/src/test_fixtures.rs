@@ -109,6 +109,12 @@ pub fn base_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
             minutes_per_tick: 1,
+            // Thermal system
+            thermal_sink_temp_mk: 293_000,
+            thermal_overheat_warning_offset_mk: 200_000,
+            thermal_overheat_critical_offset_mk: 500_000,
+            thermal_wear_multiplier_warning: 2.0,
+            thermal_wear_multiplier_critical: 4.0,
             // Derived fields — filled by derive_tick_values()
             survey_scan_ticks: 0,
             deep_scan_ticks: 0,
@@ -187,6 +193,12 @@ pub fn minimal_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
             minutes_per_tick: 1,
+            // Thermal system
+            thermal_sink_temp_mk: 293_000,
+            thermal_overheat_warning_offset_mk: 200_000,
+            thermal_overheat_critical_offset_mk: 500_000,
+            thermal_wear_multiplier_warning: 2.0,
+            thermal_wear_multiplier_critical: 4.0,
             // Derived fields — filled by derive_tick_values()
             survey_scan_ticks: 0,
             deep_scan_ticks: 0,
