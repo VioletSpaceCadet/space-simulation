@@ -9,7 +9,7 @@ function ctx(): AudioContext | null {
 function playBeep(frequency: number, durationMs: number, volume = 0.3, type: OscillatorType = 'square') {
   const ac = ctx();
   if (!ac) {return;}
-  if (ac.state === 'suspended') {ac.resume();}
+  if (ac.state === 'suspended') {void ac.resume();}
   const t = ac.currentTime;
   const dur = durationMs / 1000;
   const osc = ac.createOscillator();
@@ -30,7 +30,7 @@ export function playPause() {
   // Short percussive click — noise burst
   const ac = ctx();
   if (!ac) {return;}
-  if (ac.state === 'suspended') {ac.resume();}
+  if (ac.state === 'suspended') {void ac.resume();}
   const t = ac.currentTime;
   const bufferSize = ac.sampleRate * 0.03;
   const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
