@@ -106,7 +106,8 @@ fn power_priority(behavior: &crate::ModuleBehaviorDef) -> Option<u8> {
         crate::ModuleBehaviorDef::Maintenance(_) => Some(4),
         crate::ModuleBehaviorDef::SolarArray(_)
         | crate::ModuleBehaviorDef::Storage { .. }
-        | crate::ModuleBehaviorDef::Battery(_) => None,
+        | crate::ModuleBehaviorDef::Battery(_)
+        | crate::ModuleBehaviorDef::Radiator(_) => None,
     }
 }
 
@@ -369,7 +370,8 @@ fn extract_context<'a>(
         crate::ModuleBehaviorDef::Maintenance(m) => m.repair_interval_ticks,
         crate::ModuleBehaviorDef::Storage { .. }
         | crate::ModuleBehaviorDef::SolarArray(_)
-        | crate::ModuleBehaviorDef::Battery(_) => return None,
+        | crate::ModuleBehaviorDef::Battery(_)
+        | crate::ModuleBehaviorDef::Radiator(_) => return None,
     };
 
     let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
