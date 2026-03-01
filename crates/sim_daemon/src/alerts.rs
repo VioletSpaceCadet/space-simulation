@@ -127,6 +127,25 @@ const RULES: &[AlertRule] = &[
         message: "Research evidence not accumulating — no scan data flowing",
         suggested_action: "Need more survey and deep scan activity",
     },
+    AlertRule {
+        id: "OVERHEAT_WARNING",
+        severity: sim_core::AlertSeverity::Warning,
+        check: |h, _| {
+            tail(h, 5)
+                .iter()
+                .all(|s| s.overheat_warning_count > 0 || s.overheat_critical_count > 0)
+                && h.len() >= 5
+        },
+        message: "Modules in overheat warning zone for 5+ consecutive samples",
+        suggested_action: "Add radiators, reduce processing rate, or shut down overheating modules",
+    },
+    AlertRule {
+        id: "OVERHEAT_CRITICAL",
+        severity: sim_core::AlertSeverity::Critical,
+        check: |h, _| tail(h, 3).iter().all(|s| s.overheat_critical_count > 0) && h.len() >= 3,
+        message: "Modules in critical overheat zone — auto-disabled and wearing rapidly",
+        suggested_action: "Immediately reduce thermal load or add cooling capacity",
+    },
 ];
 
 // --- Helpers for querying recent snapshots ---
@@ -462,5 +481,140 @@ mod tests {
         assert!(!details[0].message.is_empty());
         assert!(!details[0].suggested_action.is_empty());
         assert_eq!(details[0].severity, "Warning");
+    }
+
+    #[test]
+    fn overheat_warning_fires_after_5_consecutive_samples() {
+        let mut history = VecDeque::new();
+        let mut counters = test_counters();
+        let mut engine = AlertEngine::new(5);
+
+        // 4 samples with warning — should not fire
+        for tick in 1..=4 {
+            let mut snap = empty_snapshot(tick);
+            snap.overheat_warning_count = 1;
+            history.push_back(snap);
+        }
+        let events = engine.evaluate(&history, 4, &mut counters);
+        let raised = events.iter().any(|e| {
+            matches!(&e.event, sim_core::Event::AlertRaised { alert_id, .. } if alert_id == "OVERHEAT_WARNING")
+        });
+        assert!(!raised, "4 samples should not fire OVERHEAT_WARNING");
+
+        // 5th sample — should fire
+        let mut snap5 = empty_snapshot(5);
+        snap5.overheat_warning_count = 1;
+        history.push_back(snap5);
+        let events = engine.evaluate(&history, 5, &mut counters);
+        let raised = events.iter().any(|e| {
+            matches!(&e.event, sim_core::Event::AlertRaised { alert_id, .. } if alert_id == "OVERHEAT_WARNING")
+        });
+        assert!(raised, "5 consecutive samples should fire OVERHEAT_WARNING");
+    }
+
+    #[test]
+    fn overheat_warning_clears_when_resolved() {
+        let mut history = VecDeque::new();
+        let mut counters = test_counters();
+        let mut engine = AlertEngine::new(5);
+
+        // Trigger alert with 5 warning samples
+        for tick in 1..=5 {
+            let mut snap = empty_snapshot(tick);
+            snap.overheat_warning_count = 1;
+            history.push_back(snap);
+        }
+        engine.evaluate(&history, 5, &mut counters);
+        assert!(engine
+            .active_alert_ids()
+            .contains(&"OVERHEAT_WARNING".to_string()));
+
+        // Clear: push a sample with no overheating
+        history.push_back(empty_snapshot(6));
+        let events = engine.evaluate(&history, 6, &mut counters);
+        let cleared = events.iter().any(|e| {
+            matches!(&e.event, sim_core::Event::AlertCleared { alert_id } if alert_id == "OVERHEAT_WARNING")
+        });
+        assert!(cleared, "OVERHEAT_WARNING should clear");
+    }
+
+    #[test]
+    fn overheat_critical_fires_after_3_consecutive_samples() {
+        let mut history = VecDeque::new();
+        let mut counters = test_counters();
+        let mut engine = AlertEngine::new(5);
+
+        // 2 critical samples — should not fire
+        for tick in 1..=2 {
+            let mut snap = empty_snapshot(tick);
+            snap.overheat_critical_count = 1;
+            history.push_back(snap);
+        }
+        let events = engine.evaluate(&history, 2, &mut counters);
+        let raised = events.iter().any(|e| {
+            matches!(&e.event, sim_core::Event::AlertRaised { alert_id, .. } if alert_id == "OVERHEAT_CRITICAL")
+        });
+        assert!(!raised, "2 samples should not fire OVERHEAT_CRITICAL");
+
+        // 3rd sample — should fire
+        let mut snap3 = empty_snapshot(3);
+        snap3.overheat_critical_count = 1;
+        history.push_back(snap3);
+        let events = engine.evaluate(&history, 3, &mut counters);
+        let raised = events.iter().any(|e| {
+            matches!(&e.event, sim_core::Event::AlertRaised { alert_id, .. } if alert_id == "OVERHEAT_CRITICAL")
+        });
+        assert!(
+            raised,
+            "3 consecutive critical samples should fire OVERHEAT_CRITICAL"
+        );
+    }
+
+    #[test]
+    fn overheat_critical_clears_when_resolved() {
+        let mut history = VecDeque::new();
+        let mut counters = test_counters();
+        let mut engine = AlertEngine::new(5);
+
+        // Trigger critical alert
+        for tick in 1..=3 {
+            let mut snap = empty_snapshot(tick);
+            snap.overheat_critical_count = 2;
+            history.push_back(snap);
+        }
+        engine.evaluate(&history, 3, &mut counters);
+        assert!(engine
+            .active_alert_ids()
+            .contains(&"OVERHEAT_CRITICAL".to_string()));
+
+        // Resolve: no critical modules
+        history.push_back(empty_snapshot(4));
+        let events = engine.evaluate(&history, 4, &mut counters);
+        let cleared = events.iter().any(|e| {
+            matches!(&e.event, sim_core::Event::AlertCleared { alert_id } if alert_id == "OVERHEAT_CRITICAL")
+        });
+        assert!(cleared, "OVERHEAT_CRITICAL should clear");
+    }
+
+    #[test]
+    fn overheat_warning_also_fires_for_critical_modules() {
+        let mut history = VecDeque::new();
+        let mut counters = test_counters();
+        let mut engine = AlertEngine::new(5);
+
+        // 5 samples with only critical (no warning count) — should still fire OVERHEAT_WARNING
+        for tick in 1..=5 {
+            let mut snap = empty_snapshot(tick);
+            snap.overheat_critical_count = 1;
+            history.push_back(snap);
+        }
+        let events = engine.evaluate(&history, 5, &mut counters);
+        let warning_raised = events.iter().any(|e| {
+            matches!(&e.event, sim_core::Event::AlertRaised { alert_id, .. } if alert_id == "OVERHEAT_WARNING")
+        });
+        assert!(
+            warning_raised,
+            "OVERHEAT_WARNING should fire for critical modules too"
+        );
     }
 }
