@@ -301,6 +301,8 @@ fn compute_power_budget(
     }
 
     // Apply wear to solar arrays (and any other power infrastructure with wear).
+    // Note: solar arrays use base wear only — no heat multiplier — because they
+    // are power infrastructure ticked outside the module run loop.
     for (module_idx, wear_per_run) in wear_targets {
         apply_wear(state, station_id, module_idx, wear_per_run, events);
     }
@@ -667,6 +669,7 @@ fn apply_run_result(
     state: &mut GameState,
     ctx: &ModuleTickContext,
     outcome: RunOutcome,
+    content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) {
     match outcome {
@@ -675,12 +678,21 @@ fn apply_run_result(
             handle_resume_if_stalled(state, ctx, events);
             // Reset timer
             reset_timer(state, ctx);
-            // Apply wear
+            // Compute heat wear multiplier from overheat zone.
+            let heat_multiplier = state
+                .stations
+                .get(&ctx.station_id)
+                .and_then(|s| s.modules.get(ctx.module_idx))
+                .and_then(|m| m.thermal.as_ref())
+                .map_or(1.0, |t| {
+                    crate::thermal::heat_wear_multiplier(t.overheat_zone, &content.constants)
+                });
+            // Apply wear with heat multiplier.
             apply_wear(
                 state,
                 &ctx.station_id,
                 ctx.module_idx,
-                ctx.wear_per_run,
+                ctx.wear_per_run * heat_multiplier,
                 events,
             );
             // Invalidate volume cache (inventory may have changed)
@@ -931,7 +943,13 @@ mod framework_tests {
         let station_id = StationId("station_test".to_string());
         let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
         let mut events = Vec::new();
-        apply_run_result(&mut state, &ctx, RunOutcome::Completed, &mut events);
+        apply_run_result(
+            &mut state,
+            &ctx,
+            RunOutcome::Completed,
+            &content,
+            &mut events,
+        );
 
         let station = state.stations.get(&station_id).unwrap();
         if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
@@ -961,6 +979,7 @@ mod framework_tests {
             &mut state,
             &ctx,
             RunOutcome::Skipped { reset_timer: false },
+            &content,
             &mut events,
         );
 
@@ -990,6 +1009,7 @@ mod framework_tests {
             &mut state,
             &ctx,
             RunOutcome::Skipped { reset_timer: true },
+            &content,
             &mut events,
         );
 
@@ -1022,6 +1042,7 @@ mod framework_tests {
             &mut state,
             &ctx,
             RunOutcome::Stalled(StallReason::VolumeCap { shortfall_m3: 5.0 }),
+            &content,
             &mut events,
         );
 
@@ -1053,6 +1074,7 @@ mod framework_tests {
             &mut state,
             &ctx,
             RunOutcome::Stalled(StallReason::VolumeCap { shortfall_m3: 5.0 }),
+            &content,
             &mut events,
         );
 
@@ -1076,7 +1098,13 @@ mod framework_tests {
         let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
         let mut events = Vec::new();
 
-        apply_run_result(&mut state, &ctx, RunOutcome::Completed, &mut events);
+        apply_run_result(
+            &mut state,
+            &ctx,
+            RunOutcome::Completed,
+            &content,
+            &mut events,
+        );
 
         let station = state.stations.get(&station_id).unwrap();
         if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
@@ -1085,5 +1113,44 @@ mod framework_tests {
         assert!(events
             .iter()
             .any(|e| matches!(&e.event, Event::ModuleResumed { .. })));
+    }
+
+    #[test]
+    fn apply_run_result_completed_with_overheat_warning_doubles_wear() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 5,
+                stalled: false,
+            }),
+        );
+        // Give the module a thermal state in the Warning zone.
+        let station_id = StationId("station_test".to_string());
+        state.stations.get_mut(&station_id).unwrap().modules[0].thermal = Some(ThermalState {
+            temp_mk: 300_000,
+            thermal_group: None,
+            overheat_zone: crate::OverheatZone::Warning,
+            overheat_disabled: false,
+        });
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        let mut events = Vec::new();
+        apply_run_result(
+            &mut state,
+            &ctx,
+            RunOutcome::Completed,
+            &content,
+            &mut events,
+        );
+
+        let station = state.stations.get(&station_id).unwrap();
+        // wear_per_run = 0.01, warning multiplier = 2.0 → effective wear = 0.02
+        let expected_wear = ctx.wear_per_run * content.constants.thermal_wear_multiplier_warning;
+        assert!(
+            (station.modules[0].wear.wear - expected_wear).abs() < 1e-6,
+            "expected wear {expected_wear}, got {}",
+            station.modules[0].wear.wear,
+        );
     }
 }
