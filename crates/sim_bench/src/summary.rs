@@ -79,6 +79,10 @@ pub fn compute_summary(snapshots: &[(u64, &MetricsSnapshot)]) -> SummaryStats {
             Box::new(|s| f64::from(s.station_max_temp_mk)),
         ),
         (
+            "station_avg_temp_mk",
+            Box::new(|s| f64::from(s.station_avg_temp_mk)),
+        ),
+        (
             "overheat_warning_count",
             Box::new(|s| f64::from(s.overheat_warning_count)),
         ),
@@ -208,6 +212,10 @@ pub fn build_aggregated_metrics(snapshots: &[&MetricsSnapshot]) -> serde_json::V
         (
             "station_max_temp_mk",
             Box::new(|s| f64::from(s.station_max_temp_mk)),
+        ),
+        (
+            "station_avg_temp_mk",
+            Box::new(|s| f64::from(s.station_avg_temp_mk)),
         ),
         (
             "overheat_warning_count",
@@ -409,11 +417,12 @@ mod tests {
             "power_deficit_kw",
             "battery_charge_pct",
             "station_max_temp_mk",
+            "station_avg_temp_mk",
             "overheat_warning_count",
             "overheat_critical_count",
             "heat_wear_multiplier_avg",
         ];
-        assert_eq!(obj.len(), 28);
+        assert_eq!(obj.len(), 29);
         for key in &expected_keys {
             let entry = obj
                 .get(*key)

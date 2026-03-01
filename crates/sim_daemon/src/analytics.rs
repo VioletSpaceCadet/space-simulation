@@ -103,6 +103,11 @@ const TRACKED_METRICS: &[TrackedMetric] = &[
         higher_is_better: false,
     },
     TrackedMetric {
+        name: "station_avg_temp_mk",
+        extract: |s| f64::from(s.station_avg_temp_mk),
+        higher_is_better: false,
+    },
+    TrackedMetric {
         name: "overheat_warning_count",
         extract: |s| f64::from(s.overheat_warning_count),
         higher_is_better: false,
