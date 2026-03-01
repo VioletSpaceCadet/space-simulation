@@ -595,6 +595,7 @@ mod tests {
                         thermal: Some(ThermalState {
                             temp_mk,
                             thermal_group: Some("smelting".to_string()),
+                            ..Default::default()
                         }),
                     }],
                     power: PowerState::default(),

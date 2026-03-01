@@ -709,6 +709,23 @@ pub enum Event {
         current_temp_mk: u32,
         required_temp_mk: u32,
     },
+    OverheatWarning {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        temp_mk: u32,
+        max_temp_mk: u32,
+    },
+    OverheatCritical {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        temp_mk: u32,
+        max_temp_mk: u32,
+    },
+    OverheatCleared {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        temp_mk: u32,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -1218,6 +1235,18 @@ fn default_thermal_wear_multiplier_critical() -> f32 {
 /// Modules in the same group share radiator cooling.
 pub type ThermalGroupId = String;
 
+/// Overheat zone classification for a thermal module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum OverheatZone {
+    /// Below `max_temp_mk` — normal operation.
+    #[default]
+    Nominal,
+    /// Above `max_temp_mk` + warning offset — accelerated wear (2x default).
+    Warning,
+    /// Above `max_temp_mk` + critical offset — auto-stall + accelerated wear (4x default).
+    Critical,
+}
+
 /// Per-module thermal state, tracked in milli-Kelvin for deterministic integer arithmetic.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ThermalState {
@@ -1225,6 +1254,9 @@ pub struct ThermalState {
     pub temp_mk: u32,
     /// Which thermal group this module belongs to (shared with `ThermalDef`).
     pub thermal_group: Option<ThermalGroupId>,
+    /// Current overheat zone — used for transition detection and wear multiplier.
+    #[serde(default)]
+    pub overheat_zone: OverheatZone,
 }
 
 impl Default for ThermalState {
@@ -1232,6 +1264,7 @@ impl Default for ThermalState {
         Self {
             temp_mk: DEFAULT_AMBIENT_TEMP_MK,
             thermal_group: None,
+            overheat_zone: OverheatZone::default(),
         }
     }
 }

@@ -408,6 +408,7 @@ fn smelter_module(temp_mk: u32) -> ModuleState {
         thermal: Some(ThermalState {
             temp_mk,
             thermal_group: Some("default".to_string()),
+            ..Default::default()
         }),
         power_stalled: false,
     }
@@ -423,6 +424,7 @@ fn radiator_module() -> ModuleState {
         thermal: Some(ThermalState {
             temp_mk: 293_000,
             thermal_group: Some("default".to_string()),
+            ..Default::default()
         }),
         power_stalled: false,
     }
