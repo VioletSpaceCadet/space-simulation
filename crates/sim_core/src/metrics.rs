@@ -728,7 +728,7 @@ mod tests {
         assert_eq!(snapshot.station_avg_temp_mk, 0);
         assert_eq!(snapshot.overheat_warning_count, 0);
         assert_eq!(snapshot.overheat_critical_count, 0);
-        assert_eq!(snapshot.heat_wear_multiplier_avg, 0.0);
+        assert!((snapshot.heat_wear_multiplier_avg - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -1420,6 +1420,6 @@ mod tests {
         assert_eq!(snapshot.station_avg_temp_mk, 0);
         assert_eq!(snapshot.overheat_warning_count, 0);
         assert_eq!(snapshot.overheat_critical_count, 0);
-        assert_eq!(snapshot.heat_wear_multiplier_avg, 0.0);
+        assert!((snapshot.heat_wear_multiplier_avg - 0.0).abs() < f32::EPSILON);
     }
 }

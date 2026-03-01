@@ -452,7 +452,7 @@ pub fn state_with_smelter(content: &GameContent) -> GameState {
     let station = state
         .stations
         .get_mut(&StationId("station_earth_orbit".to_string()))
-        .unwrap();
+        .expect("station_earth_orbit missing from base_state");
     station.modules.push(smelter_module(293_000));
     station.inventory = ore_inventory();
     state
@@ -465,7 +465,7 @@ pub fn state_with_smelter_at_temp(content: &GameContent, temp_mk: u32) -> GameSt
     let station = state
         .stations
         .get_mut(&StationId("station_earth_orbit".to_string()))
-        .unwrap();
+        .expect("station_earth_orbit missing from base_state");
     station.modules.push(smelter_module(temp_mk));
     station.inventory = ore_inventory();
     state
@@ -477,7 +477,7 @@ pub fn state_with_radiator(content: &GameContent) -> GameState {
     let station = state
         .stations
         .get_mut(&StationId("station_earth_orbit".to_string()))
-        .unwrap();
+        .expect("station_earth_orbit missing from base_state");
     station.modules.push(radiator_module());
     state
 }
@@ -489,7 +489,7 @@ pub fn state_with_smelter_and_radiators(content: &GameContent) -> GameState {
     let station = state
         .stations
         .get_mut(&StationId("station_earth_orbit".to_string()))
-        .unwrap();
+        .expect("station_earth_orbit missing from base_state");
     station.modules.push(smelter_module(293_000));
     station.modules.push(radiator_module());
     station.modules.push(second_radiator_module());
