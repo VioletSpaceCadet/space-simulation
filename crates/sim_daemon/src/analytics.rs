@@ -112,6 +112,16 @@ const TRACKED_METRICS: &[TrackedMetric] = &[
         extract: |s| f64::from(s.overheat_warning_count),
         higher_is_better: false,
     },
+    TrackedMetric {
+        name: "overheat_critical_count",
+        extract: |s| f64::from(s.overheat_critical_count),
+        higher_is_better: false,
+    },
+    TrackedMetric {
+        name: "heat_wear_multiplier_avg",
+        extract: |s| f64::from(s.heat_wear_multiplier_avg),
+        higher_is_better: false,
+    },
 ];
 
 const SHORT_WINDOW: usize = 10;

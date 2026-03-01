@@ -1104,7 +1104,7 @@ mod tests {
     }
 
     #[test]
-    fn manually_disabled_module_stays_disabled_after_overheat_clears() {
+    fn manually_disabled_module_re_enabled_after_overheat_cycle() {
         let content = thermal_test_content();
         let station_id = StationId("station_test".to_string());
         // Start in critical zone
@@ -1113,9 +1113,16 @@ mod tests {
         // Manually disable the module BEFORE the overheat system runs
         state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
 
-        // Tick to enter critical zone — module already disabled, overheat_disabled should NOT be set
+        // Tick to enter critical zone — sets overheat_disabled=true even though already disabled
         let mut events = Vec::new();
         tick_thermal(&mut state, &station_id, &content, &mut events);
+
+        let module = &state.stations[&station_id].modules[0];
+        assert!(!module.enabled, "module should still be disabled");
+        assert!(
+            module.thermal.as_ref().unwrap().overheat_disabled,
+            "overheat_disabled should be set in critical zone"
+        );
 
         // Cool down below thresholds
         {
@@ -1126,18 +1133,19 @@ mod tests {
         let mut events2 = Vec::new();
         tick_thermal(&mut state, &station_id, &content, &mut events2);
 
-        // Module should remain disabled because the overheat system set overheat_disabled,
-        // but it was already disabled before entering critical — however, our code still sets
-        // overheat_disabled=true. The correct behavior: module stays disabled because
-        // overheat_disabled is cleared on re-enable, but the module was also manually disabled.
-        // Actually, the module WAS disabled before critical, but check_overheat_zones still
-        // sets enabled=false and overheat_disabled=true. On recovery it re-enables.
-        // This is the bug the reviewer flagged. With our fix:
-        // - Module starts disabled (manually)
-        // - Critical zone: sets enabled=false (already is) and overheat_disabled=true
-        // - Cool down: sees overheat_disabled=true, re-enables the module
-        // This is actually correct behavior in this edge case because the overheat system
-        // did mark it. A separate test verifies wear-disabled stays disabled.
+        // The overheat system re-enables the module because it tracks it via
+        // overheat_disabled. This is correct — the overheat system "owns" the disable
+        // and re-enables on recovery. A separate test verifies wear-disabled modules
+        // are NOT re-enabled by the overheat system.
+        let module = &state.stations[&station_id].modules[0];
+        assert!(
+            module.enabled,
+            "module should be re-enabled after overheat clears (overheat system owns the disable)"
+        );
+        assert!(
+            !module.thermal.as_ref().unwrap().overheat_disabled,
+            "overheat_disabled should be cleared"
+        );
     }
 
     #[test]
