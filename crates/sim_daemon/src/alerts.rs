@@ -292,6 +292,11 @@ mod tests {
             power_consumed_kw: 0.0,
             power_deficit_kw: 0.0,
             battery_charge_pct: 0.0,
+            station_max_temp_mk: 0,
+            station_avg_temp_mk: 0,
+            overheat_warning_count: 0,
+            overheat_critical_count: 0,
+            heat_wear_multiplier_avg: 0.0,
         }
     }
 

@@ -97,6 +97,16 @@ const TRACKED_METRICS: &[TrackedMetric] = &[
         extract: |s| f64::from(s.asteroids_discovered),
         higher_is_better: true,
     },
+    TrackedMetric {
+        name: "station_max_temp_mk",
+        extract: |s| f64::from(s.station_max_temp_mk),
+        higher_is_better: false,
+    },
+    TrackedMetric {
+        name: "overheat_warning_count",
+        extract: |s| f64::from(s.overheat_warning_count),
+        higher_is_better: false,
+    },
 ];
 
 const SHORT_WINDOW: usize = 10;
@@ -266,6 +276,11 @@ mod tests {
             power_consumed_kw: 0.0,
             power_deficit_kw: 0.0,
             battery_charge_pct: 0.0,
+            station_max_temp_mk: 0,
+            station_avg_temp_mk: 0,
+            overheat_warning_count: 0,
+            overheat_critical_count: 0,
+            heat_wear_multiplier_avg: 0.0,
         }
     }
 

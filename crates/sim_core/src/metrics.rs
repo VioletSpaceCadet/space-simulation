@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-const METRICS_VERSION: u32 = 5;
+const METRICS_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
@@ -78,6 +78,13 @@ pub struct MetricsSnapshot {
     pub power_consumed_kw: f32,
     pub power_deficit_kw: f32,
     pub battery_charge_pct: f32,
+
+    // Thermal
+    pub station_max_temp_mk: u32,
+    pub station_avg_temp_mk: u32,
+    pub overheat_warning_count: u32,
+    pub overheat_critical_count: u32,
+    pub heat_wear_multiplier_avg: f32,
 }
 
 #[derive(Default)]
@@ -144,7 +151,11 @@ impl InventoryAccumulator {
     }
 }
 
-#[allow(clippy::cast_possible_truncation, clippy::too_many_lines)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::too_many_lines,
+    clippy::cognitive_complexity
+)]
 pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnapshot {
     let mut acc = InventoryAccumulator::new();
 
@@ -169,6 +180,13 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
     let mut power_deficit_kw = 0.0_f32;
     let mut battery_stored_kwh = 0.0_f32;
     let mut battery_capacity_kwh = 0.0_f32;
+
+    let mut thermal_max_temp_mk = 0_u32;
+    let mut thermal_temp_sum = 0_u64;
+    let mut thermal_module_count = 0_u32;
+    let mut overheat_warning_count = 0_u32;
+    let mut overheat_critical_count = 0_u32;
+    let mut heat_wear_multiplier_sum = 0.0_f32;
 
     // --- Stations ---
     for station in state.stations.values() {
@@ -207,6 +225,22 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
                 if module.wear.wear > max_wear {
                     max_wear = module.wear.wear;
                 }
+            }
+
+            // Accumulate thermal metrics for any module with thermal state.
+            if let Some(thermal) = &module.thermal {
+                thermal_module_count += 1;
+                thermal_temp_sum += u64::from(thermal.temp_mk);
+                if thermal.temp_mk > thermal_max_temp_mk {
+                    thermal_max_temp_mk = thermal.temp_mk;
+                }
+                match thermal.overheat_zone {
+                    crate::OverheatZone::Warning => overheat_warning_count += 1,
+                    crate::OverheatZone::Critical => overheat_critical_count += 1,
+                    crate::OverheatZone::Nominal => {}
+                }
+                heat_wear_multiplier_sum +=
+                    crate::thermal::heat_wear_multiplier(thermal.overheat_zone, &content.constants);
             }
 
             if !module.enabled {
@@ -374,6 +408,18 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         0.0
     };
 
+    let station_avg_temp_mk = if thermal_module_count > 0 {
+        (thermal_temp_sum / u64::from(thermal_module_count)) as u32
+    } else {
+        0
+    };
+
+    let heat_wear_multiplier_avg = if thermal_module_count > 0 {
+        heat_wear_multiplier_sum / thermal_module_count as f32
+    } else {
+        0.0
+    };
+
     MetricsSnapshot {
         tick: state.meta.tick,
         metrics_version: METRICS_VERSION,
@@ -414,6 +460,11 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         power_consumed_kw,
         power_deficit_kw,
         battery_charge_pct,
+        station_max_temp_mk: thermal_max_temp_mk,
+        station_avg_temp_mk,
+        overheat_warning_count,
+        overheat_critical_count,
+        heat_wear_multiplier_avg,
     }
 }
 
@@ -433,7 +484,9 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
          techs_unlocked,total_scan_data,max_tech_evidence,\
          avg_module_wear,max_module_wear,repair_kits_remaining,\
          balance,thruster_count,\
-         power_generated_kw,power_consumed_kw,power_deficit_kw,battery_charge_pct"
+         power_generated_kw,power_consumed_kw,power_deficit_kw,battery_charge_pct,\
+         station_max_temp_mk,station_avg_temp_mk,overheat_warning_count,overheat_critical_count,\
+         heat_wear_multiplier_avg"
     )
 }
 
@@ -444,7 +497,7 @@ pub fn append_metrics_row(
 ) -> std::io::Result<()> {
     writeln!(
         writer,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         snapshot.tick,
         snapshot.metrics_version,
         snapshot.total_ore_kg,
@@ -484,6 +537,11 @@ pub fn append_metrics_row(
         snapshot.power_consumed_kw,
         snapshot.power_deficit_kw,
         snapshot.battery_charge_pct,
+        snapshot.station_max_temp_mk,
+        snapshot.station_avg_temp_mk,
+        snapshot.overheat_warning_count,
+        snapshot.overheat_critical_count,
+        snapshot.heat_wear_multiplier_avg,
     )
 }
 
@@ -666,6 +724,11 @@ mod tests {
         assert_eq!(snapshot.power_consumed_kw, 0.0);
         assert_eq!(snapshot.power_deficit_kw, 0.0);
         assert_eq!(snapshot.battery_charge_pct, 0.0);
+        assert_eq!(snapshot.station_max_temp_mk, 0);
+        assert_eq!(snapshot.station_avg_temp_mk, 0);
+        assert_eq!(snapshot.overheat_warning_count, 0);
+        assert_eq!(snapshot.overheat_critical_count, 0);
+        assert_eq!(snapshot.heat_wear_multiplier_avg, 0.0);
     }
 
     #[test]
@@ -1200,5 +1263,163 @@ mod tests {
             "expected ~0.5, got {}",
             snapshot.battery_charge_pct
         );
+    }
+
+    #[test]
+    fn test_thermal_metrics_with_modules() {
+        let mut content = empty_content();
+        content.module_defs.insert(
+            "module_smelter".to_string(),
+            crate::ModuleDef {
+                id: "module_smelter".to_string(),
+                name: "Smelter".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 10.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.01,
+                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_minutes: 60,
+                    processing_interval_ticks: 60,
+                    recipes: vec![],
+                }),
+                thermal: Some(crate::ThermalDef {
+                    heat_capacity_j_per_k: 500.0,
+                    passive_cooling_coefficient: 0.0,
+                    max_temp_mk: 2_000_000,
+                    operating_min_mk: None,
+                    operating_max_mk: None,
+                    thermal_group: None,
+                }),
+            },
+        );
+
+        let mut state = empty_state();
+        let station = make_station(
+            vec![],
+            vec![
+                // Module at 1_800_000 mK (nominal)
+                ModuleState {
+                    id: ModuleInstanceId("smelter_a".to_string()),
+                    def_id: "module_smelter".to_string(),
+                    enabled: true,
+                    kind_state: ModuleKindState::Processor(ProcessorState {
+                        threshold_kg: 100.0,
+                        ticks_since_last_run: 0,
+                        stalled: false,
+                    }),
+                    wear: crate::WearState::default(),
+                    power_stalled: false,
+                    thermal: Some(crate::ThermalState {
+                        temp_mk: 1_800_000,
+                        thermal_group: None,
+                        overheat_zone: crate::OverheatZone::Nominal,
+                        overheat_disabled: false,
+                    }),
+                },
+                // Module at 2_400_000 mK (warning)
+                ModuleState {
+                    id: ModuleInstanceId("smelter_b".to_string()),
+                    def_id: "module_smelter".to_string(),
+                    enabled: true,
+                    kind_state: ModuleKindState::Processor(ProcessorState {
+                        threshold_kg: 100.0,
+                        ticks_since_last_run: 0,
+                        stalled: false,
+                    }),
+                    wear: crate::WearState::default(),
+                    power_stalled: false,
+                    thermal: Some(crate::ThermalState {
+                        temp_mk: 2_400_000,
+                        thermal_group: None,
+                        overheat_zone: crate::OverheatZone::Warning,
+                        overheat_disabled: false,
+                    }),
+                },
+                // Module at 2_800_000 mK (critical)
+                ModuleState {
+                    id: ModuleInstanceId("smelter_c".to_string()),
+                    def_id: "module_smelter".to_string(),
+                    enabled: false,
+                    kind_state: ModuleKindState::Processor(ProcessorState {
+                        threshold_kg: 100.0,
+                        ticks_since_last_run: 0,
+                        stalled: false,
+                    }),
+                    wear: crate::WearState::default(),
+                    power_stalled: false,
+                    thermal: Some(crate::ThermalState {
+                        temp_mk: 2_800_000,
+                        thermal_group: None,
+                        overheat_zone: crate::OverheatZone::Critical,
+                        overheat_disabled: true,
+                    }),
+                },
+            ],
+        );
+        // Need a second station to verify we aggregate across stations
+        state.stations.insert(station.id.clone(), station);
+
+        let snapshot = compute_metrics(&state, &content);
+
+        assert_eq!(snapshot.station_max_temp_mk, 2_800_000);
+        // avg = (1_800_000 + 2_400_000 + 2_800_000) / 3 = 2_333_333
+        assert_eq!(snapshot.station_avg_temp_mk, 2_333_333);
+        assert_eq!(snapshot.overheat_warning_count, 1);
+        assert_eq!(snapshot.overheat_critical_count, 1);
+        // Multipliers: nominal=1.0, warning=2.0, critical=4.0 → avg=(1+2+4)/3=2.333...
+        assert!(
+            (snapshot.heat_wear_multiplier_avg - 7.0 / 3.0).abs() < 1e-5,
+            "expected ~2.333, got {}",
+            snapshot.heat_wear_multiplier_avg,
+        );
+    }
+
+    #[test]
+    fn test_thermal_metrics_no_thermal_modules() {
+        let mut content = empty_content();
+        content.module_defs.insert(
+            "module_basic_iron_refinery".to_string(),
+            crate::ModuleDef {
+                id: "module_basic_iron_refinery".to_string(),
+                name: "Basic Iron Refinery".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 10.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.01,
+                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_minutes: 60,
+                    processing_interval_ticks: 60,
+                    recipes: vec![],
+                }),
+                thermal: None,
+            },
+        );
+
+        let mut state = empty_state();
+        let station = make_station(
+            vec![],
+            vec![ModuleState {
+                id: ModuleInstanceId("refinery_a".to_string()),
+                def_id: "module_basic_iron_refinery".to_string(),
+                enabled: true,
+                kind_state: ModuleKindState::Processor(ProcessorState {
+                    threshold_kg: 100.0,
+                    ticks_since_last_run: 0,
+                    stalled: false,
+                }),
+                wear: crate::WearState::default(),
+                power_stalled: false,
+                thermal: None,
+            }],
+        );
+        state.stations.insert(station.id.clone(), station);
+
+        let snapshot = compute_metrics(&state, &content);
+
+        assert_eq!(snapshot.station_max_temp_mk, 0);
+        assert_eq!(snapshot.station_avg_temp_mk, 0);
+        assert_eq!(snapshot.overheat_warning_count, 0);
+        assert_eq!(snapshot.overheat_critical_count, 0);
+        assert_eq!(snapshot.heat_wear_multiplier_avg, 0.0);
     }
 }
