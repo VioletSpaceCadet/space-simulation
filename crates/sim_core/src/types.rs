@@ -1257,6 +1257,10 @@ pub struct ThermalState {
     /// Current overheat zone — used for transition detection and wear multiplier.
     #[serde(default)]
     pub overheat_zone: OverheatZone,
+    /// Whether this module was auto-disabled by the overheat system.
+    /// Used to distinguish overheat-disabled from player-disabled or wear-disabled.
+    #[serde(default)]
+    pub overheat_disabled: bool,
 }
 
 impl Default for ThermalState {
@@ -1265,6 +1269,7 @@ impl Default for ThermalState {
             temp_mk: DEFAULT_AMBIENT_TEMP_MK,
             thermal_group: None,
             overheat_zone: OverheatZone::default(),
+            overheat_disabled: false,
         }
     }
 }
