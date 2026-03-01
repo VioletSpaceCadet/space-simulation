@@ -1143,9 +1143,8 @@ fn smelter_recipe_has_thermal_requirement() {
         .get("module_basic_smelter")
         .expect("module_basic_smelter must exist");
 
-    let processor = match &smelter.behavior {
-        ModuleBehaviorDef::Processor(p) => p,
-        _ => panic!("smelter must be a Processor"),
+    let ModuleBehaviorDef::Processor(processor) = &smelter.behavior else {
+        panic!("smelter must be a Processor")
     };
 
     assert!(!processor.recipes.is_empty(), "smelter must have recipes");
@@ -1181,7 +1180,7 @@ fn smelter_processes_less_ore_than_cold_refinery() {
     let smelter_input_kg = match &smelter.behavior {
         ModuleBehaviorDef::Processor(p) => match &p.recipes[0].inputs[0].amount {
             sim_core::InputAmount::Kg(kg) => *kg,
-            _ => panic!("expected Kg input"),
+            sim_core::InputAmount::Count(_) => panic!("expected Kg input"),
         },
         _ => panic!("expected Processor"),
     };
@@ -1189,7 +1188,7 @@ fn smelter_processes_less_ore_than_cold_refinery() {
     let refinery_input_kg = match &refinery.behavior {
         ModuleBehaviorDef::Processor(p) => match &p.recipes[0].inputs[0].amount {
             sim_core::InputAmount::Kg(kg) => *kg,
-            _ => panic!("expected Kg input"),
+            sim_core::InputAmount::Count(_) => panic!("expected Kg input"),
         },
         _ => panic!("expected Processor"),
     };
@@ -1210,18 +1209,17 @@ fn radiator_module_exists_with_correct_properties() {
         .get("module_basic_radiator")
         .expect("module_basic_radiator must exist");
 
-    let radiator_def = match &radiator.behavior {
-        ModuleBehaviorDef::Radiator(r) => r,
-        _ => panic!("radiator must be a Radiator behavior"),
+    let ModuleBehaviorDef::Radiator(radiator_def) = &radiator.behavior else {
+        panic!("radiator must be a Radiator behavior")
     };
 
     assert!(
         radiator_def.cooling_capacity_w > 0.0,
         "cooling capacity must be positive"
     );
-    assert_eq!(radiator_def.cooling_capacity_w, 500.0);
-    assert_eq!(
-        radiator.power_consumption_per_run, 0.0,
+    assert!((radiator_def.cooling_capacity_w - 500.0).abs() < f32::EPSILON);
+    assert!(
+        radiator.power_consumption_per_run.abs() < f32::EPSILON,
         "radiator is passive"
     );
 

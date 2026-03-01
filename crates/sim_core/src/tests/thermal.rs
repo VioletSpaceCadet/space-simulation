@@ -26,6 +26,7 @@ fn thermal_state_some_round_trip() {
     let thermal = ThermalState {
         temp_mk: 1_800_000,
         thermal_group: Some("smelting".to_string()),
+        ..Default::default()
     };
     let module = ModuleState {
         id: ModuleInstanceId("mod_test".to_string()),

@@ -314,6 +314,26 @@ export const eventSchemas = {
     current_temp_mk: z.number(),
     required_temp_mk: z.number(),
   }),
+
+  OverheatWarning: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+    temp_mk: z.number(),
+    max_temp_mk: z.number(),
+  }),
+
+  OverheatCritical: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+    temp_mk: z.number(),
+    max_temp_mk: z.number(),
+  }),
+
+  OverheatCleared: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+    temp_mk: z.number(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

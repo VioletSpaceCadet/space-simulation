@@ -27,7 +27,7 @@ pub(super) fn tick_maintenance_modules(
         }
 
         let outcome = execute(&ctx, state, events);
-        super::apply_run_result(state, &ctx, outcome, events);
+        super::apply_run_result(state, &ctx, outcome, content, events);
     }
 }
 

@@ -106,12 +106,24 @@ fn apply_module_override(
                 }
                 matched = true;
             }
+            _ if behavior_type == "thermal" => {
+                // Apply to the ThermalDef of ANY module that has one.
+                if let Some(ref mut thermal_def) = module_def.thermal {
+                    match field {
+                        "heat_capacity_j_per_k" => thermal_def.heat_capacity_j_per_k = as_f32(full_key, value)?,
+                        "passive_cooling_coefficient" => thermal_def.passive_cooling_coefficient = as_f32(full_key, value)?,
+                        "max_temp_mk" => thermal_def.max_temp_mk = as_u32(full_key, value)?,
+                        _ => bail!("unknown thermal field '{field}' in override key '{full_key}'. Valid fields: heat_capacity_j_per_k, passive_cooling_coefficient, max_temp_mk"),
+                    }
+                    matched = true;
+                }
+            }
             _ => {}
         }
     }
 
     if !matched {
-        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance, sensor_array, solar_array, battery, radiator");
+        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance, sensor_array, solar_array, battery, radiator, thermal");
     }
 
     Ok(())
@@ -174,6 +186,21 @@ fn apply_constant_override(
         }
         "minutes_per_tick" => {
             constants.minutes_per_tick = as_u32(key, value)?;
+        }
+        "thermal_sink_temp_mk" => {
+            constants.thermal_sink_temp_mk = as_u32(key, value)?;
+        }
+        "thermal_overheat_warning_offset_mk" => {
+            constants.thermal_overheat_warning_offset_mk = as_u32(key, value)?;
+        }
+        "thermal_overheat_critical_offset_mk" => {
+            constants.thermal_overheat_critical_offset_mk = as_u32(key, value)?;
+        }
+        "thermal_wear_multiplier_warning" => {
+            constants.thermal_wear_multiplier_warning = as_f32(key, value)?;
+        }
+        "thermal_wear_multiplier_critical" => {
+            constants.thermal_wear_multiplier_critical = as_f32(key, value)?;
         }
         _ => bail!(
             "unknown override key '{key}'. Constant keys or module.<type>.<field> keys are supported."
@@ -443,6 +470,106 @@ mod tests {
         let overrides = HashMap::from([("minutes_per_tick".to_string(), serde_json::json!(1))]);
         apply_overrides(&mut content, &overrides).unwrap();
         assert_eq!(content.constants.minutes_per_tick, 1);
+    }
+
+    #[test]
+    fn test_thermal_constant_overrides() {
+        let mut content = test_content();
+        let overrides = HashMap::from([
+            (
+                "thermal_sink_temp_mk".to_string(),
+                serde_json::json!(200_000),
+            ),
+            (
+                "thermal_overheat_warning_offset_mk".to_string(),
+                serde_json::json!(100_000),
+            ),
+            (
+                "thermal_overheat_critical_offset_mk".to_string(),
+                serde_json::json!(300_000),
+            ),
+            (
+                "thermal_wear_multiplier_warning".to_string(),
+                serde_json::json!(3.0),
+            ),
+            (
+                "thermal_wear_multiplier_critical".to_string(),
+                serde_json::json!(6.0),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        assert_eq!(content.constants.thermal_sink_temp_mk, 200_000);
+        assert_eq!(
+            content.constants.thermal_overheat_warning_offset_mk,
+            100_000
+        );
+        assert_eq!(
+            content.constants.thermal_overheat_critical_offset_mk,
+            300_000
+        );
+        assert!((content.constants.thermal_wear_multiplier_warning - 3.0).abs() < f32::EPSILON);
+        assert!((content.constants.thermal_wear_multiplier_critical - 6.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_module_thermal_override() {
+        let mut content = test_content();
+        let overrides = HashMap::from([
+            (
+                "module.thermal.heat_capacity_j_per_k".to_string(),
+                serde_json::json!(1000.0),
+            ),
+            (
+                "module.thermal.passive_cooling_coefficient".to_string(),
+                serde_json::json!(5.0),
+            ),
+            (
+                "module.thermal.max_temp_mk".to_string(),
+                serde_json::json!(3_000_000),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        // Verify all modules with thermal defs got updated
+        let thermal_modules: Vec<_> = content
+            .module_defs
+            .values()
+            .filter(|m| m.thermal.is_some())
+            .collect();
+        assert!(
+            !thermal_modules.is_empty(),
+            "should have at least one thermal module"
+        );
+        for module_def in &thermal_modules {
+            let thermal = module_def.thermal.as_ref().unwrap();
+            assert!(
+                (thermal.heat_capacity_j_per_k - 1000.0).abs() < f32::EPSILON,
+                "heat_capacity should be 1000.0, got {}",
+                thermal.heat_capacity_j_per_k,
+            );
+            assert!(
+                (thermal.passive_cooling_coefficient - 5.0).abs() < f32::EPSILON,
+                "passive_cooling should be 5.0, got {}",
+                thermal.passive_cooling_coefficient,
+            );
+            assert_eq!(thermal.max_temp_mk, 3_000_000);
+        }
+    }
+
+    #[test]
+    fn test_module_thermal_unknown_field_errors() {
+        let mut content = test_content();
+        let overrides = HashMap::from([(
+            "module.thermal.nonexistent_field".to_string(),
+            serde_json::json!(10.0),
+        )]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("nonexistent_field"));
     }
 
     #[test]
