@@ -3,6 +3,7 @@ mod lab;
 mod maintenance;
 mod processor;
 mod sensor;
+pub(crate) mod thermal;
 
 use crate::{
     tasks::element_density, Event, EventEnvelope, GameContent, GameState, InputFilter,
@@ -89,6 +90,7 @@ pub(crate) fn tick_stations(
         sensor::tick_sensor_array_modules(state, station_id, content, events);
         lab::tick_lab_modules(state, station_id, content, events);
         maintenance::tick_maintenance_modules(state, station_id, content, events);
+        thermal::tick_thermal(state, station_id, content);
     }
 }
 
@@ -104,7 +106,8 @@ fn power_priority(behavior: &crate::ModuleBehaviorDef) -> Option<u8> {
         crate::ModuleBehaviorDef::Maintenance(_) => Some(4),
         crate::ModuleBehaviorDef::SolarArray(_)
         | crate::ModuleBehaviorDef::Storage { .. }
-        | crate::ModuleBehaviorDef::Battery(_) => None,
+        | crate::ModuleBehaviorDef::Battery(_)
+        | crate::ModuleBehaviorDef::Radiator(_) => None,
     }
 }
 
@@ -318,9 +321,15 @@ pub(crate) struct ModuleTickContext<'a> {
 /// Reason a module stalled (distinct from "skipped").
 #[derive(Debug)]
 pub(crate) enum StallReason {
-    VolumeCap { shortfall_m3: f32 },
+    VolumeCap {
+        shortfall_m3: f32,
+    },
     StockCap,
     DataStarved,
+    TooCold {
+        current_temp_mk: u32,
+        required_temp_mk: u32,
+    },
 }
 
 /// Outcome of a module's `execute()` call.
@@ -361,7 +370,8 @@ fn extract_context<'a>(
         crate::ModuleBehaviorDef::Maintenance(m) => m.repair_interval_ticks,
         crate::ModuleBehaviorDef::Storage { .. }
         | crate::ModuleBehaviorDef::SolarArray(_)
-        | crate::ModuleBehaviorDef::Battery(_) => return None,
+        | crate::ModuleBehaviorDef::Battery(_)
+        | crate::ModuleBehaviorDef::Radiator(_) => return None,
     };
 
     let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
@@ -530,6 +540,16 @@ fn handle_stall_transition(
                 }
                 !was_starved
             }
+            StallReason::TooCold { .. } => {
+                let was_stalled = match &module.kind_state {
+                    crate::ModuleKindState::Processor(s) => s.stalled,
+                    _ => false,
+                };
+                if let crate::ModuleKindState::Processor(s) = &mut module.kind_state {
+                    s.stalled = true;
+                }
+                !was_stalled
+            }
         }
     };
 
@@ -548,6 +568,15 @@ fn handle_stall_transition(
             StallReason::DataStarved => Event::LabStarved {
                 station_id: ctx.station_id.clone(),
                 module_id: ctx.module_id.clone(),
+            },
+            StallReason::TooCold {
+                current_temp_mk,
+                required_temp_mk,
+            } => Event::ProcessorTooCold {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+                current_temp_mk: *current_temp_mk,
+                required_temp_mk: *required_temp_mk,
             },
         };
         events.push(crate::emit(&mut state.counters, current_tick, event));

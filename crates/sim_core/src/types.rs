@@ -193,6 +193,7 @@ pub enum ModuleKindState {
     SensorArray(SensorArrayState),
     SolarArray(SolarArrayState),
     Battery(BatteryState),
+    Radiator(RadiatorState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -210,6 +211,9 @@ pub struct BatteryState {
     /// Current stored energy in kWh.
     pub charge_kwh: f32,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RadiatorState {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessorState {
@@ -488,6 +492,7 @@ pub enum BehaviorType {
     SensorArray,
     SolarArray,
     Battery,
+    Radiator,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -698,6 +703,12 @@ pub enum Event {
         station_id: StationId,
         power: PowerState,
     },
+    ProcessorTooCold {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        current_temp_mk: u32,
+        required_temp_mk: u32,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -810,8 +821,8 @@ pub struct ElementDef {
 pub struct ThermalDef {
     /// Heat capacity in J/K. Higher values mean slower temperature changes.
     pub heat_capacity_j_per_k: f32,
-    /// Passive cooling coefficient (0.0–1.0). Fraction of temp delta above sink
-    /// dissipated per tick without a radiator.
+    /// Passive cooling coefficient (W/K). Scales heat loss via Newton's law of
+    /// cooling: `Q_loss = coeff * dt_s * (T - T_sink) / 1000`.
     pub passive_cooling_coefficient: f32,
     /// Maximum safe temperature in milli-Kelvin before overheat consequences.
     pub max_temp_mk: u32,
@@ -851,6 +862,7 @@ pub enum ModuleBehaviorDef {
     SensorArray(SensorArrayDef),
     SolarArray(SolarArrayDef),
     Battery(BatteryDef),
+    Radiator(RadiatorDef),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -911,11 +923,31 @@ pub struct BatteryDef {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RadiatorDef {
+    /// Maximum cooling capacity in Watts.
+    pub cooling_capacity_w: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessorDef {
     pub processing_interval_minutes: u64,
     #[serde(skip_deserializing, default)]
     pub processing_interval_ticks: u64,
     pub recipes: Vec<RecipeDef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RecipeThermalReq {
+    /// Below this temperature the processor stalls (`TooCold`).
+    pub min_temp_mk: u32,
+    /// Between `min_temp_mk` and `optimal_min_mk`: efficiency ramps 80%→100%.
+    pub optimal_min_mk: u32,
+    /// Between `optimal_min_mk` and `optimal_max_mk`: 100% efficiency, 100% quality.
+    pub optimal_max_mk: u32,
+    /// Between `optimal_max_mk` and `max_temp_mk`: quality degrades 100%→60%.
+    pub max_temp_mk: u32,
+    /// Heat generated (positive = exothermic) or absorbed (negative = endothermic) per run, in Joules.
+    pub heat_per_run_j: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -924,6 +956,8 @@ pub struct RecipeDef {
     pub inputs: Vec<RecipeInput>,
     pub outputs: Vec<OutputSpec>,
     pub efficiency: f32,
+    #[serde(default)]
+    pub thermal_req: Option<RecipeThermalReq>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -307,6 +307,13 @@ export const eventSchemas = {
     station_id: z.string(),
     amount: z.number(),
   }),
+
+  ProcessorTooCold: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+    current_temp_mk: z.number(),
+    required_temp_mk: z.number(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

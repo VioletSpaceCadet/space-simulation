@@ -158,6 +158,10 @@ fn apply_commands(
                             }),
                             crate::BehaviorType::Battery,
                         ),
+                        crate::ModuleBehaviorDef::Radiator(_) => (
+                            crate::ModuleKindState::Radiator(crate::RadiatorState::default()),
+                            crate::BehaviorType::Radiator,
+                        ),
                     },
                     None => continue,
                 };
