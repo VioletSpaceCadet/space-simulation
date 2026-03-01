@@ -301,6 +301,8 @@ fn compute_power_budget(
     }
 
     // Apply wear to solar arrays (and any other power infrastructure with wear).
+    // Note: solar arrays use base wear only — no heat multiplier — because they
+    // are power infrastructure ticked outside the module run loop.
     for (module_idx, wear_per_run) in wear_targets {
         apply_wear(state, station_id, module_idx, wear_per_run, events);
     }
@@ -1111,5 +1113,44 @@ mod framework_tests {
         assert!(events
             .iter()
             .any(|e| matches!(&e.event, Event::ModuleResumed { .. })));
+    }
+
+    #[test]
+    fn apply_run_result_completed_with_overheat_warning_doubles_wear() {
+        let content = test_content_with_processor();
+        let mut state = test_state_with_module(
+            &content,
+            ModuleKindState::Processor(ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 5,
+                stalled: false,
+            }),
+        );
+        // Give the module a thermal state in the Warning zone.
+        let station_id = StationId("station_test".to_string());
+        state.stations.get_mut(&station_id).unwrap().modules[0].thermal = Some(ThermalState {
+            temp_mk: 300_000,
+            thermal_group: None,
+            overheat_zone: crate::OverheatZone::Warning,
+            overheat_disabled: false,
+        });
+        let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
+        let mut events = Vec::new();
+        apply_run_result(
+            &mut state,
+            &ctx,
+            RunOutcome::Completed,
+            &content,
+            &mut events,
+        );
+
+        let station = state.stations.get(&station_id).unwrap();
+        // wear_per_run = 0.01, warning multiplier = 2.0 → effective wear = 0.02
+        let expected_wear = ctx.wear_per_run * content.constants.thermal_wear_multiplier_warning;
+        assert!(
+            (station.modules[0].wear.wear - expected_wear).abs() < 1e-6,
+            "expected wear {expected_wear}, got {}",
+            station.modules[0].wear.wear,
+        );
     }
 }
