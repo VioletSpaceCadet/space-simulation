@@ -123,7 +123,7 @@ fn apply_module_override(
     }
 
     if !matched {
-        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance, sensor_array, solar_array, battery, radiator");
+        bail!("no modules matched behavior type '{behavior_type}' for override key '{full_key}'. Valid types: processor, assembler, lab, maintenance, sensor_array, solar_array, battery, radiator, thermal");
     }
 
     Ok(())
@@ -521,6 +521,10 @@ mod tests {
                 serde_json::json!(1000.0),
             ),
             (
+                "module.thermal.passive_cooling_coefficient".to_string(),
+                serde_json::json!(5.0),
+            ),
+            (
                 "module.thermal.max_temp_mk".to_string(),
                 serde_json::json!(3_000_000),
             ),
@@ -543,6 +547,11 @@ mod tests {
                 (thermal.heat_capacity_j_per_k - 1000.0).abs() < f32::EPSILON,
                 "heat_capacity should be 1000.0, got {}",
                 thermal.heat_capacity_j_per_k,
+            );
+            assert!(
+                (thermal.passive_cooling_coefficient - 5.0).abs() < f32::EPSILON,
+                "passive_cooling should be 5.0, got {}",
+                thermal.passive_cooling_coefficient,
             );
             assert_eq!(thermal.max_temp_mk, 3_000_000);
         }
