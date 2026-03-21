@@ -72,35 +72,42 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 
 Issues tracked in Linear (VioletSpaceCadet workspace, MCP integration configured). Create issues for bugs, features, balance recommendations. Organize into projects, set blocking relationships.
 
-### Feature Development (Multi-Ticket Projects)
+### Default: Single-Ticket Workflow (`/implement`)
 
-Use the `/project-implementation <project>` command to run the full workflow end-to-end. It reads Linear tickets, creates branches, implements code, dispatches the pr-reviewer agent, merges ticket PRs, and delivers a final PR for owner approval. See `.claude/commands/project-implementation.md` for the full process.
+Use `/implement <ticket-id>` for most work. Autonomous end-to-end: read ticket → branch from main → implement → PR → CI → pr-reviewer → fix → compound (if non-trivial) → merge into main.
 
-Manual summary of the branching model:
+Claude **auto-merges into main** after CI green + pr-reviewer clean (no unresolved should-fix items). No owner approval needed for ticket PRs that pass review.
 
-1. **Create a feature branch** from main: `feat/<project-name>`
-2. **Each ticket gets its own branch** off the feature branch: `feat/<project>/<ticket-id>-<short-name>`
-3. **PR per ticket into the feature branch** — pr-reviewer agent reviews, Claude auto-merges after CI + clean review (squash merge)
-4. **Final PR from feature branch into main** — merge main into feature branch first to resolve conflicts, then requires owner (@VioletSpaceCadet) approval
-5. **Clean up** — delete feature branch and sub-branches after merge
+See `.claude/commands/implement.md` for the full process.
 
-### Small Changes (Single-Ticket)
+### Large Projects: Multi-Ticket Workflow (`/project-implementation`)
 
-Branch from main (`fix/<ticket-id>-<short-name>` or `chore/<short-name>`), PR directly into main, owner approval required.
+Use `/project-implementation <project>` for 5+ tightly coupled tickets that need to land atomically. Uses an intermediate feature branch:
+
+1. **Feature branch** from main: `feat/<project-name>`
+2. **Ticket branches** off feature branch → PR per ticket into feature branch (Claude auto-merges)
+3. **Final PR** from feature branch into main → requires owner (@VioletSpaceCadet) approval
+
+See `.claude/commands/project-implementation.md` for the full process.
 
 ### Pull Request Workflow
 
 **Branch protection on `main`:** Direct pushes blocked, required CI checks ("Rust", "Web", "Bench smoke"), CODEOWNERS review required, stale reviews dismissed.
 
-**PR reviews use the `pr-reviewer` agent** (`.claude/agents/pr-reviewer`). Dispatch it via the Task tool after CI passes. It handles the full review: reads the diff, checks for issues, and posts a review comment on the PR.
+**PR reviews use the `pr-reviewer` agent** (`.claude/agents/pr-reviewer`). Dispatch it via the Agent tool after CI passes. It handles the full review: reads the diff, checks for issues, and posts a review comment on the PR.
 
 **Creating a PR:** Push branch, `gh pr create`. Include Summary + Test plan. Use `--base feat/project-name` when targeting a feature branch.
 
-**Two merge paths:**
-- **PR into feature branch:** Claude auto-merges after CI green + pr-reviewer clean (`gh pr merge --squash`)
-- **PR into main:** pr-reviewer reviews but Claude NEVER merges — owner must approve and merge
+**Merge policy:**
+- **Ticket PR into main (via `/implement`):** Claude auto-merges after CI green + pr-reviewer clean (`gh pr merge --squash --delete-branch`)
+- **Ticket PR into feature branch:** Claude auto-merges after CI green + pr-reviewer clean
+- **Feature branch PR into main:** Owner must approve and merge
 
 **NEVER push directly to main.**
+
+### Knowledge Capture (`ce:compound`)
+
+After implementing a ticket that involved debugging, new patterns, or tricky solutions, run `ce:compound` to document the learning in `docs/solutions/`. Skip for routine/simple changes. The `/implement` command does this automatically.
 
 ## After Every Change
 
@@ -113,8 +120,9 @@ Tests run automatically via PostToolUse hook (`.claude/hooks/after-edit.sh`) on 
 
 **Always squash merge. Never push directly to main.**
 
-- **Ticket PR into feature branch:** CI pass → pr-reviewer agent → Claude runs `gh pr merge --squash`
-- **PR into main:** CI pass → pr-reviewer agent → Owner approves and squash merges
+- **Ticket PR into main (via `/implement`):** CI pass → pr-reviewer clean → Claude runs `gh pr merge --squash --delete-branch`
+- **Ticket PR into feature branch:** CI pass → pr-reviewer clean → Claude runs `gh pr merge --squash`
+- **Feature branch PR into main:** CI pass → pr-reviewer reviews → Owner approves and squash merges
 
 ## Simulation Testing & Balance Analysis
 
