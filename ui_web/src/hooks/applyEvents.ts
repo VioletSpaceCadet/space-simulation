@@ -495,7 +495,14 @@ function handleTechUnlocked(state: SimState, event: EventPayload<'TechUnlocked'>
 function handleScanSiteSpawned(state: SimState, event: EventPayload<'ScanSiteSpawned'>): SimState {
   return {
     ...state,
-    scanSites: [...state.scanSites, { id: event.site_id, position: { parent_body: event.parent_body, radius_au_um: 0, angle_mdeg: 0 }, template_id: event.template_id }],
+    scanSites: [
+      ...state.scanSites,
+      {
+        id: event.site_id,
+        position: { parent_body: event.parent_body, radius_au_um: 0, angle_mdeg: 0 },
+        template_id: event.template_id,
+      },
+    ],
   };
 }
 
