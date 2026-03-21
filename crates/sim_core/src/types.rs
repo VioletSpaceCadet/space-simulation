@@ -796,7 +796,13 @@ pub enum TechEffect {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SolarSystemDef {
+    /// Hierarchical body tree — the source of truth for spatial layout.
+    pub bodies: Vec<OrbitalBodyDef>,
+    /// Legacy node list — kept for backward compat until graph pathfinding is replaced.
+    #[serde(default)]
     pub nodes: Vec<NodeDef>,
+    /// Legacy edge list — kept for backward compat until graph pathfinding is replaced.
+    #[serde(default)]
     pub edges: Vec<(NodeId, NodeId)>,
 }
 
@@ -810,6 +816,38 @@ pub struct NodeDef {
 
 fn default_solar_intensity() -> f32 {
     1.0
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BodyType {
+    Star,
+    Planet,
+    Moon,
+    Belt,
+    Zone,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZoneDef {
+    pub radius_min_au_um: u64,
+    pub radius_max_au_um: u64,
+    pub angle_start_mdeg: u32,
+    pub angle_span_mdeg: u32,
+    pub resource_class: crate::spatial::ResourceClass,
+    pub scan_site_weight: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrbitalBodyDef {
+    pub id: BodyId,
+    pub name: String,
+    pub parent: Option<BodyId>,
+    pub body_type: BodyType,
+    pub radius_au_um: u64,
+    pub angle_mdeg: u32,
+    #[serde(default = "default_solar_intensity")]
+    pub solar_intensity: f32,
+    pub zone: Option<ZoneDef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
