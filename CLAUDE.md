@@ -147,3 +147,4 @@ See `.claude/skills/README.md` for how to add or edit skills.
 - Mutation testing with `cargo-mutants`
 - **`cargo` is on PATH.** Never prefix with `PATH=`, `export PATH=`, or `~/.cargo/bin/`. Just use `cargo test`, `cargo build`, etc. For worktrees use `--manifest-path`. The PreToolUse hook (`check-bash.sh`) enforces this.
 - **For `gh pr` bodies**, use `--body-file /tmp/pr-body.md` instead of inline `--body`. Claude Code blocks `$()`, `${}`, and quoted flag-like strings in inline text.
+- **For multi-line Python**, write to `/tmp/script.py` with the Write tool, then run `python3 /tmp/script.py`. Never use `python3 -c` with multi-line strings — Claude Code blocks commands with quoted newlines followed by `#` comments.
