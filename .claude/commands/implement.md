@@ -14,6 +14,8 @@ Argument: $ARGUMENTS (Linear ticket identifier like VIO-123, or a brief descript
 4. **Load relevant skills** — scan `.claude/skills/` and match the task against skill triggers. Load matching skills and follow their checklists.
 5. **Update Linear ticket status** to "In Progress" using `save_issue`.
 
+6. **For ambiguous tickets** — if the ticket lacks clear acceptance criteria, is tagged "needs design", or the scope is unclear, run `ce:brainstorm` to clarify requirements before implementation.
+
 ## Phase 2: Branch & Plan
 
 1. **Create a branch** from main:
@@ -55,13 +57,14 @@ If the ticket involves UI changes (components, panels, layout, styling):
 2. **Watch CI**: `gh pr checks <PR_NUMBER> --watch`
    - If CI fails: read failed logs with `gh run view <RUN_ID> --log-failed`, fix, push, watch again.
 
-3. **Dispatch the pr-reviewer agent** using the Agent tool (subagent_type: "pr-reviewer"). Wait for the review.
+3. **Dispatch review agents:**
+   - **All PRs:** Dispatch the `pr-reviewer` agent (subagent_type: "pr-reviewer").
+   - **Non-trivial PRs** (multi-file, new systems, 200+ lines): Also run `ce:review` for deeper multi-agent analysis.
+   - **UI tickets:** Also dispatch `design-implementation-reviewer` (subagent_type: `compound-engineering:design:design-implementation-reviewer`) for visual quality review.
 
-4. **For UI tickets: dispatch the design-implementation-reviewer** (subagent_type: `compound-engineering:design:design-implementation-reviewer`) in parallel with or after the pr-reviewer. It compares the live UI against expected design quality and flags visual issues (spacing, contrast, hierarchy, responsiveness).
+4. **Fix review findings** — fix should-fix items from all reviewers. Commit, push, and re-run CI. Do not ask for confirmation — just fix and push.
 
-5. **Fix review findings** — fix should-fix items from both code review and design review. Commit, push, and re-run CI. Do not ask for confirmation — just fix and push (per memory: "After review: fix, commit, and push without asking").
-
-6. **Re-review if needed** — if reviewers found Important or Critical issues, dispatch them again after fixes. Repeat until clean.
+5. **Re-review if needed** — if reviewers found Important or Critical issues, dispatch them again after fixes. Repeat until clean.
 
 ## Phase 5: Compound (auto for non-trivial)
 
