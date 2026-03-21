@@ -162,7 +162,7 @@ describe('SolarSystemMap', () => {
     );
     await waitFor(() => {
       const paths = container.querySelectorAll('path[fill-rule="evenodd"]');
-      expect(paths.length).toBeGreaterThanOrEqual(1);
+      expect(paths.length).toBe(1);
     });
   });
 });

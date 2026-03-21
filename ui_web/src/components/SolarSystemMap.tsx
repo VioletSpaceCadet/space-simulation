@@ -6,6 +6,7 @@ import type {
   AbsolutePos,
   AsteroidState,
   OrbitalBodyDef,
+  Position,
   ScanSite,
   ShipState,
   SimSnapshot,
@@ -134,7 +135,11 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
   const [config, setConfig] = useState<SolarSystemConfig | null>(null);
 
   useEffect(() => {
-    fetchSpatialConfig().then(setConfig).catch(() => {});
+    let cancelled = false;
+    fetchSpatialConfig()
+      .then((c) => { if (!cancelled) { setConfig(c); } })
+      .catch((err) => console.error('Failed to load spatial config:', err));
+    return () => { cancelled = true; };
   }, []);
 
   const [hovered, setHovered] = useState<{
@@ -193,10 +198,8 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
   function shipSvgPos(ship: ShipState): { x: number; y: number } {
     const taskKind = ship.task ? Object.keys(ship.task.kind)[0] : null;
 
-    if (taskKind === 'Transit' && ship.task) {
-      type TransitDest = { parent_body: string; radius_au_um: number; angle_mdeg: number };
-      type TransitKind = { Transit: { destination: TransitDest; total_ticks: number } };
-      const transit = (ship.task.kind as unknown as TransitKind).Transit;
+    if (taskKind === 'Transit' && ship.task && 'Transit' in ship.task.kind) {
+      const transit = (ship.task.kind as { Transit: { destination: Position } }).Transit;
       const originAbs = entityAbsolute(ship.position, bodyAbsolutes);
       const destAbs = entityAbsolute(transit.destination, bodyAbsolutes);
       const progress = ship.task.eta_tick > ship.task.started_tick
@@ -409,13 +412,14 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
           <Tooltip x={hovered.screenX} y={hovered.screenY}>
             <div className="text-accent">{entity.data.id}</div>
             <div className="text-dim">{entity.type}</div>
-            {hoveredAbs && selectedAbs && selected?.id !== hovered.id && config && (
-              <div className="text-muted">
-                {formatDistance(distanceAuUm(hoveredAbs, selectedAbs))}
-                {' '}
-                (~{estimateTravelTicks(distanceAuUm(hoveredAbs, selectedAbs), config)} ticks)
-              </div>
-            )}
+            {hoveredAbs && selectedAbs && selected?.id !== hovered.id && config && (() => {
+              const dist = distanceAuUm(hoveredAbs, selectedAbs);
+              return (
+                <div className="text-muted">
+                  {formatDistance(dist)} (~{estimateTravelTicks(dist, config)} ticks)
+                </div>
+              );
+            })()}
           </Tooltip>
         );
       })()}
