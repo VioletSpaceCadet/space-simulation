@@ -114,13 +114,14 @@ const CONTENT_FILES: Record<string, string> = {
   module_defs: "module_defs.json",
   techs: "techs.json",
   pricing: "pricing.json",
+  solar_system: "solar_system.json",
 };
 
 server.tool(
   "get_game_parameters",
-  "Read game parameter files (constants, module_defs, techs, pricing)",
+  "Read game parameter files (constants, module_defs, techs, pricing, solar_system)",
   {
-    file: z.enum(["constants", "module_defs", "techs", "pricing", "all"])
+    file: z.enum(["constants", "module_defs", "techs", "pricing", "solar_system", "all"])
       .describe("Which parameter file to read, or 'all' for everything"),
   },
   async ({ file }) => {
@@ -160,7 +161,7 @@ server.tool(
   "Save a proposed parameter change for review",
   {
     parameter_path: z.string()
-      .describe("Dotted path like constants.survey_scan_ticks"),
+      .describe("Dotted path like constants.survey_scan_ticks or constants.ticks_per_au"),
     current_value: z.string()
       .describe("Current value as string"),
     proposed_value: z.string()
