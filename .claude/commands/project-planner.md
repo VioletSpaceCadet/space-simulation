@@ -8,14 +8,19 @@ disable-model-invocation: true
 
 Argument: $ARGUMENTS (topic, idea, or feature description)
 
+## Phase 0: Ideation (optional)
+
+If the topic is broad or exploratory (e.g., "improve the UI", "what should we build next"), run `ce:ideate` first to generate and critically evaluate grounded improvement ideas. Use the output to sharpen the topic before proceeding to Phase 1.
+
 ## Phase 1: Research & Context Gathering
 
 Before asking any questions, build a thorough understanding of the problem space:
 
 1. **Read design docs** — `docs/DESIGN_SPINE.md`, `docs/reference.md`, and any relevant files in `docs/plans/`.
-2. **Explore the codebase** — Use the Explore agent (Task tool, subagent_type: "Explore") to understand relevant architecture, patterns, and constraints. Target areas the topic likely touches (sim_core types, tick ordering, UI components, content files, etc.).
-3. **Check Linear for duplicates** — Search for existing tickets and projects related to the topic using `list_issues` and `list_projects`. Avoid duplicating work that's already planned or in progress.
-4. **Gather baseline metrics** (if sim-related) — If the topic touches sim_core, sim_control, or game state, optionally dispatch the sim-e2e-tester agent (Task tool, subagent_type: "sim-e2e-tester") to gather baseline metrics before any changes. This gives a comparison point for the testing plan.
+2. **Check existing learnings** — Search `docs/solutions/` for related learnings and patterns that might inform the design.
+3. **Explore the codebase** — Use the Explore agent (Task tool, subagent_type: "Explore") to understand relevant architecture, patterns, and constraints. Target areas the topic likely touches (sim_core types, tick ordering, UI components, content files, etc.).
+4. **Check Linear for duplicates** — Search for existing tickets and projects related to the topic using `list_issues` and `list_projects`. Avoid duplicating work that's already planned or in progress.
+5. **Gather baseline metrics** (if sim-related) — If the topic touches sim_core, sim_control, or game state, optionally dispatch the sim-e2e-tester agent (Task tool, subagent_type: "sim-e2e-tester") to gather baseline metrics before any changes. This gives a comparison point for the testing plan.
 
 Summarize what you found in 3-5 bullet points before moving to Phase 2.
 
