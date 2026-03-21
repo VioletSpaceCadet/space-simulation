@@ -531,6 +531,35 @@ mod tests {
     }
 
     #[test]
+    fn test_autopilot_export_overrides() {
+        let mut content = test_content();
+        let overrides = HashMap::from([
+            (
+                "autopilot_repair_kit_reserve".to_string(),
+                serde_json::json!(20),
+            ),
+            (
+                "autopilot_fe_reserve_kg".to_string(),
+                serde_json::json!(8000.0),
+            ),
+            (
+                "autopilot_export_batch_size_kg".to_string(),
+                serde_json::json!(250.0),
+            ),
+            (
+                "autopilot_export_min_revenue".to_string(),
+                serde_json::json!(5000.0),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+
+        assert_eq!(content.constants.autopilot_repair_kit_reserve, 20);
+        assert!((content.constants.autopilot_fe_reserve_kg - 8000.0).abs() < f32::EPSILON);
+        assert!((content.constants.autopilot_export_batch_size_kg - 250.0).abs() < f32::EPSILON);
+        assert!((content.constants.autopilot_export_min_revenue - 5000.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn test_module_thermal_override() {
         let mut content = test_content();
         let overrides = HashMap::from([
