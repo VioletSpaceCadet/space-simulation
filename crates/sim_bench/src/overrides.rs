@@ -164,6 +164,18 @@ fn apply_constant_override(
         "autopilot_slag_jettison_pct" => {
             constants.autopilot_slag_jettison_pct = as_f32(key, value)?;
         }
+        "autopilot_repair_kit_reserve" => {
+            constants.autopilot_repair_kit_reserve = as_u32(key, value)?;
+        }
+        "autopilot_fe_reserve_kg" => {
+            constants.autopilot_fe_reserve_kg = as_f32(key, value)?;
+        }
+        "autopilot_export_batch_size_kg" => {
+            constants.autopilot_export_batch_size_kg = as_f32(key, value)?;
+        }
+        "autopilot_export_min_revenue" => {
+            constants.autopilot_export_min_revenue = as_f64(key, value)?;
+        }
         "research_roll_interval_minutes" => {
             constants.research_roll_interval_minutes = as_u64(key, value)?;
         }
@@ -221,6 +233,12 @@ fn as_u64(key: &str, value: &serde_json::Value) -> Result<u64> {
     value.as_u64().ok_or_else(|| {
         anyhow::anyhow!("override '{key}': expected a positive integer, got {value}")
     })
+}
+
+fn as_f64(key: &str, value: &serde_json::Value) -> Result<f64> {
+    value
+        .as_f64()
+        .ok_or_else(|| anyhow::anyhow!("override '{key}': expected a number, got {value}"))
 }
 
 fn as_u32(key: &str, value: &serde_json::Value) -> Result<u32> {
