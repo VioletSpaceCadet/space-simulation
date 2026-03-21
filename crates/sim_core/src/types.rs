@@ -1112,6 +1112,12 @@ pub struct Constants {
     pub station_power_available_per_minute: f32,
     /// Minimum `IronRich` tag confidence for autopilot to queue a deep scan.
     pub autopilot_iron_rich_confidence_threshold: f32,
+    /// Minimum `VolatileRich` tag confidence for autopilot to queue a deep scan.
+    #[serde(default = "default_autopilot_volatile_confidence_threshold")]
+    pub autopilot_volatile_confidence_threshold: f32,
+    /// H2O inventory (kg) below which autopilot prioritizes volatile-rich mining.
+    #[serde(default = "default_autopilot_volatile_threshold_kg")]
+    pub autopilot_volatile_threshold_kg: f32,
     /// Default refinery processing threshold (kg) set by autopilot on newly installed modules.
     pub autopilot_refinery_threshold_kg: f32,
     // Research system
@@ -1286,6 +1292,12 @@ impl Default for WearState {
 
 fn default_slag_jettison_pct() -> f32 {
     0.75
+}
+fn default_autopilot_volatile_confidence_threshold() -> f32 {
+    0.7
+}
+fn default_autopilot_volatile_threshold_kg() -> f32 {
+    500.0
 }
 
 fn default_autopilot_repair_kit_reserve() -> u32 {

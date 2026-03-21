@@ -150,7 +150,8 @@ fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
     ships
 }
 
-/// Returns `IronRich` asteroid IDs above confidence threshold with unknown composition, sorted by ID.
+/// Returns asteroid IDs above confidence threshold with unknown composition, sorted by ID.
+/// Includes both `IronRich` and `VolatileRich` candidates.
 fn collect_deep_scan_candidates(state: &GameState, content: &GameContent) -> Vec<AsteroidId> {
     let mut candidates: Vec<AsteroidId> = state
         .asteroids
@@ -158,14 +159,51 @@ fn collect_deep_scan_candidates(state: &GameState, content: &GameContent) -> Vec
         .filter(|asteroid| {
             asteroid.knowledge.composition.is_none()
                 && asteroid.knowledge.tag_beliefs.iter().any(|(tag, conf)| {
-                    *tag == AnomalyTag::IronRich
-                        && *conf > content.constants.autopilot_iron_rich_confidence_threshold
+                    (*tag == AnomalyTag::IronRich
+                        && *conf > content.constants.autopilot_iron_rich_confidence_threshold)
+                        || (*tag == AnomalyTag::VolatileRich
+                            && *conf > content.constants.autopilot_volatile_confidence_threshold)
                 })
         })
         .map(|a| a.id.clone())
         .collect();
     candidates.sort_by(|a, b| a.0.cmp(&b.0));
     candidates
+}
+
+/// Check if any station has a heating module installed.
+fn station_has_heating_module(state: &GameState) -> bool {
+    state.stations.values().any(|station| {
+        station
+            .modules
+            .iter()
+            .any(|module| module.def_id == "module_heating_unit")
+    })
+}
+
+/// Total H2O material across all station inventories.
+fn total_h2o_inventory(state: &GameState) -> f32 {
+    state
+        .stations
+        .values()
+        .flat_map(|s| s.inventory.iter())
+        .filter_map(|item| match item {
+            InventoryItem::Material { element, kg, .. } if element == "H2O" => Some(*kg),
+            _ => None,
+        })
+        .sum()
+}
+
+/// Mining value for sorting: `mass_kg × H2O_fraction`.
+fn h2o_mining_value(asteroid: &AsteroidState) -> f32 {
+    asteroid.mass_kg
+        * asteroid
+            .knowledge
+            .composition
+            .as_ref()
+            .and_then(|c| c.get("H2O"))
+            .copied()
+            .unwrap_or(0.0)
 }
 
 /// Mining value for sorting: `mass_kg × Fe_fraction`.
@@ -592,12 +630,29 @@ impl CommandSource for AutopilotController {
         let mut next_deep_scan = deep_scan_candidates.iter();
         let mut next_site = state.scan_sites.iter();
 
+        // Determine if we need volatile-rich mining
+        let needs_water = station_has_heating_module(state)
+            && total_h2o_inventory(state) < content.constants.autopilot_volatile_threshold_kg;
+
         let mut mine_candidates: Vec<&AsteroidState> = state
             .asteroids
             .values()
             .filter(|a| a.mass_kg > 0.0 && a.knowledge.composition.is_some())
             .collect();
-        mine_candidates.sort_by(|a, b| fe_mining_value(b).total_cmp(&fe_mining_value(a)));
+        if needs_water {
+            // Prioritize H2O-rich asteroids when water inventory is low
+            mine_candidates.sort_by(|a, b| {
+                h2o_mining_value(b)
+                    .total_cmp(&h2o_mining_value(a))
+                    .then_with(|| a.id.0.cmp(&b.id.0))
+            });
+        } else {
+            mine_candidates.sort_by(|a, b| {
+                fe_mining_value(b)
+                    .total_cmp(&fe_mining_value(a))
+                    .then_with(|| a.id.0.cmp(&b.id.0))
+            });
+        }
         let mut next_mine = mine_candidates.iter();
 
         for ship_id in idle_ships {
@@ -1923,5 +1978,301 @@ mod tests {
                 .any(|cmd| matches!(&cmd.command, Command::Export { .. })),
             "should NOT export anything before trade unlock"
         );
+    }
+
+    #[test]
+    fn test_autopilot_prefers_volatile_when_water_low() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        // Install a heating module on the station
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("mod_heat_001".to_string()),
+            def_id: "module_heating_unit".to_string(),
+            enabled: true,
+            wear: sim_core::WearState::default(),
+            kind_state: sim_core::ModuleKindState::Processor(sim_core::ProcessorState {
+                threshold_kg: 0.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+            }),
+            thermal: None,
+            power_stalled: false,
+        });
+        // No H2O in inventory → needs_water = true
+
+        // Add both Fe-rich and H2O-rich asteroids
+        let fe_asteroid = AsteroidId("asteroid_fe".to_string());
+        state.asteroids.insert(
+            fe_asteroid.clone(),
+            AsteroidState {
+                id: fe_asteroid.clone(),
+                position: test_position(),
+                true_composition: HashMap::from([("Fe".to_string(), 0.8)]),
+                anomaly_tags: vec![AnomalyTag::IronRich],
+                mass_kg: 5000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(AnomalyTag::IronRich, 0.9)],
+                    composition: Some(HashMap::from([
+                        ("Fe".to_string(), 0.8),
+                        ("Si".to_string(), 0.2),
+                    ])),
+                },
+            },
+        );
+
+        let h2o_asteroid = AsteroidId("asteroid_h2o".to_string());
+        state.asteroids.insert(
+            h2o_asteroid.clone(),
+            AsteroidState {
+                id: h2o_asteroid.clone(),
+                position: test_position(),
+                true_composition: HashMap::from([("H2O".to_string(), 0.5)]),
+                anomaly_tags: vec![AnomalyTag::VolatileRich],
+                mass_kg: 3000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(AnomalyTag::VolatileRich, 0.9)],
+                    composition: Some(HashMap::from([
+                        ("H2O".to_string(), 0.5),
+                        ("Fe".to_string(), 0.1),
+                    ])),
+                },
+            },
+        );
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        // The mine command should target the H2O-rich asteroid
+        let mine_cmd = commands.iter().find(|cmd| {
+            matches!(
+                &cmd.command,
+                Command::AssignShipTask {
+                    task_kind: TaskKind::Mine { .. },
+                    ..
+                }
+            )
+        });
+        assert!(mine_cmd.is_some(), "should assign a mine task");
+        if let Some(cmd) = mine_cmd {
+            if let Command::AssignShipTask {
+                task_kind: TaskKind::Mine { asteroid, .. },
+                ..
+            } = &cmd.command
+            {
+                assert_eq!(
+                    *asteroid, h2o_asteroid,
+                    "should prefer H2O-rich asteroid when water is needed"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_autopilot_prefers_fe_when_no_heating_module() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+        // No heating module → normal Fe-targeting behavior
+
+        let fe_asteroid = AsteroidId("asteroid_fe".to_string());
+        state.asteroids.insert(
+            fe_asteroid.clone(),
+            AsteroidState {
+                id: fe_asteroid.clone(),
+                position: test_position(),
+                true_composition: HashMap::from([("Fe".to_string(), 0.8)]),
+                anomaly_tags: vec![AnomalyTag::IronRich],
+                mass_kg: 5000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(AnomalyTag::IronRich, 0.9)],
+                    composition: Some(HashMap::from([
+                        ("Fe".to_string(), 0.8),
+                        ("Si".to_string(), 0.2),
+                    ])),
+                },
+            },
+        );
+
+        let h2o_asteroid = AsteroidId("asteroid_h2o".to_string());
+        state.asteroids.insert(
+            h2o_asteroid.clone(),
+            AsteroidState {
+                id: h2o_asteroid.clone(),
+                position: test_position(),
+                true_composition: HashMap::from([("H2O".to_string(), 0.5)]),
+                anomaly_tags: vec![AnomalyTag::VolatileRich],
+                mass_kg: 3000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(AnomalyTag::VolatileRich, 0.9)],
+                    composition: Some(HashMap::from([
+                        ("H2O".to_string(), 0.5),
+                        ("Fe".to_string(), 0.1),
+                    ])),
+                },
+            },
+        );
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let mine_cmd = commands.iter().find(|cmd| {
+            matches!(
+                &cmd.command,
+                Command::AssignShipTask {
+                    task_kind: TaskKind::Mine { .. },
+                    ..
+                }
+            )
+        });
+        assert!(mine_cmd.is_some(), "should assign a mine task");
+        if let Some(cmd) = mine_cmd {
+            if let Command::AssignShipTask {
+                task_kind: TaskKind::Mine { asteroid, .. },
+                ..
+            } = &cmd.command
+            {
+                assert_eq!(
+                    *asteroid, fe_asteroid,
+                    "should prefer Fe-rich asteroid when no heating module"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_deep_scan_includes_volatile_rich() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        let asteroid_id = AsteroidId("asteroid_vol".to_string());
+        state.asteroids.insert(
+            asteroid_id.clone(),
+            AsteroidState {
+                id: asteroid_id.clone(),
+                position: test_position(),
+                true_composition: HashMap::from([("H2O".to_string(), 0.5)]),
+                anomaly_tags: vec![AnomalyTag::VolatileRich],
+                mass_kg: 2000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(AnomalyTag::VolatileRich, 0.9)],
+                    composition: None, // Not deep-scanned yet
+                },
+            },
+        );
+
+        let candidates = collect_deep_scan_candidates(&state, &content);
+        assert!(
+            candidates.contains(&asteroid_id),
+            "VolatileRich asteroids should be deep scan candidates"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_prefers_fe_when_h2o_above_threshold() {
+        let mut content = autopilot_content();
+        // Add H2O element to content so inventory volume calc works
+        content.elements.push(sim_core::ElementDef {
+            id: "H2O".to_string(),
+            density_kg_per_m3: 1000.0,
+            display_name: "Water Ice".to_string(),
+            refined_name: Some("Water".to_string()),
+            melting_point_mk: None,
+            latent_heat_j_per_kg: None,
+            specific_heat_j_per_kg_k: None,
+        });
+        let mut state = autopilot_state(&content);
+
+        // Install heating module
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("mod_heat_001".to_string()),
+            def_id: "module_heating_unit".to_string(),
+            enabled: true,
+            wear: sim_core::WearState::default(),
+            kind_state: sim_core::ModuleKindState::Processor(sim_core::ProcessorState {
+                threshold_kg: 0.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+            }),
+            thermal: None,
+            power_stalled: false,
+        });
+        // Add H2O above threshold (500 kg) → should NOT trigger volatile targeting
+        station.inventory.push(InventoryItem::Material {
+            element: "H2O".to_string(),
+            kg: 600.0,
+            quality: 1.0,
+            thermal: None,
+        });
+
+        let fe_asteroid = AsteroidId("asteroid_fe".to_string());
+        state.asteroids.insert(
+            fe_asteroid.clone(),
+            AsteroidState {
+                id: fe_asteroid.clone(),
+                position: test_position(),
+                true_composition: HashMap::from([("Fe".to_string(), 0.8)]),
+                anomaly_tags: vec![AnomalyTag::IronRich],
+                mass_kg: 5000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(AnomalyTag::IronRich, 0.9)],
+                    composition: Some(HashMap::from([
+                        ("Fe".to_string(), 0.8),
+                        ("Si".to_string(), 0.2),
+                    ])),
+                },
+            },
+        );
+
+        let h2o_asteroid = AsteroidId("asteroid_h2o".to_string());
+        state.asteroids.insert(
+            h2o_asteroid.clone(),
+            AsteroidState {
+                id: h2o_asteroid.clone(),
+                position: test_position(),
+                true_composition: HashMap::from([("H2O".to_string(), 0.5)]),
+                anomaly_tags: vec![AnomalyTag::VolatileRich],
+                mass_kg: 3000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(AnomalyTag::VolatileRich, 0.9)],
+                    composition: Some(HashMap::from([
+                        ("H2O".to_string(), 0.5),
+                        ("Fe".to_string(), 0.1),
+                    ])),
+                },
+            },
+        );
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let mine_cmd = commands.iter().find(|cmd| {
+            matches!(
+                &cmd.command,
+                Command::AssignShipTask {
+                    task_kind: TaskKind::Mine { .. },
+                    ..
+                }
+            )
+        });
+        assert!(mine_cmd.is_some(), "should assign a mine task");
+        if let Some(cmd) = mine_cmd {
+            if let Command::AssignShipTask {
+                task_kind: TaskKind::Mine { asteroid, .. },
+                ..
+            } = &cmd.command
+            {
+                assert_eq!(
+                    *asteroid, fe_asteroid,
+                    "should prefer Fe when H2O is above threshold despite heating module"
+                );
+            }
+        }
     }
 }
