@@ -294,6 +294,27 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_spatial_overrides() {
+        let mut content = test_content();
+        let overrides = HashMap::from([
+            ("ticks_per_au".to_string(), serde_json::json!(5000)),
+            ("min_transit_ticks".to_string(), serde_json::json!(2)),
+            ("docking_range_au_um".to_string(), serde_json::json!(20000)),
+            (
+                "replenish_check_interval_ticks".to_string(),
+                serde_json::json!(48),
+            ),
+            ("replenish_target_count".to_string(), serde_json::json!(15)),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert_eq!(content.constants.ticks_per_au, 5000);
+        assert_eq!(content.constants.min_transit_ticks, 2);
+        assert_eq!(content.constants.docking_range_au_um, 20000);
+        assert_eq!(content.constants.replenish_check_interval_ticks, 48);
+        assert_eq!(content.constants.replenish_target_count, 15);
+    }
+
+    #[test]
     fn test_unknown_key_errors() {
         let mut content = test_content();
         let overrides = HashMap::from([("nonexistent_field".to_string(), serde_json::json!(1.0))]);
