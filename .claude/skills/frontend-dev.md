@@ -1,7 +1,7 @@
 ---
 name: Frontend Development
-triggers: [ui_web, React, component, panel, hook, CSS, Tailwind, frontend, FE, tsx, SSE client, vitest]
-agents: [fe-chrome-tester]
+triggers: [ui_web, React, component, panel, hook, CSS, Tailwind, frontend, FE, tsx, SSE client, vitest, UI, design, layout, styling]
+agents: [fe-chrome-tester, compound-engineering:design:design-iterator, compound-engineering:design:design-implementation-reviewer]
 ---
 
 ## When to Use
@@ -15,9 +15,15 @@ Any work touching `ui_web/` — React components, hooks, styling, SSE subscripti
 - [ ] No `any` types — use proper TS interfaces matching daemon response shapes
 - [ ] ESLint: no `_` or `_name` in destructuring — use `Object.fromEntries(Object.entries(...).filter(...))`
 
+## Design Quality
+- [ ] Use `compound-engineering:frontend-design` skill for UI implementation — produces polished, distinctive code
+- [ ] For visual changes: run `design-iterator` agent (requires `--chrome`) to iterate via screenshot→analyze→improve cycles
+- [ ] For PR review: dispatch `design-implementation-reviewer` agent alongside pr-reviewer to catch visual issues (spacing, contrast, hierarchy)
+
 ## Testing
 - **Unit/logic:** vitest (`cd ui_web && npm test`)
 - **Visual/SSE verification:** fe-chrome-tester agent (requires `--chrome` flag)
+- **Design iteration:** design-iterator agent (requires `--chrome` flag) — iteratively refines layout, spacing, typography
 - **E2E:** only for critical flows — prefer vitest over Playwright for new tests
 
 ## Pitfalls
@@ -26,3 +32,4 @@ Any work touching `ui_web/` — React components, hooks, styling, SSE subscripti
 - SSE `EventSource` must be closed on unmount or you get leaked connections
 - Vite 7 uses ESM — don't use CommonJS `require()`
 - TS interfaces must match Rust `#[derive(Serialize)]` struct shapes exactly
+- Design iteration requires `--chrome` flag and a running Vite dev server on port 5173

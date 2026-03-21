@@ -1,116 +1,96 @@
 # Project Implementation
 
-Implement a Linear project end-to-end: read tickets, create branches, write code, review, merge, and deliver a final PR for owner approval.
+Implement a Linear project end-to-end: read tickets, then for each one — branch from main, implement, review, fix, compound, merge into main, compact, repeat.
 
 ## Input
 
-Argument: $ARGUMENTS (Linear project name, ID, or slug)
+Argument: $ARGUMENTS (Linear project name, ID, slug — or a list of ticket IDs like "VIO-217 VIO-218 VIO-219")
 
-## Phase 1: Project Discovery
+## Phase 1: Discovery & Queue
 
-1. **Fetch the project** from Linear using `list_projects` or `get_project` with the argument provided.
-2. **Fetch all tickets** in the project using `list_issues` filtered by project. Include sub-issues.
-3. **Read each ticket** with `get_issue` to understand full scope, descriptions, acceptance criteria, and blocking relationships. **Also read comments** on each ticket with `list_comments` — they may contain updated requirements, implementation hints, or design decisions made after ticket creation.
-4. **Identify ticket order** — respect `blockedBy` / `blocks` relationships. Build a dependency graph and determine execution order (unblocked tickets first).
-5. **Summarize the plan** to the user: list tickets in planned execution order with brief descriptions. Ask for confirmation before proceeding.
+1. **Resolve the input:**
+   - If the argument matches a project: fetch all tickets using `list_issues` filtered by project. Skip tickets already Done.
+   - If the argument is ticket IDs: fetch each with `get_issue`.
+   - If the argument is a description: search Linear for matching tickets.
+2. **Read each ticket** with `get_issue` for full scope, acceptance criteria, and blocking relationships. **Read comments** with `list_comments` — they often contain implementation hints or updated requirements.
+3. **Build execution order** — respect `blockedBy` / `blocks` relationships. Unblocked tickets first.
+4. **Summarize the queue** to the user: list tickets in planned order with brief descriptions. Ask for confirmation before proceeding.
+5. **Update the Linear project status** to "In Progress" if applicable.
 
-## Phase 2: Branch Setup
+## Phase 2: Ticket Loop
 
-1. **Create the feature branch** from main:
+For each ticket in execution order, run this autonomous cycle:
+
+### 2a. Start
+- **Update Linear ticket status** to "In Progress".
+- **Load relevant skills** — match the ticket against `.claude/skills/` triggers.
+- **Create a branch** from main:
+  ```
+  git checkout main && git pull
+  git checkout -b feat/<ticket-id>-<short-name>
+  ```
+  Use `fix/` for bugs, `chore/` for maintenance.
+
+### 2b. Implement
+- Read ticket description, comments, and any linked documents.
+- For non-trivial tickets, use EnterPlanMode to plan the approach before writing code.
+- Write the code. Follow project conventions (see CLAUDE.md).
+- Write tests — not just happy path.
+- Run the full relevant test suite:
+  - `cargo test` for Rust changes
+  - `cd ui_web && npm test` for FE changes
+  - `./scripts/ci_event_sync.sh` if new Event variants were added
+- Update documentation (reference.md, CLAUDE.md) if types, APIs, or tick ordering changed.
+
+**Frontend/UI tickets:** Use the `compound-engineering:frontend-design` skill for polished UI. After implementation, run the `design-iterator` agent for screenshot→analyze→improve cycles (requires `--chrome`).
+
+### 2c. PR & Review Loop
+1. **Push and create a PR** targeting main:
+   ```
+   git push -u origin <branch-name>
+   gh pr create --base main --title "<ticket-id>: <title>" --body-file /tmp/pr-body.md
+   ```
+2. **Watch CI**: `gh pr checks <PR_NUMBER> --watch`. Fix failures, push, watch again.
+3. **Dispatch the pr-reviewer agent** (subagent_type: "pr-reviewer"). For UI tickets, also dispatch `design-implementation-reviewer`.
+4. **Fix review findings** — fix should-fix items, address nits you agree with. Commit, push, re-run CI. Do not ask for confirmation.
+5. **Re-review if needed** — repeat until clean.
+
+### 2d. Compound (auto for non-trivial)
+If the implementation involved debugging, new patterns, or tricky solutions: run `ce:compound` to document the learning. Skip for routine changes.
+
+### 2e. Merge & Close
+1. **Squash merge into main**:
+   ```
+   gh pr merge <PR_NUMBER> --squash --delete-branch
+   ```
+2. **Update Linear ticket status** to "Done".
+3. **Clean up local branch**:
    ```
    git checkout main && git pull
-   git checkout -b feat/<project-slug>
-   git push -u origin feat/<project-slug>
+   git branch -d <branch-name>
    ```
-2. **Update the Linear project status** to "In Progress" if not already.
 
-## Phase 3: Ticket Implementation Loop
+### 2f. Compact & Continue
+- **Run `/compact`** to clear stale context (diffs, CI logs, review comments from the completed ticket). This is critical for multi-ticket runs — without it, the context window fills up and quality degrades.
+- **Check next ticket** — if it was previously blocked, verify its blockers are now Done.
+- **Continue** to the next ticket.
 
-For each ticket in execution order:
+## Phase 3: Wrap Up
 
-### 3a. Start the ticket
-- **Update Linear ticket status** to "In Progress" using `save_issue`.
-- **Create a ticket branch** off the feature branch:
-  ```
-  git checkout feat/<project-slug>
-  git checkout -b feat/<project-slug>/<ticket-id>-<short-name>
-  ```
+After all tickets are complete:
 
-### 3b. Implement the ticket
-- Read the ticket description and any linked documents for requirements.
-- **Read ticket comments** using `list_comments` — comments often contain implementation notes, design clarifications, practitioner tips, or owner feedback added after the ticket was created. Do not skip this.
-- If the ticket needs design exploration, use EnterPlanMode to plan the approach and get user approval before writing code.
-- Write the code. Follow existing project conventions (see CLAUDE.md).
-- Write tests covering the changes — not just happy path.
-- Confirm all tests pass before moving on. Run the relevant test commands from CLAUDE.md.
-- Update documentation (reference.md, CLAUDE.md) if the change affects public APIs, types, or tick ordering.
-
-### 3c. Create a PR into the feature branch
-- Push the ticket branch.
-- Create a PR targeting the feature branch:
-  ```
-  gh pr create --base feat/<project-slug> --title "<ticket-id>: <title>" --body "..."
-  ```
-  Include a Summary (bullet points of what changed) and Test plan.
-
-### 3d. CI + Review
-- Watch CI: `gh pr checks <PR_NUMBER> --watch`
-- If CI fails: read the failed logs with `gh run view <RUN_ID> --log-failed`, fix the issue, push, and watch again.
-- Once CI passes: **dispatch the pr-reviewer agent** using the Task tool (subagent_type: "pr-reviewer"). Do NOT use model: "haiku" — the reviewer must use the default model to ensure it posts its review comment on the PR via `gh pr review`.
-- If the reviewer finds Important or Critical issues: fix them, push, wait for CI, and request another review.
-- Once the review is clean: squash merge the PR.
-  ```
-  gh pr merge <PR_NUMBER> --squash --delete-branch
-  ```
-
-### 3e. Close the ticket
-- **Update Linear ticket status** to "Done" using `save_issue`.
-- **Return to the feature branch** and pull the merged changes:
-  ```
-  git checkout feat/<project-slug> && git pull
-  ```
-- **Compact context** — Run `/compact` to clear stale context from the completed ticket (old diffs, CI logs, review comments). This keeps the session focused for the next ticket.
-
-### 3f. Repeat
-- Continue to the next unblocked ticket. If a ticket was previously blocked, check whether its blockers are now resolved.
-
-## Phase 4: Final Integration
-
-1. **Merge main into the feature branch** to resolve any conflicts:
-   ```
-   git checkout feat/<project-slug>
-   git merge main
-   ```
-   Resolve conflicts if any. Run full test suite to confirm nothing broke.
-
-2. **Create the final PR** into main:
-   ```
-   gh pr create --base main --title "feat: <project-name>" --body "..."
-   ```
-   The body should summarize all tickets completed with their identifiers.
-
-3. **Watch CI** on the final PR: `gh pr checks <PR_NUMBER> --watch`
-
-4. **Dispatch the pr-reviewer agent** for a final comprehensive review of the full feature branch diff.
-
-5. **Fix any issues** found in the final review. Push and re-review until clean.
-
-6. **Notify the user** that the PR is ready for their approval. Do NOT merge PRs into main — that requires owner (@VioletSpaceCadet) approval.
-
-## Phase 5: Cleanup
-
-After the owner merges the final PR:
-
-1. Delete the feature branch: `git push origin --delete feat/<project-slug>`
-2. Update the Linear project status to "Completed".
-3. Clean up local branches.
+1. **Update Linear project status** to "Completed" (if processing a full project).
+2. **Run `ce:compound-refresh`** if the project touched areas with existing docs/solutions/ learnings — check for stale docs.
+3. **Summarize** what was completed: list tickets merged with their PR numbers.
 
 ## Rules
 
 - **NEVER push directly to main.** All changes go through PRs.
-- **NEVER merge into main.** Only the owner does that.
-- **Always squash merge** ticket PRs into the feature branch.
-- **Always run tests** before creating a PR. Don't PR broken code.
-- **Update Linear** at every state change — tickets should reflect real-time progress.
-- **If stuck on a ticket**, ask the user rather than guessing. Blocked is better than wrong.
-- **One ticket at a time.** Finish, PR, merge, then move to the next. Don't batch unrelated changes.
+- **Auto-merge into main** after CI green + pr-reviewer clean (no unresolved should-fix items).
+- **Always squash merge.**
+- **Always run tests** before creating a PR.
+- **Update Linear** at every state change.
+- **Compact after every ticket.** Do not wait until context is full.
+- **If stuck on a ticket**, ask the user rather than guessing.
+- **One ticket at a time.** Finish, PR, merge, compact, then next.
+- **Compound selectively.** Only non-trivial learnings.
