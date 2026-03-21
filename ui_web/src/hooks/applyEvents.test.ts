@@ -1543,4 +1543,136 @@ describe('applyEvents', () => {
       errorSpy.mockRestore();
     });
   });
+
+  describe('OverheatWarning', () => {
+    it('updates module thermal state to Warning zone', () => {
+      const thermal = {
+        temp_mk: 2_000_000, thermal_group: 'default',
+        overheat_zone: 'Nominal' as const, overheat_disabled: false,
+      };
+      const station = makeStation({
+        modules: [{
+          id: 'mod_smelter', def_id: 'module_basic_smelter', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 }, thermal,
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          OverheatWarning: {
+            station_id: 'station_001', module_id: 'mod_smelter',
+            temp_mk: 2_200_000, max_temp_mk: 2_000_000,
+          },
+        },
+      }];
+
+      const result = applyEvents(
+        {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+      );
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.thermal?.overheat_zone).toBe('Warning');
+      expect(mod.thermal?.temp_mk).toBe(2_200_000);
+      expect(mod.enabled).toBe(true);
+    });
+  });
+
+  describe('OverheatCritical', () => {
+    it('updates module thermal state to Critical zone and disables module', () => {
+      const thermal = {
+        temp_mk: 2_200_000, thermal_group: 'default',
+        overheat_zone: 'Warning' as const, overheat_disabled: false,
+      };
+      const station = makeStation({
+        modules: [{
+          id: 'mod_smelter', def_id: 'module_basic_smelter', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 }, thermal,
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          OverheatCritical: {
+            station_id: 'station_001', module_id: 'mod_smelter',
+            temp_mk: 2_500_000, max_temp_mk: 2_000_000,
+          },
+        },
+      }];
+
+      const result = applyEvents(
+        {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+      );
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.thermal?.overheat_zone).toBe('Critical');
+      expect(mod.thermal?.temp_mk).toBe(2_500_000);
+      expect(mod.thermal?.overheat_disabled).toBe(true);
+      expect(mod.enabled).toBe(false);
+    });
+  });
+
+  describe('OverheatCleared', () => {
+    it('resets module thermal state to Nominal zone', () => {
+      const thermal = {
+        temp_mk: 2_500_000, thermal_group: 'default',
+        overheat_zone: 'Critical' as const, overheat_disabled: true,
+      };
+      const station = makeStation({
+        modules: [{
+          id: 'mod_smelter', def_id: 'module_basic_smelter', enabled: false,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 }, thermal,
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          OverheatCleared: {
+            station_id: 'station_001', module_id: 'mod_smelter',
+            temp_mk: 1_900_000,
+          },
+        },
+      }];
+
+      const result = applyEvents(
+        {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+      );
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.thermal?.overheat_zone).toBe('Nominal');
+      expect(mod.thermal?.temp_mk).toBe(1_900_000);
+      expect(mod.thermal?.overheat_disabled).toBe(false);
+      expect(mod.enabled).toBe(true);
+    });
+
+    it('creates thermal state if module had none', () => {
+      const station = makeStation({
+        modules: [{
+          id: 'mod_smelter', def_id: 'module_basic_smelter', enabled: true,
+          kind_state: { Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false } },
+          wear: { wear: 0 },
+        }],
+      });
+
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          OverheatCleared: {
+            station_id: 'station_001', module_id: 'mod_smelter',
+            temp_mk: 1_900_000,
+          },
+        },
+      }];
+
+      const result = applyEvents(
+        {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+      );
+      const mod = result.stations['station_001'].modules[0];
+      expect(mod.thermal).toBeDefined();
+      expect(mod.thermal?.overheat_zone).toBe('Nominal');
+      expect(mod.thermal?.temp_mk).toBe(1_900_000);
+    });
+  });
 });
