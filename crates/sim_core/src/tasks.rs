@@ -173,7 +173,7 @@ pub(crate) fn resolve_transit(
         current_tick,
         Event::ShipArrived {
             ship_id: ship_id.clone(),
-            parent_body: destination.parent_body.clone(),
+            position: destination.clone(),
         },
     ));
 
@@ -259,7 +259,7 @@ pub(crate) fn resolve_survey(
         current_tick,
         Event::AsteroidDiscovered {
             asteroid_id: asteroid_id.clone(),
-            parent_body: site.position.parent_body.clone(),
+            position: site.position.clone(),
         },
     ));
 

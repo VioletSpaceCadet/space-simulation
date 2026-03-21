@@ -99,7 +99,7 @@ describe('useSimStream', () => {
     await act(async () => { await Promise.resolve(); });
 
     const events = [
-      { id: 'evt_000010', tick: 20, event: { AsteroidDiscovered: { asteroid_id: 'asteroid_0005', parent_body: 'node_belt_inner' } } },
+      { id: 'evt_000010', tick: 20, event: { AsteroidDiscovered: { asteroid_id: 'asteroid_0005', position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 } } } },
       { id: 'evt_000011', tick: 20, event: { ScanResult: { asteroid_id: 'asteroid_0005', tags: [['IronRich', 0.9]] } } },
     ];
     act(() => {
@@ -182,7 +182,7 @@ describe('useSimStream', () => {
     expect(result.current.snapshot?.ships['ship_0001'].position.parent_body).toBe('node_earth_orbit');
 
     const events = [
-      { id: 'evt_s1', tick: 12, event: { ShipArrived: { ship_id: 'ship_0001', parent_body: 'node_belt_inner' } } },
+      { id: 'evt_s1', tick: 12, event: { ShipArrived: { ship_id: 'ship_0001', position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 } } } },
     ];
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }));
@@ -217,7 +217,7 @@ describe('useSimStream', () => {
     expect(result.current.snapshot?.scan_sites).toEqual([]);
 
     const events = [
-      { id: 'evt_ss1', tick: 30, event: { ScanSiteSpawned: { site_id: 'site_new_001', parent_body: 'node_belt_inner', template_id: 'tmpl_iron_rich' } } },
+      { id: 'evt_ss1', tick: 30, event: { ScanSiteSpawned: { site_id: 'site_new_001', position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'tmpl_iron_rich' } } },
     ];
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }));

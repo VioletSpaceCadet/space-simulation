@@ -31,12 +31,12 @@ export function transitPosition(
   return polarToCartesian(radius, angle);
 }
 
-/** Node ID → ring radius lookup */
+/** Body ID → ring radius lookup */
 const RING_RADII: Record<string, number> = {
-  node_earth_orbit: 100,
-  node_belt_inner: 200,
-  node_belt_mid: 300,
-  node_belt_outer: 400,
+  earth_orbit_zone: 100,
+  earth_neos: 150,
+  inner_belt: 250,
+  outer_belt: 400,
 };
 
 export function ringRadiusForNode(nodeId: string): number {

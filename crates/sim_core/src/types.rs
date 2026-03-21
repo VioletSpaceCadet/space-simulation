@@ -519,7 +519,7 @@ pub enum Event {
     },
     AsteroidDiscovered {
         asteroid_id: AsteroidId,
-        parent_body: crate::BodyId,
+        position: crate::Position,
     },
     ScanResult {
         asteroid_id: AsteroidId,
@@ -542,7 +542,7 @@ pub enum Event {
     },
     ShipArrived {
         ship_id: ShipId,
-        parent_body: crate::BodyId,
+        position: crate::Position,
     },
     OreMined {
         ship_id: ShipId,
@@ -588,7 +588,7 @@ pub enum Event {
     },
     ScanSiteSpawned {
         site_id: SiteId,
-        parent_body: crate::BodyId,
+        position: crate::Position,
         template_id: String,
     },
     /// Only emitted at `EventLevel::Debug`.
@@ -691,7 +691,7 @@ pub enum Event {
     ShipConstructed {
         station_id: StationId,
         ship_id: ShipId,
-        parent_body: crate::BodyId,
+        position: crate::Position,
         cargo_capacity_m3: f64,
     },
     InsufficientFunds {

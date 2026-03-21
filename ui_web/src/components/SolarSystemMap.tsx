@@ -167,10 +167,10 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
             const taskKind = ship.task ? Object.keys(ship.task.kind)[0] : null;
 
             if (taskKind === 'Transit' && ship.task) {
-              const transit = (ship.task.kind as { Transit: { destination: string } }).Transit;
+              const transit = (ship.task.kind as { Transit: { destination: { parent_body: string } } }).Transit;
               const originRadius = ringRadiusForNode(ship.position.parent_body);
               const originAngle = angleFromId(ship.id + ':origin');
-              const destRadius = ringRadiusForNode(transit.destination);
+              const destRadius = ringRadiusForNode(transit.destination.parent_body);
               const destAngle = angleFromId(ship.id + ':dest');
               const progress = ship.task.eta_tick > ship.task.started_tick
                 ? (currentTick - ship.task.started_tick) / (ship.task.eta_tick - ship.task.started_tick)

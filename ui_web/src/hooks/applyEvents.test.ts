@@ -716,7 +716,7 @@ describe('applyEvents', () => {
     it('adds a new asteroid to state', () => {
       const events = [{
         id: 'e1', tick: 5,
-        event: { AsteroidDiscovered: { asteroid_id: 'ast_new', parent_body: 'body_b' } },
+        event: { AsteroidDiscovered: { asteroid_id: 'ast_new', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 } } },
       }];
 
       const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
@@ -732,7 +732,7 @@ describe('applyEvents', () => {
       const existing = makeAsteroid({ id: 'ast_001', mass_kg: 999 });
       const events = [{
         id: 'e1', tick: 5,
-        event: { AsteroidDiscovered: { asteroid_id: 'ast_001', parent_body: 'body_b' } },
+        event: { AsteroidDiscovered: { asteroid_id: 'ast_001', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 } } },
       }];
 
       const result = applyEvents(
@@ -1168,7 +1168,7 @@ describe('applyEvents', () => {
         event: {
           ShipConstructed: {
             ship_id: 'ship_new', station_id: 'station_001',
-            parent_body: 'body_a', cargo_capacity_m3: 30,
+            position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, cargo_capacity_m3: 30,
           },
         },
       }];
@@ -1216,7 +1216,7 @@ describe('applyEvents', () => {
         id: 'e1', tick: 10,
         event: {
           ScanSiteSpawned: {
-            site_id: 'site_1', parent_body: 'body_a', template_id: 'template_iron',
+            site_id: 'site_1', position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_iron',
           },
         },
       }];
@@ -1236,7 +1236,7 @@ describe('applyEvents', () => {
         id: 'e1', tick: 10,
         event: {
           ScanSiteSpawned: {
-            site_id: 'site_1', parent_body: 'body_a', template_id: 'template_iron',
+            site_id: 'site_1', position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_iron',
           },
         },
       }];
@@ -1403,7 +1403,7 @@ describe('applyEvents', () => {
 
       const events = [{
         id: 'e1', tick: 10,
-        event: { ShipArrived: { ship_id: 'ship_0001', parent_body: 'body_b' } },
+        event: { ShipArrived: { ship_id: 'ship_0001', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 } } },
       }];
 
       const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);

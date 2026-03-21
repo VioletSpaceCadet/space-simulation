@@ -91,7 +91,7 @@ function handleAsteroidDiscovered(state: SimState, event: EventPayload<'Asteroid
       ...state.asteroids,
       [event.asteroid_id]: {
         id: event.asteroid_id,
-        position: { parent_body: event.parent_body, radius_au_um: 0, angle_mdeg: 0 },
+        position: event.position,
         anomaly_tags: [],
         knowledge: { tag_beliefs: [], composition: null },
       },
@@ -499,7 +499,7 @@ function handleScanSiteSpawned(state: SimState, event: EventPayload<'ScanSiteSpa
       ...state.scanSites,
       {
         id: event.site_id,
-        position: { parent_body: event.parent_body, radius_au_um: 0, angle_mdeg: 0 },
+        position: event.position,
         template_id: event.template_id,
       },
     ],
@@ -513,7 +513,7 @@ function handleShipConstructed(state: SimState, event: EventPayload<'ShipConstru
       ...state.ships,
       [event.ship_id]: {
         id: event.ship_id,
-        position: { parent_body: event.parent_body, radius_au_um: 0, angle_mdeg: 0 },
+        position: event.position,
         owner: 'principal_autopilot',
         inventory: [],
         cargo_capacity_m3: event.cargo_capacity_m3,
@@ -664,7 +664,7 @@ function handleShipArrived(state: SimState, event: EventPayload<'ShipArrived'>):
       ...state.ships,
       [event.ship_id]: {
         ...ship,
-        position: { ...ship.position, parent_body: event.parent_body },
+        position: event.position,
       },
     },
   };

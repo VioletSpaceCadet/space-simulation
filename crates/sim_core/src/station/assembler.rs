@@ -383,7 +383,7 @@ fn resolve_assembler_run(
                     Event::ShipConstructed {
                         station_id: ctx.station_id.clone(),
                         ship_id,
-                        parent_body: ship_position.parent_body,
+                        position: ship_position,
                         cargo_capacity_m3: f64::from(*cargo_capacity_m3),
                     },
                 ));

@@ -597,7 +597,7 @@ fn replenish_scan_sites(
             current_tick,
             crate::Event::ScanSiteSpawned {
                 site_id,
-                parent_body: position.parent_body,
+                position,
                 template_id: template.id.clone(),
             },
         ));

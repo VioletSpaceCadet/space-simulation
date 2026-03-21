@@ -254,7 +254,7 @@ fn transit_moves_ship_and_starts_next_task() {
     );
     assert!(
         events.iter().any(
-            |e| matches!(&e.event, Event::ShipArrived { parent_body, .. } if parent_body == &body_b)
+            |e| matches!(&e.event, Event::ShipArrived { ref position, .. } if position.parent_body == body_b)
         ),
         "ShipArrived event should be emitted"
     );
