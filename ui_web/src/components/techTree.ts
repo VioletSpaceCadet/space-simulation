@@ -22,12 +22,8 @@ export interface TreeState {
   edges: TreeEdge[];
 }
 
-export const DOMAIN_COLORS: Record<string, string> = {
-  Survey: '#5ca0c8',
-  Materials: '#c89a4a',
-  Manufacturing: '#4caf7d',
-  Propulsion: '#a78bfa',
-};
+// Re-export for consumers that import from this module
+export { DOMAIN_COLORS } from '../config/theme';
 
 function getEvidence(techId: string, research: ResearchState): Record<string, number> {
   const domainProgress = research.evidence[techId];

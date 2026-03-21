@@ -1,3 +1,4 @@
+import { TAG_COLORS, hashColor } from '../config/theme';
 import { useSortableData } from '../hooks/useSortableData';
 import type { AsteroidState } from '../types';
 
@@ -19,14 +20,9 @@ function compositionSummary(composition: Record<string, number> | null): string 
     .join(' | ');
 }
 
-const TAG_COLORS: Record<string, { bg: string; text: string }> = {
-  IronRich: { bg: 'rgba(196, 112, 56, 0.15)', text: '#c47038' },
-  VolatileRich: { bg: 'rgba(56, 160, 196, 0.15)', text: '#38a0c4' },
-  Carbonaceous: { bg: 'rgba(180, 140, 60, 0.15)', text: '#b48c3c' },
-};
-
 function TagBadge({ tag, confidence }: { tag: string; confidence: number }) {
-  const colors = TAG_COLORS[tag] ?? { bg: 'rgba(138, 142, 152, 0.15)', text: '#8a8e98' };
+  const fallbackText = hashColor(tag);
+  const colors = TAG_COLORS[tag] ?? { bg: `${fallbackText}26`, text: fallbackText };
   return (
     <span
       style={{ background: colors.bg, color: colors.text, padding: '0 4px', borderRadius: 2, fontSize: 10 }}

@@ -1,16 +1,4 @@
-const DATA_KIND_LABELS: Record<string, string> = {
-  SurveyData: 'Survey',
-  AssayData: 'Assay',
-  ManufacturingData: 'Manufacturing',
-  TransitData: 'Transit',
-};
-
-const DATA_KIND_COLORS: Record<string, string> = {
-  SurveyData: '#5ca0c8',
-  AssayData: '#c89a4a',
-  ManufacturingData: '#4caf7d',
-  TransitData: '#a78bfa',
-};
+import { DATA_KIND_COLORS, DATA_KIND_LABELS, SEMANTIC_COLORS } from '../config/theme';
 
 export interface DataPoolSectionProps {
   dataPool: Record<string, number>;
@@ -40,7 +28,7 @@ export function DataPoolSection({ dataPool, dataRates }: DataPoolSectionProps) {
             <span style={{ color }} className="font-medium">{label}</span>
             <span className="text-muted">{amount.toFixed(1)}</span>
             {rate !== 0 && (
-              <span style={{ color: rate > 0 ? '#4caf7d' : '#e05252' }}>
+              <span style={{ color: rate > 0 ? SEMANTIC_COLORS.positive : SEMANTIC_COLORS.negative }}>
                 {rate > 0 ? '+' : ''}{rate.toFixed(1)}/hr
               </span>
             )}

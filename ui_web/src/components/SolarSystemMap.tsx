@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { fetchSpatialConfig } from '../api';
+import {
+  BODY_COLORS,
+  TAG_COLORS,
+  ZONE_COLORS,
+  ZONE_STROKES,
+  shipTaskColor,
+  tagColor,
+} from '../config/theme';
 import { useSvgZoomPan } from '../hooks/useSvgZoomPan';
 import type {
   AbsolutePos,
@@ -41,36 +49,10 @@ function toSvgPos(abs: AbsolutePos): { x: number; y: number } {
   return { x: toSvg(abs.x_au_um), y: toSvg(abs.y_au_um) };
 }
 
-const ZONE_COLORS: Record<string, string> = {
-  MetalRich: 'rgba(217, 158, 60, 0.15)',
-  Mixed: 'rgba(160, 160, 180, 0.12)',
-  VolatileRich: 'rgba(80, 140, 220, 0.15)',
-};
-
-const ZONE_STROKES: Record<string, string> = {
-  MetalRich: 'rgba(217, 158, 60, 0.3)',
-  Mixed: 'rgba(160, 160, 180, 0.2)',
-  VolatileRich: 'rgba(80, 140, 220, 0.3)',
-};
-
-const BODY_COLORS: Record<string, string> = {
-  Star: '#f5c842',
-  Planet: '#6b9dba',
-  Moon: '#999',
-  Belt: '#888',
-};
-
 function shipColor(task: ShipState['task']): string {
-  if (!task) { return 'var(--color-dim)'; }
+  if (!task) {return 'var(--color-dim)';}
   const kind = Object.keys(task.kind)[0];
-  switch (kind) {
-    case 'Survey': return '#5b9bd5';
-    case 'DeepScan': return '#7b68ee';
-    case 'Mine': return '#d4a44c';
-    case 'Deposit': return '#4caf7d';
-    case 'Transit': return 'var(--color-accent)';
-    default: return 'var(--color-dim)';
-  }
+  return shipTaskColor(kind);
 }
 
 /** Build an SVG path for a zone arc (annular sector). */
@@ -341,11 +323,10 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
             const { x, y } = toSvgPos(entityAbsolute(asteroid.position, bodyAbsolutes));
             const massKg = asteroid.mass_kg ?? 1000;
             const size = Math.max(2.5, Math.min(8, Math.log10(massKg)));
-            const asteroidFill =
-              asteroid.anomaly_tags.includes('VolatileRich') ? '#38a0c4'
-                : asteroid.anomaly_tags.includes('Carbonaceous') ? '#b48c3c'
-                  : asteroid.anomaly_tags.includes('IronRich') ? '#c47038'
-                    : '#8a8e98';
+            const matchedTag = asteroid.anomaly_tags.find((t: string) => TAG_COLORS[t]);
+            const asteroidFill = matchedTag
+              ? tagColor(matchedTag)
+              : '#8a8e98';
 
             return (
               <circle
