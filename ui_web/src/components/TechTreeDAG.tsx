@@ -145,7 +145,7 @@ interface DomainBarProps {
 }
 
 function DomainBar({ domain, required, evidence }: DomainBarProps) {
-  const fill = Math.min(evidence / required, 1.0);
+  const fill = required > 0 ? Math.min(evidence / required, 1.0) : 0;
   const color = DOMAIN_COLORS[domain] ?? '#888888';
 
   return (
@@ -297,13 +297,21 @@ function EdgeLine({ edge, layoutNodes }: EdgeLineProps) {
 export function TechTreeDAG({ techs, research, labAssignments }: TechTreeDAGProps) {
   const treeState = useMemo(
     () => computeTreeState(techs, research, labAssignments),
-
     [techs, research, labAssignments],
   );
 
+  // Structural key: only re-run dagre when node set or edge set changes,
+  // not on every tick when evidence values update.
+  const structureKey = useMemo(() => {
+    const nodeIds = [...treeState.nodes.keys()].sort().join(',');
+    const edgeIds = treeState.edges.map(e => `${e.from}-${e.to}`).sort().join(',');
+    return `${nodeIds}|${edgeIds}`;
+  }, [treeState.nodes, treeState.edges]);
+
   const layout = useMemo(
     () => computeLayout(treeState.nodes, treeState.edges),
-    [treeState.nodes, treeState.edges],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-layout only on structural changes
+    [structureKey],
   );
 
   if (treeState.nodes.size === 0) {
