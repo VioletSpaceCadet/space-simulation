@@ -641,9 +641,17 @@ impl CommandSource for AutopilotController {
             .collect();
         if needs_water {
             // Prioritize H2O-rich asteroids when water inventory is low
-            mine_candidates.sort_by(|a, b| h2o_mining_value(b).total_cmp(&h2o_mining_value(a)));
+            mine_candidates.sort_by(|a, b| {
+                h2o_mining_value(b)
+                    .total_cmp(&h2o_mining_value(a))
+                    .then_with(|| a.id.0.cmp(&b.id.0))
+            });
         } else {
-            mine_candidates.sort_by(|a, b| fe_mining_value(b).total_cmp(&fe_mining_value(a)));
+            mine_candidates.sort_by(|a, b| {
+                fe_mining_value(b)
+                    .total_cmp(&fe_mining_value(a))
+                    .then_with(|| a.id.0.cmp(&b.id.0))
+            });
         }
         let mut next_mine = mine_candidates.iter();
 
@@ -2161,5 +2169,110 @@ mod tests {
             candidates.contains(&asteroid_id),
             "VolatileRich asteroids should be deep scan candidates"
         );
+    }
+
+    #[test]
+    fn test_autopilot_prefers_fe_when_h2o_above_threshold() {
+        let mut content = autopilot_content();
+        // Add H2O element to content so inventory volume calc works
+        content.elements.push(sim_core::ElementDef {
+            id: "H2O".to_string(),
+            density_kg_per_m3: 1000.0,
+            display_name: "Water Ice".to_string(),
+            refined_name: Some("Water".to_string()),
+            melting_point_mk: None,
+            latent_heat_j_per_kg: None,
+            specific_heat_j_per_kg_k: None,
+        });
+        let mut state = autopilot_state(&content);
+
+        // Install heating module
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("mod_heat_001".to_string()),
+            def_id: "module_heating_unit".to_string(),
+            enabled: true,
+            wear: sim_core::WearState::default(),
+            kind_state: sim_core::ModuleKindState::Processor(sim_core::ProcessorState {
+                threshold_kg: 0.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+            }),
+            thermal: None,
+            power_stalled: false,
+        });
+        // Add H2O above threshold (500 kg) → should NOT trigger volatile targeting
+        station.inventory.push(InventoryItem::Material {
+            element: "H2O".to_string(),
+            kg: 600.0,
+            quality: 1.0,
+            thermal: None,
+        });
+
+        let fe_asteroid = AsteroidId("asteroid_fe".to_string());
+        state.asteroids.insert(
+            fe_asteroid.clone(),
+            AsteroidState {
+                id: fe_asteroid.clone(),
+                position: test_position(),
+                true_composition: HashMap::from([("Fe".to_string(), 0.8)]),
+                anomaly_tags: vec![AnomalyTag::IronRich],
+                mass_kg: 5000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(AnomalyTag::IronRich, 0.9)],
+                    composition: Some(HashMap::from([
+                        ("Fe".to_string(), 0.8),
+                        ("Si".to_string(), 0.2),
+                    ])),
+                },
+            },
+        );
+
+        let h2o_asteroid = AsteroidId("asteroid_h2o".to_string());
+        state.asteroids.insert(
+            h2o_asteroid.clone(),
+            AsteroidState {
+                id: h2o_asteroid.clone(),
+                position: test_position(),
+                true_composition: HashMap::from([("H2O".to_string(), 0.5)]),
+                anomaly_tags: vec![AnomalyTag::VolatileRich],
+                mass_kg: 3000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(AnomalyTag::VolatileRich, 0.9)],
+                    composition: Some(HashMap::from([
+                        ("H2O".to_string(), 0.5),
+                        ("Fe".to_string(), 0.1),
+                    ])),
+                },
+            },
+        );
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let mine_cmd = commands.iter().find(|cmd| {
+            matches!(
+                &cmd.command,
+                Command::AssignShipTask {
+                    task_kind: TaskKind::Mine { .. },
+                    ..
+                }
+            )
+        });
+        assert!(mine_cmd.is_some(), "should assign a mine task");
+        if let Some(cmd) = mine_cmd {
+            if let Command::AssignShipTask {
+                task_kind: TaskKind::Mine { asteroid, .. },
+                ..
+            } = &cmd.command
+            {
+                assert_eq!(
+                    *asteroid, fe_asteroid,
+                    "should prefer Fe when H2O is above threshold despite heating module"
+                );
+            }
+        }
     }
 }
