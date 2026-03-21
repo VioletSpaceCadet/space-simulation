@@ -9,6 +9,7 @@ mod cold_refinery_regression;
 mod commands;
 mod deep_scan;
 mod deposit;
+mod heating;
 mod integration;
 mod mining;
 mod performance;
