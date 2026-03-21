@@ -47,6 +47,7 @@ fn replenish_test_content() -> GameContent {
             density_kg_per_m3: 3000.0,
             display_name: "Raw Ore".to_string(),
             refined_name: None,
+            category: "raw_ore".to_string(),
             melting_point_mk: None,
             latent_heat_j_per_kg: None,
             specific_heat_j_per_kg_k: None,

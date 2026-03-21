@@ -271,6 +271,7 @@ fn maintenance_content() -> GameContent {
                 wear_reduction_per_run: 0.2,
                 repair_kit_cost: 1,
                 repair_threshold: 0.0,
+                maintenance_component_id: "repair_kit".to_string(),
             }),
             thermal: None,
         },

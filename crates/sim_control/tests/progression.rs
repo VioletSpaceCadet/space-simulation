@@ -248,6 +248,7 @@ fn production_like_content() -> GameContent {
                 wear_reduction_per_run: 0.2,
                 repair_kit_cost: 1,
                 repair_threshold: 0.1,
+                maintenance_component_id: "repair_kit".to_string(),
             }),
             thermal: None,
         },
@@ -542,6 +543,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
             base_price_per_unit: 50_000.0,
             importable: true,
             exportable: false,
+            ..Default::default()
         },
     );
 

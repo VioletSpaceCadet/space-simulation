@@ -18,6 +18,7 @@ fn economy_content() -> GameContent {
                     base_price_per_unit: 50.0,
                     importable: true,
                     exportable: true,
+                    ..Default::default()
                 },
             ),
             (
@@ -26,6 +27,7 @@ fn economy_content() -> GameContent {
                     base_price_per_unit: 500_000.0,
                     importable: true,
                     exportable: true,
+                    ..Default::default()
                 },
             ),
             (
@@ -34,6 +36,7 @@ fn economy_content() -> GameContent {
                     base_price_per_unit: 5_000_000.0,
                     importable: true,
                     exportable: true,
+                    ..Default::default()
                 },
             ),
         ]),
