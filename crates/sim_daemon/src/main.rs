@@ -732,6 +732,86 @@ mod tests {
         assert!((rate - 1000.0).abs() < 0.001);
     }
 
+    #[tokio::test]
+    async fn test_spatial_config_returns_200() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/spatial-config")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["bodies"].is_array(), "should contain bodies array");
+        assert!(
+            json["body_absolutes"].is_object(),
+            "should contain body_absolutes map"
+        );
+        assert!(
+            json["ticks_per_au"].is_number(),
+            "should contain ticks_per_au"
+        );
+        assert!(
+            json["min_transit_ticks"].is_number(),
+            "should contain min_transit_ticks"
+        );
+        assert!(
+            json["docking_range_au_um"].is_number(),
+            "should contain docking_range_au_um"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_spatial_config_body_absolutes_match_bodies() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/spatial-config")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let bodies = json["bodies"].as_array().unwrap();
+        let absolutes = json["body_absolutes"].as_object().unwrap();
+        // Every body should have an entry in body_absolutes
+        for body_def in bodies {
+            let id = body_def["id"].as_str().unwrap();
+            assert!(
+                absolutes.contains_key(id),
+                "body_absolutes missing entry for body '{id}'"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_includes_body_absolutes() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/snapshot")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(
+            json["body_absolutes"].is_object(),
+            "snapshot should include body_absolutes"
+        );
+    }
+
     #[test]
     fn test_paused_flag_parsed() {
         use clap::Parser;

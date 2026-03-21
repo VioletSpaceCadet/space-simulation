@@ -9,7 +9,9 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use sim_core::{CommandEnvelope, CommandId, EventEnvelope, PrincipalId};
+use sim_core::{
+    AbsolutePos, BodyId, CommandEnvelope, CommandId, EventEnvelope, OrbitalBodyDef, PrincipalId,
+};
 use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::sync::atomic::Ordering;
@@ -41,6 +43,7 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> Router {
         .route("/api/v1/advisor/digest", get(advisor_digest_handler))
         .route("/api/v1/command", post(command_handler))
         .route("/api/v1/pricing", get(pricing_handler))
+        .route("/api/v1/spatial-config", get(spatial_config_handler))
         .route("/api/v1/speed", post(speed_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -66,9 +69,22 @@ pub async fn snapshot_handler(
     State(app_state): State<AppState>,
 ) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
     let sim = app_state.sim.lock();
-    match serde_json::to_string(&sim.game_state) {
-        Ok(json) => {
+    match serde_json::to_value(&sim.game_state) {
+        Ok(mut val) => {
+            // Inject body_absolutes so FE can compute entity absolute positions.
+            let body_absolutes: std::collections::HashMap<BodyId, AbsolutePos> = sim
+                .game_state
+                .body_cache
+                .iter()
+                .map(|(id, bc)| (id.clone(), bc.absolute))
+                .collect();
+            if let Some(obj) = val.as_object_mut() {
+                if let Ok(ba) = serde_json::to_value(&body_absolutes) {
+                    obj.insert("body_absolutes".to_string(), ba);
+                }
+            }
             drop(sim);
+            let json = serde_json::to_string(&val).unwrap_or_default();
             (
                 StatusCode::OK,
                 [(header::CONTENT_TYPE, "application/json")],
@@ -247,6 +263,32 @@ pub async fn command_handler(
 pub async fn pricing_handler(State(app_state): State<AppState>) -> Json<sim_core::PricingTable> {
     let sim = app_state.sim.lock();
     Json(sim.content.pricing.clone())
+}
+
+#[derive(serde::Serialize)]
+struct SolarSystemConfig {
+    bodies: Vec<OrbitalBodyDef>,
+    body_absolutes: std::collections::HashMap<BodyId, AbsolutePos>,
+    ticks_per_au: u64,
+    min_transit_ticks: u64,
+    docking_range_au_um: u64,
+}
+
+async fn spatial_config_handler(State(app_state): State<AppState>) -> Json<SolarSystemConfig> {
+    let sim = app_state.sim.lock();
+    let body_absolutes = sim
+        .game_state
+        .body_cache
+        .iter()
+        .map(|(id, bc)| (id.clone(), bc.absolute))
+        .collect();
+    Json(SolarSystemConfig {
+        bodies: sim.content.solar_system.bodies.clone(),
+        body_absolutes,
+        ticks_per_au: sim.content.constants.ticks_per_au,
+        min_transit_ticks: sim.content.constants.min_transit_ticks,
+        docking_range_au_um: sim.content.constants.docking_range_au_um,
+    })
 }
 
 pub async fn speed_handler(
