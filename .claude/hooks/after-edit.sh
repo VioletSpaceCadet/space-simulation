@@ -6,7 +6,15 @@ set -euo pipefail
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 
-# Only act on Rust source files.
+# TypeScript/TSX files: run ESLint autofix
+if [[ "$FILE_PATH" =~ \.(ts|tsx)$ ]]; then
+  REPO_ROOT=$(git -C "$(dirname "$FILE_PATH")" rev-parse --show-toplevel 2>/dev/null)
+  echo "--- eslint --fix ---"
+  npx --prefix "$REPO_ROOT/ui_web" eslint --fix "$FILE_PATH" 2>&1 || true
+  exit 0
+fi
+
+# Only act on Rust source files below this point.
 if [[ ! "$FILE_PATH" =~ \.rs$ ]]; then
   exit 0
 fi
