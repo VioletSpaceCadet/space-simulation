@@ -728,6 +728,8 @@ mod tests {
         assert_eq!(snapshot.repair_kits_remaining, 0);
         assert_eq!(snapshot.balance, 0.0);
         assert_eq!(snapshot.thruster_count, 0);
+        assert_eq!(snapshot.export_revenue_total, 0.0);
+        assert_eq!(snapshot.export_count, 0);
         assert_eq!(snapshot.power_generated_kw, 0.0);
         assert_eq!(snapshot.power_consumed_kw, 0.0);
         assert_eq!(snapshot.power_deficit_kw, 0.0);
