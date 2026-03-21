@@ -76,6 +76,14 @@ jobs:
       - name: Dependency audit
         run: npm audit --audit-level=high
 
+      - name: Check for silent catch handlers
+        run: |
+          if grep -rn '\.catch(() => {})' src/ | grep -v '// intentional' | grep -q .; then
+            echo "ERROR: Silent .catch(() => {}) found. Every catch must log with context."
+            grep -rn '\.catch(() => {})' src/ | grep -v '// intentional'
+            exit 1
+          fi
+
       - name: Lint
         run: npm run lint
 

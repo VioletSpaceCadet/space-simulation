@@ -88,7 +88,7 @@ export function EconomyPanel({ snapshot, events }: Props) {
         return response.json();
       })
       .then((data: PricingTable) => setPricing(data))
-      .catch(() => {});
+      .catch((err: unknown) => console.error('Failed to fetch pricing:', err));
   }, []);
 
   const categorizedItems = useMemo(() => {
@@ -171,7 +171,8 @@ export function EconomyPanel({ snapshot, events }: Props) {
       await sendCommand('Import', importCategory, importItem, importQuantity);
       setImportStatus('sent');
       setTimeout(() => setImportStatus('idle'), 1500);
-    } catch {
+    } catch (err) {
+      console.error('Import failed:', err);
       setImportStatus('error');
       setTimeout(() => setImportStatus('idle'), 2000);
     }
@@ -184,7 +185,8 @@ export function EconomyPanel({ snapshot, events }: Props) {
       await sendCommand('Export', exportCategory, exportItem, exportQuantity);
       setExportStatus('sent');
       setTimeout(() => setExportStatus('idle'), 1500);
-    } catch {
+    } catch (err) {
+      console.error('Export failed:', err);
       setExportStatus('error');
       setTimeout(() => setExportStatus('idle'), 2000);
     }

@@ -15,7 +15,7 @@ export async function fetchMeta(): Promise<MetaInfo> {
 export async function saveGame(): Promise<{ path: string; tick: number }> {
   const response = await fetch('/api/v1/save', { method: 'POST' });
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: 'unknown error' }));
+    const body = await response.json().catch(() => ({ error: 'unknown error' })); // intentional — fallback when response body is not JSON
     throw new Error(body.error ?? `Save failed: ${response.status}`);
   }
   return response.json();

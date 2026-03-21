@@ -49,21 +49,25 @@ export default function App() {
         setMinutesPerTick(meta.minutes_per_tick);
         setPaused(meta.paused);
       })
-      .catch(() => {});
+      .catch((err: unknown) => console.error('fetchMeta failed:', err));
   }, []);
 
   const handleTogglePause = useCallback(() => {
     const nextPaused = !paused;
     if (nextPaused) { playPause(); } else { playResume(); }
     setPaused(nextPaused)
-    ;(nextPaused ? pauseGame() : resumeGame()).catch(() => setPaused(!nextPaused));
+    ;(nextPaused ? pauseGame() : resumeGame()).catch((err: unknown) => {
+      console.error('togglePause failed:', err);
+      setPaused(!nextPaused);
+    });
   }, [paused]);
 
   const handleSetSpeed = useCallback((tps: number) => {
     setTicksPerSec(tps);
-    setSpeed(tps).catch(() => {
+    setSpeed(tps).catch((err: unknown) => {
+      console.error('setSpeed failed:', err);
       // Revert on failure — re-fetch meta to get actual speed
-      fetchMeta().then((meta) => setTicksPerSec(meta.ticks_per_sec)).catch(() => {});
+      fetchMeta().then((meta) => setTicksPerSec(meta.ticks_per_sec)).catch((innerErr: unknown) => console.error('fetchMeta fallback failed:', innerErr));
     });
   }, []);
 
