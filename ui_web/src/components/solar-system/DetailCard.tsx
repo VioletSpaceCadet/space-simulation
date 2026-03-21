@@ -78,7 +78,20 @@ function AsteroidDetail({ asteroid }: { asteroid: AsteroidState }) {
         <div className="text-muted mt-1">mass: {asteroid.mass_kg.toLocaleString()} kg</div>
       )}
       {asteroid.anomaly_tags.length > 0 && (
-        <div className="text-muted mt-1">tags: {asteroid.anomaly_tags.join(', ')}</div>
+        <div className="mt-1" style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          {asteroid.anomaly_tags.map((tag) => {
+            const color =
+              tag === 'VolatileRich' ? '#38a0c4'
+                : tag === 'Carbonaceous' ? '#b48c3c'
+                  : tag === 'IronRich' ? '#c47038'
+                    : '#8a8e98';
+            return (
+              <span key={tag} style={{ color, background: `${color}22`, padding: '0 4px', borderRadius: 2, fontSize: 10 }}>
+                {tag}
+              </span>
+            );
+          })}
+        </div>
       )}
       {asteroid.knowledge.composition && (
         <div className="text-dim mt-1">

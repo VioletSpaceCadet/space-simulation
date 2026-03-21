@@ -19,9 +19,30 @@ function compositionSummary(composition: Record<string, number> | null): string 
     .join(' | ');
 }
 
-function tagSummary(tagBeliefs: [string, number][]): string {
-  if (tagBeliefs.length === 0) {return '—';}
-  return tagBeliefs.map(([tag, conf]) => `${tag} (${pct(conf)})`).join(', ');
+const TAG_COLORS: Record<string, { bg: string; text: string }> = {
+  IronRich: { bg: 'rgba(196, 112, 56, 0.15)', text: '#c47038' },
+  VolatileRich: { bg: 'rgba(56, 160, 196, 0.15)', text: '#38a0c4' },
+  Carbonaceous: { bg: 'rgba(180, 140, 60, 0.15)', text: '#b48c3c' },
+};
+
+function TagBadge({ tag, confidence }: { tag: string; confidence: number }) {
+  const colors = TAG_COLORS[tag] ?? { bg: 'rgba(138, 142, 152, 0.15)', text: '#8a8e98' };
+  return (
+    <span
+      style={{ background: colors.bg, color: colors.text, padding: '0 4px', borderRadius: 2, fontSize: 10 }}
+    >
+      {tag} {pct(confidence)}
+    </span>
+  );
+}
+
+function TagBadges({ tagBeliefs }: { tagBeliefs: [string, number][] }) {
+  if (tagBeliefs.length === 0) {return <span className="text-faint">—</span>;}
+  return (
+    <span style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+      {tagBeliefs.map(([tag, conf]) => <TagBadge key={tag} tag={tag} confidence={conf} />)}
+    </span>
+  );
 }
 
 function primaryFraction(asteroid: AsteroidState): number {
@@ -86,7 +107,7 @@ export function AsteroidTable({ asteroids }: Props) {
             <tr key={asteroid.id}>
               <td className="px-2 py-0.5 border-b border-surface">{asteroid.id}</td>
               <td className="px-2 py-0.5 border-b border-surface">{asteroid.position.parent_body}</td>
-              <td className="px-2 py-0.5 border-b border-surface">{tagSummary(asteroid.knowledge.tag_beliefs)}</td>
+              <td className="px-2 py-0.5 border-b border-surface"><TagBadges tagBeliefs={asteroid.knowledge.tag_beliefs} /></td>
               <td className="px-2 py-0.5 border-b border-surface text-cargo">{compositionSummary(asteroid.knowledge.composition)}</td>
               <td className="px-2 py-0.5 border-b border-surface">
                 {asteroid.mass_kg === undefined
