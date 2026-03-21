@@ -178,44 +178,92 @@ Override constants or module parameters without editing content files:
 
 ### What it is
 
-Claude Code's built-in Chrome browser tools, used via the `fe-chrome-tester` agent. Takes screenshots, inspects DOM, checks console errors, and verifies UI rendering against live SSE data.
+Claude Code's built-in Chrome browser tools, used via the `fe-chrome-tester` agent. Takes screenshots, inspects DOM, checks console errors, runs JS in page context, and verifies UI rendering against live SSE data. Verified working as of 2026-03-20.
 
 ### Prerequisites
 
-- Claude Code must be started with `--chrome` flag: `claude --chrome`
-- A running daemon (use MCP `start_simulation` or manual `cargo run -p sim_daemon`)
-- A running Vite dev server: `cd ui_web && npm run dev` (port 5173)
+1. **Claude Code with `--chrome` flag**: `claude --chrome`
+2. **Chrome browser** open with the **Claude in Chrome** extension installed and active (green "Claude (MCP)" tab visible)
+3. **Running daemon**: use MCP `start_simulation` (recommended) or manual `cargo run -p sim_daemon`
+4. **Running Vite dev server**: `cd ui_web && npm run dev` (port 5173)
 
-### How to use it
+### Setup gotchas
 
-Launch the `fe-chrome-tester` agent via the Agent tool. It has access to Chrome browser tools:
-- `navigate_to(url)` — load a page
-- `take_screenshot()` — capture current viewport
-- `click(selector)` — interact with elements
-- `read_console_messages()` — check for JS errors
-- `evaluate(js)` — run JS in the page context
+- **Extension connection can be finicky.** If `tabs_context_mcp` returns "No Chrome extension connected", try: click the extension icon in Chrome toolbar, close/reopen the Claude (MCP) tab, or restart Chrome. May take a few attempts.
+- **Always call `tabs_context_mcp` first** to get tab IDs. Then either navigate an existing tab or create a new one with `tabs_create_mcp`.
+- **Start the daemon via MCP** (`start_simulation`), not manually. The MCP server manages the lifecycle and avoids port conflicts.
+
+### Verified tool workflow
+
+```
+1. tabs_context_mcp (createIfEmpty: true)    → get tab IDs
+2. navigate (url: "http://localhost:5173")    → load the UI
+3. computer (action: "screenshot")           → verify UI rendered
+4. set_speed (ticks_per_sec: 1000)           → crank sim for data
+5. computer (action: "wait", duration: 3)    → accumulate ticks
+6. computer (action: "screenshot")           → verify SSE streaming
+7. read_console_messages (onlyErrors: true)  → check for JS errors
+8. javascript_tool (action: "javascript_exec", text: "...") → extract DOM state
+9. find (query: "RUNNING button")            → locate interactive elements
+10. computer (action: "left_click", ref: "ref_19") → click by ref
+```
+
+### Key tools and what they're good for
+
+| Tool | Use for |
+|------|---------|
+| `computer` (screenshot) | Visual verification, layout checks |
+| `computer` (left_click with ref) | Clicking buttons, nav links, alert pills |
+| `computer` (key: "Space") | Testing keyboard shortcuts |
+| `find` (natural language query) | Locating buttons, inputs, elements by description |
+| `javascript_tool` | Extracting DOM state, comparing against API, debugging |
+| `read_console_messages` (onlyErrors) | Checking for JS errors after interactions |
+| `read_page` | Getting full accessibility tree of page elements |
+| `zoom` (region) | Inspecting small UI elements like status bar dots |
+
+### Practical debugging pattern: API vs UI state comparison
+
+The most useful Chrome testing technique is comparing daemon API state against rendered UI:
+
+```javascript
+// Run via javascript_tool — extract key UI values from DOM
+JSON.stringify({
+  tick: document.body.innerText.match(/tick (\d+)/)?.[1],
+  balance: document.body.innerText.match(/\$[\d.]+[BMK]?/)?.[0],
+  alertPills: [...document.querySelectorAll('button')]
+    .filter(b => b.textContent.includes('×'))
+    .map(b => b.textContent.trim())
+})
+```
+
+Then compare with `curl localhost:3001/api/v1/meta` — ticks should match, alerts should match. Drift means SSE handlers are dropping or misprocessing events.
 
 ### What works well
 
-- **Visual verification** — screenshots show actual rendered state, catches layout bugs
-- **SSE health checking** — verify tick counter advances, status bar dot is green
-- **Panel rendering** — verify all 6 panels (MAP, EVENTS, ASTEROIDS, FLEET, RESEARCH, ECONOMY) render
-- **State comparison** — compare `curl localhost:3001/api/v1/state` against what the UI shows
-- **Console error detection** — catches unhandled promise rejections, missing event handlers
+- **Visual verification** — screenshots show actual rendered state at 1440x736
+- **SSE health checking** — green dot + advancing tick counter = healthy connection
+- **Panel rendering** — all 6 panels (MAP, EVENTS, ASTEROIDS, FLEET, RESEARCH, ECONOMY) verified
+- **Keyboard shortcuts** — spacebar pause/resume, number keys for speed presets
+- **Alert pills** — rendered correctly with dismiss (×) buttons
+- **Console error detection** — `onlyErrors: true` flag filters noise effectively
+- **`find` tool** — natural language queries like "RUNNING button" reliably locate elements
+- **Click by ref** — more reliable than coordinate-based clicking
 
 ### Gotchas
 
-- **Requires `--chrome` flag** — without it, Chrome tools are not available. This is the most common "why doesn't it work" issue.
-- **HMR may miss deep hook changes** — use hard reload (Cmd+R) to confirm fixes in hooks like `applyEvents.ts`
-- **`read_console_messages` replays full buffer** — even with `clear: true`, you may see historical messages. Focus on errors after a known action.
-- **SSE readyState is unreliable** — check the status bar green/red dot or whether tick counter advances, not `EventSource.readyState`
-- **Port conflicts** — if something is already running on 5173, Vite falls back to another port. The UI may not connect to the daemon if CORS origins don't match.
+- **Extension connection is the #1 setup issue.** `tabs_context_mcp` returning "No Chrome extension connected" means the WebSocket between Claude Code and the extension isn't established. Clicking the extension icon or restarting Chrome usually fixes it.
+- **Requires `--chrome` flag** — without it, Chrome tools won't even load. Not a graceful error.
+- **Console tracking starts on first call.** Call `read_console_messages` early, then again after actions to catch errors.
+- **HMR may miss deep hook changes** — use hard reload (Cmd+R via `computer key "cmd+r"`) for hooks like `applyEvents.ts`.
+- **SSE readyState is unreliable** — check the status bar green/red dot or whether tick counter advances, not `EventSource.readyState`.
+- **Port conflicts** — if something is already on 5173, Vite falls back. Check `lsof -i :5173` first.
 
 ### When to use
 
 - After changing React components, CSS, or panel rendering
 - To verify SSE event handlers actually update the UI
-- When investigating a visual bug reported by a user
+- To compare API state vs rendered UI state (the killer debugging technique)
+- When investigating a visual bug
 - NOT for automated regression testing (use vitest + Playwright for that)
 
 ---
