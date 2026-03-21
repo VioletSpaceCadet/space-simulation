@@ -19,6 +19,28 @@
         "He": [0.00, 0.10]
       },
       "preferred_class": null
+    },
+    {
+      "id": "tmpl_volatile_rich",
+      "anomaly_tags": ["VolatileRich"],
+      "composition_ranges": {
+        "H2O": [0.30, 0.60],
+        "Fe":  [0.05, 0.15],
+        "Si":  [0.10, 0.25],
+        "He":  [0.05, 0.20]
+      },
+      "preferred_class": "VolatileRich"
+    },
+    {
+      "id": "tmpl_carbonaceous",
+      "anomaly_tags": ["Carbonaceous"],
+      "composition_ranges": {
+        "H2O": [0.15, 0.35],
+        "Fe":  [0.10, 0.20],
+        "Si":  [0.20, 0.35],
+        "He":  [0.10, 0.25]
+      },
+      "preferred_class": "VolatileRich"
     }
   ]
 }

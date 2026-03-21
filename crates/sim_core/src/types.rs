@@ -60,6 +60,8 @@ string_id!(ComponentId);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AnomalyTag {
     IronRich,
+    VolatileRich,
+    Carbonaceous,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
