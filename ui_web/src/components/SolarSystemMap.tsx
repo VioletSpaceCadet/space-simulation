@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fetchSpatialConfig } from '../api';
 import {
   BODY_COLORS,
+  TAG_COLORS,
   ZONE_COLORS,
   ZONE_STROKES,
   shipTaskColor,
@@ -322,8 +323,9 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
             const { x, y } = toSvgPos(entityAbsolute(asteroid.position, bodyAbsolutes));
             const massKg = asteroid.mass_kg ?? 1000;
             const size = Math.max(2.5, Math.min(8, Math.log10(massKg)));
-            const asteroidFill = asteroid.anomaly_tags.length > 0
-              ? tagColor(asteroid.anomaly_tags[0])
+            const matchedTag = asteroid.anomaly_tags.find((t: string) => TAG_COLORS[t]);
+            const asteroidFill = matchedTag
+              ? tagColor(matchedTag)
               : '#8a8e98';
 
             return (

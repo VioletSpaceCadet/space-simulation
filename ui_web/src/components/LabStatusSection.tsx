@@ -1,4 +1,4 @@
-import { LAB_STATUS_STYLES } from '../config/theme';
+import { LAB_STATUS_STYLES, SEMANTIC_COLORS } from '../config/theme';
 import type { LabRateInfo } from '../types';
 
 export interface LabStatusSectionProps {
@@ -59,7 +59,7 @@ export function LabStatusSection({ labs, techNames }: LabStatusSectionProps) {
               <span className="text-muted truncate max-w-[8rem]">{techName}</span>
             )}
             {lab.assigned_tech !== null && (
-              <span className="text-[10px]" style={{ color: '#4caf7d' }}>
+              <span className="text-[10px]" style={{ color: SEMANTIC_COLORS.positive }}>
                 +{lab.points_per_hour.toFixed(1)}/hr
               </span>
             )}

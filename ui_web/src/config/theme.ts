@@ -10,7 +10,17 @@ export function hashColor(value: string): string {
     hash = value.charCodeAt(i) + ((hash << 5) - hash);
   }
   const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 55%, 55%)`;
+  // Convert to hex so callers can safely append alpha bytes
+  const h = hue / 360;
+  const s = 0.55;
+  const l = 0.55;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
 }
 
 // --- Asteroid anomaly tags ---
