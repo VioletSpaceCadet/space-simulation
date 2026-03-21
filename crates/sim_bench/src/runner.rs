@@ -221,7 +221,8 @@ mod tests {
     fn test_run_seed_with_base_state() {
         let content = sim_world::load_content("../../content").unwrap();
         let json = std::fs::read_to_string("../../content/dev_base_state.json").unwrap();
-        let base_state: GameState = serde_json::from_str(&json).unwrap();
+        let mut base_state: GameState = serde_json::from_str(&json).unwrap();
+        base_state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
         let temp_dir = TempDir::new().unwrap();
         let seed_dir = temp_dir.path().join("seed_99");
         let params = serde_json::json!({"ticks": 120});
