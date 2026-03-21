@@ -41,6 +41,47 @@
     }
   },
   {
+    "id": "module_heating_unit",
+    "name": "Heating Unit",
+    "mass_kg": 500.0,
+    "volume_m3": 2.0,
+    "power_consumption_per_run": 15.0,
+    "wear_per_run": 0.01,
+    "behavior": {
+      "Processor": {
+        "processing_interval_minutes": 60,
+        "recipes": [
+          {
+            "id": "recipe_extract_water",
+            "inputs": [
+              {
+                "filter": { "ItemKind": "Ore" },
+                "amount": { "Kg": 1000.0 }
+              }
+            ],
+            "outputs": [
+              {
+                "Material": {
+                  "element": "H2O",
+                  "yield_formula": { "ElementFraction": { "element": "H2O" } },
+                  "quality_formula": {
+                    "ElementFractionTimesMultiplier": { "element": "H2O", "multiplier": 1.0 }
+                  }
+                }
+              },
+              {
+                "Slag": {
+                  "yield_formula": { "FixedFraction": 1.0 }
+                }
+              }
+            ],
+            "efficiency": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
     "id": "module_maintenance_bay",
     "name": "Maintenance Bay",
     "mass_kg": 2000.0,
