@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import type { AsteroidState, ComponentItem, MaterialItem, ModuleKindState, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
+import type { AsteroidState, ComponentItem, MaterialItem, ModuleKindState, OverheatZone, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
 
 import { eventSchemas } from './eventSchemas';
 import type { EventType } from './eventSchemas';
@@ -669,6 +669,36 @@ function handleDataGenerated(state: SimState, event: EventPayload<'DataGenerated
   };
 }
 
+function handleOverheatWarning(state: SimState, event: EventPayload<'OverheatWarning'>): SimState {
+  return updateModuleThermalZone(state, event.station_id, event.module_id, 'Warning', event.temp_mk, false);
+}
+
+function handleOverheatCritical(state: SimState, event: EventPayload<'OverheatCritical'>): SimState {
+  return updateModuleThermalZone(state, event.station_id, event.module_id, 'Critical', event.temp_mk, true);
+}
+
+function handleOverheatCleared(state: SimState, event: EventPayload<'OverheatCleared'>): SimState {
+  return updateModuleThermalZone(state, event.station_id, event.module_id, 'Nominal', event.temp_mk, false);
+}
+
+function updateModuleThermalZone(
+  state: SimState,
+  stationId: string,
+  moduleId: string,
+  zone: OverheatZone,
+  tempMk: number,
+  overheatDisabled: boolean,
+): SimState {
+  return mapStationModule(state, stationId, moduleId, (m) => {
+    const thermal = m.thermal ?? { temp_mk: tempMk, thermal_group: null, overheat_zone: zone, overheat_disabled: overheatDisabled };
+    return {
+      ...m,
+      thermal: { ...thermal, temp_mk: tempMk, overheat_zone: zone, overheat_disabled: overheatDisabled },
+      enabled: overheatDisabled ? false : m.enabled,
+    };
+  });
+}
+
 // No-op handler for informational events that don't mutate state
 function noOp(state: SimState): SimState {
   return state;
@@ -720,9 +750,9 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   ShipArrived: handleShipArrived,
   DataGenerated: handleDataGenerated,
   ProcessorTooCold: noOp,
-  OverheatWarning: noOp,
-  OverheatCritical: noOp,
-  OverheatCleared: noOp,
+  OverheatWarning: handleOverheatWarning,
+  OverheatCritical: handleOverheatCritical,
+  OverheatCleared: handleOverheatCleared,
 };
 
 export function applyEvents(

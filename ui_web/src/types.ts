@@ -38,11 +38,20 @@ export interface SlagItem {
   composition: CompositionVec
 }
 
+export type Phase = 'Solid' | 'Liquid'
+
+export interface MaterialThermalProps {
+  temp_mk: number
+  phase: Phase
+  latent_heat_buffer_j: number
+}
+
 export interface MaterialItem {
   kind: 'Material'
   element: string
   kg: number
   quality: number
+  thermal?: MaterialThermalProps
 }
 
 export interface ComponentItem {
@@ -107,12 +116,22 @@ export interface WearState {
   wear: number
 }
 
+export type OverheatZone = 'Nominal' | 'Warning' | 'Critical'
+
+export interface ThermalState {
+  temp_mk: number
+  thermal_group: string | null
+  overheat_zone: OverheatZone
+  overheat_disabled: boolean
+}
+
 export interface ModuleState {
   id: string
   def_id: string
   enabled: boolean
   kind_state: ModuleKindState
   wear: WearState
+  thermal?: ThermalState
 }
 
 export interface ShipState {
