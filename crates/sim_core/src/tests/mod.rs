@@ -17,6 +17,7 @@ mod refinery;
 mod research;
 mod survey;
 mod thermal;
+mod thermal_determinism;
 mod transit;
 mod wear;
 
