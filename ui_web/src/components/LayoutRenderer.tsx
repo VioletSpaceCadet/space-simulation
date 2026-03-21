@@ -30,7 +30,7 @@ function RenderNode({
     return (
       <section className="relative flex flex-col h-full overflow-hidden bg-void p-3">
         <DraggableTab panelId={node.panelId} isDragging={drag.activeDragId === node.panelId} />
-        <div className="flex-1 overflow-hidden mt-2">{renderPanel(node.panelId)}</div>
+        <div className="flex-1 min-h-0 overflow-y-auto mt-2">{renderPanel(node.panelId)}</div>
         <DropZoneOverlay
           panelId={node.panelId}
           active={drag.isDragging && drag.activeDragId !== node.panelId}
