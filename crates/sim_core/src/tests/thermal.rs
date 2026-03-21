@@ -140,7 +140,6 @@ fn thermal_constants_deserialize_from_json() {
     let json = r#"{
         "survey_scan_minutes": 1,
         "deep_scan_minutes": 1,
-        "travel_minutes_per_hop": 1,
         "survey_tag_detection_probability": 1.0,
         "asteroid_count_per_template": 1,
         "asteroid_mass_min_kg": 500.0,
@@ -183,7 +182,6 @@ fn thermal_constants_default_when_missing_from_json() {
     let json = r#"{
         "survey_scan_minutes": 1,
         "deep_scan_minutes": 1,
-        "travel_minutes_per_hop": 1,
         "survey_tag_detection_probability": 1.0,
         "asteroid_count_per_template": 1,
         "asteroid_mass_min_kg": 500.0,

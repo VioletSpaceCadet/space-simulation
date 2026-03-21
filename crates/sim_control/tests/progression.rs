@@ -24,7 +24,6 @@ fn production_like_content() -> GameContent {
     // Realistic durations (game-time minutes)
     content.constants.survey_scan_minutes = 120;
     content.constants.deep_scan_minutes = 480;
-    content.constants.travel_minutes_per_hop = 2880;
     content.constants.deposit_minutes = 120;
     content.constants.research_roll_interval_minutes = 60;
     content.constants.mining_rate_kg_per_minute = 15.0;
@@ -347,10 +346,6 @@ fn derive_tick_values_produces_correct_ticks_at_mpt_60() {
     assert_eq!(
         content.constants.deep_scan_ticks, 8,
         "480 min / 60 mpt = 8 ticks"
-    );
-    assert_eq!(
-        content.constants.travel_ticks_per_hop, 48,
-        "2880 min / 60 mpt = 48 ticks"
     );
     assert_eq!(
         content.constants.deposit_ticks, 2,

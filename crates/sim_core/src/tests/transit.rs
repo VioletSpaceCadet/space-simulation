@@ -1,116 +1,6 @@
 use super::*;
 
 #[test]
-fn test_shortest_hop_count_same_node() {
-    let content = test_content();
-    let node = NodeId("node_test".to_string());
-    assert_eq!(
-        shortest_hop_count(&node, &node, &content.solar_system),
-        Some(0)
-    );
-}
-
-#[test]
-fn test_shortest_hop_count_adjacent() {
-    let solar_system = SolarSystemDef {
-        bodies: vec![],
-        nodes: vec![
-            NodeDef {
-                id: NodeId("a".to_string()),
-                name: "A".to_string(),
-                solar_intensity: 1.0,
-            },
-            NodeDef {
-                id: NodeId("b".to_string()),
-                name: "B".to_string(),
-                solar_intensity: 1.0,
-            },
-        ],
-        edges: vec![(NodeId("a".to_string()), NodeId("b".to_string()))],
-    };
-    assert_eq!(
-        shortest_hop_count(
-            &NodeId("a".to_string()),
-            &NodeId("b".to_string()),
-            &solar_system
-        ),
-        Some(1)
-    );
-    assert_eq!(
-        shortest_hop_count(
-            &NodeId("b".to_string()),
-            &NodeId("a".to_string()),
-            &solar_system
-        ),
-        Some(1)
-    );
-}
-
-#[test]
-fn test_shortest_hop_count_two_hops() {
-    let solar_system = SolarSystemDef {
-        bodies: vec![],
-        nodes: vec![
-            NodeDef {
-                id: NodeId("a".to_string()),
-                name: "A".to_string(),
-                solar_intensity: 1.0,
-            },
-            NodeDef {
-                id: NodeId("b".to_string()),
-                name: "B".to_string(),
-                solar_intensity: 1.0,
-            },
-            NodeDef {
-                id: NodeId("c".to_string()),
-                name: "C".to_string(),
-                solar_intensity: 1.0,
-            },
-        ],
-        edges: vec![
-            (NodeId("a".to_string()), NodeId("b".to_string())),
-            (NodeId("b".to_string()), NodeId("c".to_string())),
-        ],
-    };
-    assert_eq!(
-        shortest_hop_count(
-            &NodeId("a".to_string()),
-            &NodeId("c".to_string()),
-            &solar_system
-        ),
-        Some(2)
-    );
-}
-
-#[test]
-fn test_shortest_hop_count_no_path() {
-    let solar_system = SolarSystemDef {
-        bodies: vec![],
-        nodes: vec![
-            NodeDef {
-                id: NodeId("a".to_string()),
-                name: "A".to_string(),
-                solar_intensity: 1.0,
-            },
-            NodeDef {
-                id: NodeId("b".to_string()),
-                name: "B".to_string(),
-                solar_intensity: 1.0,
-            },
-        ],
-        edges: vec![],
-    };
-    assert_eq!(
-        shortest_hop_count(
-            &NodeId("a".to_string()),
-            &NodeId("b".to_string()),
-            &solar_system
-        ),
-        None
-    );
-}
-
-#[test]
 #[allow(clippy::too_many_lines)]
 fn transit_moves_ship_and_starts_next_task() {
     let mut content = test_content();
@@ -132,7 +22,6 @@ fn transit_moves_ship_and_starts_next_task() {
         ],
         edges: vec![(node_a.clone(), node_b.clone())],
     };
-    content.constants.travel_ticks_per_hop = 5;
     content.constants.survey_scan_ticks = 1;
 
     let pos_a = Position {

@@ -60,7 +60,6 @@ fn replenish_test_content() -> GameContent {
         constants: Constants {
             survey_scan_minutes: 1,
             deep_scan_minutes: 1,
-            travel_minutes_per_hop: 1,
             survey_tag_detection_probability: 1.0,
             asteroid_count_per_template: 1,
             asteroid_mass_min_kg: 500.0,
@@ -99,7 +98,6 @@ fn replenish_test_content() -> GameContent {
             // Derived fields — filled by derive_tick_values()
             survey_scan_ticks: 0,
             deep_scan_ticks: 0,
-            travel_ticks_per_hop: 0,
             mining_rate_kg_per_tick: 0.0,
             deposit_ticks: 0,
             station_power_available_per_tick: 0.0,
