@@ -133,6 +133,8 @@ pub fn base_content() -> GameContent {
             mining_rate_kg_per_minute: 50.0,
             deposit_minutes: 1, // fast for tests
             autopilot_iron_rich_confidence_threshold: 0.7,
+            autopilot_volatile_confidence_threshold: 0.7,
+            autopilot_volatile_threshold_kg: 500.0,
             autopilot_refinery_threshold_kg: 500.0,
             research_roll_interval_minutes: 60,
             data_generation_peak: 100.0,
@@ -235,6 +237,8 @@ pub fn minimal_content() -> GameContent {
             mining_rate_kg_per_minute: 50.0,
             deposit_minutes: 1,
             autopilot_iron_rich_confidence_threshold: 0.7,
+            autopilot_volatile_confidence_threshold: 0.7,
+            autopilot_volatile_threshold_kg: 500.0,
             autopilot_refinery_threshold_kg: 500.0,
             research_roll_interval_minutes: 60,
             data_generation_peak: 100.0,
