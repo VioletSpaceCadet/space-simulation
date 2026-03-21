@@ -1,8 +1,9 @@
 use sim_core::{
-    inventory_volume_m3, mine_duration, shortest_hop_count, trade, AnomalyTag, AsteroidId,
-    AsteroidState, Command, CommandEnvelope, CommandId, ComponentId, DomainProgress, GameContent,
-    GameState, InputAmount, InputFilter, InventoryItem, ModuleBehaviorDef, ModuleKindState, NodeId,
-    PrincipalId, ShipId, ShipState, SiteId, StationState, TaskKind, TechDef, TechId, TradeItemSpec,
+    compute_entity_absolute, inventory_volume_m3, is_co_located, mine_duration, trade,
+    travel_ticks, AnomalyTag, AsteroidId, AsteroidState, Command, CommandEnvelope, CommandId,
+    ComponentId, DomainProgress, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
+    ModuleBehaviorDef, ModuleKindState, Position, PrincipalId, ShipId, ShipState, SiteId,
+    StationState, TaskKind, TechDef, TechId, TradeItemSpec,
 };
 
 pub trait CommandSource {
@@ -27,15 +28,34 @@ const AUTOPILOT_OWNER: &str = "principal_autopilot";
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/// Wraps `task` in a Transit if `from` and `to` are different nodes; else returns `task` as-is.
-fn maybe_transit(task: TaskKind, from: &NodeId, to: &NodeId, content: &GameContent) -> TaskKind {
-    match shortest_hop_count(from, to, &content.solar_system) {
-        Some(0) | None => task,
-        Some(hops) => TaskKind::Transit {
-            destination: to.clone(),
-            total_ticks: hops * content.constants.travel_ticks_per_hop,
-            then: Box::new(task),
-        },
+/// Wraps `task` in a Transit if `from` and `to` are not co-located; else returns `task` as-is.
+fn maybe_transit(
+    task: TaskKind,
+    from: &Position,
+    to: &Position,
+    state: &GameState,
+    content: &GameContent,
+) -> TaskKind {
+    if is_co_located(
+        from,
+        to,
+        &state.body_cache,
+        content.constants.docking_range_au_um,
+    ) {
+        return task;
+    }
+    let from_abs = compute_entity_absolute(from, &state.body_cache);
+    let to_abs = compute_entity_absolute(to, &state.body_cache);
+    let ticks = travel_ticks(
+        from_abs,
+        to_abs,
+        content.constants.ticks_per_au,
+        content.constants.min_transit_ticks,
+    );
+    TaskKind::Transit {
+        destination: to.clone(),
+        total_ticks: ticks,
+        then: Box::new(task),
     }
 }
 
@@ -173,17 +193,19 @@ fn deposit_priority(
     {
         return None;
     }
+    let ship_abs = compute_entity_absolute(&ship.position, &state.body_cache);
     let station = state.stations.values().min_by_key(|s| {
-        shortest_hop_count(&ship.location_node, &s.location_node, &content.solar_system)
-            .unwrap_or(u64::MAX)
+        let s_abs = compute_entity_absolute(&s.position, &state.body_cache);
+        ship_abs.distance_squared(s_abs)
     })?;
     Some(maybe_transit(
         TaskKind::Deposit {
             station: station.id.clone(),
             blocked: false,
         },
-        &ship.location_node,
-        &station.location_node,
+        &ship.position,
+        &station.position,
+        state,
         content,
     ))
 }
@@ -602,8 +624,9 @@ impl CommandSource for AutopilotController {
                         asteroid: asteroid.id.clone(),
                         duration_ticks: mine_duration(asteroid, ship, content),
                     },
-                    &ship.location_node,
-                    &asteroid.location_node,
+                    &ship.position,
+                    &asteroid.position,
+                    state,
                     content,
                 );
                 commands.push(make_cmd(
@@ -621,13 +644,14 @@ impl CommandSource for AutopilotController {
             // Priority 3: deep scan (enables future mining).
             if deep_scan_unlocked {
                 if let Some(asteroid_id) = next_deep_scan.next() {
-                    let node = state.asteroids[asteroid_id].location_node.clone();
+                    let asteroid_pos = state.asteroids[asteroid_id].position.clone();
                     let task = maybe_transit(
                         TaskKind::DeepScan {
                             asteroid: asteroid_id.clone(),
                         },
-                        &ship.location_node,
-                        &node,
+                        &ship.position,
+                        &asteroid_pos,
+                        state,
                         content,
                     );
                     commands.push(make_cmd(
@@ -649,8 +673,9 @@ impl CommandSource for AutopilotController {
                     TaskKind::Survey {
                         site: SiteId(site.id.0.clone()),
                     },
-                    &ship.location_node,
-                    &site.node,
+                    &ship.position,
+                    &site.position,
+                    state,
                     content,
                 );
                 commands.push(make_cmd(
@@ -672,8 +697,8 @@ impl CommandSource for AutopilotController {
 mod tests {
     use super::*;
     use sim_core::{
-        test_fixtures::{base_content, base_state},
-        AsteroidId, AsteroidKnowledge, AsteroidState, ComponentDef, InventoryItem, LotId, NodeId,
+        test_fixtures::{base_content, base_state, test_position},
+        AsteroidId, AsteroidKnowledge, AsteroidState, ComponentDef, InventoryItem, LotId,
         PricingEntry, ShipId, StationId,
     };
     use std::collections::HashMap;
@@ -707,7 +732,7 @@ mod tests {
             asteroid_id.clone(),
             AsteroidState {
                 id: asteroid_id.clone(),
-                location_node: NodeId("node_test".to_string()),
+                position: test_position(),
                 true_composition: HashMap::from([("Fe".to_string(), 1.0)]),
                 anomaly_tags: vec![],
                 mass_kg: 500.0,
@@ -886,7 +911,7 @@ mod tests {
         // Restore scan sites (autopilot_state clears them).
         state.scan_sites = vec![sim_core::ScanSite {
             id: SiteId("site_0001".to_string()),
-            node: NodeId("node_test".to_string()),
+            position: test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         }];
         // No asteroids (default), no cargo on ship → should fall through to Survey.
@@ -932,7 +957,7 @@ mod tests {
         // Add a scan site so ship has something to do.
         state.scan_sites = vec![sim_core::ScanSite {
             id: SiteId("site_0001".to_string()),
-            node: NodeId("node_test".to_string()),
+            position: test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         }];
 
@@ -966,7 +991,7 @@ mod tests {
             ship_2.clone(),
             ShipState {
                 id: ship_2,
-                location_node: NodeId("node_test".to_string()),
+                position: test_position(),
                 owner,
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
@@ -978,12 +1003,12 @@ mod tests {
         state.scan_sites = vec![
             sim_core::ScanSite {
                 id: SiteId("site_0001".to_string()),
-                node: NodeId("node_test".to_string()),
+                position: test_position(),
                 template_id: "tmpl_iron_rich".to_string(),
             },
             sim_core::ScanSite {
                 id: SiteId("site_0002".to_string()),
-                node: NodeId("node_test".to_string()),
+                position: test_position(),
                 template_id: "tmpl_iron_rich".to_string(),
             },
         ];

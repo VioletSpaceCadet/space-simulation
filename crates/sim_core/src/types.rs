@@ -132,7 +132,7 @@ pub struct MetaState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanSite {
     pub id: SiteId,
-    pub node: NodeId,
+    pub position: crate::Position,
     /// References an `AsteroidTemplateDef` id in `GameContent`.
     pub template_id: String,
 }
@@ -260,7 +260,7 @@ pub struct LabState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsteroidState {
     pub id: AsteroidId,
-    pub location_node: NodeId,
+    pub position: crate::Position,
     /// Ground truth — never exposed to the UI.
     pub true_composition: CompositionVec,
     pub anomaly_tags: Vec<AnomalyTag>,
@@ -278,7 +278,7 @@ pub struct AsteroidKnowledge {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShipState {
     pub id: ShipId,
-    pub location_node: NodeId,
+    pub position: crate::Position,
     pub owner: PrincipalId,
     pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
@@ -301,7 +301,7 @@ pub struct PowerState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StationState {
     pub id: StationId,
-    pub location_node: NodeId,
+    pub position: crate::Position,
     pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
@@ -354,8 +354,8 @@ pub enum TaskKind {
     Idle,
     /// Ship is in transit. On arrival it will immediately start `then`.
     Transit {
-        destination: NodeId,
-        /// Pre-computed total travel ticks (`hop_count` × `travel_ticks_per_hop`).
+        destination: crate::Position,
+        /// Pre-computed total travel ticks.
         total_ticks: u64,
         then: Box<TaskKind>,
     },
@@ -519,7 +519,7 @@ pub enum Event {
     },
     AsteroidDiscovered {
         asteroid_id: AsteroidId,
-        location_node: NodeId,
+        position: crate::Position,
     },
     ScanResult {
         asteroid_id: AsteroidId,
@@ -542,7 +542,7 @@ pub enum Event {
     },
     ShipArrived {
         ship_id: ShipId,
-        node: NodeId,
+        position: crate::Position,
     },
     OreMined {
         ship_id: ShipId,
@@ -588,7 +588,7 @@ pub enum Event {
     },
     ScanSiteSpawned {
         site_id: SiteId,
-        node: NodeId,
+        position: crate::Position,
         template_id: String,
     },
     /// Only emitted at `EventLevel::Debug`.
@@ -691,7 +691,7 @@ pub enum Event {
     ShipConstructed {
         station_id: StationId,
         ship_id: ShipId,
-        location_node: NodeId,
+        position: crate::Position,
         cargo_capacity_m3: f64,
     },
     InsufficientFunds {
@@ -1140,6 +1140,16 @@ pub struct Constants {
     /// Skip exports that would yield less than this revenue. Avoids micro-transactions.
     #[serde(default = "default_autopilot_export_min_revenue")]
     pub autopilot_export_min_revenue: f64,
+    // Spatial system
+    /// Max distance (micro-AU) for docking/deposit operations. Ships must be within this range.
+    #[serde(default = "default_docking_range_au_um")]
+    pub docking_range_au_um: u64,
+    /// Ticks to cross 1 AU. Calibrate so Earth→Inner Belt ≈ 2,880 ticks.
+    #[serde(default = "default_ticks_per_au")]
+    pub ticks_per_au: u64,
+    /// Floor for short trips (e.g., same-zone travel).
+    #[serde(default = "default_min_transit_ticks")]
+    pub min_transit_ticks: u64,
     // Thermal system
     /// Ambient/radiator sink temperature in milli-Kelvin (20 C, not cosmic background).
     #[serde(default = "default_thermal_sink_temp_mk")]
@@ -1302,6 +1312,15 @@ fn default_thermal_wear_multiplier_warning() -> f32 {
 }
 fn default_thermal_wear_multiplier_critical() -> f32 {
     4.0
+}
+fn default_docking_range_au_um() -> u64 {
+    10_000 // ~1.5 million km
+}
+fn default_ticks_per_au() -> u64 {
+    2_133 // calibrated so Earth→Inner Belt ≈ 2,880 ticks
+}
+fn default_min_transit_ticks() -> u64 {
+    1
 }
 
 // ---------------------------------------------------------------------------

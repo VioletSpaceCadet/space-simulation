@@ -367,10 +367,10 @@ fn resolve_assembler_run(
                 let Some(station) = state.stations.get(&ctx.station_id) else {
                     return;
                 };
-                let location_node = station.location_node.clone();
+                let ship_position = station.position.clone();
                 let ship = ShipState {
                     id: ship_id.clone(),
-                    location_node: location_node.clone(),
+                    position: ship_position.clone(),
                     owner: PrincipalId("principal_autopilot".to_string()),
                     inventory: vec![],
                     cargo_capacity_m3: *cargo_capacity_m3,
@@ -383,7 +383,7 @@ fn resolve_assembler_run(
                     Event::ShipConstructed {
                         station_id: ctx.station_id.clone(),
                         ship_id,
-                        location_node,
+                        position: ship_position,
                         cargo_capacity_m3: f64::from(*cargo_capacity_m3),
                     },
                 ));
@@ -479,7 +479,7 @@ mod assembler_component_tests {
                 station_id.clone(),
                 StationState {
                     id: station_id,
-                    location_node: NodeId("node_test".to_string()),
+                    position: crate::test_fixtures::test_position(),
                     inventory: vec![
                         InventoryItem::Material {
                             element: "Fe".to_string(),
@@ -769,7 +769,7 @@ mod assembler_component_tests {
                 station_id.clone(),
                 StationState {
                     id: station_id,
-                    location_node: NodeId("node_test".to_string()),
+                    position: crate::test_fixtures::test_position(),
                     inventory: vec![
                         InventoryItem::Material {
                             element: "Fe".to_string(),
@@ -844,7 +844,7 @@ mod assembler_component_tests {
             ship.id.0.starts_with("ship_"),
             "ship ID should start with ship_"
         );
-        assert_eq!(ship.location_node.0, "node_test");
+        assert_eq!(ship.position, crate::test_fixtures::test_position());
         assert!((ship.cargo_capacity_m3 - 50.0).abs() < 1e-3);
         assert!(ship.task.is_none());
 

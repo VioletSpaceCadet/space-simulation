@@ -138,7 +138,7 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
 
           {/* Stations */}
           {snapshot && Object.values(snapshot.stations).map((station) => {
-            const radius = ringRadiusForNode(station.location_node);
+            const radius = ringRadiusForNode(station.position.parent_body);
             const angle = angleFromId(station.id);
             const { x, y } = polarToCartesian(radius, angle);
             return (
@@ -167,10 +167,11 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
             const taskKind = ship.task ? Object.keys(ship.task.kind)[0] : null;
 
             if (taskKind === 'Transit' && ship.task) {
-              const transit = (ship.task.kind as { Transit: { destination: string } }).Transit;
-              const originRadius = ringRadiusForNode(ship.location_node);
+              type TransitKind = { Transit: { destination: { parent_body: string } } };
+              const transit = (ship.task.kind as unknown as TransitKind).Transit;
+              const originRadius = ringRadiusForNode(ship.position.parent_body);
               const originAngle = angleFromId(ship.id + ':origin');
-              const destRadius = ringRadiusForNode(transit.destination);
+              const destRadius = ringRadiusForNode(transit.destination.parent_body);
               const destAngle = angleFromId(ship.id + ':dest');
               const progress = ship.task.eta_tick > ship.task.started_tick
                 ? (currentTick - ship.task.started_tick) / (ship.task.eta_tick - ship.task.started_tick)
@@ -183,7 +184,7 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
               x = pos.x;
               y = pos.y;
             } else {
-              const radius = ringRadiusForNode(ship.location_node);
+              const radius = ringRadiusForNode(ship.position.parent_body);
               const angle = angleFromId(ship.id);
               const pos = polarToCartesian(radius, angle);
               x = pos.x;
@@ -208,7 +209,7 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
 
           {/* Asteroids */}
           {snapshot && Object.values(snapshot.asteroids).map((asteroid) => {
-            const radius = ringRadiusForNode(asteroid.location_node);
+            const radius = ringRadiusForNode(asteroid.position.parent_body);
             const angle = angleFromId(asteroid.id);
             const { x, y } = polarToCartesian(radius, angle);
             const massKg = asteroid.mass_kg ?? 1000;
@@ -236,7 +237,7 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
 
           {/* Scan sites */}
           {snapshot && snapshot.scan_sites.map((site) => {
-            const radius = ringRadiusForNode(site.node);
+            const radius = ringRadiusForNode(site.position.parent_body);
             const angle = angleFromId(site.id);
             const { x, y } = polarToCartesian(radius, angle);
             const isSelected = selected?.id === site.id;

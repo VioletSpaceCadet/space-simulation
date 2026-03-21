@@ -66,10 +66,10 @@ describe('transitPosition', () => {
 
 describe('ringRadiusForNode', () => {
   it('returns correct radius for known nodes', () => {
-    expect(ringRadiusForNode('node_earth_orbit')).toBe(100);
-    expect(ringRadiusForNode('node_belt_inner')).toBe(200);
-    expect(ringRadiusForNode('node_belt_mid')).toBe(300);
-    expect(ringRadiusForNode('node_belt_outer')).toBe(400);
+    expect(ringRadiusForNode('earth_orbit_zone')).toBe(100);
+    expect(ringRadiusForNode('earth_neos')).toBe(150);
+    expect(ringRadiusForNode('inner_belt')).toBe(250);
+    expect(ringRadiusForNode('outer_belt')).toBe(400);
   });
 
   it('returns fallback for unknown nodes', () => {

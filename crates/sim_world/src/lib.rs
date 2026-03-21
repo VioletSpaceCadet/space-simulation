@@ -5,10 +5,9 @@ use rand::Rng;
 use serde::Deserialize;
 use sim_core::{
     AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, GameContent, GameState,
-    InputFilter, InventoryItem, MetaState, ModuleBehaviorDef, ModuleDef, ModuleItemId, NodeId,
-    OutputSpec, PowerState, PricingTable, PrincipalId, QualityFormula, ResearchState, ScanSite,
-    ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId,
-    YieldFormula,
+    InputFilter, InventoryItem, MetaState, ModuleBehaviorDef, ModuleDef, ModuleItemId, OutputSpec,
+    PowerState, PricingTable, PrincipalId, QualityFormula, ResearchState, ScanSite, ShipId,
+    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId, YieldFormula,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -322,12 +321,17 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
 
 #[allow(clippy::too_many_lines)]
 pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
-    let earth_orbit = NodeId("node_earth_orbit".to_string());
+    // Station is in Earth orbit zone (~3000 µAU from Earth, i.e. ~450km altitude)
+    let earth_orbit_pos = sim_core::Position {
+        parent_body: sim_core::BodyId("earth_orbit_zone".to_string()),
+        radius_au_um: sim_core::RadiusAuMicro(3_000),
+        angle_mdeg: sim_core::AngleMilliDeg(0),
+    };
     let c = &content.constants;
     let station_id = StationId("station_earth_orbit".to_string());
     let station = StationState {
         id: station_id.clone(),
-        location_node: earth_orbit.clone(),
+        position: earth_orbit_pos.clone(),
         inventory: vec![
             InventoryItem::Module {
                 item_id: ModuleItemId("module_item_0001".to_string()),
@@ -407,21 +411,38 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     let owner = PrincipalId("principal_autopilot".to_string());
     let ship = ShipState {
         id: ship_id.clone(),
-        location_node: earth_orbit.clone(),
+        position: earth_orbit_pos.clone(),
         owner,
         inventory: vec![],
         cargo_capacity_m3: c.ship_cargo_capacity_m3,
         task: None,
     };
-    let node_ids: Vec<&NodeId> = content.solar_system.nodes.iter().map(|n| &n.id).collect();
+    // Place scan sites in zone bodies.
+    let zone_bodies: Vec<&sim_core::OrbitalBodyDef> = content
+        .solar_system
+        .bodies
+        .iter()
+        .filter(|b| b.zone.is_some())
+        .collect();
     let mut scan_sites = Vec::new();
     for template in &content.asteroid_templates {
         for _ in 0..c.asteroid_count_per_template {
-            let node = node_ids[rng.gen_range(0..node_ids.len())].clone();
+            if zone_bodies.is_empty() {
+                break;
+            }
+            let body = zone_bodies[rng.gen_range(0..zone_bodies.len())];
+            let zone = body.zone.as_ref().expect("filtered to zone bodies");
+            let radius = rng.gen_range(zone.radius_min_au_um..=zone.radius_max_au_um);
+            let angle = (zone.angle_start_mdeg + rng.gen_range(0..zone.angle_span_mdeg))
+                % sim_core::FULL_CIRCLE;
             let uuid = sim_core::generate_uuid(rng);
             scan_sites.push(ScanSite {
                 id: SiteId(format!("site_{uuid}")),
-                node,
+                position: sim_core::Position {
+                    parent_body: body.id.clone(),
+                    radius_au_um: sim_core::RadiusAuMicro(radius),
+                    angle_mdeg: sim_core::AngleMilliDeg(angle),
+                },
                 template_id: template.id.clone(),
             });
         }
@@ -536,7 +557,7 @@ mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
     use sim_core::{
-        test_fixtures::{base_content, minimal_content},
+        test_fixtures::{base_content, minimal_content, test_position},
         AssemblerDef, AsteroidTemplateDef, Counters, GameState, InputAmount, InputFilter,
         InventoryItem, ItemKind, MetaState, ModuleBehaviorDef, ModuleDef, NodeDef, NodeId,
         OutputSpec, ProcessorDef, QualityFormula, RecipeDef, RecipeInput, ResearchState, StationId,
@@ -660,8 +681,8 @@ mod tests {
         let ship = state.ships.values().next().unwrap();
         let station = state.stations.values().next().unwrap();
         assert_eq!(
-            ship.location_node, station.location_node,
-            "ship and station should be at the same node"
+            ship.position, station.position,
+            "ship and station should be at the same position"
         );
     }
 
@@ -859,7 +880,7 @@ mod tests {
                 station_id.clone(),
                 StationState {
                     id: station_id,
-                    location_node: NodeId("node_test".to_string()),
+                    position: test_position(),
                     inventory: vec![InventoryItem::Material {
                         element: "Unobtanium".to_string(),
                         kg: 100.0,

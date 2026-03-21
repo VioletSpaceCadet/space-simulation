@@ -96,7 +96,7 @@ fn economy_state(content: &GameContent) -> GameState {
     for index in 0..5 {
         state.scan_sites.push(ScanSite {
             id: SiteId(format!("site_pad_{index}")),
-            node: NodeId("node_test".to_string()),
+            position: crate::test_fixtures::test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         });
     }

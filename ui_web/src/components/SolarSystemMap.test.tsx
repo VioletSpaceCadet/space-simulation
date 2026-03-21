@@ -29,7 +29,7 @@ describe('SolarSystemMap', () => {
       stations: {
         station_001: {
           id: 'station_001',
-          location_node: 'node_earth_orbit',
+          position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
           power_available_per_tick: 100,
           inventory: [],
           cargo_capacity_m3: 10000,
@@ -54,7 +54,7 @@ describe('SolarSystemMap', () => {
       ships: {
         ship_001: {
           id: 'ship_001',
-          location_node: 'node_earth_orbit',
+          position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
           owner: 'player',
           inventory: [],
           cargo_capacity_m3: 20,
@@ -75,7 +75,7 @@ describe('SolarSystemMap', () => {
       asteroids: {
         asteroid_0001: {
           id: 'asteroid_0001',
-          location_node: 'node_belt_inner',
+          position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 },
           anomaly_tags: ['IronRich'],
           mass_kg: 5000,
           knowledge: { tag_beliefs: [['IronRich', 0.85]], composition: null },
@@ -93,7 +93,7 @@ describe('SolarSystemMap', () => {
     const snapshotWithSites: SimSnapshot = {
       ...emptySnapshot,
       scan_sites: [
-        { id: 'site_001', node: 'node_belt_mid', template_id: 'tmpl_iron' },
+        { id: 'site_001', position: { parent_body: 'node_belt_mid', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'tmpl_iron' },
       ],
     };
     const { container } = render(

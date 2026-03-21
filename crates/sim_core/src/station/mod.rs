@@ -199,10 +199,10 @@ fn compute_power_budget(
 
     let solar_intensity = content
         .solar_system
-        .nodes
+        .bodies
         .iter()
-        .find(|n| n.id == station.location_node)
-        .map_or(1.0, |n| n.solar_intensity);
+        .find(|b| b.id == station.position.parent_body)
+        .map_or(1.0, |b| b.solar_intensity);
 
     let mut generated_kw = 0.0_f32;
     let mut consumed_kw = 0.0_f32;
@@ -762,7 +762,7 @@ mod framework_tests {
                 station_id.clone(),
                 StationState {
                     id: station_id,
-                    location_node: NodeId("node_test".to_string()),
+                    position: crate::test_fixtures::test_position(),
                     inventory: vec![],
                     cargo_capacity_m3: 10_000.0,
                     power_available_per_tick: 100.0,

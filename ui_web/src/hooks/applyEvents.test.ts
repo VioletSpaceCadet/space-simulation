@@ -10,7 +10,7 @@ const defaultBalance = 1_000_000_000;
 function makeShip(overrides: Partial<ShipState> = {}): ShipState {
   return {
     id: 'ship_0001',
-    location_node: 'node_a',
+    position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 },
     owner: 'player',
     inventory: [],
     cargo_capacity_m3: 20,
@@ -22,7 +22,7 @@ function makeShip(overrides: Partial<ShipState> = {}): ShipState {
 function makeAsteroid(overrides: Partial<AsteroidState> = {}): AsteroidState {
   return {
     id: 'ast_001',
-    location_node: 'node_a',
+    position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 },
     anomaly_tags: [],
     mass_kg: 500,
     knowledge: { tag_beliefs: [], composition: null },
@@ -33,7 +33,7 @@ function makeAsteroid(overrides: Partial<AsteroidState> = {}): AsteroidState {
 function makeStation(overrides: Partial<StationState> = {}): StationState {
   return {
     id: 'station_001',
-    location_node: 'node_a',
+    position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 },
     power_available_per_tick: 10,
     inventory: [],
     cargo_capacity_m3: 100,
@@ -716,14 +716,14 @@ describe('applyEvents', () => {
     it('adds a new asteroid to state', () => {
       const events = [{
         id: 'e1', tick: 5,
-        event: { AsteroidDiscovered: { asteroid_id: 'ast_new', location_node: 'node_b' } },
+        event: { AsteroidDiscovered: { asteroid_id: 'ast_new', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 } } },
       }];
 
       const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
 
       expect(result.asteroids['ast_new']).toBeDefined();
       expect(result.asteroids['ast_new'].id).toBe('ast_new');
-      expect(result.asteroids['ast_new'].location_node).toBe('node_b');
+      expect(result.asteroids['ast_new'].position.parent_body).toBe('body_b');
       expect(result.asteroids['ast_new'].knowledge.tag_beliefs).toEqual([]);
       expect(result.asteroids['ast_new'].knowledge.composition).toBeNull();
     });
@@ -732,7 +732,7 @@ describe('applyEvents', () => {
       const existing = makeAsteroid({ id: 'ast_001', mass_kg: 999 });
       const events = [{
         id: 'e1', tick: 5,
-        event: { AsteroidDiscovered: { asteroid_id: 'ast_001', location_node: 'node_b' } },
+        event: { AsteroidDiscovered: { asteroid_id: 'ast_001', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 } } },
       }];
 
       const result = applyEvents(
@@ -1168,7 +1168,7 @@ describe('applyEvents', () => {
         event: {
           ShipConstructed: {
             ship_id: 'ship_new', station_id: 'station_001',
-            location_node: 'node_a', cargo_capacity_m3: 30,
+            position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, cargo_capacity_m3: 30,
           },
         },
       }];
@@ -1177,7 +1177,7 @@ describe('applyEvents', () => {
 
       expect(result.ships['ship_new']).toBeDefined();
       expect(result.ships['ship_new'].id).toBe('ship_new');
-      expect(result.ships['ship_new'].location_node).toBe('node_a');
+      expect(result.ships['ship_new'].position.parent_body).toBe('body_a');
       expect(result.ships['ship_new'].cargo_capacity_m3).toBe(30);
       expect(result.ships['ship_new'].inventory).toEqual([]);
       expect(result.ships['ship_new'].task).toBeNull();
@@ -1216,7 +1216,7 @@ describe('applyEvents', () => {
         id: 'e1', tick: 10,
         event: {
           ScanSiteSpawned: {
-            site_id: 'site_1', node: 'node_a', template_id: 'template_iron',
+            site_id: 'site_1', position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_iron',
           },
         },
       }];
@@ -1224,19 +1224,19 @@ describe('applyEvents', () => {
       const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
       expect(result.scanSites).toHaveLength(1);
       expect(result.scanSites[0]).toEqual({
-        id: 'site_1', node: 'node_a', template_id: 'template_iron',
+        id: 'site_1', position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_iron',
       });
     });
 
     it('appends to existing scan sites', () => {
       const existingSites: ScanSite[] = [
-        { id: 'site_0', node: 'node_b', template_id: 'template_gold' },
+        { id: 'site_0', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_gold' },
       ];
       const events = [{
         id: 'e1', tick: 10,
         event: {
           ScanSiteSpawned: {
-            site_id: 'site_1', node: 'node_a', template_id: 'template_iron',
+            site_id: 'site_1', position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_iron',
           },
         },
       }];
@@ -1398,16 +1398,16 @@ describe('applyEvents', () => {
   });
 
   describe('ShipArrived', () => {
-    it('updates ship location_node', () => {
-      const ship = makeShip({ location_node: 'node_a' });
+    it('updates ship position parent_body', () => {
+      const ship = makeShip({ position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 } });
 
       const events = [{
         id: 'e1', tick: 10,
-        event: { ShipArrived: { ship_id: 'ship_0001', node: 'node_b' } },
+        event: { ShipArrived: { ship_id: 'ship_0001', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 } } },
       }];
 
       const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
-      expect(result.ships['ship_0001'].location_node).toBe('node_b');
+      expect(result.ships['ship_0001'].position.parent_body).toBe('body_b');
     });
   });
 

@@ -6,22 +6,22 @@
     "content_version": "0.1.0"
   },
   "scan_sites": [
-    { "id": "site_0001", "node": "node_belt_inner",  "template_id": "tmpl_iron_rich" },
-    { "id": "site_0002", "node": "node_belt_inner",  "template_id": "tmpl_iron_rich" },
-    { "id": "site_0003", "node": "node_belt_mid",    "template_id": "tmpl_iron_rich" },
-    { "id": "site_0004", "node": "node_belt_mid",    "template_id": "tmpl_iron_rich" },
-    { "id": "site_0005", "node": "node_belt_outer",  "template_id": "tmpl_iron_rich" },
-    { "id": "site_0006", "node": "node_belt_outer",  "template_id": "tmpl_iron_rich" },
-    { "id": "site_0007", "node": "node_belt_inner",  "template_id": "tmpl_iron_rich" },
-    { "id": "site_0008", "node": "node_belt_mid",    "template_id": "tmpl_iron_rich" },
-    { "id": "site_0009", "node": "node_belt_outer",  "template_id": "tmpl_iron_rich" },
-    { "id": "site_0010", "node": "node_belt_inner",  "template_id": "tmpl_iron_rich" }
+    { "id": "site_0001", "position": { "parent_body": "inner_belt", "radius_au_um": 2450000, "angle_mdeg": 0 },      "template_id": "tmpl_iron_rich" },
+    { "id": "site_0002", "position": { "parent_body": "inner_belt", "radius_au_um": 2450000, "angle_mdeg": 36000 },   "template_id": "tmpl_iron_rich" },
+    { "id": "site_0003", "position": { "parent_body": "inner_belt", "radius_au_um": 2500000, "angle_mdeg": 72000 },   "template_id": "tmpl_iron_rich" },
+    { "id": "site_0004", "position": { "parent_body": "inner_belt", "radius_au_um": 2500000, "angle_mdeg": 108000 },  "template_id": "tmpl_iron_rich" },
+    { "id": "site_0005", "position": { "parent_body": "outer_belt", "radius_au_um": 3050000, "angle_mdeg": 0 },      "template_id": "tmpl_iron_rich" },
+    { "id": "site_0006", "position": { "parent_body": "outer_belt", "radius_au_um": 3050000, "angle_mdeg": 36000 },   "template_id": "tmpl_iron_rich" },
+    { "id": "site_0007", "position": { "parent_body": "inner_belt", "radius_au_um": 2450000, "angle_mdeg": 144000 },  "template_id": "tmpl_iron_rich" },
+    { "id": "site_0008", "position": { "parent_body": "inner_belt", "radius_au_um": 2500000, "angle_mdeg": 180000 },  "template_id": "tmpl_iron_rich" },
+    { "id": "site_0009", "position": { "parent_body": "outer_belt", "radius_au_um": 3050000, "angle_mdeg": 72000 },   "template_id": "tmpl_iron_rich" },
+    { "id": "site_0010", "position": { "parent_body": "inner_belt", "radius_au_um": 2450000, "angle_mdeg": 216000 },  "template_id": "tmpl_iron_rich" }
   ],
   "asteroids": {},
   "ships": {
     "ship_0001": {
       "id": "ship_0001",
-      "location_node": "node_earth_orbit",
+      "position": { "parent_body": "earth_orbit_zone", "radius_au_um": 3000, "angle_mdeg": 0 },
       "owner": "principal_autopilot",
       "inventory": [],
       "cargo_capacity_m3": 50.0,
@@ -31,7 +31,7 @@
   "stations": {
     "station_earth_orbit": {
       "id": "station_earth_orbit",
-      "location_node": "node_earth_orbit",
+      "position": { "parent_body": "earth_orbit_zone", "radius_au_um": 3000, "angle_mdeg": 0 },
       "inventory": [
         {
           "kind": "Module",

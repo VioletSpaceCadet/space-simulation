@@ -1,7 +1,7 @@
 use crate::{
     AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, CompositionVec, Constants, DataKind,
-    Event, EventEnvelope, GameContent, GameState, InventoryItem, LotId, NodeId, ResearchState,
-    ShipId, ShipState, SiteId, StationId, TaskKind, TaskState, TechEffect,
+    Event, EventEnvelope, GameContent, GameState, InventoryItem, LotId, ResearchState, ShipId,
+    ShipState, SiteId, StationId, TaskKind, TaskState, TechEffect,
 };
 use rand::Rng;
 
@@ -30,7 +30,7 @@ pub(crate) fn task_kind_label(kind: &TaskKind) -> &'static str {
 pub(crate) fn task_target(kind: &TaskKind) -> Option<String> {
     match kind {
         TaskKind::Idle => None,
-        TaskKind::Transit { destination, .. } => Some(destination.0.clone()),
+        TaskKind::Transit { destination, .. } => Some(destination.parent_body.0.clone()),
         TaskKind::Survey { site } => Some(site.0.clone()),
         TaskKind::DeepScan { asteroid } | TaskKind::Mine { asteroid, .. } => {
             Some(asteroid.0.clone())
@@ -157,7 +157,7 @@ pub(crate) fn set_ship_idle(state: &mut GameState, ship_id: &ShipId, current_tic
 pub(crate) fn resolve_transit(
     state: &mut GameState,
     ship_id: &ShipId,
-    destination: &NodeId,
+    destination: &crate::Position,
     then: &TaskKind,
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
@@ -165,7 +165,7 @@ pub(crate) fn resolve_transit(
     let current_tick = state.meta.tick;
 
     if let Some(ship) = state.ships.get_mut(ship_id) {
-        ship.location_node = destination.clone();
+        ship.position = destination.clone();
     }
 
     events.push(crate::emit(
@@ -173,7 +173,7 @@ pub(crate) fn resolve_transit(
         current_tick,
         Event::ShipArrived {
             ship_id: ship_id.clone(),
-            node: destination.clone(),
+            position: destination.clone(),
         },
     ));
 
@@ -243,7 +243,7 @@ pub(crate) fn resolve_survey(
         asteroid_id.clone(),
         AsteroidState {
             id: asteroid_id.clone(),
-            location_node: site.node.clone(),
+            position: site.position.clone(),
             true_composition: composition,
             anomaly_tags: anomaly_tags.clone(),
             mass_kg,
@@ -259,7 +259,7 @@ pub(crate) fn resolve_survey(
         current_tick,
         Event::AsteroidDiscovered {
             asteroid_id: asteroid_id.clone(),
-            location_node: site.node.clone(),
+            position: site.position.clone(),
         },
     ));
 

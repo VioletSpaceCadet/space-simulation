@@ -13,9 +13,9 @@ const baseSnapshot: SimSnapshot = {
   ships: {
     ship_0001: {
       id: 'ship_0001',
-      location_node: 'node_earth_orbit',
+      position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
       owner: 'principal_autopilot',
-      cargo: {},
+      inventory: [],
       cargo_capacity_m3: 20,
       task: null,
     },
@@ -99,7 +99,7 @@ describe('useSimStream', () => {
     await act(async () => { await Promise.resolve(); });
 
     const events = [
-      { id: 'evt_000010', tick: 20, event: { AsteroidDiscovered: { asteroid_id: 'asteroid_0005', location_node: 'node_belt_inner' } } },
+      { id: 'evt_000010', tick: 20, event: { AsteroidDiscovered: { asteroid_id: 'asteroid_0005', position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 } } } },
       { id: 'evt_000011', tick: 20, event: { ScanResult: { asteroid_id: 'asteroid_0005', tags: [['IronRich', 0.9]] } } },
     ];
     act(() => {
@@ -107,7 +107,7 @@ describe('useSimStream', () => {
     });
 
     expect(result.current.snapshot?.asteroids['asteroid_0005']).toBeDefined();
-    expect(result.current.snapshot?.asteroids['asteroid_0005'].location_node).toBe('node_belt_inner');
+    expect(result.current.snapshot?.asteroids['asteroid_0005'].position.parent_body).toBe('node_belt_inner');
     expect(result.current.snapshot?.asteroids['asteroid_0005'].knowledge.tag_beliefs).toEqual([['IronRich', 0.9]]);
   });
 
@@ -179,16 +179,16 @@ describe('useSimStream', () => {
     const { result } = renderHook(() => useSimStream());
     await act(async () => { await Promise.resolve(); });
 
-    expect(result.current.snapshot?.ships['ship_0001'].location_node).toBe('node_earth_orbit');
+    expect(result.current.snapshot?.ships['ship_0001'].position.parent_body).toBe('node_earth_orbit');
 
     const events = [
-      { id: 'evt_s1', tick: 12, event: { ShipArrived: { ship_id: 'ship_0001', node: 'node_belt_inner' } } },
+      { id: 'evt_s1', tick: 12, event: { ShipArrived: { ship_id: 'ship_0001', position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 } } } },
     ];
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }));
     });
 
-    expect(result.current.snapshot?.ships['ship_0001'].location_node).toBe('node_belt_inner');
+    expect(result.current.snapshot?.ships['ship_0001'].position.parent_body).toBe('node_belt_inner');
   });
 
   it('accumulates data pool on DataGenerated', async () => {
@@ -217,14 +217,14 @@ describe('useSimStream', () => {
     expect(result.current.snapshot?.scan_sites).toEqual([]);
 
     const events = [
-      { id: 'evt_ss1', tick: 30, event: { ScanSiteSpawned: { site_id: 'site_new_001', node: 'node_belt_inner', template_id: 'tmpl_iron_rich' } } },
+      { id: 'evt_ss1', tick: 30, event: { ScanSiteSpawned: { site_id: 'site_new_001', position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'tmpl_iron_rich' } } },
     ];
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }));
     });
 
     expect(result.current.snapshot?.scan_sites).toHaveLength(1);
-    expect(result.current.snapshot?.scan_sites[0]).toEqual({ id: 'site_new_001', node: 'node_belt_inner', template_id: 'tmpl_iron_rich' });
+    expect(result.current.snapshot?.scan_sites[0]).toEqual({ id: 'site_new_001', position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'tmpl_iron_rich' });
   });
 
   it('updates currentTick from heartbeat', async () => {

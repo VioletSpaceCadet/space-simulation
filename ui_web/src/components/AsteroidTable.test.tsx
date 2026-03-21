@@ -8,7 +8,7 @@ import { AsteroidTable } from './AsteroidTable';
 const asteroids: Record<string, AsteroidState> = {
   'asteroid_0001': {
     id: 'asteroid_0001',
-    location_node: 'node_belt_inner',
+    position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 },
     anomaly_tags: ['IronRich'],
     mass_kg: 5000,
     knowledge: {
@@ -18,7 +18,7 @@ const asteroids: Record<string, AsteroidState> = {
   },
   'asteroid_0002': {
     id: 'asteroid_0002',
-    location_node: 'node_belt_outer',
+    position: { parent_body: 'node_belt_outer', radius_au_um: 0, angle_mdeg: 0 },
     anomaly_tags: ['IronRich'],
     mass_kg: 1000,
     knowledge: {

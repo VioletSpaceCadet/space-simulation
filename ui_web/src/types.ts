@@ -134,9 +134,15 @@ export interface ModuleState {
   thermal?: ThermalState
 }
 
+export interface Position {
+  parent_body: string
+  radius_au_um: number
+  angle_mdeg: number
+}
+
 export interface ShipState {
   id: string
-  location_node: string
+  position: Position
   owner: string
   inventory: InventoryItem[]
   cargo_capacity_m3: number
@@ -154,7 +160,7 @@ export interface PowerState {
 
 export interface StationState {
   id: string
-  location_node: string
+  position: Position
   power_available_per_tick: number
   inventory: InventoryItem[]
   cargo_capacity_m3: number
@@ -170,7 +176,7 @@ export interface AsteroidKnowledge {
 
 export interface AsteroidState {
   id: string
-  location_node: string
+  position: Position
   anomaly_tags: string[]
   mass_kg?: number   // undefined = not yet known (discovered via event before snapshot)
   knowledge: AsteroidKnowledge
@@ -178,7 +184,7 @@ export interface AsteroidState {
 
 export interface ScanSite {
   id: string
-  node: string
+  position: Position
   template_id: string
 }
 

@@ -135,6 +135,18 @@ fn transit_moves_ship_and_starts_next_task() {
     content.constants.travel_ticks_per_hop = 5;
     content.constants.survey_scan_ticks = 1;
 
+    let pos_a = Position {
+        parent_body: BodyId("body_a".to_string()),
+        radius_au_um: RadiusAuMicro(0),
+        angle_mdeg: AngleMilliDeg(0),
+    };
+    let pos_b = Position {
+        parent_body: BodyId("body_b".to_string()),
+        radius_au_um: RadiusAuMicro(1_000_000),
+        angle_mdeg: AngleMilliDeg(0),
+    };
+    let body_b = BodyId("body_b".to_string());
+
     let ship_id = ShipId("ship_0001".to_string());
     let site_id = SiteId("site_0001".to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
@@ -149,7 +161,7 @@ fn transit_moves_ship_and_starts_next_task() {
         },
         scan_sites: vec![ScanSite {
             id: site_id.clone(),
-            node: node_b.clone(),
+            position: pos_b.clone(),
             template_id: "tmpl_iron_rich".to_string(),
         }],
         asteroids: HashMap::new(),
@@ -157,7 +169,7 @@ fn transit_moves_ship_and_starts_next_task() {
             ship_id.clone(),
             ShipState {
                 id: ship_id.clone(),
-                location_node: node_a.clone(),
+                position: pos_a.clone(),
                 owner: owner.clone(),
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
@@ -168,7 +180,7 @@ fn transit_moves_ship_and_starts_next_task() {
             station_id.clone(),
             StationState {
                 id: station_id,
-                location_node: node_a.clone(),
+                position: pos_a.clone(),
                 inventory: vec![],
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
@@ -206,7 +218,7 @@ fn transit_moves_ship_and_starts_next_task() {
         command: Command::AssignShipTask {
             ship_id: ship_id.clone(),
             task_kind: TaskKind::Transit {
-                destination: node_b.clone(),
+                destination: pos_b.clone(),
                 total_ticks: 5,
                 then: Box::new(TaskKind::Survey {
                     site: site_id.clone(),
@@ -223,7 +235,7 @@ fn transit_moves_ship_and_starts_next_task() {
         EventLevel::Normal,
     );
     assert_eq!(
-        state.ships[&ship_id].location_node, node_a,
+        state.ships[&ship_id].position, pos_a,
         "ship still at origin during transit"
     );
 
@@ -231,19 +243,19 @@ fn transit_moves_ship_and_starts_next_task() {
         tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
     }
     assert_eq!(
-        state.ships[&ship_id].location_node, node_a,
+        state.ships[&ship_id].position, pos_a,
         "ship still in transit"
     );
 
     let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
     assert_eq!(
-        state.ships[&ship_id].location_node, node_b,
+        state.ships[&ship_id].position, pos_b,
         "ship arrived at destination"
     );
     assert!(
-        events
-            .iter()
-            .any(|e| matches!(&e.event, Event::ShipArrived { node, .. } if node == &node_b)),
+        events.iter().any(
+            |e| matches!(&e.event, Event::ShipArrived { ref position, .. } if position.parent_body == body_b)
+        ),
         "ShipArrived event should be emitted"
     );
     let survey_started = events.iter().any(|e| {

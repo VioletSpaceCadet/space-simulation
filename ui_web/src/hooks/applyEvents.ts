@@ -91,7 +91,7 @@ function handleAsteroidDiscovered(state: SimState, event: EventPayload<'Asteroid
       ...state.asteroids,
       [event.asteroid_id]: {
         id: event.asteroid_id,
-        location_node: event.location_node,
+        position: event.position,
         anomaly_tags: [],
         knowledge: { tag_beliefs: [], composition: null },
       },
@@ -495,7 +495,14 @@ function handleTechUnlocked(state: SimState, event: EventPayload<'TechUnlocked'>
 function handleScanSiteSpawned(state: SimState, event: EventPayload<'ScanSiteSpawned'>): SimState {
   return {
     ...state,
-    scanSites: [...state.scanSites, { id: event.site_id, node: event.node, template_id: event.template_id }],
+    scanSites: [
+      ...state.scanSites,
+      {
+        id: event.site_id,
+        position: event.position,
+        template_id: event.template_id,
+      },
+    ],
   };
 }
 
@@ -506,7 +513,7 @@ function handleShipConstructed(state: SimState, event: EventPayload<'ShipConstru
       ...state.ships,
       [event.ship_id]: {
         id: event.ship_id,
-        location_node: event.location_node,
+        position: event.position,
         owner: 'principal_autopilot',
         inventory: [],
         cargo_capacity_m3: event.cargo_capacity_m3,
@@ -650,9 +657,16 @@ function handleTaskCompleted(state: SimState, event: EventPayload<'TaskCompleted
 
 function handleShipArrived(state: SimState, event: EventPayload<'ShipArrived'>): SimState {
   if (!state.ships[event.ship_id]) {return state;}
+  const ship = state.ships[event.ship_id];
   return {
     ...state,
-    ships: { ...state.ships, [event.ship_id]: { ...state.ships[event.ship_id], location_node: event.node } },
+    ships: {
+      ...state.ships,
+      [event.ship_id]: {
+        ...ship,
+        position: event.position,
+      },
+    },
   };
 }
 

@@ -171,7 +171,7 @@ mod tests {
                 station_id.clone(),
                 StationState {
                     id: station_id,
-                    location_node: NodeId("node_test".to_string()),
+                    position: crate::test_fixtures::test_position(),
                     inventory: vec![],
                     cargo_capacity_m3: 10_000.0,
                     power_available_per_tick: 100.0,

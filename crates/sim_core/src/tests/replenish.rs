@@ -9,7 +9,23 @@ fn replenish_test_content() -> GameContent {
         content_version: "test".to_string(),
         techs: vec![],
         solar_system: SolarSystemDef {
-            bodies: vec![],
+            bodies: vec![OrbitalBodyDef {
+                id: BodyId("test_body".to_string()),
+                name: "Test Belt".to_string(),
+                parent: None,
+                body_type: BodyType::Belt,
+                radius_au_um: 0,
+                angle_mdeg: 0,
+                solar_intensity: 1.0,
+                zone: Some(ZoneDef {
+                    radius_min_au_um: 1_000,
+                    radius_max_au_um: 2_000,
+                    angle_start_mdeg: 0,
+                    angle_span_mdeg: 360_000,
+                    resource_class: ResourceClass::MetalRich,
+                    scan_site_weight: 1,
+                }),
+            }],
             nodes: vec![NodeDef {
                 id: NodeId("node_test".to_string()),
                 name: "Test Node".to_string(),
@@ -70,6 +86,10 @@ fn replenish_test_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
             minutes_per_tick: 1,
+            // Spatial system
+            docking_range_au_um: 10_000,
+            ticks_per_au: 2_133,
+            min_transit_ticks: 1,
             // Thermal system
             thermal_sink_temp_mk: 293_000,
             thermal_overheat_warning_offset_mk: 200_000,
@@ -107,7 +127,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
             StationId("station_test".to_string()),
             StationState {
                 id: StationId("station_test".to_string()),
-                location_node: NodeId("node_test".to_string()),
+                position: crate::test_fixtures::test_position(),
                 inventory: vec![],
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
@@ -159,7 +179,7 @@ fn replenish_does_not_spawn_when_at_threshold() {
     for i in 0..5 {
         state.scan_sites.push(ScanSite {
             id: SiteId(format!("site_existing_{i}")),
-            node: NodeId("node_test".to_string()),
+            position: crate::test_fixtures::test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         });
     }
@@ -199,7 +219,7 @@ fn jettison_slag_removes_all_slag_and_emits_event() {
     for i in 0..5 {
         state.scan_sites.push(ScanSite {
             id: SiteId(format!("site_existing_{i}")),
-            node: NodeId("node_test".to_string()),
+            position: crate::test_fixtures::test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         });
     }
@@ -266,7 +286,7 @@ fn jettison_slag_no_event_when_no_slag() {
     for i in 0..5 {
         state.scan_sites.push(ScanSite {
             id: SiteId(format!("site_existing_{i}")),
-            node: NodeId("node_test".to_string()),
+            position: crate::test_fixtures::test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         });
     }

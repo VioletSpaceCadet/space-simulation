@@ -14,7 +14,7 @@ const zeroPower: PowerState = {
 const mockShips: Record<string, ShipState> = {
   ship_0001: {
     id: 'ship_0001',
-    location_node: 'node_earth_orbit',
+    position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
     owner: 'principal_autopilot',
     inventory: [
       { kind: 'Ore', lot_id: 'lot_0001', asteroid_id: 'asteroid_0001', kg: 150.0, composition: { Fe: 0.7, Si: 0.3 } },
@@ -25,7 +25,7 @@ const mockShips: Record<string, ShipState> = {
   },
   ship_0002: {
     id: 'ship_0002',
-    location_node: 'node_belt_inner',
+    position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 },
     owner: 'principal_autopilot',
     inventory: [],
     cargo_capacity_m3: 20.0,
@@ -36,7 +36,7 @@ const mockShips: Record<string, ShipState> = {
 const mockStations: Record<string, StationState> = {
   station_earth_orbit: {
     id: 'station_earth_orbit',
-    location_node: 'node_earth_orbit',
+    position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
     power_available_per_tick: 100,
     inventory: [{ kind: 'Material', element: 'Fe', kg: 500.0, quality: 0.85 }],
     cargo_capacity_m3: 100.0,
@@ -87,7 +87,7 @@ describe('FleetPanel', () => {
     const ships: Record<string, ShipState> = {
       ship_0001: {
         id: 'ship_0001',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         owner: 'principal_autopilot',
         inventory: [],
         cargo_capacity_m3: 20,
@@ -110,7 +110,7 @@ describe('FleetPanel', () => {
     const ships: Record<string, ShipState> = {
       ship_0001: {
         id: 'ship_0001',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         owner: 'principal_autopilot',
         inventory: [],
         cargo_capacity_m3: 20,
@@ -127,7 +127,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_earth_orbit: {
         id: 'station_earth_orbit',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [{ kind: 'Material', element: 'Fe', kg: 500.0, quality: 0.85 }],
         cargo_capacity_m3: 100.0,
@@ -169,7 +169,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_earth_orbit: {
         id: 'station_earth_orbit',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [
           { kind: 'Ore', lot_id: 'lot_1', asteroid_id: 'a1', kg: 200.0, composition: { Fe: 0.7, Si: 0.3 } },
@@ -209,7 +209,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_earth_orbit: {
         id: 'station_earth_orbit',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [],
         cargo_capacity_m3: 100.0,
@@ -249,7 +249,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_1: {
         id: 'station_1',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [],
         cargo_capacity_m3: 100,
@@ -274,7 +274,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_1: {
         id: 'station_1',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [],
         cargo_capacity_m3: 100,
@@ -304,7 +304,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_1: {
         id: 'station_1',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [],
         cargo_capacity_m3: 100,
@@ -340,7 +340,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_1: {
         id: 'station_1',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [],
         cargo_capacity_m3: 100,
@@ -372,7 +372,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_1: {
         id: 'station_1',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [],
         cargo_capacity_m3: 100,
@@ -404,7 +404,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_1: {
         id: 'station_1',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [],
         cargo_capacity_m3: 100,
@@ -436,7 +436,7 @@ describe('FleetPanel', () => {
     const stations: Record<string, StationState> = {
       station_1: {
         id: 'station_1',
-        location_node: 'node_earth_orbit',
+        position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
         power_available_per_tick: 100,
         inventory: [],
         cargo_capacity_m3: 100,
