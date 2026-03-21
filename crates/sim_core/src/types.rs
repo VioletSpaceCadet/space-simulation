@@ -421,7 +421,7 @@ pub struct PricingEntry {
     pub base_price_per_unit: f64,
     pub importable: bool,
     pub exportable: bool,
-    /// Item category for UI grouping: "material", "component", "module", "raw_ore", "byproduct".
+    /// Item category for UI grouping: `material`, `component`, `module`, `raw_ore`, `byproduct`.
     #[serde(default)]
     pub category: String,
 }
@@ -894,7 +894,7 @@ pub struct ElementDef {
     pub display_name: String,
     #[serde(default)]
     pub refined_name: Option<String>,
-    /// Category for UI grouping: "material", "byproduct", "raw_ore". Defaults to "material".
+    /// Category for UI grouping: `material`, `byproduct`, `raw_ore`. Defaults to `material`.
     #[serde(default = "default_element_category")]
     pub category: String,
     /// Melting point in milli-Kelvin. `None` for non-thermal elements (ore, slag).
@@ -1015,7 +1015,7 @@ pub struct MaintenanceDef {
     /// Minimum wear level before the bay will consume a kit. Defaults to 0.0 (no threshold).
     #[serde(default)]
     pub repair_threshold: f32,
-    /// Component ID consumed for repairs. Defaults to "repair_kit".
+    /// Component ID consumed for repairs. Defaults to `repair_kit`.
     #[serde(default = "default_maintenance_component_id")]
     pub maintenance_component_id: String,
 }
@@ -1207,9 +1207,6 @@ pub struct Constants {
     /// Minimum repair kits to keep for maintenance before exporting surplus.
     #[serde(default = "default_autopilot_repair_kit_reserve")]
     pub autopilot_repair_kit_reserve: u32,
-    /// Primary element for metrics/autopilot tracking (e.g., "Fe"). Defaults to "Fe".
-    #[serde(default = "default_primary_element")]
-    pub primary_element: String,
     /// Fe (kg) reserved for shipyard recipe + assembler buffer. Surplus above this may be exported.
     #[serde(default = "default_autopilot_fe_reserve_kg")]
     pub autopilot_fe_reserve_kg: f32,
@@ -1369,10 +1366,6 @@ fn default_autopilot_volatile_threshold_kg() -> f32 {
 
 fn default_autopilot_repair_kit_reserve() -> u32 {
     10
-}
-
-fn default_primary_element() -> String {
-    crate::ELEMENT_FE.to_string()
 }
 
 fn default_autopilot_fe_reserve_kg() -> f32 {
