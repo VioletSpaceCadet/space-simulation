@@ -35,7 +35,7 @@ fn replenish_test_content() -> GameContent {
         },
         asteroid_templates: vec![AsteroidTemplateDef {
             id: "tmpl_iron_rich".to_string(),
-            anomaly_tags: vec![AnomalyTag::IronRich],
+            anomaly_tags: vec![AnomalyTag::new("IronRich")],
             composition_ranges: HashMap::from([
                 ("Fe".to_string(), (0.7, 0.7)),
                 ("Si".to_string(), (0.3, 0.3)),

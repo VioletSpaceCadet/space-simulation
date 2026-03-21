@@ -1,7 +1,7 @@
 use sim_core::{
     compute_entity_absolute, inventory_volume_m3, is_co_located, mine_duration, trade,
-    travel_ticks, AnomalyTag, AsteroidId, AsteroidState, Command, CommandEnvelope, CommandId,
-    ComponentId, DomainProgress, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
+    travel_ticks, AsteroidId, AsteroidState, Command, CommandEnvelope, CommandId, ComponentId,
+    DomainProgress, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
     ModuleBehaviorDef, ModuleKindState, Position, PrincipalId, ShipId, ShipState, SiteId,
     StationState, TaskKind, TechDef, TechId, TradeItemSpec,
 };
@@ -159,9 +159,9 @@ fn collect_deep_scan_candidates(state: &GameState, content: &GameContent) -> Vec
         .filter(|asteroid| {
             asteroid.knowledge.composition.is_none()
                 && asteroid.knowledge.tag_beliefs.iter().any(|(tag, conf)| {
-                    (*tag == AnomalyTag::IronRich
+                    (tag.0 == "IronRich"
                         && *conf > content.constants.autopilot_iron_rich_confidence_threshold)
-                        || (*tag == AnomalyTag::VolatileRich
+                        || (tag.0 == "VolatileRich"
                             && *conf > content.constants.autopilot_volatile_confidence_threshold)
                 })
         })
@@ -753,8 +753,8 @@ mod tests {
     use super::*;
     use sim_core::{
         test_fixtures::{base_content, base_state, test_position},
-        AsteroidId, AsteroidKnowledge, AsteroidState, ComponentDef, InventoryItem, LotId,
-        PricingEntry, ShipId, StationId,
+        AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, ComponentDef, InventoryItem,
+        LotId, PricingEntry, ShipId, StationId,
     };
     use std::collections::HashMap;
 
@@ -2018,10 +2018,10 @@ mod tests {
                 id: fe_asteroid.clone(),
                 position: test_position(),
                 true_composition: HashMap::from([("Fe".to_string(), 0.8)]),
-                anomaly_tags: vec![AnomalyTag::IronRich],
+                anomaly_tags: vec![AnomalyTag::new("IronRich")],
                 mass_kg: 5000.0,
                 knowledge: AsteroidKnowledge {
-                    tag_beliefs: vec![(AnomalyTag::IronRich, 0.9)],
+                    tag_beliefs: vec![(AnomalyTag::new("IronRich"), 0.9)],
                     composition: Some(HashMap::from([
                         ("Fe".to_string(), 0.8),
                         ("Si".to_string(), 0.2),
@@ -2037,10 +2037,10 @@ mod tests {
                 id: h2o_asteroid.clone(),
                 position: test_position(),
                 true_composition: HashMap::from([("H2O".to_string(), 0.5)]),
-                anomaly_tags: vec![AnomalyTag::VolatileRich],
+                anomaly_tags: vec![AnomalyTag::new("VolatileRich")],
                 mass_kg: 3000.0,
                 knowledge: AsteroidKnowledge {
-                    tag_beliefs: vec![(AnomalyTag::VolatileRich, 0.9)],
+                    tag_beliefs: vec![(AnomalyTag::new("VolatileRich"), 0.9)],
                     composition: Some(HashMap::from([
                         ("H2O".to_string(), 0.5),
                         ("Fe".to_string(), 0.1),
@@ -2091,10 +2091,10 @@ mod tests {
                 id: fe_asteroid.clone(),
                 position: test_position(),
                 true_composition: HashMap::from([("Fe".to_string(), 0.8)]),
-                anomaly_tags: vec![AnomalyTag::IronRich],
+                anomaly_tags: vec![AnomalyTag::new("IronRich")],
                 mass_kg: 5000.0,
                 knowledge: AsteroidKnowledge {
-                    tag_beliefs: vec![(AnomalyTag::IronRich, 0.9)],
+                    tag_beliefs: vec![(AnomalyTag::new("IronRich"), 0.9)],
                     composition: Some(HashMap::from([
                         ("Fe".to_string(), 0.8),
                         ("Si".to_string(), 0.2),
@@ -2110,10 +2110,10 @@ mod tests {
                 id: h2o_asteroid.clone(),
                 position: test_position(),
                 true_composition: HashMap::from([("H2O".to_string(), 0.5)]),
-                anomaly_tags: vec![AnomalyTag::VolatileRich],
+                anomaly_tags: vec![AnomalyTag::new("VolatileRich")],
                 mass_kg: 3000.0,
                 knowledge: AsteroidKnowledge {
-                    tag_beliefs: vec![(AnomalyTag::VolatileRich, 0.9)],
+                    tag_beliefs: vec![(AnomalyTag::new("VolatileRich"), 0.9)],
                     composition: Some(HashMap::from([
                         ("H2O".to_string(), 0.5),
                         ("Fe".to_string(), 0.1),
@@ -2162,10 +2162,10 @@ mod tests {
                 id: asteroid_id.clone(),
                 position: test_position(),
                 true_composition: HashMap::from([("H2O".to_string(), 0.5)]),
-                anomaly_tags: vec![AnomalyTag::VolatileRich],
+                anomaly_tags: vec![AnomalyTag::new("VolatileRich")],
                 mass_kg: 2000.0,
                 knowledge: AsteroidKnowledge {
-                    tag_beliefs: vec![(AnomalyTag::VolatileRich, 0.9)],
+                    tag_beliefs: vec![(AnomalyTag::new("VolatileRich"), 0.9)],
                     composition: None, // Not deep-scanned yet
                 },
             },
@@ -2225,10 +2225,10 @@ mod tests {
                 id: fe_asteroid.clone(),
                 position: test_position(),
                 true_composition: HashMap::from([("Fe".to_string(), 0.8)]),
-                anomaly_tags: vec![AnomalyTag::IronRich],
+                anomaly_tags: vec![AnomalyTag::new("IronRich")],
                 mass_kg: 5000.0,
                 knowledge: AsteroidKnowledge {
-                    tag_beliefs: vec![(AnomalyTag::IronRich, 0.9)],
+                    tag_beliefs: vec![(AnomalyTag::new("IronRich"), 0.9)],
                     composition: Some(HashMap::from([
                         ("Fe".to_string(), 0.8),
                         ("Si".to_string(), 0.2),
@@ -2244,10 +2244,10 @@ mod tests {
                 id: h2o_asteroid.clone(),
                 position: test_position(),
                 true_composition: HashMap::from([("H2O".to_string(), 0.5)]),
-                anomaly_tags: vec![AnomalyTag::VolatileRich],
+                anomaly_tags: vec![AnomalyTag::new("VolatileRich")],
                 mass_kg: 3000.0,
                 knowledge: AsteroidKnowledge {
-                    tag_beliefs: vec![(AnomalyTag::VolatileRich, 0.9)],
+                    tag_beliefs: vec![(AnomalyTag::new("VolatileRich"), 0.9)],
                     composition: Some(HashMap::from([
                         ("H2O".to_string(), 0.5),
                         ("Fe".to_string(), 0.1),

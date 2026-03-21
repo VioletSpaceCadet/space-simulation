@@ -59,11 +59,21 @@ string_id!(ComponentId);
 // Core enums
 // ---------------------------------------------------------------------------
 
+/// Data-driven anomaly tag. Values come from content JSON (asteroid_templates).
+/// Adding a new asteroid type = adding a JSON entry, not a code change.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum AnomalyTag {
-    IronRich,
-    VolatileRich,
-    Carbonaceous,
+pub struct AnomalyTag(pub String);
+
+impl AnomalyTag {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+}
+
+impl std::fmt::Display for AnomalyTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
