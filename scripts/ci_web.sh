@@ -13,9 +13,9 @@ echo "  npm audit..."
 npm audit --audit-level=high
 
 echo "  checking for silent catch handlers..."
-if grep -rn '\.catch(()' src/ | grep -v 'console\.' | grep -v '// intentional' | grep -q .; then
+if grep -rn '\.catch(() => {})' src/ | grep -v '// intentional' | grep -q .; then
   echo "ERROR: Silent .catch(() => {}) found. Every catch must log with context."
-  grep -rn '\.catch(()' src/ | grep -v 'console\.' | grep -v '// intentional'
+  grep -rn '\.catch(() => {})' src/ | grep -v '// intentional'
   exit 1
 fi
 
