@@ -341,10 +341,11 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
             const { x, y } = toSvgPos(entityAbsolute(asteroid.position, bodyAbsolutes));
             const massKg = asteroid.mass_kg ?? 1000;
             const size = Math.max(2.5, Math.min(8, Math.log10(massKg)));
-            const asteroidFill = asteroid.anomaly_tags.includes('VolatileRich') ? '#38a0c4'
-              : asteroid.anomaly_tags.includes('Carbonaceous') ? '#b48c3c'
-              : asteroid.anomaly_tags.includes('IronRich') ? '#c47038'
-              : '#8a8e98';
+            const asteroidFill =
+              asteroid.anomaly_tags.includes('VolatileRich') ? '#38a0c4'
+                : asteroid.anomaly_tags.includes('Carbonaceous') ? '#b48c3c'
+                  : asteroid.anomaly_tags.includes('IronRich') ? '#c47038'
+                    : '#8a8e98';
 
             return (
               <circle

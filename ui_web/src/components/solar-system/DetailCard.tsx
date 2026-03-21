@@ -80,10 +80,11 @@ function AsteroidDetail({ asteroid }: { asteroid: AsteroidState }) {
       {asteroid.anomaly_tags.length > 0 && (
         <div className="mt-1" style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           {asteroid.anomaly_tags.map((tag) => {
-            const color = tag === 'VolatileRich' ? '#38a0c4'
-              : tag === 'Carbonaceous' ? '#b48c3c'
-              : tag === 'IronRich' ? '#c47038'
-              : '#8a8e98';
+            const color =
+              tag === 'VolatileRich' ? '#38a0c4'
+                : tag === 'Carbonaceous' ? '#b48c3c'
+                  : tag === 'IronRich' ? '#c47038'
+                    : '#8a8e98';
             return (
               <span key={tag} style={{ color, background: `${color}22`, padding: '0 4px', borderRadius: 2, fontSize: 10 }}>
                 {tag}
