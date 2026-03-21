@@ -6,6 +6,7 @@
       "melting_point_mk": 1811000, "latent_heat_j_per_kg": 247000, "specific_heat_j_per_kg_k": 449 },
     { "id": "Si",   "density_kg_per_m3": 2329.0, "display_name": "Silicon",    "refined_name": null,
       "melting_point_mk": 1687000, "latent_heat_j_per_kg": 1787000, "specific_heat_j_per_kg_k": 710 },
-    { "id": "He",   "density_kg_per_m3": 125.0,  "display_name": "Helium-3",   "refined_name": "Liquid Helium-3" }
+    { "id": "He",   "density_kg_per_m3": 125.0,  "display_name": "Helium-3",   "refined_name": "Liquid Helium-3" },
+    { "id": "H2O",  "density_kg_per_m3": 1000.0, "display_name": "Water Ice",   "refined_name": "Water" }
   ]
 }
