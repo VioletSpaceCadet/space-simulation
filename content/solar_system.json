@@ -109,6 +109,23 @@
       }
     },
     {
+      "id": "lunar_orbit_zone",
+      "name": "Lunar Orbit",
+      "parent": "luna",
+      "body_type": "Zone",
+      "radius_au_um": 0,
+      "angle_mdeg": 0,
+      "solar_intensity": 0.95,
+      "zone": {
+        "radius_min_au_um": 0,
+        "radius_max_au_um": 500,
+        "angle_start_mdeg": 0,
+        "angle_span_mdeg": 360000,
+        "resource_class": "Mixed",
+        "scan_site_weight": 1
+      }
+    },
+    {
       "id": "jupiter",
       "name": "Jupiter",
       "parent": "sun",
@@ -117,6 +134,23 @@
       "angle_mdeg": 270000,
       "solar_intensity": 0.04,
       "zone": null
+    },
+    {
+      "id": "jupiter_trojans",
+      "name": "Jupiter Trojans",
+      "parent": "sun",
+      "body_type": "Belt",
+      "radius_au_um": 5203000,
+      "angle_mdeg": 330000,
+      "solar_intensity": 0.04,
+      "zone": {
+        "radius_min_au_um": 4800000,
+        "radius_max_au_um": 5600000,
+        "angle_start_mdeg": 310000,
+        "angle_span_mdeg": 40000,
+        "resource_class": "VolatileRich",
+        "scan_site_weight": 1
+      }
     }
   ],
   "nodes": [
