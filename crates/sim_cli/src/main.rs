@@ -157,7 +157,7 @@ fn print_status(state: &GameState, minutes_per_tick: u32) {
     let scan_data = state
         .research
         .data_pool
-        .get(&sim_core::DataKind::ScanData)
+        .get(&sim_core::DataKind::SurveyData)
         .copied()
         .unwrap_or(0.0);
 

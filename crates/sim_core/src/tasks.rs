@@ -286,7 +286,7 @@ pub(crate) fn resolve_survey(
 
     let data_amount = crate::research::generate_data(
         &mut state.research,
-        DataKind::ScanData,
+        DataKind::SurveyData,
         "survey",
         &content.constants,
     );
@@ -295,7 +295,7 @@ pub(crate) fn resolve_survey(
         &mut state.counters,
         current_tick,
         Event::DataGenerated {
-            kind: DataKind::ScanData,
+            kind: DataKind::SurveyData,
             amount: data_amount,
         },
     ));
@@ -380,7 +380,7 @@ pub(crate) fn resolve_mine(
 
     crate::research::generate_data(
         &mut state.research,
-        DataKind::MiningData,
+        DataKind::AssayData,
         "mine",
         &content.constants,
     );
@@ -590,7 +590,7 @@ pub(crate) fn resolve_deep_scan(
 
     let data_amount = crate::research::generate_data(
         &mut state.research,
-        DataKind::ScanData,
+        DataKind::SurveyData,
         "deep_scan",
         &content.constants,
     );
@@ -599,7 +599,7 @@ pub(crate) fn resolve_deep_scan(
         &mut state.counters,
         current_tick,
         Event::DataGenerated {
-            kind: DataKind::ScanData,
+            kind: DataKind::SurveyData,
             amount: data_amount,
         },
     ));

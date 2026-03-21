@@ -64,16 +64,18 @@ pub enum AnomalyTag {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DataKind {
-    ScanData,
-    MiningData,
-    EngineeringData,
+    SurveyData,
+    AssayData,
+    ManufacturingData,
+    TransitData,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ResearchDomain {
+    Survey,
     Materials,
-    Exploration,
-    Engineering,
+    Manufacturing,
+    Propulsion,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

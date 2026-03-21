@@ -349,7 +349,7 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
     let total_scan_data = state
         .research
         .data_pool
-        .get(&crate::DataKind::ScanData)
+        .get(&crate::DataKind::SurveyData)
         .copied()
         .unwrap_or(0.0);
 
@@ -1023,11 +1023,11 @@ mod tests {
 
         state.research.unlocked.insert(TechId("tech_a".to_string()));
         state.research.unlocked.insert(TechId("tech_b".to_string()));
-        state.research.data_pool.insert(DataKind::ScanData, 42.5);
+        state.research.data_pool.insert(DataKind::SurveyData, 42.5);
         state.research.evidence.insert(
             TechId("tech_c".to_string()),
             DomainProgress {
-                points: HashMap::from([(ResearchDomain::Exploration, 15.0)]),
+                points: HashMap::from([(ResearchDomain::Survey, 15.0)]),
             },
         );
         state.research.evidence.insert(
