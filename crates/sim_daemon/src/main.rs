@@ -861,4 +861,50 @@ mod tests {
             "oldest snapshot should be tick 10 after dropping first 10"
         );
     }
+
+    #[tokio::test]
+    async fn test_content_returns_200_with_techs() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/content")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(
+            json["techs"].is_array(),
+            "response should contain techs array"
+        );
+        assert!(
+            !json["techs"].as_array().unwrap().is_empty(),
+            "techs should not be empty"
+        );
+        assert!(
+            json["minutes_per_tick"].is_number(),
+            "should include minutes_per_tick"
+        );
+        assert!(
+            json["lab_rates"].is_array(),
+            "should include lab_rates array"
+        );
+        assert!(
+            json["data_rates"].is_object(),
+            "should include data_rates object"
+        );
+        // Verify tech structure
+        let tech = &json["techs"][0];
+        assert!(tech["id"].is_string(), "tech should have id");
+        assert!(tech["name"].is_string(), "tech should have name");
+        assert!(tech["prereqs"].is_array(), "tech should have prereqs");
+        assert!(
+            tech["domain_requirements"].is_object(),
+            "tech should have domain_requirements"
+        );
+    }
 }

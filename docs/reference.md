@@ -177,6 +177,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 **API endpoints:**
 - `POST /api/v1/command` — enqueue a `Command` (JSON body) into the daemon's command queue, processed next tick
 - `GET /api/v1/pricing` — returns the `PricingTable` as JSON
+- `GET /api/v1/content` — returns tech definitions, lab rates (points/hr), data pool net rates (per kind/hr), and `minutes_per_tick`
 
 **Future direction (not yet built):**
 - Ore keyed by composition hash instead of asteroid ID — compatible ores blend naturally.
