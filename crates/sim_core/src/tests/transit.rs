@@ -13,6 +13,7 @@ fn test_shortest_hop_count_same_node() {
 #[test]
 fn test_shortest_hop_count_adjacent() {
     let solar_system = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![
             NodeDef {
                 id: NodeId("a".to_string()),
@@ -48,6 +49,7 @@ fn test_shortest_hop_count_adjacent() {
 #[test]
 fn test_shortest_hop_count_two_hops() {
     let solar_system = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![
             NodeDef {
                 id: NodeId("a".to_string()),
@@ -83,6 +85,7 @@ fn test_shortest_hop_count_two_hops() {
 #[test]
 fn test_shortest_hop_count_no_path() {
     let solar_system = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![
             NodeDef {
                 id: NodeId("a".to_string()),
@@ -114,6 +117,7 @@ fn transit_moves_ship_and_starts_next_task() {
     let node_a = NodeId("node_a".to_string());
     let node_b = NodeId("node_b".to_string());
     content.solar_system = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![
             NodeDef {
                 id: node_a.clone(),

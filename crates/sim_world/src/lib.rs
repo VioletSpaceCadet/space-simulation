@@ -33,7 +33,7 @@ struct ElementsFile {
 ///
 /// Catches mistakes like: referencing an unknown element in a recipe, a tech
 /// prereq that doesn't exist, or a solar-system edge pointing at an unknown node.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
 pub fn validate_content(content: &GameContent) {
     assert!(
         content.constants.minutes_per_tick > 0,
@@ -69,7 +69,7 @@ pub fn validate_content(content: &GameContent) {
         }
     }
 
-    // Validate solar system edges reference known nodes.
+    // Validate solar system edges reference known nodes (legacy compat).
     for (from, to) in &content.solar_system.edges {
         assert!(
             node_ids.contains(from.0.as_str()),
@@ -81,6 +81,65 @@ pub fn validate_content(content: &GameContent) {
             "solar system edge references unknown node '{}'",
             to.0,
         );
+    }
+
+    // Validate orbital body tree.
+    let body_ids: HashSet<&str> = content
+        .solar_system
+        .bodies
+        .iter()
+        .map(|b| b.id.0.as_str())
+        .collect();
+    assert!(
+        body_ids.len() == content.solar_system.bodies.len(),
+        "duplicate body id in orbital body tree"
+    );
+    for body in &content.solar_system.bodies {
+        // All parents must reference existing bodies.
+        if let Some(ref parent) = body.parent {
+            assert!(
+                body_ids.contains(parent.0.as_str()),
+                "orbital body '{}' references unknown parent '{}'",
+                body.id.0,
+                parent.0,
+            );
+        }
+        // Zone validation.
+        if let Some(ref zone) = body.zone {
+            assert!(
+                zone.radius_max_au_um > zone.radius_min_au_um,
+                "orbital body '{}' zone has radius_max <= radius_min",
+                body.id.0,
+            );
+            assert!(
+                zone.angle_span_mdeg > 0 && zone.angle_span_mdeg <= sim_core::FULL_CIRCLE,
+                "orbital body '{}' zone has invalid angle_span (must be 1..=360000)",
+                body.id.0,
+            );
+            assert!(
+                zone.scan_site_weight > 0,
+                "orbital body '{}' zone has scan_site_weight of 0",
+                body.id.0,
+            );
+        }
+    }
+    // Verify no cycles: every body's ancestor chain must terminate at a root (parent=None).
+    for body in &content.solar_system.bodies {
+        let mut visited = HashSet::new();
+        let mut current_id = body.parent.as_ref();
+        while let Some(pid) = current_id {
+            assert!(
+                visited.insert(pid.0.as_str()),
+                "cycle detected in orbital body tree at '{}'",
+                pid.0,
+            );
+            current_id = content
+                .solar_system
+                .bodies
+                .iter()
+                .find(|b| b.id == *pid)
+                .and_then(|b| b.parent.as_ref());
+        }
     }
 
     // Validate asteroid template composition element IDs.
@@ -652,6 +711,131 @@ mod tests {
             },
         );
         validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate body id")]
+    fn test_body_tree_duplicate_id_panics() {
+        let mut content = minimal_content();
+        let body = sim_core::OrbitalBodyDef {
+            id: sim_core::BodyId("dup".to_string()),
+            name: "Dup".to_string(),
+            parent: None,
+            body_type: sim_core::BodyType::Star,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: None,
+        };
+        content.solar_system.bodies.push(body.clone());
+        content.solar_system.bodies.push(body);
+        validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown parent")]
+    fn test_body_tree_unknown_parent_panics() {
+        let mut content = minimal_content();
+        content.solar_system.bodies.push(sim_core::OrbitalBodyDef {
+            id: sim_core::BodyId("orphan".to_string()),
+            name: "Orphan".to_string(),
+            parent: Some(sim_core::BodyId("nonexistent".to_string())),
+            body_type: sim_core::BodyType::Planet,
+            radius_au_um: 1_000_000,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: None,
+        });
+        validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "radius_max <= radius_min")]
+    fn test_body_tree_inverted_zone_radius_panics() {
+        let mut content = minimal_content();
+        content.solar_system.bodies.push(sim_core::OrbitalBodyDef {
+            id: sim_core::BodyId("bad_zone".to_string()),
+            name: "Bad Zone".to_string(),
+            parent: None,
+            body_type: sim_core::BodyType::Zone,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: Some(sim_core::ZoneDef {
+                radius_min_au_um: 5000,
+                radius_max_au_um: 1000,
+                angle_start_mdeg: 0,
+                angle_span_mdeg: 360_000,
+                resource_class: sim_core::ResourceClass::MetalRich,
+                scan_site_weight: 1,
+            }),
+        });
+        validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid angle_span")]
+    fn test_body_tree_oversized_angle_span_panics() {
+        let mut content = minimal_content();
+        content.solar_system.bodies.push(sim_core::OrbitalBodyDef {
+            id: sim_core::BodyId("wide_zone".to_string()),
+            name: "Wide Zone".to_string(),
+            parent: None,
+            body_type: sim_core::BodyType::Zone,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: Some(sim_core::ZoneDef {
+                radius_min_au_um: 1000,
+                radius_max_au_um: 5000,
+                angle_start_mdeg: 0,
+                angle_span_mdeg: 400_000,
+                resource_class: sim_core::ResourceClass::Mixed,
+                scan_site_weight: 1,
+            }),
+        });
+        validate_content(&content);
+    }
+
+    #[test]
+    fn test_body_tree_deserialization() {
+        let json = r#"{
+            "id": "earth",
+            "name": "Earth",
+            "parent": "sun",
+            "body_type": "Planet",
+            "radius_au_um": 1000000,
+            "angle_mdeg": 0,
+            "zone": null
+        }"#;
+        let body: sim_core::OrbitalBodyDef = serde_json::from_str(json).unwrap();
+        assert_eq!(body.id, sim_core::BodyId("earth".to_string()));
+        assert_eq!(body.parent, Some(sim_core::BodyId("sun".to_string())));
+        assert_eq!(body.body_type, sim_core::BodyType::Planet);
+        assert!((body.solar_intensity - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_load_content_parses_body_tree() {
+        let content_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../content");
+        let content = load_content(content_dir.to_str().unwrap()).unwrap();
+        assert!(
+            !content.solar_system.bodies.is_empty(),
+            "bodies should be populated from solar_system.json"
+        );
+        let sun = content.solar_system.bodies.iter().find(|b| b.id.0 == "sun");
+        assert!(sun.is_some(), "should have a sun body");
+        assert!(sun.unwrap().parent.is_none(), "sun should have no parent");
+        let inner_belt = content
+            .solar_system
+            .bodies
+            .iter()
+            .find(|b| b.id.0 == "inner_belt");
+        assert!(inner_belt.is_some(), "should have inner_belt body");
+        assert!(
+            inner_belt.unwrap().zone.is_some(),
+            "inner_belt should have a zone"
+        );
     }
 
     #[test]

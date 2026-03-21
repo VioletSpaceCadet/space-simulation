@@ -37,6 +37,7 @@ pub fn base_content() -> GameContent {
             ],
         }],
         solar_system: SolarSystemDef {
+            bodies: vec![],
             nodes: vec![NodeDef {
                 id: NodeId("node_test".to_string()),
                 name: "Test Node".to_string(),
@@ -156,6 +157,7 @@ pub fn minimal_content() -> GameContent {
         content_version: "test".to_string(),
         techs: vec![],
         solar_system: SolarSystemDef {
+            bodies: vec![],
             nodes: vec![],
             edges: vec![],
         },

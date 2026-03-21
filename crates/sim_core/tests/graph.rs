@@ -15,6 +15,7 @@ fn nid(id: &str) -> NodeId {
 #[test]
 fn test_same_node_returns_zero() {
     let solar = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![node("A")],
         edges: vec![],
     };
@@ -24,6 +25,7 @@ fn test_same_node_returns_zero() {
 #[test]
 fn test_direct_neighbors_returns_one() {
     let solar = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![node("A"), node("B")],
         edges: vec![(nid("A"), nid("B"))],
     };
@@ -33,6 +35,7 @@ fn test_direct_neighbors_returns_one() {
 #[test]
 fn test_two_hops() {
     let solar = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![node("A"), node("B"), node("C")],
         edges: vec![(nid("A"), nid("B")), (nid("B"), nid("C"))],
     };
@@ -42,6 +45,7 @@ fn test_two_hops() {
 #[test]
 fn test_disconnected_returns_none() {
     let solar = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![node("A"), node("B"), node("C")],
         edges: vec![(nid("A"), nid("B"))],
     };
@@ -51,6 +55,7 @@ fn test_disconnected_returns_none() {
 #[test]
 fn test_single_node_no_edges() {
     let solar = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![node("A")],
         edges: vec![],
     };
@@ -60,6 +65,7 @@ fn test_single_node_no_edges() {
 #[test]
 fn test_bidirectional() {
     let solar = SolarSystemDef {
+        bodies: vec![],
         nodes: vec![node("A"), node("B"), node("C")],
         edges: vec![(nid("A"), nid("B")), (nid("B"), nid("C"))],
     };

@@ -1,4 +1,124 @@
 {
+  "bodies": [
+    {
+      "id": "sun",
+      "name": "Sun",
+      "parent": null,
+      "body_type": "Star",
+      "radius_au_um": 0,
+      "angle_mdeg": 0,
+      "solar_intensity": 1.0,
+      "zone": null
+    },
+    {
+      "id": "earth",
+      "name": "Earth",
+      "parent": "sun",
+      "body_type": "Planet",
+      "radius_au_um": 1000000,
+      "angle_mdeg": 0,
+      "solar_intensity": 1.0,
+      "zone": null
+    },
+    {
+      "id": "luna",
+      "name": "Luna",
+      "parent": "earth",
+      "body_type": "Moon",
+      "radius_au_um": 2570,
+      "angle_mdeg": 0,
+      "solar_intensity": 1.0,
+      "zone": null
+    },
+    {
+      "id": "earth_orbit_zone",
+      "name": "Earth Orbit",
+      "parent": "earth",
+      "body_type": "Zone",
+      "radius_au_um": 0,
+      "angle_mdeg": 0,
+      "solar_intensity": 1.0,
+      "zone": {
+        "radius_min_au_um": 0,
+        "radius_max_au_um": 10000,
+        "angle_start_mdeg": 0,
+        "angle_span_mdeg": 360000,
+        "resource_class": "Mixed",
+        "scan_site_weight": 1
+      }
+    },
+    {
+      "id": "earth_neos",
+      "name": "Earth NEOs",
+      "parent": "sun",
+      "body_type": "Zone",
+      "radius_au_um": 1000000,
+      "angle_mdeg": 0,
+      "solar_intensity": 1.0,
+      "zone": {
+        "radius_min_au_um": 800000,
+        "radius_max_au_um": 1200000,
+        "angle_start_mdeg": 0,
+        "angle_span_mdeg": 360000,
+        "resource_class": "Mixed",
+        "scan_site_weight": 1
+      }
+    },
+    {
+      "id": "mars",
+      "name": "Mars",
+      "parent": "sun",
+      "body_type": "Planet",
+      "radius_au_um": 1524000,
+      "angle_mdeg": 135000,
+      "solar_intensity": 0.43,
+      "zone": null
+    },
+    {
+      "id": "inner_belt",
+      "name": "Inner Belt",
+      "parent": "sun",
+      "body_type": "Belt",
+      "radius_au_um": 2450000,
+      "angle_mdeg": 0,
+      "solar_intensity": 0.40,
+      "zone": {
+        "radius_min_au_um": 2100000,
+        "radius_max_au_um": 2800000,
+        "angle_start_mdeg": 0,
+        "angle_span_mdeg": 360000,
+        "resource_class": "MetalRich",
+        "scan_site_weight": 3
+      }
+    },
+    {
+      "id": "outer_belt",
+      "name": "Outer Belt",
+      "parent": "sun",
+      "body_type": "Belt",
+      "radius_au_um": 3050000,
+      "angle_mdeg": 0,
+      "solar_intensity": 0.20,
+      "zone": {
+        "radius_min_au_um": 2800000,
+        "radius_max_au_um": 3300000,
+        "angle_start_mdeg": 0,
+        "angle_span_mdeg": 360000,
+        "resource_class": "VolatileRich",
+        "scan_site_weight": 2
+      }
+    },
+    {
+      "id": "jupiter",
+      "name": "Jupiter",
+      "parent": "sun",
+      "body_type": "Planet",
+      "radius_au_um": 5203000,
+      "angle_mdeg": 270000,
+      "solar_intensity": 0.04,
+      "zone": null
+    }
+  ],
   "nodes": [
     { "id": "node_earth_orbit", "name": "Earth Orbit",  "solar_intensity": 1.00 },
     { "id": "node_belt_inner",  "name": "Inner Belt",   "solar_intensity": 0.40 },
