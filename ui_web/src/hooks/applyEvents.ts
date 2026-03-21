@@ -700,7 +700,9 @@ function updateModuleThermalZone(
         ...thermal, temp_mk: tempMk,
         overheat_zone: zone, overheat_disabled: overheatDisabled,
       },
-      enabled: overheatDisabled ? false : m.enabled,
+      enabled: overheatDisabled
+        ? false
+        : (m.thermal?.overheat_disabled ? true : m.enabled),
     };
   });
 }

@@ -1644,6 +1644,7 @@ describe('applyEvents', () => {
       expect(mod.thermal?.overheat_zone).toBe('Nominal');
       expect(mod.thermal?.temp_mk).toBe(1_900_000);
       expect(mod.thermal?.overheat_disabled).toBe(false);
+      expect(mod.enabled).toBe(true);
     });
 
     it('creates thermal state if module had none', () => {
