@@ -90,6 +90,10 @@ pub fn validate_content(content: &GameContent) {
         .iter()
         .map(|b| b.id.0.as_str())
         .collect();
+    assert!(
+        body_ids.len() == content.solar_system.bodies.len(),
+        "duplicate body id in orbital body tree"
+    );
     for body in &content.solar_system.bodies {
         // All parents must reference existing bodies.
         if let Some(ref parent) = body.parent {
@@ -108,8 +112,8 @@ pub fn validate_content(content: &GameContent) {
                 body.id.0,
             );
             assert!(
-                zone.angle_span_mdeg <= sim_core::FULL_CIRCLE,
-                "orbital body '{}' zone has angle_span > 360°",
+                zone.angle_span_mdeg > 0 && zone.angle_span_mdeg <= sim_core::FULL_CIRCLE,
+                "orbital body '{}' zone has invalid angle_span (must be 1..=360000)",
                 body.id.0,
             );
             assert!(
@@ -710,6 +714,25 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "duplicate body id")]
+    fn test_body_tree_duplicate_id_panics() {
+        let mut content = minimal_content();
+        let body = sim_core::OrbitalBodyDef {
+            id: sim_core::BodyId("dup".to_string()),
+            name: "Dup".to_string(),
+            parent: None,
+            body_type: sim_core::BodyType::Star,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: None,
+        };
+        content.solar_system.bodies.push(body.clone());
+        content.solar_system.bodies.push(body);
+        validate_content(&content);
+    }
+
+    #[test]
     #[should_panic(expected = "unknown parent")]
     fn test_body_tree_unknown_parent_panics() {
         let mut content = minimal_content();
@@ -751,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "angle_span > 360")]
+    #[should_panic(expected = "invalid angle_span")]
     fn test_body_tree_oversized_angle_span_panics() {
         let mut content = minimal_content();
         content.solar_system.bodies.push(sim_core::OrbitalBodyDef {

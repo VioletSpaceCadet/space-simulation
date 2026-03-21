@@ -827,7 +827,7 @@ pub enum BodyType {
     Zone,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ZoneDef {
     pub radius_min_au_um: u64,
     pub radius_max_au_um: u64,
@@ -837,7 +837,7 @@ pub struct ZoneDef {
     pub scan_site_weight: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OrbitalBodyDef {
     pub id: BodyId,
     pub name: String,
