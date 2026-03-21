@@ -19,6 +19,16 @@ const snapshot: SimSnapshot = {
 beforeEach(() => {
   localStorage.clear();
   vi.spyOn(api, 'fetchSnapshot').mockResolvedValue(snapshot);
+  vi.spyOn(api, 'fetchSpatialConfig').mockResolvedValue({
+    bodies: [
+      { id: 'sun', name: 'Sun', parent: null, body_type: 'Star', radius_au_um: 0, angle_mdeg: 0, solar_intensity: 1.0, zone: null },
+      { id: 'earth', name: 'Earth', parent: 'sun', body_type: 'Planet', radius_au_um: 1_000_000, angle_mdeg: 0, solar_intensity: 1.0, zone: null },
+    ],
+    body_absolutes: { sun: { x_au_um: 0, y_au_um: 0 }, earth: { x_au_um: 1_000_000, y_au_um: 0 } },
+    ticks_per_au: 100,
+    min_transit_ticks: 5,
+    docking_range_au_um: 10_000,
+  });
   vi.spyOn(api, 'createEventSource').mockReturnValue({
     onopen: null,
     onerror: null,
@@ -74,10 +84,12 @@ describe('App', () => {
     expect(handles.length).toBeGreaterThan(0);
   });
 
-  it('renders solar system map panel with SVG', () => {
+  it('renders solar system map panel with SVG', async () => {
     const { container } = render(<App />);
     expect(container.querySelector('svg')).toBeInTheDocument();
-    expect(screen.getByText('Earth Orbit')).toBeInTheDocument();
+    // Body labels load async from fetchSpatialConfig
+    await screen.findByText('Sun');
+    expect(screen.getByText('Earth')).toBeInTheDocument();
   });
 
   it('can toggle map panel off and on', () => {

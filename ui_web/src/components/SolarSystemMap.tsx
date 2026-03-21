@@ -1,27 +1,66 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import { fetchSpatialConfig } from '../api';
 import { useSvgZoomPan } from '../hooks/useSvgZoomPan';
-import type { AsteroidState, ScanSite, ShipState, SimSnapshot, StationState } from '../types';
+import type {
+  AbsolutePos,
+  AsteroidState,
+  OrbitalBodyDef,
+  ScanSite,
+  ShipState,
+  SimSnapshot,
+  SolarSystemConfig,
+  StationState,
+} from '../types';
+import {
+  auUmToAu,
+  distanceAuUm,
+  entityAbsolute,
+  estimateTravelTicks,
+  mdegToRad,
+  shipTransitAbsolute,
+} from '../utils/spatial';
 
 import { DetailCard } from './solar-system/DetailCard';
-import { angleFromId, polarToCartesian, ringRadiusForNode, transitPosition } from './solar-system/layout';
 import { Tooltip } from './solar-system/Tooltip';
 
 interface Props {
   snapshot: SimSnapshot | null
   currentTick: number
-
 }
 
-const RINGS: { nodeId: string; label: string; radius: number; isBelt: boolean }[] = [
-  { nodeId: 'node_earth_orbit', label: 'Earth Orbit', radius: 100, isBelt: false },
-  { nodeId: 'node_belt_inner', label: 'Inner Belt', radius: 200, isBelt: true },
-  { nodeId: 'node_belt_mid', label: 'Mid Belt', radius: 300, isBelt: true },
-  { nodeId: 'node_belt_outer', label: 'Outer Belt', radius: 400, isBelt: true },
-];
+/** Scale factor: 1 SVG unit = 10,000 µAU */
+const SVG_SCALE = 10_000;
+
+function toSvg(auUm: number): number {
+  return auUm / SVG_SCALE;
+}
+
+function toSvgPos(abs: AbsolutePos): { x: number; y: number } {
+  return { x: toSvg(abs.x_au_um), y: toSvg(abs.y_au_um) };
+}
+
+const ZONE_COLORS: Record<string, string> = {
+  MetalRich: 'rgba(217, 158, 60, 0.15)',
+  Mixed: 'rgba(160, 160, 180, 0.12)',
+  VolatileRich: 'rgba(80, 140, 220, 0.15)',
+};
+
+const ZONE_STROKES: Record<string, string> = {
+  MetalRich: 'rgba(217, 158, 60, 0.3)',
+  Mixed: 'rgba(160, 160, 180, 0.2)',
+  VolatileRich: 'rgba(80, 140, 220, 0.3)',
+};
+
+const BODY_COLORS: Record<string, string> = {
+  Star: '#f5c842',
+  Planet: '#6b9dba',
+  Moon: '#999',
+  Belt: '#888',
+};
 
 function shipColor(task: ShipState['task']): string {
-  if (!task) {return 'var(--color-dim)';}
+  if (!task) { return 'var(--color-dim)'; }
   const kind = Object.keys(task.kind)[0];
   switch (kind) {
     case 'Survey': return '#5b9bd5';
@@ -33,11 +72,70 @@ function shipColor(task: ShipState['task']): string {
   }
 }
 
+/** Build an SVG path for a zone arc (annular sector). */
+function zoneArcPath(
+  centerX: number,
+  centerY: number,
+  rMin: number,
+  rMax: number,
+  startMdeg: number,
+  spanMdeg: number,
+): string {
+  if (spanMdeg >= 360_000) {
+    // Full circle donut — use two semicircles to avoid degenerate arc
+    return [
+      `M ${centerX + rMax} ${centerY}`,
+      `A ${rMax} ${rMax} 0 1 1 ${centerX - rMax} ${centerY}`,
+      `A ${rMax} ${rMax} 0 1 1 ${centerX + rMax} ${centerY}`,
+      'Z',
+      `M ${centerX + rMin} ${centerY}`,
+      `A ${rMin} ${rMin} 0 1 0 ${centerX - rMin} ${centerY}`,
+      `A ${rMin} ${rMin} 0 1 0 ${centerX + rMin} ${centerY}`,
+      'Z',
+    ].join(' ');
+  }
+
+  const startRad = mdegToRad(startMdeg);
+  const endRad = mdegToRad(startMdeg + spanMdeg);
+  const largeArc = spanMdeg > 180_000 ? 1 : 0;
+
+  const outerX1 = centerX + rMax * Math.cos(startRad);
+  const outerY1 = centerY + rMax * Math.sin(startRad);
+  const outerX2 = centerX + rMax * Math.cos(endRad);
+  const outerY2 = centerY + rMax * Math.sin(endRad);
+  const innerX1 = centerX + rMin * Math.cos(endRad);
+  const innerY1 = centerY + rMin * Math.sin(endRad);
+  const innerX2 = centerX + rMin * Math.cos(startRad);
+  const innerY2 = centerY + rMin * Math.sin(startRad);
+
+  return [
+    `M ${outerX1} ${outerY1}`,
+    `A ${rMax} ${rMax} 0 ${largeArc} 1 ${outerX2} ${outerY2}`,
+    `L ${innerX1} ${innerY1}`,
+    `A ${rMin} ${rMin} 0 ${largeArc} 0 ${innerX2} ${innerY2}`,
+    'Z',
+  ].join(' ');
+}
+
+function formatDistance(distAuUm: number): string {
+  const au = auUmToAu(distAuUm);
+  if (au < 0.01) {
+    return `${(au * 1000).toFixed(1)} mAU`;
+  }
+  return `${au.toFixed(2)} AU`;
+}
+
 export function SolarSystemMap({ snapshot, currentTick }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const groupRef = useRef<SVGGElement>(null);
 
-  useSvgZoomPan(svgRef, groupRef);
+  useSvgZoomPan(svgRef, groupRef, { minZoom: 0.1, maxZoom: 50 });
+
+  const [config, setConfig] = useState<SolarSystemConfig | null>(null);
+
+  useEffect(() => {
+    fetchSpatialConfig().then(setConfig).catch(() => {});
+  }, []);
 
   const [hovered, setHovered] = useState<{
     type: string
@@ -47,6 +145,9 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
   } | null>(null);
 
   const [selected, setSelected] = useState<{ type: string; id: string } | null>(null);
+
+  // Merge: config provides baseline, snapshot overrides with tick-fresh values
+  const bodyAbsolutes = { ...(config?.body_absolutes ?? {}), ...(snapshot?.body_absolutes ?? {}) };
 
   function entityMouseHandlers(type: string, id: string) {
     return {
@@ -64,34 +165,66 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
     | { type: 'asteroid'; data: AsteroidState }
     | { type: 'scan-site'; data: ScanSite }
     | null {
-    if (!snapshot) {return null;}
-    if (sel.type === 'station' && snapshot.stations[sel.id])
-    {return { type: 'station', data: snapshot.stations[sel.id] };}
-    if (sel.type === 'ship' && snapshot.ships[sel.id])
-    {return { type: 'ship', data: snapshot.ships[sel.id] };}
-    if (sel.type === 'asteroid' && snapshot.asteroids[sel.id])
-    {return { type: 'asteroid', data: snapshot.asteroids[sel.id] };}
+    if (!snapshot) { return null; }
+    if (sel.type === 'station' && snapshot.stations[sel.id]) {
+      return { type: 'station', data: snapshot.stations[sel.id] };
+    }
+    if (sel.type === 'ship' && snapshot.ships[sel.id]) {
+      return { type: 'ship', data: snapshot.ships[sel.id] };
+    }
+    if (sel.type === 'asteroid' && snapshot.asteroids[sel.id]) {
+      return { type: 'asteroid', data: snapshot.asteroids[sel.id] };
+    }
     if (sel.type === 'scan-site') {
       const site = snapshot.scan_sites.find(s => s.id === sel.id);
-      if (site) {return { type: 'scan-site', data: site };}
+      if (site) { return { type: 'scan-site', data: site }; }
     }
     return null;
   }
+
+  function getEntityAbsolute(sel: { type: string; id: string }): AbsolutePos | null {
+    if (!snapshot) { return null; }
+    const entity = lookupEntity(sel);
+    if (!entity) { return null; }
+    return entityAbsolute(entity.data.position, bodyAbsolutes);
+  }
+
+  // Compute ship SVG position, handling transit interpolation
+  function shipSvgPos(ship: ShipState): { x: number; y: number } {
+    const taskKind = ship.task ? Object.keys(ship.task.kind)[0] : null;
+
+    if (taskKind === 'Transit' && ship.task) {
+      type TransitDest = { parent_body: string; radius_au_um: number; angle_mdeg: number };
+      type TransitKind = { Transit: { destination: TransitDest; total_ticks: number } };
+      const transit = (ship.task.kind as unknown as TransitKind).Transit;
+      const originAbs = entityAbsolute(ship.position, bodyAbsolutes);
+      const destAbs = entityAbsolute(transit.destination, bodyAbsolutes);
+      const progress = ship.task.eta_tick > ship.task.started_tick
+        ? (currentTick - ship.task.started_tick) / (ship.task.eta_tick - ship.task.started_tick)
+        : 1;
+      return toSvgPos(shipTransitAbsolute(originAbs, destAbs, progress));
+    }
+
+    return toSvgPos(entityAbsolute(ship.position, bodyAbsolutes));
+  }
+
+  // Zone bodies from config
+  const zoneBodies = config?.bodies.filter((b: OrbitalBodyDef) => b.zone !== null) ?? [];
 
   return (
     <div className="relative w-full h-full bg-void overflow-hidden">
       <svg
         ref={svgRef}
         className="w-full h-full"
-        viewBox="-500 -500 1000 1000"
+        viewBox="-600 -600 1200 1200"
         preserveAspectRatio="xMidYMid meet"
-        onClick={(e) => { if (e.target === svgRef.current) {setSelected(null);} }}
+        onClick={(e) => { if (e.target === svgRef.current) { setSelected(null); } }}
       >
         <g ref={groupRef}>
           {/* Starfield */}
           {Array.from({ length: 80 }, (_, starIndex) => {
-            const sx = ((starIndex * 7919 + 1) % 1000) - 500;
-            const sy = ((starIndex * 6271 + 3) % 1000) - 500;
+            const sx = ((starIndex * 7919 + 1) % 1200) - 600;
+            const sy = ((starIndex * 6271 + 3) % 1200) - 600;
             const size = (starIndex % 3 === 0) ? 1.5 : 0.8;
             return (
               <circle
@@ -105,55 +238,75 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
             );
           })}
 
-          {/* Sun at center */}
-          <circle cx={0} cy={0} r={12} fill="#f5c842" opacity={0.9} />
-          <circle cx={0} cy={0} r={18} fill="none" stroke="#f5c842" opacity={0.2} strokeWidth={4} />
-
-          {/* Orbital rings */}
-          {RINGS.map((ring) => (
-            <g key={ring.nodeId}>
-              <circle
-                cx={0}
-                cy={0}
-                r={ring.radius}
-                fill="none"
-                stroke="var(--color-dim)"
-                strokeWidth={ring.isBelt ? 0.8 : 1.2}
-                strokeDasharray={ring.isBelt ? '6 4' : undefined}
-                opacity={0.6}
+          {/* Zone arcs */}
+          {zoneBodies.map((body) => {
+            if (!body.zone) { return null; }
+            const parentAbs = bodyAbsolutes[body.parent ?? ''] ?? bodyAbsolutes[body.id];
+            if (!parentAbs) { return null; }
+            const center = toSvgPos(parentAbs);
+            const rMin = toSvg(body.zone.radius_min_au_um);
+            const rMax = toSvg(body.zone.radius_max_au_um);
+            if (rMax < 0.1) { return null; }
+            const fillColor = ZONE_COLORS[body.zone.resource_class] ?? ZONE_COLORS.Mixed;
+            const strokeColor = ZONE_STROKES[body.zone.resource_class] ?? ZONE_STROKES.Mixed;
+            return (
+              <path
+                key={`zone-${body.id}`}
+                d={zoneArcPath(center.x, center.y, rMin, rMax, body.zone.angle_start_mdeg, body.zone.angle_span_mdeg)}
+                fill={fillColor}
+                stroke={strokeColor}
+                strokeWidth={0.5}
+                fillRule="evenodd"
               />
-              <text
-                x={0}
-                y={-ring.radius - 10}
-                textAnchor="middle"
-                fill="var(--color-fg)"
-                fontSize={12}
-                fontFamily="monospace"
-                opacity={0.7}
-              >
-                {ring.label}
-              </text>
-            </g>
-          ))}
+            );
+          })}
+
+          {/* Orbital body markers */}
+          {config?.bodies.map((body) => {
+            const abs = bodyAbsolutes[body.id];
+            if (!abs) { return null; }
+            const { x, y } = toSvgPos(abs);
+            const color = BODY_COLORS[body.body_type] ?? '#888';
+            if (body.body_type === 'Zone' || body.body_type === 'Belt') { return null; }
+
+            const radius = body.body_type === 'Star' ? 8 : body.body_type === 'Moon' ? 3 : 5;
+            return (
+              <g key={`body-${body.id}`}>
+                <circle cx={x} cy={y} r={radius} fill={color} opacity={0.9} />
+                {body.body_type === 'Star' && (
+                  <circle cx={x} cy={y} r={radius * 1.5} fill="none" stroke={color} opacity={0.2} strokeWidth={3} />
+                )}
+                <text
+                  x={x}
+                  y={y - radius - 4}
+                  textAnchor="middle"
+                  fill="var(--color-fg)"
+                  fontSize={8}
+                  fontFamily="monospace"
+                  opacity={0.7}
+                >
+                  {body.name}
+                </text>
+              </g>
+            );
+          })}
 
           {/* Stations */}
           {snapshot && Object.values(snapshot.stations).map((station) => {
-            const radius = ringRadiusForNode(station.position.parent_body);
-            const angle = angleFromId(station.id);
-            const { x, y } = polarToCartesian(radius, angle);
+            const { x, y } = toSvgPos(entityAbsolute(station.position, bodyAbsolutes));
             return (
               <rect
                 key={station.id}
                 data-entity-type="station"
                 data-entity-id={station.id}
-                x={x - 8}
-                y={y - 8}
-                width={16}
-                height={16}
+                x={x - 5}
+                y={y - 5}
+                width={10}
+                height={10}
                 fill="var(--color-accent)"
                 transform={`rotate(45 ${x} ${y})`}
                 stroke={selected?.id === station.id ? 'var(--color-bright)' : undefined}
-                strokeWidth={selected?.id === station.id ? 2 : undefined}
+                strokeWidth={selected?.id === station.id ? 1.5 : undefined}
                 className="cursor-pointer"
                 {...entityMouseHandlers('station', station.id)}
                 onClick={() => setSelected({ type: 'station', id: station.id })}
@@ -163,43 +316,16 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
 
           {/* Ships */}
           {snapshot && Object.values(snapshot.ships).map((ship) => {
-            let x: number, y: number;
-            const taskKind = ship.task ? Object.keys(ship.task.kind)[0] : null;
-
-            if (taskKind === 'Transit' && ship.task) {
-              type TransitKind = { Transit: { destination: { parent_body: string } } };
-              const transit = (ship.task.kind as unknown as TransitKind).Transit;
-              const originRadius = ringRadiusForNode(ship.position.parent_body);
-              const originAngle = angleFromId(ship.id + ':origin');
-              const destRadius = ringRadiusForNode(transit.destination.parent_body);
-              const destAngle = angleFromId(ship.id + ':dest');
-              const progress = ship.task.eta_tick > ship.task.started_tick
-                ? (currentTick - ship.task.started_tick) / (ship.task.eta_tick - ship.task.started_tick)
-                : 1;
-              const pos = transitPosition(
-                { radius: originRadius, angle: originAngle },
-                { radius: destRadius, angle: destAngle },
-                progress,
-              );
-              x = pos.x;
-              y = pos.y;
-            } else {
-              const radius = ringRadiusForNode(ship.position.parent_body);
-              const angle = angleFromId(ship.id);
-              const pos = polarToCartesian(radius, angle);
-              x = pos.x;
-              y = pos.y;
-            }
-
+            const { x, y } = shipSvgPos(ship);
             return (
               <polygon
                 key={ship.id}
                 data-entity-type="ship"
                 data-entity-id={ship.id}
-                points={`${x},${y - 8} ${x - 6},${y + 5} ${x + 6},${y + 5}`}
+                points={`${x},${y - 5} ${x - 4},${y + 3} ${x + 4},${y + 3}`}
                 fill={shipColor(ship.task)}
                 stroke={selected?.id === ship.id ? 'var(--color-bright)' : undefined}
-                strokeWidth={selected?.id === ship.id ? 2 : undefined}
+                strokeWidth={selected?.id === ship.id ? 1.5 : undefined}
                 className="cursor-pointer"
                 {...entityMouseHandlers('ship', ship.id)}
                 onClick={() => setSelected({ type: 'ship', id: ship.id })}
@@ -209,11 +335,9 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
 
           {/* Asteroids */}
           {snapshot && Object.values(snapshot.asteroids).map((asteroid) => {
-            const radius = ringRadiusForNode(asteroid.position.parent_body);
-            const angle = angleFromId(asteroid.id);
-            const { x, y } = polarToCartesian(radius, angle);
+            const { x, y } = toSvgPos(entityAbsolute(asteroid.position, bodyAbsolutes));
             const massKg = asteroid.mass_kg ?? 1000;
-            const size = Math.max(4, Math.min(12, Math.log10(massKg) + 1));
+            const size = Math.max(2.5, Math.min(8, Math.log10(massKg)));
             const isIronRich = asteroid.anomaly_tags.includes('IronRich');
 
             return (
@@ -227,7 +351,7 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
                 fill={isIronRich ? '#c47038' : '#8a8e98'}
                 opacity={0.9}
                 stroke={selected?.id === asteroid.id ? 'var(--color-bright)' : undefined}
-                strokeWidth={selected?.id === asteroid.id ? 2 : undefined}
+                strokeWidth={selected?.id === asteroid.id ? 1.5 : undefined}
                 className="cursor-pointer"
                 {...entityMouseHandlers('asteroid', asteroid.id)}
                 onClick={() => setSelected({ type: 'asteroid', id: asteroid.id })}
@@ -237,9 +361,7 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
 
           {/* Scan sites */}
           {snapshot && snapshot.scan_sites.map((site) => {
-            const radius = ringRadiusForNode(site.position.parent_body);
-            const angle = angleFromId(site.id);
-            const { x, y } = polarToCartesian(radius, angle);
+            const { x, y } = toSvgPos(entityAbsolute(site.position, bodyAbsolutes));
             const isSelected = selected?.id === site.id;
 
             return (
@@ -254,10 +376,10 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
                 <circle
                   cx={x}
                   cy={y}
-                  r={8}
+                  r={5}
                   fill="var(--color-edge)"
                   stroke={isSelected ? 'var(--color-bright)' : 'var(--color-muted)'}
-                  strokeWidth={isSelected ? 1.5 : 0.8}
+                  strokeWidth={isSelected ? 1 : 0.5}
                   opacity={0.8}
                 />
                 <text
@@ -266,7 +388,7 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
                   textAnchor="middle"
                   dominantBaseline="central"
                   fill={isSelected ? 'var(--color-bright)' : 'var(--color-fg)'}
-                  fontSize={11}
+                  fontSize={7}
                   fontFamily="monospace"
                   fontWeight="bold"
                 >
@@ -280,18 +402,27 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
 
       {hovered && snapshot && (() => {
         const entity = lookupEntity(hovered);
-        if (!entity) {return null;}
+        if (!entity) { return null; }
+        const hoveredAbs = getEntityAbsolute(hovered);
+        const selectedAbs = selected ? getEntityAbsolute(selected) : null;
         return (
           <Tooltip x={hovered.screenX} y={hovered.screenY}>
             <div className="text-accent">{entity.data.id}</div>
             <div className="text-dim">{entity.type}</div>
+            {hoveredAbs && selectedAbs && selected?.id !== hovered.id && config && (
+              <div className="text-muted">
+                {formatDistance(distanceAuUm(hoveredAbs, selectedAbs))}
+                {' '}
+                (~{estimateTravelTicks(distanceAuUm(hoveredAbs, selectedAbs), config)} ticks)
+              </div>
+            )}
           </Tooltip>
         );
       })()}
 
       {selected && snapshot && (() => {
         const entity = lookupEntity(selected);
-        if (!entity) {return null;}
+        if (!entity) { return null; }
         return <DetailCard entity={entity} onClose={() => setSelected(null)} />;
       })()}
     </div>
