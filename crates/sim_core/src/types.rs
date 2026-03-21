@@ -1079,6 +1079,19 @@ pub struct Constants {
     /// Game-time minutes per simulation tick. Production = 60 (1 tick = 1 hour).
     /// Test fixtures use 1 to preserve existing assertions.
     pub minutes_per_tick: u32,
+    // Autopilot export
+    /// Minimum repair kits to keep for maintenance before exporting surplus.
+    #[serde(default = "default_autopilot_repair_kit_reserve")]
+    pub autopilot_repair_kit_reserve: u32,
+    /// Fe (kg) reserved for shipyard recipe + assembler buffer. Surplus above this may be exported.
+    #[serde(default = "default_autopilot_fe_reserve_kg")]
+    pub autopilot_fe_reserve_kg: f32,
+    /// Max kg per material export command per tick. Prevents dumping entire stockpile at once.
+    #[serde(default = "default_autopilot_export_batch_size_kg")]
+    pub autopilot_export_batch_size_kg: f32,
+    /// Skip exports that would yield less than this revenue. Avoids micro-transactions.
+    #[serde(default = "default_autopilot_export_min_revenue")]
+    pub autopilot_export_min_revenue: f64,
     // Thermal system
     /// Ambient/radiator sink temperature in milli-Kelvin (20 C, not cosmic background).
     #[serde(default = "default_thermal_sink_temp_mk")]
@@ -1206,6 +1219,22 @@ impl Default for WearState {
 
 fn default_slag_jettison_pct() -> f32 {
     0.75
+}
+
+fn default_autopilot_repair_kit_reserve() -> u32 {
+    10
+}
+
+fn default_autopilot_fe_reserve_kg() -> f32 {
+    12_000.0
+}
+
+fn default_autopilot_export_batch_size_kg() -> f32 {
+    500.0
+}
+
+fn default_autopilot_export_min_revenue() -> f64 {
+    1_000.0
 }
 
 /// 20 °C in milli-Kelvin — shared default for ambient/sink temperature.
