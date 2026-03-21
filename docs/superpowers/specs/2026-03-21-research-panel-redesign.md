@@ -36,23 +36,32 @@ A tier-based top-to-bottom directed acyclic graph.
 
 **Rendering approach:** Hybrid HTML nodes + SVG edges. Use dagre for layout positioning. Nodes are styled HTML cards, edges are SVG lines drawn in an overlay. Designed for 10-20+ nodes with scrolling.
 
+**"Researching" definition:** A tech is "researching" when (a) at least one lab has `assigned_tech` pointing to it, AND (b) all its prereqs are unlocked. A tech with met prereqs but no lab assigned is NOT shown as researching — it stays hidden until a lab begins work.
+
 **Node states and styling:**
 
 | State | Background | Border | Name color | Visibility rule |
 |-------|-----------|--------|------------|-----------------|
 | Unlocked | green tint rgba(76,175,125,0.07) | solid green 0.35 | green #4caf7d | Always shown |
-| Researching | blue tint rgba(92,160,200,0.06) | solid blue 0.30 | default #e0e2e8 | Shown if ALL prereqs are unlocked |
-| Locked | #13161e | dashed #2a2e38, opacity 0.5 | default (dimmed) | Shown if it's a direct child of a researching tech (one tier only) |
+| Researching | blue tint rgba(92,160,200,0.06) | solid blue 0.30 | default #e0e2e8 | Lab assigned + all prereqs unlocked |
+| Locked | #13161e | dashed #2a2e38, opacity 0.5 | default (dimmed) | Direct child of a researching tech (one tier only) |
 | Mystery | #0e1018 | dashed #1e2228 | "???" in #2a2e38 | Everything beyond locked tier |
 
 **Progressive disclosure rules:**
 1. Show all unlocked techs
-2. Show researching techs (only if all prereqs unlocked)
+2. Show researching techs (lab assigned + all prereqs unlocked)
 3. Show one tier of locked children (direct dependents of researching techs)
 4. Everything deeper renders as `???` mystery nodes
 5. `???` nodes are same width/height as tech nodes for connector alignment
 6. DAG edges continue into the `???` zone — if a hidden tech requires both a locked node and a `???` node, show converging edges into a `???`
 7. The tree grows as techs unlock — newly unlocked techs reveal the next locked tier
+8. If a locked child has multiple prereqs and only some are visible (researching), show it with edges only from visible parents
+
+**Domain ↔ Color mapping** (same colors for both DataKind and ResearchDomain — 1:1 mapping):
+- Survey / SurveyData: blue #5ca0c8
+- Materials / AssayData: gold #c89a4a
+- Manufacturing / ManufacturingData: green #4caf7d
+- Propulsion / TransitData: purple #a78bfa
 
 **Node content:**
 - Tech name (human-readable from `TechDef.name`, never raw tech_id)
@@ -83,14 +92,13 @@ Propulsion Lab    Efficient Propulsion +1.5/hr  active
 
 ## Backend Requirements
 
-### New API data needed
+### New API data needed (RD-10)
 
-The FE needs the following from the snapshot/SSE to render the tree:
+The snapshot currently serializes only `GameState`, NOT `GameContent`. The FE has no access to tech definitions. This must be fixed.
 
-1. **Tech definitions with names** — `TechDef` must include `name` field (already exists in `techs.json`)
-2. **Prereq graph** — `TechDef.prereqs` already contains prerequisite tech IDs
-3. **Data generation rates** — net rate per data kind (generation - consumption). Can be computed FE-side from sensor/lab tick rates, or provided by the daemon.
-4. **Lab production rates** — points produced per tick by each lab. Can derive from `LabDef.points_per_run` and tick interval, or emit in events.
+1. **Tech definitions** — New `GET /api/v1/content` endpoint (preferred) or embed in snapshot. FE needs: `TechDef.id`, `TechDef.name`, `TechDef.prereqs`, `TechDef.domain_requirements`, `TechDef.difficulty`, `TechDef.accepted_data`
+2. **Data pool rates** — Backend provides net rate per data kind per game hour in the snapshot (`data_rates: HashMap<DataKind, f64>`). Backend-computed is simpler and more accurate than FE delta tracking.
+3. **Lab production rates** — Backend provides research points per game hour per lab, derivable from `LabDef.points_per_run` and tick interval.
 
 ### Existing data that's sufficient
 
@@ -98,12 +106,6 @@ The FE needs the following from the snapshot/SSE to render the tree:
 - `ResearchState.evidence` — per-tech domain progress
 - `ResearchState.unlocked` — unlocked tech set
 - `LabState.assigned_tech`, `LabState.starved` — lab assignments and status
-- `TechDef.domain_requirements` — target values for progress bars
-- `TechDef.prereqs` — DAG edges
-
-### Content data flow
-
-The snapshot already includes `content` with tech definitions. The FE reads the full tech list from content, builds the DAG from prereqs, and applies visibility rules based on `ResearchState`. No new endpoints needed for the tree structure itself.
 
 ## Dependencies
 
@@ -121,5 +123,7 @@ The FE tickets should be sequenced after the backend tickets.
 - Nodes rendered as HTML divs (styled with existing Tailwind classes), positioned absolutely within a scrollable viewport.
 - SVG overlay for edges only — simple line segments with right-angle bends, not bezier curves.
 - The `TechTreeDAG` component should be a standalone component that takes `ResearchState` + `TechDef[]` and handles all layout/visibility logic.
-- Progressive disclosure logic is pure: given unlocked set + prereq graph → compute visible set + node states.
-- Rate computation: track delta between consecutive SSE snapshots, or derive from content constants.
+- Progressive disclosure logic is pure: given unlocked set + lab assignments + prereq graph → compute visible set + node states.
+- Rates provided by backend (see RD-10). FE just displays them.
+- dagre config: `rankdir: 'TB'`, reasonable `nodesep`/`ranksep` for the panel width. Re-run layout only when tree structure changes (unlock events), not on every tick.
+- Empty state (tick 0, no labs): show "no research activity" placeholder. Root techs with no prereqs only appear once a lab is assigned.
