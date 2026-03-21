@@ -341,7 +341,10 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
             const { x, y } = toSvgPos(entityAbsolute(asteroid.position, bodyAbsolutes));
             const massKg = asteroid.mass_kg ?? 1000;
             const size = Math.max(2.5, Math.min(8, Math.log10(massKg)));
-            const isIronRich = asteroid.anomaly_tags.includes('IronRich');
+            const asteroidFill = asteroid.anomaly_tags.includes('VolatileRich') ? '#38a0c4'
+              : asteroid.anomaly_tags.includes('Carbonaceous') ? '#b48c3c'
+              : asteroid.anomaly_tags.includes('IronRich') ? '#c47038'
+              : '#8a8e98';
 
             return (
               <circle
@@ -351,7 +354,7 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
                 cx={x}
                 cy={y}
                 r={size}
-                fill={isIronRich ? '#c47038' : '#8a8e98'}
+                fill={asteroidFill}
                 opacity={0.9}
                 stroke={selected?.id === asteroid.id ? 'var(--color-bright)' : undefined}
                 strokeWidth={selected?.id === asteroid.id ? 1.5 : undefined}

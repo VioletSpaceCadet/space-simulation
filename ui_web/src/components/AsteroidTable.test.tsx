@@ -55,6 +55,28 @@ describe('AsteroidTable', () => {
     expect(headers.some((h) => h.textContent?.includes('⇅'))).toBe(true);
   });
 
+  it('renders VolatileRich and Carbonaceous tag badges', () => {
+    const mixed: Record<string, AsteroidState> = {
+      'asteroid_v': {
+        id: 'asteroid_v',
+        position: { parent_body: 'outer_belt', radius_au_um: 0, angle_mdeg: 0 },
+        anomaly_tags: ['VolatileRich'],
+        mass_kg: 2000,
+        knowledge: { tag_beliefs: [['VolatileRich', 0.75]], composition: null },
+      },
+      'asteroid_c': {
+        id: 'asteroid_c',
+        position: { parent_body: 'outer_belt', radius_au_um: 0, angle_mdeg: 0 },
+        anomaly_tags: ['Carbonaceous'],
+        mass_kg: 1500,
+        knowledge: { tag_beliefs: [['Carbonaceous', 0.60]], composition: null },
+      },
+    };
+    render(<AsteroidTable asteroids={mixed} />);
+    expect(screen.getByText(/VolatileRich/)).toBeInTheDocument();
+    expect(screen.getByText(/Carbonaceous/)).toBeInTheDocument();
+  });
+
   it('sorts by mass ascending on click', () => {
     render(<AsteroidTable asteroids={asteroids} />);
     const massHeader = screen.getByText(/Mass/);
