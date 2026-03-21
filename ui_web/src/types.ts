@@ -258,6 +258,7 @@ export interface PricingEntry {
   base_price_per_unit: number
   importable: boolean
   exportable: boolean
+  category: string
 }
 
 export interface PricingTable {

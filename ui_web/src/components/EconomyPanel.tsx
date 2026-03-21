@@ -15,16 +15,15 @@ interface CategorizedItem {
 }
 
 function categorizePricingItems(pricing: PricingTable): CategorizedItem[] {
-  const materials = new Set(['Fe', 'Si', 'He']);
   const items: CategorizedItem[] = [];
 
   for (const [key, entry] of Object.entries(pricing.items)) {
-    if (key === 'ore' || key === 'slag') {continue;}
+    if (entry.category === 'raw_ore' || entry.category === 'byproduct') {continue;}
 
     let category: ItemCategory;
-    if (materials.has(key)) {
+    if (entry.category === 'material') {
       category = 'Material';
-    } else if (key.startsWith('module_')) {
+    } else if (entry.category === 'module') {
       category = 'Module';
     } else {
       category = 'Component';

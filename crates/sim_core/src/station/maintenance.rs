@@ -43,6 +43,7 @@ fn execute(
     let repair_reduction = maint_def.wear_reduction_per_run;
     let kit_cost = maint_def.repair_kit_cost;
     let repair_threshold = maint_def.repair_threshold;
+    let component_id_str = &maint_def.maintenance_component_id;
 
     let current_tick = state.meta.tick;
 
@@ -75,7 +76,7 @@ fn execute(
         };
         let kit_slot = station.inventory.iter_mut().find(|i| {
             matches!(i, InventoryItem::Component { component_id, count, .. }
-                if component_id.0 == "repair_kit" && *count >= kit_cost)
+                if component_id.0 == *component_id_str && *count >= kit_cost)
         });
         if let Some(InventoryItem::Component { count, .. }) = kit_slot {
             *count -= kit_cost;
@@ -122,7 +123,7 @@ fn execute(
                     ..
                 } = i
                 {
-                    if component_id.0 == "repair_kit" {
+                    if component_id.0 == *component_id_str {
                         Some(*count)
                     } else {
                         None

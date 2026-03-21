@@ -16,6 +16,7 @@ fn trade_content() -> GameContent {
                     base_price_per_unit: 50.0,
                     importable: true,
                     exportable: true,
+                    ..Default::default()
                 },
             ),
             (
@@ -24,6 +25,7 @@ fn trade_content() -> GameContent {
                     base_price_per_unit: 500_000.0,
                     importable: true,
                     exportable: true,
+                    ..Default::default()
                 },
             ),
             (
@@ -32,6 +34,7 @@ fn trade_content() -> GameContent {
                     base_price_per_unit: 8_000.0,
                     importable: true,
                     exportable: true,
+                    ..Default::default()
                 },
             ),
             (
@@ -40,6 +43,7 @@ fn trade_content() -> GameContent {
                     base_price_per_unit: 5.0,
                     importable: false,
                     exportable: false,
+                    ..Default::default()
                 },
             ),
             (
@@ -48,6 +52,7 @@ fn trade_content() -> GameContent {
                     base_price_per_unit: 1.0,
                     importable: false,
                     exportable: false,
+                    ..Default::default()
                 },
             ),
             (
@@ -56,6 +61,7 @@ fn trade_content() -> GameContent {
                     base_price_per_unit: 2_000_000.0,
                     importable: true,
                     exportable: true,
+                    ..Default::default()
                 },
             ),
         ]),

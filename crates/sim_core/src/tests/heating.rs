@@ -8,6 +8,7 @@ fn heating_content() -> GameContent {
         density_kg_per_m3: 1000.0,
         display_name: "Water Ice".to_string(),
         refined_name: Some("Water".to_string()),
+        category: "material".to_string(),
         melting_point_mk: None,
         latent_heat_j_per_kg: None,
         specific_heat_j_per_kg_k: None,

@@ -296,10 +296,10 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
                 ..
             } = item
             {
-                if component_id.0 == "repair_kit" {
+                if component_id.0 == crate::COMPONENT_REPAIR_KIT {
                     total_repair_kits += *count;
                 }
-                if component_id.0 == "thruster" {
+                if component_id.0 == crate::COMPONENT_THRUSTER {
                     total_thruster_count += *count;
                 }
             }

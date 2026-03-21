@@ -47,6 +47,7 @@ fn replenish_test_content() -> GameContent {
             density_kg_per_m3: 3000.0,
             display_name: "Raw Ore".to_string(),
             refined_name: None,
+            category: "raw_ore".to_string(),
             melting_point_mk: None,
             latent_heat_j_per_kg: None,
             specific_heat_j_per_kg_k: None,
@@ -100,6 +101,7 @@ fn replenish_test_content() -> GameContent {
             thermal_overheat_critical_offset_mk: 500_000,
             thermal_wear_multiplier_warning: 2.0,
             thermal_wear_multiplier_critical: 4.0,
+            primary_element: "Fe".to_string(),
             // Derived fields — filled by derive_tick_values()
             survey_scan_ticks: 0,
             deep_scan_ticks: 0,

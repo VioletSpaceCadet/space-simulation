@@ -932,6 +932,7 @@ mod tests {
                     wear_reduction_per_run: 0.2,
                     repair_kit_cost: 1,
                     repair_threshold: 0.0,
+                    maintenance_component_id: "repair_kit".to_string(),
                 }),
                 thermal: None,
             },
@@ -1539,6 +1540,7 @@ mod tests {
                     base_price_per_unit: 50_000.0,
                     importable: true,
                     exportable: true,
+                    ..Default::default()
                 },
             )]),
         };
@@ -1695,6 +1697,7 @@ mod tests {
                 base_price_per_unit: 8000.0,
                 importable: true,
                 exportable: true,
+                ..Default::default()
             },
         );
         content.pricing.items.insert(
@@ -1703,6 +1706,7 @@ mod tests {
                 base_price_per_unit: 200.0,
                 importable: true,
                 exportable: true,
+                ..Default::default()
             },
         );
         content.pricing.items.insert(
@@ -1711,6 +1715,7 @@ mod tests {
                 base_price_per_unit: 80.0,
                 importable: true,
                 exportable: true,
+                ..Default::default()
             },
         );
         content.pricing.items.insert(
@@ -1719,6 +1724,7 @@ mod tests {
                 base_price_per_unit: 50.0,
                 importable: true,
                 exportable: true,
+                ..Default::default()
             },
         );
         // Add He element (not in base_content) for density lookup
@@ -1727,6 +1733,7 @@ mod tests {
             density_kg_per_m3: 125.0,
             display_name: "Helium-3".to_string(),
             refined_name: None,
+            category: "material".to_string(),
             melting_point_mk: None,
             latent_heat_j_per_kg: None,
             specific_heat_j_per_kg_k: None,
@@ -2180,6 +2187,7 @@ mod tests {
             density_kg_per_m3: 1000.0,
             display_name: "Water Ice".to_string(),
             refined_name: Some("Water".to_string()),
+            category: "material".to_string(),
             melting_point_mk: None,
             latent_heat_j_per_kg: None,
             specific_heat_j_per_kg_k: None,
