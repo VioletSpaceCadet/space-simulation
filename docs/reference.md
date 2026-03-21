@@ -13,12 +13,12 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `ShipState` | `id`, `location_node`, `owner`, `inventory: Vec<InventoryItem>`, `cargo_capacity_m3`, `task` |
 | `StationState` | `id`, `location_node`, `inventory`, `cargo_capacity_m3`, `power_available_per_tick`, `facilities`, `modules: Vec<ModuleState>` |
 | `InventoryItem` | Enum: `Ore { lot_id, asteroid_id, kg, composition }`, `Material { element, kg, quality }`, `Slag { kg, composition }`, `Component { component_id, count, quality }`, `Module { item_id, module_def_id }` |
-| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, or Assembler), `wear: WearState`. Processor/Assembler have `stalled: bool`. Assembler also has `capped: bool`, `cap_override: HashMap<ComponentId, u32>` |
+| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, Assembler, Lab, SensorArray, SolarArray, Battery, Radiator), `wear: WearState`, optional `thermal: ThermalState`. Processor/Assembler have `stalled: bool`. Assembler also has `capped: bool`, `cap_override: HashMap<ComponentId, u32>` |
 | `WearState` | `wear: f32` (0.0–1.0). Embedded on any wearable entity. |
 | `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
 | `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold`, `AssignLabTech`, `SetAssemblerCap`, `Import`, `Export`, `JettisonSlag` |
 | `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, component_defs, constants |
-| `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, Maintenance, Assembler, Lab, or SensorArray), `wear_per_run` |
+| `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, Maintenance, Assembler, Lab, SensorArray, SolarArray, Battery, Radiator), `wear_per_run`, optional `thermal: ThermalDef` |
 | `ComponentDef` | Component definition: `id`, `name`, `mass_kg`, `volume_m3` |
 | `MaintenanceDef` | Maintenance module behavior: `repair_interval_ticks`, `wear_reduction_per_run`, `repair_kit_cost` |
 | `AssemblerDef` | Assembler module behavior: `assembly_interval_ticks`, `recipes` (list of input filters + output component), `max_stock: HashMap<ComponentId, u32>` (optional stock cap per output component) |
@@ -32,6 +32,13 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `DataKind` | Enum: `ScanData`, `MiningData`, `EngineeringData` — type of raw data a lab consumes |
 | `LabDef` | Lab module behavior definition: `data_kind`, `domain`, `throughput_per_tick` |
 | `LabState` | Lab runtime state (embedded in `ModuleState::kind_state`): `assigned_tech: Option<TechId>` |
+| `ThermalDef` | Module thermal properties: `heat_capacity_j_per_k`, `passive_cooling_coefficient`, `max_temp_mk`, `operating_min_mk`, `operating_max_mk`, `thermal_group` |
+| `ThermalState` | Per-module thermal runtime: `temp_mk: u32`, `thermal_group`, `overheat_zone: OverheatZone`, `overheat_disabled: bool` |
+| `OverheatZone` | Enum: `Nominal`, `Warning`, `Critical` — drives wear multiplier and auto-disable |
+| `RecipeThermalReq` | Recipe thermal requirements: `min_temp_mk`, `optimal_min_mk`, `optimal_max_mk`, `max_temp_mk`, `heat_per_run_j` |
+| `RadiatorDef` | Radiator behavior: `cooling_capacity_w` — shared across thermal group |
+| `MaterialThermalProps` | Material thermal tracking: `temp_mk`, `phase: Phase`, `latent_heat_buffer_j` |
+| `Phase` | Enum: `Solid`, `Liquid` |
 
 Note: `FacilitiesState` has been removed. Research state is fully contained in `ResearchState`.
 
@@ -73,7 +80,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 | `solar_system.json` | 4 nodes (Earth Orbit → Inner Belt → Mid Belt → Outer Belt), linear chain |
 | `asteroid_templates.json` | 2 templates: `tmpl_iron_rich` (IronRich, Fe-heavy) and `tmpl_silicate` (Si-heavy) |
 | `elements.json` | 5 elements: `ore` (3000), `slag` (2500), `Fe` (7874), `Si` (2329), `He` (125) kg/m³ |
-| `module_defs.json` | 3 modules: `module_basic_iron_refinery` (Processor, 60-tick interval, wear_per_run=0.01), `module_maintenance_bay` (Maintenance, 30-tick interval, reduces 0.2 wear, costs 1 RepairKit), `module_basic_assembler` (Assembler, 360-tick interval, wear_per_run=0.008, 200kg Fe → 1 RepairKit, max_stock: repair_kit=50) |
+| `module_defs.json` | Modules include: `module_basic_iron_refinery` (Processor, 60-tick interval, wear_per_run=0.01), `module_maintenance_bay` (Maintenance, 30-tick interval, reduces 0.2 wear, costs 1 RepairKit), `module_basic_assembler` (Assembler, 360-tick interval, wear_per_run=0.008, 200kg Fe → 1 RepairKit, max_stock: repair_kit=50), `module_basic_smelter` (Processor with ThermalDef, thermal recipe requirements), `module_basic_radiator` (Radiator, cooling_capacity_w shared across thermal group) |
 | `component_defs.json` | 1 component: `repair_kit` (50kg, 0.1 m³) |
 | `pricing.json` | Import/export pricing: surcharges per kg, per-item base prices, importable/exportable flags |
 | `dev_base_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
@@ -160,6 +167,63 @@ All in `content/`. Loaded at runtime; never compiled in.
 - Component output from processors (type defined but no-op).
 - Storage modules (type defined but tick loop skips them).
 
+## Thermal System
+
+**Thermal types:**
+
+| Type | Purpose |
+|---|---|
+| `ThermalState` | Per-module runtime thermal state: `temp_mk: u32` (milli-Kelvin), `thermal_group: Option<ThermalGroupId>`, `overheat_zone: OverheatZone`, `overheat_disabled: bool` |
+| `ThermalDef` | Content-driven module thermal properties: `heat_capacity_j_per_k: f32`, `passive_cooling_coefficient: f32`, `max_temp_mk: u32`, `operating_min_mk: Option<u32>`, `operating_max_mk: Option<u32>`, `thermal_group: Option<ThermalGroupId>` |
+| `MaterialThermalProps` | Thermal properties on a `Material` inventory item: `temp_mk: u32`, `phase: Phase`, `latent_heat_buffer_j: i64` |
+| `Phase` | Enum: `Solid`, `Liquid` |
+| `OverheatZone` | Enum: `Nominal` (default), `Warning`, `Critical` |
+| `RecipeThermalReq` | Per-recipe thermal requirements: `min_temp_mk`, `optimal_min_mk`, `optimal_max_mk`, `max_temp_mk`, `heat_per_run_j` |
+| `RadiatorDef` | Radiator module behavior: `cooling_capacity_w: f32` |
+
+**Thermal tick step (3.6):** Runs after maintenance, before research. For each station, groups modules by `thermal_group` (BTreeMap for deterministic order, modules sorted by ID within each group). Two passes:
+
+1. **Passive cooling:** For each thermal module, applies Newton's cooling law toward the sink temperature: `Q_loss = passive_cooling_coefficient * dt_s * (T - T_sink) / 1000`. Converts energy to temperature delta via `heat_capacity_j_per_k`. Temperature clamped to `[sink_temp, 10_000_000 mK]`.
+2. **Radiator cooling:** Per group, sums total radiator `cooling_capacity_w` (adjusted for wear efficiency), distributes cooling energy evenly across all thermal modules in the group. Same energy-to-delta conversion and clamping.
+
+After temperature updates, checks all thermal modules for overheat zone transitions and emits events.
+
+**Smelter module:** A Processor with a `ThermalDef`. Recipes have a `RecipeThermalReq` specifying thermal requirements:
+- Below `min_temp_mk`: processor stalls (emits `ProcessorTooCold`).
+- `min_temp_mk` to `optimal_min_mk`: efficiency ramps 80% to 100% (reduced yield).
+- `optimal_min_mk` to `optimal_max_mk`: 100% efficiency, 100% quality.
+- `optimal_max_mk` to `max_temp_mk`: quality degrades 100% to 60%.
+- Above `max_temp_mk`: quality drops to 30%.
+- Each processing run generates `heat_per_run_j` (positive = exothermic, negative = endothermic).
+
+**Radiator module:** `ModuleBehaviorDef::Radiator`. Provides passive cooling via `cooling_capacity_w`, shared across all thermal modules in the same `thermal_group`. Subject to wear efficiency. No operating temperature requirement.
+
+**Overheat escalation:**
+
+| Zone | Trigger | Effect |
+|---|---|---|
+| Nominal | Below `max_temp_mk` + warning offset | Normal operation (1x wear) |
+| Warning | `max_temp_mk` + 200K (`thermal_overheat_warning_offset_mk`) | 2x wear (`thermal_wear_multiplier_warning`) |
+| Critical | `max_temp_mk` + 500K (`thermal_overheat_critical_offset_mk`) | 4x wear (`thermal_wear_multiplier_critical`), module auto-disabled |
+
+Zone transitions emit `OverheatWarning`, `OverheatCritical`, or `OverheatCleared` events.
+
+**Thermal constants (in `Constants`):**
+
+| Constant | Default | Purpose |
+|---|---|---|
+| `thermal_sink_temp_mk` | 293,000 (20 C) | Ambient/radiator sink temperature |
+| `thermal_overheat_warning_offset_mk` | 200,000 | Offset above `max_temp_mk` for Warning zone |
+| `thermal_overheat_critical_offset_mk` | 500,000 | Offset above `max_temp_mk` for Critical zone |
+| `thermal_wear_multiplier_warning` | 2.0 | Wear rate multiplier in Warning zone |
+| `thermal_wear_multiplier_critical` | 4.0 | Wear rate multiplier in Critical zone |
+
+**Module initialization:** Thermal modules start at `operating_min_mk` (if set) or ambient (`DEFAULT_AMBIENT_TEMP_MK` = 293,000 mK / 20 C). `MaterialThermalProps` defaults to ambient, Solid phase, zero latent heat buffer.
+
+**Events:** `ProcessorTooCold`, `OverheatWarning`, `OverheatCritical`.
+
+**Metrics (MetricsSnapshot):** `station_max_temp_mk`, `station_avg_temp_mk`, `overheat_warning_count`, `overheat_critical_count`, `heat_wear_multiplier_avg`.
+
 ## Slag Jettison
 
 **Command:** `JettisonSlag { station_id }` — removes all `InventoryItem::Slag` from the station's inventory. Emits `SlagJettisoned { station_id, kg }` with the total mass jettisoned. No event if no slag is present.
@@ -224,3 +288,4 @@ runs/<name>_<timestamp>/
 - **Pause Tick Freeze (done):** `useAnimatedTick` freezes `displayTick` immediately when paused (no drift).
 - **Benchmark Runner (done):** `sim_bench` crate — JSON scenario files, constant overrides, parallel seed execution (rayon), per-seed CSV metrics, cross-seed summary statistics, collapse detection.
 - **Economy & Trade (done):** Balance system ($1B start), import/export commands, pricing table from pricing.json, shipyard assembler (OutputSpec::Ship), thruster import autopilot, Economy UI panel, daemon command queue + pricing endpoint.
+- **Heat System MVP (done):** Thermal state on modules (milli-Kelvin), smelter (processor with thermal requirements), radiator (shared cooling per thermal group), overheat escalation (Warning 2x wear, Critical 4x wear + auto-disable), thermal metrics, thermal alerts, UI temperature readouts and badges.
