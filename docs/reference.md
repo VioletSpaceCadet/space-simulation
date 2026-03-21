@@ -13,7 +13,7 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `ShipState` | `id`, `location_node`, `owner`, `inventory: Vec<InventoryItem>`, `cargo_capacity_m3`, `task` |
 | `StationState` | `id`, `location_node`, `inventory`, `cargo_capacity_m3`, `power_available_per_tick`, `facilities`, `modules: Vec<ModuleState>` |
 | `InventoryItem` | Enum: `Ore { lot_id, asteroid_id, kg, composition }`, `Material { element, kg, quality }`, `Slag { kg, composition }`, `Component { component_id, count, quality }`, `Module { item_id, module_def_id }` |
-| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, or Assembler), `wear: WearState`, optional `thermal: ThermalState`. Processor/Assembler have `stalled: bool`. Assembler also has `capped: bool`, `cap_override: HashMap<ComponentId, u32>` |
+| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, Assembler, Lab, SensorArray, SolarArray, Battery, Radiator), `wear: WearState`, optional `thermal: ThermalState`. Processor/Assembler have `stalled: bool`. Assembler also has `capped: bool`, `cap_override: HashMap<ComponentId, u32>` |
 | `WearState` | `wear: f32` (0.0–1.0). Embedded on any wearable entity. |
 | `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
 | `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold`, `AssignLabTech`, `SetAssemblerCap`, `Import`, `Export`, `JettisonSlag` |
@@ -202,11 +202,11 @@ After temperature updates, checks all thermal modules for overheat zone transiti
 
 | Zone | Trigger | Effect |
 |---|---|---|
-| Nominal | Below `max_temp_mk` | Normal operation (1x wear) |
+| Nominal | Below `max_temp_mk` + warning offset | Normal operation (1x wear) |
 | Warning | `max_temp_mk` + 200K (`thermal_overheat_warning_offset_mk`) | 2x wear (`thermal_wear_multiplier_warning`) |
 | Critical | `max_temp_mk` + 500K (`thermal_overheat_critical_offset_mk`) | 4x wear (`thermal_wear_multiplier_critical`), module auto-disabled |
 
-Zone transitions emit `OverheatWarning` or `OverheatCritical` events.
+Zone transitions emit `OverheatWarning`, `OverheatCritical`, or `OverheatCleared` events.
 
 **Thermal constants (in `Constants`):**
 
