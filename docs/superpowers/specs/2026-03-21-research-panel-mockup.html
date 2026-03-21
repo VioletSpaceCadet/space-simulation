@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Research Panel Mockup v13</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0b0d14;
+    color: #c8ccd4;
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 11px;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .panel {
+    background: #10131a;
+    border: 1px solid #1e2228;
+    border-radius: 4px;
+    width: 440px;
+    max-height: 92vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #6b7080;
+    padding: 8px 10px 6px;
+    border-bottom: 1px solid #1e2228;
+  }
+
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #6b7080;
+    margin-bottom: 6px;
+  }
+
+  .data-pool {
+    padding: 8px 10px;
+    border-bottom: 1px solid #1e2228;
+  }
+  .data-pool-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+  }
+  .data-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+  }
+  .data-kind { color: #8a8e98; font-size: 10px; }
+  .data-amount { font-size: 11px; font-variant-numeric: tabular-nums; }
+  .data-rate {
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+    margin-left: 4px;
+  }
+  .data-rate.positive { color: #4caf7d; }
+  .data-rate.negative { color: #c85450; }
+  .data-amount.survey { color: #5ca0c8; }
+  .data-amount.assay { color: #c89a4a; }
+  .data-amount.manufacturing { color: #4caf7d; }
+  .data-amount.transit { color: #a78bfa; }
+
+  .tree-container { padding: 12px 10px 10px; flex: 1; }
+
+  .tier { display: flex; gap: 10px; justify-content: center; }
+
+  .tier-connectors {
+    position: relative;
+    height: 26px;
+    margin: 0 10px;
+  }
+  .tier-connectors svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .tier-connectors line, .tier-connectors path {
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    fill: none;
+    vector-effect: non-scaling-stroke;
+  }
+  .conn-active { stroke: rgba(92, 160, 200, 0.45); }
+  .conn-dim { stroke: #2a2e38; }
+  .conn-fade { stroke: #1e2228; stroke-dasharray: 4 3; }
+
+  .tech-node {
+    border-radius: 4px;
+    padding: 7px 10px;
+    width: 196px;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+  .tech-node.unlocked {
+    background: rgba(76, 175, 125, 0.07);
+    border-color: rgba(76, 175, 125, 0.35);
+  }
+  .tech-node.unlocked .tech-name { color: #4caf7d; }
+  .tech-node.researching {
+    background: rgba(92, 160, 200, 0.06);
+    border-color: rgba(92, 160, 200, 0.30);
+  }
+  .tech-node.locked {
+    background: #13161e;
+    border-color: #2a2e38;
+    border-style: dashed;
+    opacity: 0.50;
+  }
+
+  .tech-name {
+    font-size: 11px;
+    color: #e0e2e8;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+
+  /* ── Domain bars — numbers inside ── */
+  .domain-bars { display: flex; flex-direction: column; gap: 4px; }
+  .domain-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .domain-label {
+    font-size: 8px;
+    color: #6b7080;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .domain-bar-outer {
+    position: relative;
+    width: 100%;
+    height: 12px;
+    background: #1e2228;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .domain-bar-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    border-radius: 2px;
+  }
+  .domain-bar-fill.survey { background: rgba(92, 160, 200, 0.35); }
+  .domain-bar-fill.materials { background: rgba(200, 154, 74, 0.35); }
+  .domain-bar-fill.manufacturing { background: rgba(76, 175, 125, 0.35); }
+  .domain-bar-fill.propulsion { background: rgba(167, 139, 250, 0.35); }
+  .domain-bar-text {
+    position: absolute;
+    top: 0;
+    right: 4px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+    color: #8a8e98;
+    white-space: nowrap;
+  }
+
+  .mystery-node {
+    width: 196px;
+    min-height: 58px;
+    border: 1px dashed #1e2228;
+    border-radius: 4px;
+    background: #0e1018;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .mystery-text {
+    font-size: 11px;
+    color: #2a2e38;
+    letter-spacing: 0.15em;
+  }
+
+  .labs-section { padding: 8px 10px; border-top: 1px solid #1e2228; }
+  .lab-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 10px;
+  }
+  .lab-name { color: #8a8e98; width: 110px; flex-shrink: 0; }
+  .lab-tech { color: #c8ccd4; flex: 1; }
+  .lab-rate {
+    font-size: 9px;
+    color: #5c6070;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    margin-right: 4px;
+  }
+  .lab-status { font-size: 9px; padding: 1px 5px; border-radius: 2px; }
+  .lab-status.active { color: #4caf7d; background: rgba(76, 175, 125, 0.1); }
+  .lab-status.starved { color: #c85450; background: rgba(200, 84, 80, 0.1); }
+  .lab-status.idle { color: #5c6070; background: rgba(92, 96, 112, 0.08); }
+
+  .mockup-label {
+    position: fixed;
+    top: 12px;
+    right: 20px;
+    font-size: 10px;
+    color: #5c6070;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-label">Research Panel — v13</div>
+
+<div class="panel">
+  <div class="panel-title">Research</div>
+
+  <div class="data-pool">
+    <div class="section-label">Data Pool</div>
+    <div class="data-pool-grid">
+      <div class="data-item">
+        <span class="data-kind">Survey</span>
+        <span><span class="data-amount survey">142.3</span><span class="data-rate positive">+1.2/hr</span></span>
+      </div>
+      <div class="data-item">
+        <span class="data-kind">Assay</span>
+        <span><span class="data-amount assay">87.1</span><span class="data-rate negative">-0.4/hr</span></span>
+      </div>
+      <div class="data-item">
+        <span class="data-kind">Manufacturing</span>
+        <span><span class="data-amount manufacturing">51.8</span><span class="data-rate positive">+0.8/hr</span></span>
+      </div>
+      <div class="data-item">
+        <span class="data-kind">Transit</span>
+        <span><span class="data-amount transit">23.4</span><span class="data-rate positive">+0.3/hr</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tree-container">
+    <div class="section-label">Tech Tree</div>
+
+    <!-- TIER 0 -->
+    <div class="tier">
+      <div class="tech-node unlocked">
+        <div class="tech-name">Deep Scan v1</div>
+        <div class="domain-bars">
+          <div class="domain-row">
+            <div class="domain-label">Survey</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill survey" style="width:100%"></div>
+              <div class="domain-bar-text">100/100</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tech-node unlocked">
+        <div class="tech-name">Basic Smelting</div>
+        <div class="domain-bars">
+          <div class="domain-row">
+            <div class="domain-label">Materials</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill materials" style="width:100%"></div>
+              <div class="domain-bar-text">80/80</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tier-connectors">
+      <svg viewBox="0 0 402 26" preserveAspectRatio="none">
+        <line x1="100" y1="0" x2="100" y2="26" class="conn-active" />
+        <line x1="302" y1="0" x2="302" y2="26" class="conn-active" />
+      </svg>
+    </div>
+
+    <!-- TIER 1 -->
+    <div class="tier">
+      <div class="tech-node unlocked">
+        <div class="tech-name">Advanced Refining</div>
+        <div class="domain-bars">
+          <div class="domain-row">
+            <div class="domain-label">Materials</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill materials" style="width:100%"></div>
+              <div class="domain-bar-text">150/150</div>
+            </div>
+          </div>
+          <div class="domain-row">
+            <div class="domain-label">Manufacturing</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill manufacturing" style="width:100%"></div>
+              <div class="domain-bar-text">50/50</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tech-node unlocked">
+        <div class="tech-name">Ship Construction</div>
+        <div class="domain-bars">
+          <div class="domain-row">
+            <div class="domain-label">Manufacturing</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill manufacturing" style="width:100%"></div>
+              <div class="domain-bar-text">200/200</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tier-connectors">
+      <svg viewBox="0 0 402 26" preserveAspectRatio="none">
+        <line x1="100" y1="0" x2="100" y2="26" class="conn-active" />
+        <line x1="302" y1="0" x2="302" y2="26" class="conn-active" />
+      </svg>
+    </div>
+
+    <!-- TIER 2 -->
+    <div class="tier">
+      <div class="tech-node unlocked">
+        <div class="tech-name">Ore Classification</div>
+        <div class="domain-bars">
+          <div class="domain-row">
+            <div class="domain-label">Survey</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill survey" style="width:100%"></div>
+              <div class="domain-bar-text">120/120</div>
+            </div>
+          </div>
+          <div class="domain-row">
+            <div class="domain-label">Materials</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill materials" style="width:100%"></div>
+              <div class="domain-bar-text">60/60</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tech-node researching">
+        <div class="tech-name">Efficient Propulsion</div>
+        <div class="domain-bars">
+          <div class="domain-row">
+            <div class="domain-label">Propulsion</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill propulsion" style="width:72%"></div>
+              <div class="domain-bar-text">130/180</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tier-connectors">
+      <svg viewBox="0 0 402 26" preserveAspectRatio="none">
+        <line x1="100" y1="0" x2="100" y2="26" class="conn-active" />
+        <line x1="302" y1="0" x2="302" y2="26" class="conn-dim" />
+      </svg>
+    </div>
+
+    <!-- TIER 3 -->
+    <div class="tier">
+      <div class="tech-node researching">
+        <div class="tech-name">Alloy Synthesis</div>
+        <div class="domain-bars">
+          <div class="domain-row">
+            <div class="domain-label">Materials</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill materials" style="width:45%"></div>
+              <div class="domain-bar-text">90/200</div>
+            </div>
+          </div>
+          <div class="domain-row">
+            <div class="domain-label">Manufacturing</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill manufacturing" style="width:30%"></div>
+              <div class="domain-bar-text">45/150</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tech-node locked">
+        <div class="tech-name">Warp Drive Theory</div>
+        <div class="domain-bars">
+          <div class="domain-row">
+            <div class="domain-label">Propulsion</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill propulsion" style="width:0%"></div>
+              <div class="domain-bar-text">0/300</div>
+            </div>
+          </div>
+          <div class="domain-row">
+            <div class="domain-label">Survey</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill survey" style="width:0%"></div>
+              <div class="domain-bar-text">0/100</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tier-connectors">
+      <svg viewBox="0 0 402 26" preserveAspectRatio="none">
+        <line x1="100" y1="0" x2="100" y2="26" class="conn-dim" />
+        <line x1="302" y1="0" x2="302" y2="26" class="conn-fade" />
+      </svg>
+    </div>
+
+    <!-- TIER 4: One locked + one ??? -->
+    <div class="tier">
+      <div class="tech-node locked">
+        <div class="tech-name">Cryo Insulation</div>
+        <div class="domain-bars">
+          <div class="domain-row">
+            <div class="domain-label">Materials</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill materials" style="width:0%"></div>
+              <div class="domain-bar-text">0/200</div>
+            </div>
+          </div>
+          <div class="domain-row">
+            <div class="domain-label">Survey</div>
+            <div class="domain-bar-outer">
+              <div class="domain-bar-fill survey" style="width:0%"></div>
+              <div class="domain-bar-text">0/80</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mystery-node">
+        <span class="mystery-text">???</span>
+      </div>
+    </div>
+
+    <!-- Connectors: Cryo (left, x=98) and ??? (right, x=304) converge to center (x=201) -->
+    <div class="tier-connectors">
+      <svg viewBox="0 0 402 26" preserveAspectRatio="none">
+        <line x1="98" y1="0" x2="98" y2="11" class="conn-fade" />
+        <line x1="98" y1="11" x2="304" y2="11" class="conn-fade" />
+        <line x1="304" y1="0" x2="304" y2="11" class="conn-fade" />
+        <line x1="201" y1="11" x2="201" y2="26" class="conn-fade" />
+      </svg>
+    </div>
+
+    <!-- TIER 5: Bottom ??? -->
+    <div class="tier" style="justify-content: center;">
+      <div class="mystery-node">
+        <span class="mystery-text">???</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="labs-section">
+    <div class="section-label">Labs</div>
+    <div class="lab-row">
+      <span class="lab-name">Survey Lab</span>
+      <span class="lab-tech">Alloy Synthesis</span>
+      <span class="lab-rate">+3.2/hr</span>
+      <span class="lab-status active">active</span>
+    </div>
+    <div class="lab-row">
+      <span class="lab-name">Materials Lab</span>
+      <span class="lab-tech">Alloy Synthesis</span>
+      <span class="lab-rate">+2.8/hr</span>
+      <span class="lab-status active">active</span>
+    </div>
+    <div class="lab-row">
+      <span class="lab-name">Manufacturing Lab</span>
+      <span class="lab-tech">Efficient Propulsion</span>
+      <span class="lab-rate">0/hr</span>
+      <span class="lab-status starved">starved</span>
+    </div>
+    <div class="lab-row">
+      <span class="lab-name">Propulsion Lab</span>
+      <span class="lab-tech">Efficient Propulsion</span>
+      <span class="lab-rate">+1.5/hr</span>
+      <span class="lab-status active">active</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
