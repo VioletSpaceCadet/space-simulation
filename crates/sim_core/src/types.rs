@@ -210,6 +210,20 @@ pub enum ModuleKindState {
     Radiator(RadiatorState),
 }
 
+impl ModuleKindState {
+    /// Returns a mutable reference to the tick timer, or `None` for non-ticking modules.
+    pub fn ticks_since_last_run_mut(&mut self) -> Option<&mut u64> {
+        match self {
+            Self::Processor(s) => Some(&mut s.ticks_since_last_run),
+            Self::Assembler(s) => Some(&mut s.ticks_since_last_run),
+            Self::SensorArray(s) => Some(&mut s.ticks_since_last_run),
+            Self::Lab(s) => Some(&mut s.ticks_since_last_run),
+            Self::Maintenance(s) => Some(&mut s.ticks_since_last_run),
+            Self::Storage | Self::SolarArray(_) | Self::Battery(_) | Self::Radiator(_) => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SensorArrayState {
     pub ticks_since_last_run: u64,
@@ -936,6 +950,37 @@ pub enum ModuleBehaviorDef {
     SolarArray(SolarArrayDef),
     Battery(BatteryDef),
     Radiator(RadiatorDef),
+}
+
+impl ModuleBehaviorDef {
+    /// Returns the tick interval for ticking module types, or `None` for passive modules.
+    pub fn interval_ticks(&self) -> Option<u64> {
+        match self {
+            Self::Processor(p) => Some(p.processing_interval_ticks),
+            Self::Assembler(a) => Some(a.assembly_interval_ticks),
+            Self::SensorArray(s) => Some(s.scan_interval_ticks),
+            Self::Lab(l) => Some(l.research_interval_ticks),
+            Self::Maintenance(m) => Some(m.repair_interval_ticks),
+            Self::Storage { .. } | Self::SolarArray(_) | Self::Battery(_) | Self::Radiator(_) => {
+                None
+            }
+        }
+    }
+
+    /// Returns the power-stall priority for ticking modules. Lower = stalled first.
+    /// Passive modules (solar, storage, battery, radiator) return `None`.
+    pub fn power_priority(&self) -> Option<u8> {
+        match self {
+            Self::SensorArray(_) => Some(0),
+            Self::Lab(_) => Some(1),
+            Self::Assembler(_) => Some(2),
+            Self::Processor(_) => Some(3),
+            Self::Maintenance(_) => Some(4),
+            Self::Storage { .. } | Self::SolarArray(_) | Self::Battery(_) | Self::Radiator(_) => {
+                None
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

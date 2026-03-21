@@ -98,17 +98,7 @@ pub(crate) fn tick_stations(
 /// Priority (highest first): Maintenance(4) > Processor(3) > Assembler(2) > Lab(1) > SensorArray(0).
 /// Solar arrays and storage are never stalled (they generate power or are passive).
 fn power_priority(behavior: &crate::ModuleBehaviorDef) -> Option<u8> {
-    match behavior {
-        crate::ModuleBehaviorDef::SensorArray(_) => Some(0),
-        crate::ModuleBehaviorDef::Lab(_) => Some(1),
-        crate::ModuleBehaviorDef::Assembler(_) => Some(2),
-        crate::ModuleBehaviorDef::Processor(_) => Some(3),
-        crate::ModuleBehaviorDef::Maintenance(_) => Some(4),
-        crate::ModuleBehaviorDef::SolarArray(_)
-        | crate::ModuleBehaviorDef::Storage { .. }
-        | crate::ModuleBehaviorDef::Battery(_)
-        | crate::ModuleBehaviorDef::Radiator(_) => None,
-    }
+    behavior.power_priority()
 }
 
 /// Apply battery charge/discharge. Returns (discharge, charge, stored) in kW/kWh.
@@ -364,17 +354,7 @@ fn extract_context<'a>(
 
     let def = content.module_defs.get(&module.def_id)?;
 
-    let interval = match &def.behavior {
-        crate::ModuleBehaviorDef::Processor(p) => p.processing_interval_ticks,
-        crate::ModuleBehaviorDef::Assembler(a) => a.assembly_interval_ticks,
-        crate::ModuleBehaviorDef::SensorArray(s) => s.scan_interval_ticks,
-        crate::ModuleBehaviorDef::Lab(l) => l.research_interval_ticks,
-        crate::ModuleBehaviorDef::Maintenance(m) => m.repair_interval_ticks,
-        crate::ModuleBehaviorDef::Storage { .. }
-        | crate::ModuleBehaviorDef::SolarArray(_)
-        | crate::ModuleBehaviorDef::Battery(_)
-        | crate::ModuleBehaviorDef::Radiator(_) => return None,
-    };
+    let interval = def.behavior.interval_ticks()?;
 
     let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
 
@@ -440,29 +420,11 @@ fn should_run(state: &mut GameState, ctx: &ModuleTickContext) -> bool {
             return false;
         };
         let module = &mut station.modules[ctx.module_idx];
-        match &mut module.kind_state {
-            crate::ModuleKindState::Processor(s) => {
-                s.ticks_since_last_run += 1;
-                s.ticks_since_last_run
-            }
-            crate::ModuleKindState::Assembler(s) => {
-                s.ticks_since_last_run += 1;
-                s.ticks_since_last_run
-            }
-            crate::ModuleKindState::SensorArray(s) => {
-                s.ticks_since_last_run += 1;
-                s.ticks_since_last_run
-            }
-            crate::ModuleKindState::Lab(s) => {
-                s.ticks_since_last_run += 1;
-                s.ticks_since_last_run
-            }
-            crate::ModuleKindState::Maintenance(s) => {
-                s.ticks_since_last_run += 1;
-                s.ticks_since_last_run
-            }
-            _ => return false,
-        }
+        let Some(timer) = module.kind_state.ticks_since_last_run_mut() else {
+            return false;
+        };
+        *timer += 1;
+        *timer
     };
 
     if ticks < ctx.interval {
@@ -481,13 +443,8 @@ fn reset_timer(state: &mut GameState, ctx: &ModuleTickContext) {
         return;
     };
     let module = &mut station.modules[ctx.module_idx];
-    match &mut module.kind_state {
-        crate::ModuleKindState::Processor(s) => s.ticks_since_last_run = 0,
-        crate::ModuleKindState::Assembler(s) => s.ticks_since_last_run = 0,
-        crate::ModuleKindState::SensorArray(s) => s.ticks_since_last_run = 0,
-        crate::ModuleKindState::Lab(s) => s.ticks_since_last_run = 0,
-        crate::ModuleKindState::Maintenance(s) => s.ticks_since_last_run = 0,
-        _ => {}
+    if let Some(timer) = module.kind_state.ticks_since_last_run_mut() {
+        *timer = 0;
     }
 }
 
