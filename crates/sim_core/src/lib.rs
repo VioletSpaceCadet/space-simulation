@@ -25,8 +25,9 @@ pub use metrics::{
     MetricsFileWriter, MetricsSnapshot,
 };
 pub use spatial::{
-    integer_sqrt, polar_to_cart, AbsolutePos, AngleMilliDeg, Position, RadiusAuMicro,
-    ResourceClass, FULL_CIRCLE, METERS_PER_AU, METERS_PER_MICRO_AU,
+    build_body_cache, integer_sqrt, polar_to_cart, AbsolutePos, AngleMilliDeg, BodyCache,
+    EntityCache, Position, RadiusAuMicro, ResourceClass, FULL_CIRCLE, METERS_PER_AU,
+    METERS_PER_MICRO_AU,
 };
 pub use tasks::{inventory_volume_m3, mine_duration};
 pub use types::*;

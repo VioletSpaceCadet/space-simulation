@@ -453,6 +453,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             next_lot_id: 0,
             next_module_instance_id: 0,
         },
+        body_cache: sim_core::build_body_cache(&content.solar_system.bodies),
     }
 }
 
@@ -515,8 +516,9 @@ pub fn load_or_build_state(
     if let Some(path) = state_file {
         let json =
             std::fs::read_to_string(path).with_context(|| format!("reading state file: {path}"))?;
-        let loaded: GameState =
+        let mut loaded: GameState =
             serde_json::from_str(&json).with_context(|| format!("parsing state file: {path}"))?;
+        loaded.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
         let rng = ChaCha8Rng::seed_from_u64(loaded.meta.seed);
         validate_state(&loaded, content);
         Ok((loaded, rng))
@@ -887,6 +889,7 @@ mod tests {
                 next_lot_id: 0,
                 next_module_instance_id: 0,
             },
+            body_cache: std::collections::HashMap::new(),
         };
         validate_state(&state, &content);
     }

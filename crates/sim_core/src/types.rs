@@ -116,6 +116,9 @@ pub struct GameState {
     #[serde(default)]
     pub export_count: u32,
     pub counters: Counters,
+    /// Cached absolute positions for orbital bodies. Not serialized — recomputed on load.
+    #[serde(skip, default)]
+    pub body_cache: std::collections::HashMap<BodyId, crate::spatial::BodyCache>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

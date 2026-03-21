@@ -795,6 +795,7 @@ mod framework_tests {
                 next_lot_id: 0,
                 next_module_instance_id: 0,
             },
+            body_cache: std::collections::HashMap::new(),
         }
     }
 

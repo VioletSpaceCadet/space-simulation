@@ -57,8 +57,9 @@ fn run(scenario_path: &str, output_dir: &str) -> Result<()> {
     let base_state = if let Some(ref state_path) = scenario.state {
         let json = std::fs::read_to_string(state_path)
             .with_context(|| format!("reading state file: {state_path}"))?;
-        let loaded: sim_core::GameState = serde_json::from_str(&json)
+        let mut loaded: sim_core::GameState = serde_json::from_str(&json)
             .with_context(|| format!("parsing state file: {state_path}"))?;
+        loaded.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
         println!("Using state file: {state_path}");
         Some(loaded)
     } else {

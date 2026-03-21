@@ -3,9 +3,11 @@
 //! All positions use micro-AU (`µAU`) for radii and milli-degrees (m°) for angles.
 //! Integer math throughout for determinism.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
-use crate::BodyId;
+use crate::{BodyId, OrbitalBodyDef};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -154,6 +156,104 @@ pub fn integer_sqrt(n: u128) -> u64 {
         x = x1;
     }
     x as u64
+}
+
+// ---------------------------------------------------------------------------
+// Body position cache
+// ---------------------------------------------------------------------------
+
+/// Cached absolute position for an orbital body, with epoch for invalidation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BodyCache {
+    pub absolute: AbsolutePos,
+    pub epoch: u32,
+}
+
+/// Cached absolute position for an entity, with the parent body's epoch at compute time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct EntityCache {
+    pub absolute: AbsolutePos,
+    pub cached_parent_epoch: u32,
+}
+
+impl EntityCache {
+    /// Recompute this entity's absolute position if the parent body's epoch has changed,
+    /// or if the cache is empty (epoch 0).
+    pub fn get_or_recompute(
+        &mut self,
+        position: &Position,
+        body_cache: &HashMap<BodyId, BodyCache>,
+    ) -> AbsolutePos {
+        let parent = &body_cache[&position.parent_body];
+        if self.cached_parent_epoch != parent.epoch {
+            let (dx, dy) = polar_to_cart(position.radius_au_um, position.angle_mdeg);
+            self.absolute = AbsolutePos {
+                x_au_um: parent.absolute.x_au_um + dx,
+                y_au_um: parent.absolute.y_au_um + dy,
+            };
+            self.cached_parent_epoch = parent.epoch;
+        }
+        self.absolute
+    }
+}
+
+/// Build the body cache by walking the body tree root→leaves.
+///
+/// Bodies with no parent (roots) get their position from `polar_to_cart(radius, angle)`.
+/// Children accumulate: `child_abs = parent_abs + polar_to_cart(child.radius, child.angle)`.
+/// All bodies start at epoch 1.
+pub fn build_body_cache(bodies: &[OrbitalBodyDef]) -> HashMap<BodyId, BodyCache> {
+    let mut cache: HashMap<BodyId, BodyCache> = HashMap::with_capacity(bodies.len());
+
+    // Index bodies by id for parent lookup.
+    let by_id: HashMap<&BodyId, &OrbitalBodyDef> = bodies.iter().map(|b| (&b.id, b)).collect();
+
+    // Process roots first, then children. Repeat until all are placed.
+    // This handles arbitrary tree depth without requiring sorted input.
+    let mut remaining: Vec<&OrbitalBodyDef> = bodies.iter().collect();
+    while !remaining.is_empty() {
+        let before = remaining.len();
+        remaining.retain(|body| {
+            let parent_abs = match &body.parent {
+                None => AbsolutePos::default(), // Root body (e.g., Sun at origin)
+                Some(pid) => {
+                    if let Some(pc) = cache.get(pid) {
+                        pc.absolute
+                    } else {
+                        return true; // Parent not yet computed, retry next pass
+                    }
+                }
+            };
+            let (dx, dy) = polar_to_cart(
+                RadiusAuMicro(body.radius_au_um),
+                AngleMilliDeg(body.angle_mdeg),
+            );
+            cache.insert(
+                body.id.clone(),
+                BodyCache {
+                    absolute: AbsolutePos {
+                        x_au_um: parent_abs.x_au_um + dx,
+                        y_au_um: parent_abs.y_au_um + dy,
+                    },
+                    epoch: 1,
+                },
+            );
+            false // Placed successfully, remove from remaining
+        });
+        assert!(
+            remaining.len() < before,
+            "body tree has unreachable bodies (cycle or missing parent)"
+        );
+    }
+
+    // Verify all bodies were placed.
+    assert_eq!(
+        cache.len(),
+        by_id.len(),
+        "not all bodies were placed in cache"
+    );
+
+    cache
 }
 
 #[cfg(test)]
@@ -443,5 +543,175 @@ mod tests {
         let json = serde_json::to_string(&pos).expect("serialize");
         let restored: AbsolutePos = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(pos, restored);
+    }
+
+    // -- Body cache --
+
+    fn bid(id: &str) -> BodyId {
+        BodyId(id.to_string())
+    }
+
+    fn body(id: &str, parent: Option<&str>, radius: u64, angle: u32) -> OrbitalBodyDef {
+        OrbitalBodyDef {
+            id: BodyId(id.to_string()),
+            parent: parent.map(|p| BodyId(p.to_string())),
+            name: id.to_string(),
+            body_type: crate::BodyType::Planet,
+            radius_au_um: radius,
+            angle_mdeg: angle,
+            solar_intensity: 1.0,
+            zone: None,
+        }
+    }
+
+    #[test]
+    fn body_cache_sun_at_origin() {
+        let bodies = vec![body("sun", None, 0, 0)];
+        let cache = build_body_cache(&bodies);
+        assert_eq!(cache[&bid("sun")].absolute, AbsolutePos::default());
+        assert_eq!(cache[&bid("sun")].epoch, 1);
+    }
+
+    #[test]
+    fn body_cache_earth_position() {
+        let bodies = vec![
+            body("sun", None, 0, 0),
+            body("earth", Some("sun"), 1_000_000, 0), // 1 AU at 0°
+        ];
+        let cache = build_body_cache(&bodies);
+        assert_eq!(
+            cache[&bid("earth")].absolute,
+            AbsolutePos {
+                x_au_um: 1_000_000,
+                y_au_um: 0
+            }
+        );
+    }
+
+    #[test]
+    fn body_cache_multi_level_sun_earth_moon() {
+        let bodies = vec![
+            body("sun", None, 0, 0),
+            body("earth", Some("sun"), 1_000_000, 0),
+            body("luna", Some("earth"), 2_570, 90_000), // 90° from earth
+        ];
+        let cache = build_body_cache(&bodies);
+        // Luna should be at Earth's position + polar_to_cart(2570, 90°)
+        // polar_to_cart(2570, 90°) = (0, 2570)
+        assert_eq!(
+            cache[&bid("luna")].absolute,
+            AbsolutePos {
+                x_au_um: 1_000_000,
+                y_au_um: 2_570
+            }
+        );
+    }
+
+    #[test]
+    fn body_cache_handles_unsorted_input() {
+        // Children before parents — build_body_cache should handle this
+        let bodies = vec![
+            body("luna", Some("earth"), 2_570, 90_000),
+            body("earth", Some("sun"), 1_000_000, 0),
+            body("sun", None, 0, 0),
+        ];
+        let cache = build_body_cache(&bodies);
+        assert_eq!(cache.len(), 3);
+        assert_eq!(
+            cache[&bid("luna")].absolute,
+            AbsolutePos {
+                x_au_um: 1_000_000,
+                y_au_um: 2_570
+            }
+        );
+    }
+
+    #[test]
+    fn body_cache_all_bodies_get_epoch_1() {
+        let bodies = vec![
+            body("sun", None, 0, 0),
+            body("earth", Some("sun"), 1_000_000, 0),
+            body("mars", Some("sun"), 1_524_000, 135_000),
+        ];
+        let cache = build_body_cache(&bodies);
+        for bc in cache.values() {
+            assert_eq!(bc.epoch, 1);
+        }
+    }
+
+    // -- Entity cache --
+
+    #[test]
+    fn entity_cache_computes_on_first_access() {
+        let bodies = vec![
+            body("sun", None, 0, 0),
+            body("earth", Some("sun"), 1_000_000, 0),
+        ];
+        let body_cache = build_body_cache(&bodies);
+        let pos = Position {
+            parent_body: BodyId("earth".to_string()),
+            radius_au_um: RadiusAuMicro(5_000),
+            angle_mdeg: AngleMilliDeg(0),
+        };
+        let mut ec = EntityCache::default();
+        let abs = ec.get_or_recompute(&pos, &body_cache);
+        assert_eq!(
+            abs,
+            AbsolutePos {
+                x_au_um: 1_005_000,
+                y_au_um: 0
+            }
+        );
+        assert_eq!(ec.cached_parent_epoch, 1);
+    }
+
+    #[test]
+    fn entity_cache_returns_cached_on_same_epoch() {
+        let bodies = vec![
+            body("sun", None, 0, 0),
+            body("earth", Some("sun"), 1_000_000, 0),
+        ];
+        let body_cache = build_body_cache(&bodies);
+        let pos = Position {
+            parent_body: BodyId("earth".to_string()),
+            radius_au_um: RadiusAuMicro(5_000),
+            angle_mdeg: AngleMilliDeg(0),
+        };
+        let mut ec = EntityCache::default();
+        let abs1 = ec.get_or_recompute(&pos, &body_cache);
+        let abs2 = ec.get_or_recompute(&pos, &body_cache);
+        assert_eq!(abs1, abs2);
+    }
+
+    #[test]
+    fn entity_cache_recomputes_on_epoch_change() {
+        let bodies = vec![
+            body("sun", None, 0, 0),
+            body("earth", Some("sun"), 1_000_000, 0),
+        ];
+        let mut body_cache = build_body_cache(&bodies);
+        let pos = Position {
+            parent_body: BodyId("earth".to_string()),
+            radius_au_um: RadiusAuMicro(5_000),
+            angle_mdeg: AngleMilliDeg(0),
+        };
+        let mut ec = EntityCache::default();
+        ec.get_or_recompute(&pos, &body_cache);
+        assert_eq!(ec.cached_parent_epoch, 1);
+
+        // Simulate body movement: shift earth and bump epoch
+        let earth = body_cache.get_mut(&bid("earth")).expect("earth");
+        earth.absolute.x_au_um = 2_000_000;
+        earth.epoch = 2;
+
+        let abs = ec.get_or_recompute(&pos, &body_cache);
+        assert_eq!(
+            abs,
+            AbsolutePos {
+                x_au_um: 2_005_000,
+                y_au_um: 0
+            }
+        );
+        assert_eq!(ec.cached_parent_epoch, 2);
     }
 }
