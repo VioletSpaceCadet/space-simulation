@@ -166,6 +166,11 @@ fn test_install_module_initializes_thermal_state_for_thermal_modules() {
         !thermal.overheat_disabled,
         "module should not be overheat-disabled on install"
     );
+    assert_eq!(
+        thermal.thermal_group,
+        Some("default".to_string()),
+        "thermal_group should be propagated from ThermalDef"
+    );
 }
 
 #[test]
