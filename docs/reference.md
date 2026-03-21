@@ -27,9 +27,9 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `TradeItemSpec` | Enum: `Material { element, kg }`, `Component { component_id, count }`, `Module { module_def_id }` |
 | `OutputSpec` | Enum: `Material { ... }`, `Slag { ... }`, `Component { ... }`, `Ship { cargo_capacity_m3 }` |
 | `TechEffect` | `EnableDeepScan` or `DeepScanCompositionNoise { sigma }` |
-| `ResearchDomain` | Enum: `Materials`, `Exploration`, `Engineering` — categorises techs and lab output |
-| `DomainProgress` | Per-tech domain point tracking: `{ materials: f64, exploration: f64, engineering: f64 }` |
-| `DataKind` | Enum: `ScanData`, `MiningData`, `EngineeringData` — type of raw data a lab consumes |
+| `ResearchDomain` | Enum: `Survey`, `Materials`, `Manufacturing`, `Propulsion` — categorises techs and lab output |
+| `DomainProgress` | Per-tech domain point tracking: `points: HashMap<ResearchDomain, f64>` |
+| `DataKind` | Enum: `SurveyData`, `AssayData`, `ManufacturingData`, `TransitData` — type of raw data a lab consumes |
 | `LabDef` | Lab module behavior definition: `data_kind`, `domain`, `throughput_per_tick` |
 | `LabState` | Lab runtime state (embedded in `ModuleState::kind_state`): `assigned_tech: Option<TechId>` |
 | `ThermalDef` | Module thermal properties: `heat_capacity_j_per_k`, `passive_cooling_coefficient`, `max_temp_mk`, `operating_min_mk`, `operating_max_mk`, `thermal_group` |
@@ -46,9 +46,27 @@ Note: `FacilitiesState` has been removed. Research state is fully contained in `
 
 **Lab-based domain model:** Labs are station modules (`ModuleBehaviorDef::Lab`) that consume raw data from the sim-wide `ResearchState.data_pool` each tick and produce domain-specific research points toward an assigned tech.
 
-**`ResearchState` fields:** `unlocked: HashSet<TechId>`, `data_pool: HashMap<DataKind, f64>`, `domain_progress: HashMap<TechId, DomainProgress>`.
+**Research Domains (4):**
 
-**Raw data generation:** Ships generate raw data as a side-effect of tasks. `data_yield(task, content)` computes yield for a completed task. `generate_data(state, task, content)` applies the yield to `ResearchState.data_pool`. Data is sim-wide — not stored in ship or station inventory.
+| Domain | Fantasy | Gameplay Loop |
+|--------|---------|---------------|
+| Survey | Finding and characterizing the environment | Scanning, sensor arrays |
+| Materials | Physical/chemical science | Processing ore, refining |
+| Manufacturing | Building systems at scale | Assembly, module operations |
+| Propulsion | Moving mass through space | Ship transits (late-game) |
+
+**Data Kinds (4):**
+
+| DataKind | Source Activities |
+|----------|------------------|
+| SurveyData | Survey tasks, deep scans, sensor arrays |
+| AssayData | Mining task completion |
+| ManufacturingData | Assembler runs |
+| TransitData | Ship transit completion |
+
+**`ResearchState` fields:** `unlocked: HashSet<TechId>`, `data_pool: HashMap<DataKind, f64>`, `evidence: HashMap<TechId, DomainProgress>`, `action_counts: HashMap<String, u32>`.
+
+**Raw data generation:** Tasks generate raw data via `generate_data(research, kind, action_key, constants)` with diminishing returns (yield = `base_yield × (1 / (1 + 0.1 × count))`). Data is sim-wide — not stored in ship or station inventory.
 
 **Research roll:** Occurs every `research_roll_interval_ticks` ticks (not every tick). For each tech with an assigned lab:
 1. Lab consumes data from `data_pool` (up to `throughput_per_tick × interval`).
