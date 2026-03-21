@@ -177,6 +177,23 @@ pub(crate) fn resolve_transit(
         },
     ));
 
+    // Generate transit data from completed flight
+    let data_amount = crate::research::generate_data(
+        &mut state.research,
+        DataKind::TransitData,
+        "transit",
+        &content.constants,
+    );
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::DataGenerated {
+            kind: DataKind::TransitData,
+            amount: data_amount,
+        },
+    ));
+
     // Start the follow-on task immediately.
     let duration = task_duration(then, &content.constants);
     let label = task_kind_label(then).to_string();

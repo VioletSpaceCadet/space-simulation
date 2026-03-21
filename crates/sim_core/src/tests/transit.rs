@@ -164,4 +164,204 @@ fn transit_moves_ship_and_starts_next_task() {
             .any(|e| matches!(e.event, Event::AsteroidDiscovered { .. })),
         "AsteroidDiscovered after survey completes"
     );
+
+    // Transit should have generated TransitData
+    let transit_data = state
+        .research
+        .data_pool
+        .get(&DataKind::TransitData)
+        .copied()
+        .unwrap_or(0.0);
+    assert!(
+        transit_data > 0.0,
+        "TransitData should accumulate after transit completion, got {transit_data}"
+    );
+    assert_eq!(
+        state
+            .research
+            .action_counts
+            .get("transit")
+            .copied()
+            .unwrap_or(0),
+        1,
+        "transit action counter should increment"
+    );
+}
+
+#[test]
+fn transit_generates_transit_data_with_diminishing_returns() {
+    let mut content = test_content();
+    let node_a = NodeId("node_a".to_string());
+    let node_b = NodeId("node_b".to_string());
+    content.solar_system = SolarSystemDef {
+        bodies: vec![],
+        nodes: vec![
+            NodeDef {
+                id: node_a.clone(),
+                name: "A".to_string(),
+                solar_intensity: 1.0,
+            },
+            NodeDef {
+                id: node_b.clone(),
+                name: "B".to_string(),
+                solar_intensity: 1.0,
+            },
+        ],
+        edges: vec![(node_a.clone(), node_b.clone())],
+    };
+
+    let pos_a = Position {
+        parent_body: BodyId("body_a".to_string()),
+        radius_au_um: RadiusAuMicro(0),
+        angle_mdeg: AngleMilliDeg(0),
+    };
+    let pos_b = Position {
+        parent_body: BodyId("body_b".to_string()),
+        radius_au_um: RadiusAuMicro(1_000_000),
+        angle_mdeg: AngleMilliDeg(0),
+    };
+
+    let ship_id = ShipId("ship_0001".to_string());
+    let owner = PrincipalId("principal_autopilot".to_string());
+    let station_id = StationId("station_test".to_string());
+
+    let mut state = GameState {
+        meta: MetaState {
+            tick: 0,
+            seed: 0,
+            schema_version: 1,
+            content_version: "test".to_string(),
+        },
+        scan_sites: vec![],
+        asteroids: HashMap::new(),
+        ships: HashMap::from([(
+            ship_id.clone(),
+            ShipState {
+                id: ship_id.clone(),
+                position: pos_a.clone(),
+                owner: owner.clone(),
+                inventory: vec![],
+                cargo_capacity_m3: 20.0,
+                task: None,
+            },
+        )]),
+        stations: HashMap::from([(
+            station_id.clone(),
+            StationState {
+                id: station_id,
+                position: pos_a.clone(),
+                inventory: vec![],
+                cargo_capacity_m3: 10_000.0,
+                power_available_per_tick: 100.0,
+                modules: vec![],
+                power: PowerState::default(),
+                cached_inventory_volume_m3: None,
+            },
+        )]),
+        research: ResearchState {
+            unlocked: std::collections::HashSet::new(),
+            data_pool: HashMap::new(),
+            evidence: HashMap::new(),
+            action_counts: HashMap::new(),
+        },
+        balance: 0.0,
+        export_revenue_total: 0.0,
+        export_count: 0,
+        counters: Counters {
+            next_event_id: 0,
+            next_command_id: 0,
+            next_asteroid_id: 0,
+            next_lot_id: 0,
+            next_module_instance_id: 0,
+        },
+        body_cache: std::collections::HashMap::new(),
+    };
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // First transit: Idle as follow-on
+    let transit_cmd = CommandEnvelope {
+        id: CommandId("cmd_000000".to_string()),
+        issued_by: owner.clone(),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::AssignShipTask {
+            ship_id: ship_id.clone(),
+            task_kind: TaskKind::Transit {
+                destination: pos_b.clone(),
+                total_ticks: 1,
+                then: Box::new(TaskKind::Idle),
+            },
+        },
+    };
+
+    tick(
+        &mut state,
+        &[transit_cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+    );
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    assert!(events
+        .iter()
+        .any(|e| matches!(&e.event, Event::ShipArrived { .. })));
+
+    let first_transit_data = state
+        .research
+        .data_pool
+        .get(&DataKind::TransitData)
+        .copied()
+        .unwrap_or(0.0);
+    assert!(
+        first_transit_data > 0.0,
+        "first transit should generate data"
+    );
+
+    // Second transit back: should generate less data (diminishing returns)
+    let transit_back = CommandEnvelope {
+        id: CommandId("cmd_000001".to_string()),
+        issued_by: owner,
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::AssignShipTask {
+            ship_id: ship_id.clone(),
+            task_kind: TaskKind::Transit {
+                destination: pos_a,
+                total_ticks: 1,
+                then: Box::new(TaskKind::Idle),
+            },
+        },
+    };
+
+    tick(
+        &mut state,
+        &[transit_back],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+    );
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    let total_transit_data = state
+        .research
+        .data_pool
+        .get(&DataKind::TransitData)
+        .copied()
+        .unwrap_or(0.0);
+    let second_amount = total_transit_data - first_transit_data;
+
+    assert!(
+        second_amount > 0.0,
+        "second transit should still generate some data"
+    );
+    assert!(
+        second_amount < first_transit_data,
+        "second transit should generate less than first (diminishing returns): \
+         first={first_transit_data}, second={second_amount}"
+    );
+    assert_eq!(
+        state.research.action_counts["transit"], 2,
+        "transit action counter should be 2 after two transits"
+    );
 }
