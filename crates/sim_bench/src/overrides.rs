@@ -137,7 +137,6 @@ fn apply_constant_override(
     match key {
         "survey_scan_minutes" => constants.survey_scan_minutes = as_u64(key, value)?,
         "deep_scan_minutes" => constants.deep_scan_minutes = as_u64(key, value)?,
-        "travel_minutes_per_hop" => constants.travel_minutes_per_hop = as_u64(key, value)?,
         "survey_tag_detection_probability" => {
             constants.survey_tag_detection_probability = as_f32(key, value)?;
         }

@@ -1,7 +1,6 @@
 {
   "survey_scan_minutes": 120,
   "deep_scan_minutes": 480,
-  "travel_minutes_per_hop": 2880,
   "survey_tag_detection_probability": 0.85,
   "asteroid_count_per_template": 10,
   "asteroid_mass_min_kg": 500000.0,

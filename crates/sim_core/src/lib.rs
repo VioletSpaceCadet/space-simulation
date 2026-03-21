@@ -5,7 +5,6 @@
 
 mod composition;
 mod engine;
-mod graph;
 mod id;
 pub mod metrics;
 mod research;
@@ -18,7 +17,6 @@ mod types;
 pub mod wear;
 
 pub use engine::{tick, trade_unlock_tick};
-pub use graph::shortest_hop_count;
 pub use id::generate_uuid;
 pub use metrics::{
     append_metrics_row, compute_metrics, write_metrics_csv, write_metrics_header,

@@ -244,10 +244,6 @@ fn constants_durations_are_positive() {
     assert!(c.minutes_per_tick > 0, "minutes_per_tick must be > 0");
     assert!(c.survey_scan_minutes > 0, "survey_scan_minutes must be > 0");
     assert!(c.deep_scan_minutes > 0, "deep_scan_minutes must be > 0");
-    assert!(
-        c.travel_minutes_per_hop > 0,
-        "travel_minutes_per_hop must be > 0"
-    );
     assert!(c.deposit_minutes > 0, "deposit_minutes must be > 0");
     assert!(
         c.research_roll_interval_minutes > 0,
