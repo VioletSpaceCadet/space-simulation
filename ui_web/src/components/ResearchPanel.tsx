@@ -1,53 +1,46 @@
-import type { DomainProgress, ResearchState } from '../types';
+import { useMemo } from 'react';
+
+import { useContent } from '../hooks/useContent';
+import type { ResearchState } from '../types';
+
+import { DataPoolSection } from './DataPoolSection';
+import { LabStatusSection } from './LabStatusSection';
+import { TechTreeDAG } from './TechTreeDAG';
 
 interface Props {
-  research: ResearchState
-}
-
-function totalEvidence(dp: DomainProgress | undefined): number {
-  if (!dp) {return 0;}
-  return Object.values(dp.points).reduce((sum, v) => sum + v, 0);
-}
-
-function unlockProbability(evidence: number, difficulty = 200): number {
-  return 1 - Math.exp(-evidence / difficulty);
+  research: ResearchState;
 }
 
 export function ResearchPanel({ research }: Props) {
-  const allTechIds = new Set([...research.unlocked, ...Object.keys(research.evidence)]);
+  const { content } = useContent();
+
+  const techNames = useMemo(() => {
+    if (!content) { return {}; }
+    return Object.fromEntries(content.techs.map((tech) => [tech.id, tech.name]));
+  }, [content]);
+
+  const labAssignments = useMemo(() => {
+    if (!content) { return []; }
+    return content.lab_rates
+      .filter((lab) => lab.assigned_tech !== null)
+      .map((lab) => lab.assigned_tech as string);
+  }, [content]);
+
+  if (!content) {
+    return (
+      <div className="overflow-y-auto flex-1 flex items-center justify-center">
+        <span className="text-faint italic text-[11px]">loading…</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="overflow-y-auto flex-1">
-      <div className="flex flex-wrap gap-1.5 mb-2.5 text-[11px] text-dim">
-        <span className="text-label">Data pool: </span>
-        {Object.entries(research.data_pool).map(([kind, amount]) => (
-          <span key={kind}>
-            {kind}: {amount.toFixed(1)}
-          </span>
-        ))}
-        {Object.keys(research.data_pool).length === 0 && (
-          <span className="text-faint">—</span>
-        )}
+    <div className="overflow-y-auto flex-1 flex flex-col">
+      <DataPoolSection dataPool={research.data_pool} dataRates={content.data_rates} />
+      <div className="flex-1 min-h-0">
+        <TechTreeDAG techs={content.techs} research={research} labAssignments={labAssignments} />
       </div>
-      <div>
-        {[...allTechIds].map((techId) => {
-          const evidence = totalEvidence(research.evidence[techId]);
-          const isUnlocked = research.unlocked.includes(techId);
-          const prob = unlockProbability(evidence);
-          return (
-            <div key={techId} className="py-1.5 border-b border-surface text-[11px]">
-              <div className="text-accent mb-0.5">{techId}</div>
-              <div className="text-muted">evidence: {evidence.toFixed(1)}</div>
-              {isUnlocked ? (
-                <div className="text-online mt-0.5">✓ unlocked</div>
-              ) : (
-                <div className="text-muted mt-0.5">p(unlock): {(prob * 100).toFixed(1)}%</div>
-              )}
-            </div>
-          );
-        })}
-        {allTechIds.size === 0 && <div className="text-faint italic">no research data yet</div>}
-      </div>
+      <LabStatusSection labs={content.lab_rates} techNames={techNames} />
     </div>
   );
 }
