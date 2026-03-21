@@ -199,14 +199,14 @@ describe('useSimStream', () => {
     await act(async () => { await Promise.resolve(); });
 
     const events = [
-      { id: 'evt_d1', tick: 10, event: { DataGenerated: { kind: 'ScanData', amount: 5.0 } } },
-      { id: 'evt_d2', tick: 11, event: { DataGenerated: { kind: 'ScanData', amount: 3.0 } } },
+      { id: 'evt_d1', tick: 10, event: { DataGenerated: { kind: 'SurveyData', amount: 5.0 } } },
+      { id: 'evt_d2', tick: 11, event: { DataGenerated: { kind: 'SurveyData', amount: 3.0 } } },
     ];
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }));
     });
 
-    expect(result.current.snapshot?.research.data_pool['ScanData']).toBeCloseTo(8.0);
+    expect(result.current.snapshot?.research.data_pool['SurveyData']).toBeCloseTo(8.0);
   });
 
   it('adds scan site on ScanSiteSpawned', async () => {
