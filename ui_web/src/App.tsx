@@ -24,9 +24,11 @@ import { ALL_PANELS, PANEL_LABELS } from './layout';
 import type { PanelId } from './layout';
 import { playPause, playResume } from './sounds';
 
+const PANEL_ID_SET: ReadonlySet<string> = new Set<string>(ALL_PANELS);
+
 export default function App() {
   const { snapshot, events, connected, currentTick, activeAlerts, dismissedAlerts, dismissAlert } = useSimStream();
-  const { layout, visiblePanels, move, togglePanel } = useLayoutState();
+  const { layout, visiblePanels, move, togglePanel, ensurePanelVisible } = useLayoutState();
 
   const [ticksPerSec, setTicksPerSec] = useState(10); // default fallback
   const [minutesPerTick, setMinutesPerTick] = useState(60);
@@ -63,6 +65,12 @@ export default function App() {
       fetchMeta().then((meta) => setTicksPerSec(meta.ticks_per_sec)).catch(() => {});
     });
   }, []);
+
+  const handleNavigateToPanel = useCallback((panelId: string) => {
+    if (PANEL_ID_SET.has(panelId)) {
+      ensurePanelVisible(panelId as PanelId);
+    }
+  }, [ensurePanelVisible]);
 
   useEffect(() => {
     const SPEED_KEYS: Record<string, number> = {
@@ -155,6 +163,7 @@ export default function App() {
         alerts={activeAlerts}
         dismissedAlerts={dismissedAlerts}
         onDismissAlert={dismissAlert}
+        onNavigateToPanel={handleNavigateToPanel}
         minutesPerTick={minutesPerTick}
         activeSpeed={ticksPerSec}
         onSetSpeed={handleSetSpeed}

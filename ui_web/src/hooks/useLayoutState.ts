@@ -69,11 +69,25 @@ export function useLayoutState() {
     });
   }, []);
 
+  const ensurePanelVisible = useCallback((panelId: PanelId) => {
+    setLayout((current) => {
+      const currentPanels = findPanelIds(current);
+      if (currentPanels.includes(panelId)) {return current;}
+      const lastPanel = currentPanels[currentPanels.length - 1];
+      const result = insertPanel(current, panelId, lastPanel, 'after');
+      const next: GroupNode = result.type === 'group'
+        ? result
+        : { type: 'group', direction: 'horizontal', children: [result] };
+      persist(next);
+      return next;
+    });
+  }, []);
+
   const resetLayout = useCallback(() => {
     const defaultLayout = buildDefaultLayout(ALL_PANELS);
     persist(defaultLayout);
     setLayout(defaultLayout);
   }, []);
 
-  return { layout, visiblePanels, move, togglePanel, resetLayout };
+  return { layout, visiblePanels, move, togglePanel, ensurePanelVisible, resetLayout };
 }
