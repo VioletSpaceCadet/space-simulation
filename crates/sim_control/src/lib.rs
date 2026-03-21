@@ -2,7 +2,7 @@ use sim_core::{
     inventory_volume_m3, mine_duration, shortest_hop_count, trade, AnomalyTag, AsteroidId,
     AsteroidState, Command, CommandEnvelope, CommandId, ComponentId, DomainProgress, GameContent,
     GameState, InputAmount, InputFilter, InventoryItem, ModuleBehaviorDef, ModuleKindState, NodeId,
-    PrincipalId, ShipId, ShipState, SiteId, TaskKind, TechDef, TechId, TradeItemSpec,
+    PrincipalId, ShipId, ShipState, SiteId, StationState, TaskKind, TechDef, TechId, TradeItemSpec,
 };
 
 pub trait CommandSource {
@@ -384,6 +384,116 @@ fn thruster_import_commands(
     commands
 }
 
+/// Exports surplus materials and components for revenue.
+///
+/// Priority order: `repair_kits` > He > Si > Fe.
+/// Reserve enforcement is hard — never exports below reserve thresholds.
+/// One export per item type per station per tick to prevent stockpile dumping.
+fn export_commands(
+    state: &GameState,
+    content: &GameContent,
+    owner: &PrincipalId,
+    next_id: &mut u64,
+) -> Vec<CommandEnvelope> {
+    let mut commands = Vec::new();
+
+    // Gate: Trade unlock
+    if state.meta.tick < sim_core::trade_unlock_tick(content.constants.minutes_per_tick) {
+        return commands;
+    }
+
+    let reserve_kits = content.constants.autopilot_repair_kit_reserve;
+    let reserve_fe_kg = content.constants.autopilot_fe_reserve_kg;
+    let batch_size_kg = content.constants.autopilot_export_batch_size_kg;
+    let min_revenue = content.constants.autopilot_export_min_revenue;
+
+    let mut sorted_stations: Vec<_> = state.stations.values().collect();
+    sorted_stations.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+
+    for station in sorted_stations {
+        // Export candidates in priority order
+        let candidates =
+            build_export_candidates(station, reserve_kits, reserve_fe_kg, batch_size_kg);
+
+        for candidate in candidates {
+            let revenue = match trade::compute_export_revenue(&candidate, &content.pricing, content)
+            {
+                Some(rev) if rev >= min_revenue => rev,
+                _ => continue,
+            };
+            // Verify station actually has the items
+            if !trade::has_enough_for_export(&station.inventory, &candidate) {
+                continue;
+            }
+            let _ = revenue; // revenue validated; engine computes final amount
+            commands.push(make_cmd(
+                owner,
+                state.meta.tick,
+                next_id,
+                Command::Export {
+                    station_id: station.id.clone(),
+                    item_spec: candidate,
+                },
+            ));
+        }
+    }
+    commands
+}
+
+/// Builds the list of export candidates for a station in priority order.
+fn build_export_candidates(
+    station: &StationState,
+    reserve_kits: u32,
+    reserve_fe_kg: f32,
+    batch_size_kg: f32,
+) -> Vec<TradeItemSpec> {
+    let mut candidates = Vec::new();
+
+    // 1. Repair kits — export surplus above reserve
+    let kit_count: u32 = station
+        .inventory
+        .iter()
+        .filter_map(|item| match item {
+            InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } if component_id.0 == "repair_kit" => Some(*count),
+            _ => None,
+        })
+        .sum();
+    if kit_count > reserve_kits {
+        candidates.push(TradeItemSpec::Component {
+            component_id: ComponentId("repair_kit".to_string()),
+            count: kit_count - reserve_kits,
+        });
+    }
+
+    // 2-4. Materials in priority order: He, Si, Fe
+    for (element, reserve_kg) in [("He", 0.0_f32), ("Si", 0.0_f32), ("Fe", reserve_fe_kg)] {
+        let available_kg: f32 = station
+            .inventory
+            .iter()
+            .filter_map(|item| match item {
+                InventoryItem::Material {
+                    element: el, kg, ..
+                } if el == element => Some(*kg),
+                _ => None,
+            })
+            .sum();
+        let surplus_kg = available_kg - reserve_kg;
+        if surplus_kg > 0.0 {
+            let export_kg = surplus_kg.min(batch_size_kg);
+            candidates.push(TradeItemSpec::Material {
+                element: element.to_string(),
+                kg: export_kg,
+            });
+        }
+    }
+
+    candidates
+}
+
 /// Jettisons all slag from stations whose storage usage exceeds the threshold.
 fn slag_jettison_commands(
     state: &GameState,
@@ -449,6 +559,7 @@ impl CommandSource for AutopilotController {
             &owner,
             next_command_id,
         ));
+        commands.extend(export_commands(state, content, &owner, next_command_id));
 
         let idle_ships = collect_idle_ships(state, &owner);
         let deep_scan_unlocked = state
@@ -562,8 +673,8 @@ mod tests {
     use super::*;
     use sim_core::{
         test_fixtures::{base_content, base_state},
-        AsteroidId, AsteroidKnowledge, AsteroidState, InventoryItem, LotId, NodeId, ShipId,
-        StationId,
+        AsteroidId, AsteroidKnowledge, AsteroidState, ComponentDef, InventoryItem, LotId, NodeId,
+        PricingEntry, ShipId, StationId,
     };
     use std::collections::HashMap;
 
@@ -1486,6 +1597,306 @@ mod tests {
                 }
             )),
             "autopilot should NOT import thrusters when cost exceeds 5% budget cap"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Export tests
+    // -----------------------------------------------------------------------
+
+    /// Set up content and state for export tests: pricing entries, component defs,
+    /// tick past trade unlock.
+    fn export_setup() -> (sim_core::GameContent, sim_core::GameState) {
+        let mut content = autopilot_content();
+        // Add pricing entries
+        content.pricing.items.insert(
+            "repair_kit".to_string(),
+            PricingEntry {
+                base_price_per_unit: 8000.0,
+                importable: true,
+                exportable: true,
+            },
+        );
+        content.pricing.items.insert(
+            "He".to_string(),
+            PricingEntry {
+                base_price_per_unit: 200.0,
+                importable: true,
+                exportable: true,
+            },
+        );
+        content.pricing.items.insert(
+            "Si".to_string(),
+            PricingEntry {
+                base_price_per_unit: 80.0,
+                importable: true,
+                exportable: true,
+            },
+        );
+        content.pricing.items.insert(
+            "Fe".to_string(),
+            PricingEntry {
+                base_price_per_unit: 50.0,
+                importable: true,
+                exportable: true,
+            },
+        );
+        // Add He element (not in base_content) for density lookup
+        content.elements.push(sim_core::ElementDef {
+            id: "He".to_string(),
+            density_kg_per_m3: 125.0,
+            display_name: "Helium-3".to_string(),
+            refined_name: None,
+            melting_point_mk: None,
+            latent_heat_j_per_kg: None,
+            specific_heat_j_per_kg_k: None,
+        });
+        content.init_caches(); // Rebuild density_map with He
+                               // Add component def for repair_kit (needed for mass calculation)
+        content.component_defs.push(ComponentDef {
+            id: "repair_kit".to_string(),
+            name: "Repair Kit".to_string(),
+            mass_kg: 50.0,
+            volume_m3: 0.05,
+        });
+
+        let mut state = autopilot_state(&content);
+        // Set tick past trade unlock (minutes_per_tick=1 → unlock at 525,600)
+        state.meta.tick = 525_601;
+        (content, state)
+    }
+
+    #[test]
+    fn test_export_surplus_kits_above_reserve() {
+        let (content, mut state) = export_setup();
+        let station_id = StationId("station_earth_orbit".to_string());
+
+        // Add 15 repair kits (reserve = 10, so 5 surplus)
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Component {
+                component_id: ComponentId("repair_kit".to_string()),
+                count: 15,
+                quality: 1.0,
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let export_cmds: Vec<_> = commands
+            .iter()
+            .filter(|cmd| {
+                matches!(
+                    &cmd.command,
+                    Command::Export {
+                        item_spec: TradeItemSpec::Component {
+                            component_id,
+                            count: 5,
+                            ..
+                        },
+                        ..
+                    } if component_id.0 == "repair_kit"
+                )
+            })
+            .collect();
+        assert_eq!(
+            export_cmds.len(),
+            1,
+            "should export exactly 5 surplus kits (15 - 10 reserve)"
+        );
+    }
+
+    #[test]
+    fn test_export_kits_at_reserve_not_exported() {
+        let (content, mut state) = export_setup();
+        let station_id = StationId("station_earth_orbit".to_string());
+
+        // Add exactly 10 repair kits (= reserve, no surplus)
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Component {
+                component_id: ComponentId("repair_kit".to_string()),
+                count: 10,
+                quality: 1.0,
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                Command::Export {
+                    item_spec: TradeItemSpec::Component { .. },
+                    ..
+                }
+            )),
+            "should NOT export kits when at reserve threshold"
+        );
+    }
+
+    #[test]
+    fn test_export_fe_zero_margin_not_exported() {
+        let (content, mut state) = export_setup();
+        let station_id = StationId("station_earth_orbit".to_string());
+
+        // Add 20,000 kg Fe (reserve is 12,000, surplus is 8,000)
+        // But Fe has $0 margin: base $50/kg - surcharge $50/kg = $0
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Material {
+                element: "Fe".to_string(),
+                kg: 20_000.0,
+                quality: 1.0,
+                thermal: None,
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                Command::Export {
+                    item_spec: TradeItemSpec::Material { ref element, .. },
+                    ..
+                } if element == "Fe"
+            )),
+            "should NOT export Fe when revenue is $0"
+        );
+    }
+
+    #[test]
+    fn test_export_si_when_present() {
+        let (content, mut state) = export_setup();
+        let station_id = StationId("station_earth_orbit".to_string());
+
+        // Add 1000 kg Si (no reserve, batch_size=500, so exports 500 kg)
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Material {
+                element: "Si".to_string(),
+                kg: 1000.0,
+                quality: 1.0,
+                thermal: None,
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let export_cmds: Vec<_> = commands
+            .iter()
+            .filter(|cmd| {
+                matches!(
+                    &cmd.command,
+                    Command::Export {
+                        item_spec: TradeItemSpec::Material { ref element, .. },
+                        ..
+                    } if element == "Si"
+                )
+            })
+            .collect();
+        assert_eq!(export_cmds.len(), 1, "should export Si when present");
+        // Verify batch size capping
+        if let Command::Export { item_spec, .. } = &export_cmds[0].command {
+            if let TradeItemSpec::Material { kg, .. } = item_spec {
+                assert!(
+                    (*kg - 500.0).abs() < f32::EPSILON,
+                    "should cap at batch_size_kg (500)"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_export_he_when_present() {
+        let (content, mut state) = export_setup();
+        let station_id = StationId("station_earth_orbit".to_string());
+
+        // Add 200 kg He (no reserve, under batch_size so exports all 200 kg)
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Material {
+                element: "He".to_string(),
+                kg: 200.0,
+                quality: 1.0,
+                thermal: None,
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let export_cmds: Vec<_> = commands
+            .iter()
+            .filter(|cmd| {
+                matches!(
+                    &cmd.command,
+                    Command::Export {
+                        item_spec: TradeItemSpec::Material { ref element, .. },
+                        ..
+                    } if element == "He"
+                )
+            })
+            .collect();
+        assert_eq!(export_cmds.len(), 1, "should export He when present");
+        if let Command::Export { item_spec, .. } = &export_cmds[0].command {
+            if let TradeItemSpec::Material { kg, .. } = item_spec {
+                assert!(
+                    (*kg - 200.0).abs() < f32::EPSILON,
+                    "should export all 200 kg (under batch_size)"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_no_exports_before_trade_unlock() {
+        let (content, mut state) = export_setup();
+        let station_id = StationId("station_earth_orbit".to_string());
+
+        // Set tick before trade unlock
+        state.meta.tick = 100;
+
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Component {
+                component_id: ComponentId("repair_kit".to_string()),
+                count: 50,
+                quality: 1.0,
+            });
+
+        let mut autopilot = AutopilotController;
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands
+                .iter()
+                .any(|cmd| matches!(&cmd.command, Command::Export { .. })),
+            "should NOT export anything before trade unlock"
         );
     }
 }
