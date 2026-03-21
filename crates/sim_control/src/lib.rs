@@ -159,9 +159,9 @@ fn collect_deep_scan_candidates(state: &GameState, content: &GameContent) -> Vec
         .filter(|asteroid| {
             asteroid.knowledge.composition.is_none()
                 && asteroid.knowledge.tag_beliefs.iter().any(|(tag, conf)| {
-                    (tag.0 == "IronRich"
+                    (tag.0 == sim_core::TAG_IRON_RICH
                         && *conf > content.constants.autopilot_iron_rich_confidence_threshold)
-                        || (tag.0 == "VolatileRich"
+                        || (tag.0 == sim_core::TAG_VOLATILE_RICH
                             && *conf > content.constants.autopilot_volatile_confidence_threshold)
                 })
         })

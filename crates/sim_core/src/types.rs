@@ -24,6 +24,13 @@ pub const COMPONENT_REPAIR_KIT: &str = "repair_kit";
 pub const COMPONENT_THRUSTER: &str = "thruster";
 
 // ---------------------------------------------------------------------------
+// Well-known anomaly tag IDs
+// ---------------------------------------------------------------------------
+
+pub const TAG_IRON_RICH: &str = "IronRich";
+pub const TAG_VOLATILE_RICH: &str = "VolatileRich";
+
+// ---------------------------------------------------------------------------
 // ID newtypes
 // ---------------------------------------------------------------------------
 
@@ -59,7 +66,7 @@ string_id!(ComponentId);
 // Core enums
 // ---------------------------------------------------------------------------
 
-/// Data-driven anomaly tag. Values come from content JSON (asteroid_templates).
+/// Data-driven anomaly tag. Values come from content JSON (`asteroid_templates`).
 /// Adding a new asteroid type = adding a JSON entry, not a code change.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AnomalyTag(pub String);
