@@ -416,6 +416,8 @@ fn apply_commands(
                 }
                 station.invalidate_volume_cache();
                 state.balance += revenue;
+                state.export_revenue_total += revenue;
+                state.export_count += 1;
 
                 events.push(crate::emit(
                     &mut state.counters,

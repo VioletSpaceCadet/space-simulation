@@ -122,6 +122,8 @@ fn empty_sites_state(content: &GameContent) -> GameState {
             action_counts: HashMap::new(),
         },
         balance: 0.0,
+        export_revenue_total: 0.0,
+        export_count: 0,
         counters: Counters {
             next_event_id: 0,
             next_command_id: 0,

@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-const METRICS_VERSION: u32 = 6;
+const METRICS_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
@@ -72,6 +72,8 @@ pub struct MetricsSnapshot {
     // Economy
     pub balance: f64,
     pub thruster_count: u32,
+    pub export_revenue_total: f64,
+    pub export_count: u32,
 
     // Power
     pub power_generated_kw: f32,
@@ -456,6 +458,8 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         repair_kits_remaining: total_repair_kits,
         balance: state.balance,
         thruster_count: total_thruster_count,
+        export_revenue_total: state.export_revenue_total,
+        export_count: state.export_count,
         power_generated_kw,
         power_consumed_kw,
         power_deficit_kw,
@@ -483,7 +487,7 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
          scan_sites_remaining,asteroids_discovered,asteroids_depleted,\
          techs_unlocked,total_scan_data,max_tech_evidence,\
          avg_module_wear,max_module_wear,repair_kits_remaining,\
-         balance,thruster_count,\
+         balance,thruster_count,export_revenue_total,export_count,\
          power_generated_kw,power_consumed_kw,power_deficit_kw,battery_charge_pct,\
          station_max_temp_mk,station_avg_temp_mk,overheat_warning_count,overheat_critical_count,\
          heat_wear_multiplier_avg"
@@ -497,7 +501,7 @@ pub fn append_metrics_row(
 ) -> std::io::Result<()> {
     writeln!(
         writer,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         snapshot.tick,
         snapshot.metrics_version,
         snapshot.total_ore_kg,
@@ -533,6 +537,8 @@ pub fn append_metrics_row(
         snapshot.repair_kits_remaining,
         snapshot.balance,
         snapshot.thruster_count,
+        snapshot.export_revenue_total,
+        snapshot.export_count,
         snapshot.power_generated_kw,
         snapshot.power_consumed_kw,
         snapshot.power_deficit_kw,
@@ -649,6 +655,8 @@ mod tests {
                 action_counts: HashMap::new(),
             },
             balance: 0.0,
+            export_revenue_total: 0.0,
+            export_count: 0,
             counters: Counters {
                 next_event_id: 0,
                 next_command_id: 0,

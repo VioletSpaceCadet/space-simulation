@@ -1,0 +1,8 @@
+{
+  "name": "export_verification",
+  "ticks": 17520,
+  "metrics_every": 60,
+  "seeds": [1, 2, 3],
+  "state": "./content/dev_base_state.json",
+  "overrides": {}
+}

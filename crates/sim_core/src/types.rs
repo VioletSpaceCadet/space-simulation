@@ -108,6 +108,12 @@ pub struct GameState {
     pub research: ResearchState,
     #[serde(default)]
     pub balance: f64,
+    /// Cumulative export revenue since simulation start.
+    #[serde(default)]
+    pub export_revenue_total: f64,
+    /// Total number of export transactions since simulation start.
+    #[serde(default)]
+    pub export_count: u32,
     pub counters: Counters,
 }
 
