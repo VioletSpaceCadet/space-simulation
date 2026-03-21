@@ -9,6 +9,7 @@ mod graph;
 mod id;
 pub mod metrics;
 mod research;
+pub mod spatial;
 mod station;
 pub(crate) mod tasks;
 pub mod thermal;
@@ -22,6 +23,10 @@ pub use id::generate_uuid;
 pub use metrics::{
     append_metrics_row, compute_metrics, write_metrics_csv, write_metrics_header,
     MetricsFileWriter, MetricsSnapshot,
+};
+pub use spatial::{
+    integer_sqrt, polar_to_cart, AbsolutePos, AngleMilliDeg, Position, RadiusAuMicro,
+    ResourceClass, FULL_CIRCLE, METERS_PER_AU, METERS_PER_MICRO_AU,
 };
 pub use tasks::{inventory_volume_m3, mine_duration};
 pub use types::*;
