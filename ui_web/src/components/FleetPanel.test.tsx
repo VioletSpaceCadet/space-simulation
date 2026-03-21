@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import type { PowerState, ShipState, StationState } from '../types';
+import type { ModuleState, PowerState, ShipState, StationState } from '../types';
+import { formatTempMk, thermalColorClass } from '../utils';
 
 import { FleetPanel } from './FleetPanel';
 
@@ -229,5 +230,184 @@ describe('FleetPanel', () => {
     expect(screen.getByText(/basic_iron_refinery/)).toBeInTheDocument();
     expect(screen.getByText(/STALLED/)).toBeInTheDocument();
     expect(screen.getByText(/35%/)).toBeInTheDocument(); // health = 100 - 65 = 35%
+  });
+
+  it('module with thermal state shows formatted temperature', () => {
+    const thermalModule: ModuleState = {
+      id: 'mod_thermal',
+      def_id: 'module_smelter',
+      enabled: true,
+      kind_state: { Processor: { threshold_kg: 50, ticks_since_last_run: 0, stalled: false } },
+      wear: { wear: 0.1 },
+      thermal: {
+        temp_mk: 500_000,
+        thermal_group: 'smelter',
+        overheat_zone: 'Nominal',
+        overheat_disabled: false,
+      },
+    };
+    const stations: Record<string, StationState> = {
+      station_1: {
+        id: 'station_1',
+        location_node: 'node_earth_orbit',
+        power_available_per_tick: 100,
+        inventory: [],
+        cargo_capacity_m3: 100,
+        modules: [thermalModule],
+        power: zeroPower,
+      },
+    };
+    render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
+    fireEvent.click(screen.getByText('station_1').closest('tr')!);
+    // 500_000 mK = 500.0 K
+    expect(screen.getByText('500.0 K')).toBeInTheDocument();
+  });
+
+  it('module without thermal state shows N/A', () => {
+    const noThermalModule: ModuleState = {
+      id: 'mod_plain',
+      def_id: 'module_storage',
+      enabled: true,
+      kind_state: 'Storage',
+      wear: { wear: 0 },
+    };
+    const stations: Record<string, StationState> = {
+      station_1: {
+        id: 'station_1',
+        location_node: 'node_earth_orbit',
+        power_available_per_tick: 100,
+        inventory: [],
+        cargo_capacity_m3: 100,
+        modules: [noThermalModule],
+        power: zeroPower,
+      },
+    };
+    render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
+    fireEvent.click(screen.getByText('station_1').closest('tr')!);
+    expect(screen.getByText('N/A')).toBeInTheDocument();
+  });
+
+  it('temperature unit toggle switches between K and C', () => {
+    const thermalModule: ModuleState = {
+      id: 'mod_thermal',
+      def_id: 'module_smelter',
+      enabled: true,
+      kind_state: { Processor: { threshold_kg: 50, ticks_since_last_run: 0, stalled: false } },
+      wear: { wear: 0 },
+      thermal: {
+        temp_mk: 500_000,
+        thermal_group: 'smelter',
+        overheat_zone: 'Nominal',
+        overheat_disabled: false,
+      },
+    };
+    const stations: Record<string, StationState> = {
+      station_1: {
+        id: 'station_1',
+        location_node: 'node_earth_orbit',
+        power_available_per_tick: 100,
+        inventory: [],
+        cargo_capacity_m3: 100,
+        modules: [thermalModule],
+        power: zeroPower,
+      },
+    };
+    render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
+    fireEvent.click(screen.getByText('station_1').closest('tr')!);
+    expect(screen.getByText('500.0 K')).toBeInTheDocument();
+
+    // Click the unit toggle button
+    const toggle = screen.getByLabelText(/Switch to °C/);
+    fireEvent.click(toggle);
+    // 500 K - 273.15 = 226.85 °C
+    expect(screen.getByText('226.9 °C')).toBeInTheDocument();
+  });
+
+  it('overheat-disabled module shows OVERHEAT badge', () => {
+    const overheatedModule: ModuleState = {
+      id: 'mod_hot',
+      def_id: 'module_smelter',
+      enabled: true,
+      kind_state: { Processor: { threshold_kg: 50, ticks_since_last_run: 0, stalled: false } },
+      wear: { wear: 0 },
+      thermal: {
+        temp_mk: 900_000,
+        thermal_group: 'smelter',
+        overheat_zone: 'Critical',
+        overheat_disabled: true,
+      },
+    };
+    const stations: Record<string, StationState> = {
+      station_1: {
+        id: 'station_1',
+        location_node: 'node_earth_orbit',
+        power_available_per_tick: 100,
+        inventory: [],
+        cargo_capacity_m3: 100,
+        modules: [overheatedModule],
+        power: zeroPower,
+      },
+    };
+    render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
+    fireEvent.click(screen.getByText('station_1').closest('tr')!);
+    expect(screen.getByText('OVERHEAT')).toBeInTheDocument();
+  });
+});
+
+describe('formatTempMk', () => {
+  it('converts milli-Kelvin to Kelvin', () => {
+    expect(formatTempMk(300_000, 'K')).toBe('300.0 K');
+  });
+
+  it('converts milli-Kelvin to Celsius', () => {
+    // 300 K = 26.85 °C
+    expect(formatTempMk(300_000, 'C')).toBe('26.9 °C');
+  });
+
+  it('handles zero milli-Kelvin', () => {
+    expect(formatTempMk(0, 'K')).toBe('0.0 K');
+    expect(formatTempMk(0, 'C')).toBe('-273.1 °C');
+  });
+});
+
+describe('thermalColorClass', () => {
+  it('returns emerald for Nominal zone', () => {
+    expect(thermalColorClass({
+      temp_mk: 300_000,
+      thermal_group: null,
+      overheat_zone: 'Nominal',
+      overheat_disabled: false,
+    })).toBe('text-emerald-500');
+  });
+
+  it('returns amber for Warning zone', () => {
+    expect(thermalColorClass({
+      temp_mk: 700_000,
+      thermal_group: null,
+      overheat_zone: 'Warning',
+      overheat_disabled: false,
+    })).toBe('text-amber-500');
+  });
+
+  it('returns red for Critical zone', () => {
+    expect(thermalColorClass({
+      temp_mk: 900_000,
+      thermal_group: null,
+      overheat_zone: 'Critical',
+      overheat_disabled: false,
+    })).toBe('text-red-500');
+  });
+
+  it('returns red for overheat-disabled module', () => {
+    expect(thermalColorClass({
+      temp_mk: 900_000,
+      thermal_group: null,
+      overheat_zone: 'Critical',
+      overheat_disabled: true,
+    })).toBe('text-red-500');
+  });
+
+  it('returns neutral for undefined thermal state', () => {
+    expect(thermalColorClass(undefined)).toBe('text-neutral-500');
   });
 });
