@@ -14,6 +14,9 @@ Any work in `sim_core`, `sim_world`, or `sim_control` — game state, tick logic
 - [ ] **RNG threading:** pass `&mut impl rand::Rng`, concrete `ChaCha8Rng` only in cli/daemon
 - [ ] **Content loading:** new fields need defaults or `#[serde(default)]` for backward compat
 - [ ] **Snapshot fixtures:** if state shape changed, update test fixtures
+- [ ] **No hardcoded content IDs:** business logic must not branch on specific element, component, or tech ID strings — use content-defined fields
+- [ ] **Data-driven types:** game content types (asteroid tags, data kinds, research domains) are Strings loaded from content — never add new enum variants for content-defined categories
+- [ ] **Module extensibility:** new module types use common fields/trait — never add match arms to station/mod.rs dispatcher functions
 
 ## Testing
 - **Unit:** `cargo test -p sim_core` (runs automatically via PostToolUse hook on `.rs` edits)
@@ -28,3 +31,5 @@ Any work in `sim_core`, `sim_world`, or `sim_control` — game state, tick logic
 - Raw data lives on `ResearchState` (sim-wide), not station inventory
 - Research rolls every N ticks, not every tick
 - `DeepScan` commands silently dropped if no unlocked tech has `EnableDeepScan` effect
+- `AnomalyTag`, `DataKind`, `ResearchDomain` are data-driven (String/newtype), not compile-time enums — don't add variants, add content JSON entries
+- Adding a new `ModuleBehaviorDef` variant? Use common fields/trait, don't add 5 match arms to dispatcher functions
