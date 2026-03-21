@@ -102,7 +102,7 @@
         "domain": "Materials",
         "data_consumption_per_run": 10.0,
         "research_points_per_run": 5.0,
-        "accepted_data": ["MiningData", "EngineeringData"],
+        "accepted_data": ["AssayData", "ManufacturingData"],
         "research_interval_minutes": 60
       }
     }
@@ -116,10 +116,10 @@
     "wear_per_run": 0.005,
     "behavior": {
       "Lab": {
-        "domain": "Exploration",
+        "domain": "Survey",
         "data_consumption_per_run": 8.0,
         "research_points_per_run": 4.0,
-        "accepted_data": ["ScanData"],
+        "accepted_data": ["SurveyData"],
         "research_interval_minutes": 60
       }
     }
@@ -133,10 +133,10 @@
     "wear_per_run": 0.005,
     "behavior": {
       "Lab": {
-        "domain": "Engineering",
+        "domain": "Manufacturing",
         "data_consumption_per_run": 10.0,
         "research_points_per_run": 5.0,
-        "accepted_data": ["EngineeringData"],
+        "accepted_data": ["ManufacturingData"],
         "research_interval_minutes": 60
       }
     }
@@ -150,7 +150,7 @@
     "wear_per_run": 0.003,
     "behavior": {
       "SensorArray": {
-        "data_kind": "ScanData",
+        "data_kind": "SurveyData",
         "action_key": "sensor_scan",
         "scan_interval_minutes": 120
       }

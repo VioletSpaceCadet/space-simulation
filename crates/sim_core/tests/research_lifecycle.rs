@@ -22,10 +22,10 @@ fn full_research_lifecycle() {
             power_consumption_per_run: 10.0,
             wear_per_run: 0.0,
             behavior: ModuleBehaviorDef::Lab(LabDef {
-                domain: ResearchDomain::Exploration,
+                domain: ResearchDomain::Survey,
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
-                accepted_data: vec![DataKind::ScanData],
+                accepted_data: vec![DataKind::SurveyData],
                 research_interval_minutes: 1,
                 research_interval_ticks: 1,
             }),
@@ -34,7 +34,7 @@ fn full_research_lifecycle() {
     );
 
     // Make tech require Exploration domain, low difficulty for test
-    content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Exploration, 10.0)]);
+    content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Survey, 10.0)]);
     content.techs[0].difficulty = 5.0;
 
     let mut state = base_state(&content);
@@ -44,7 +44,7 @@ fn full_research_lifecycle() {
     *state
         .research
         .data_pool
-        .entry(DataKind::ScanData)
+        .entry(DataKind::SurveyData)
         .or_insert(0.0) = 1000.0;
 
     // Install lab with assigned tech
@@ -97,10 +97,10 @@ fn research_lifecycle_no_data_means_no_unlock() {
             power_consumption_per_run: 10.0,
             wear_per_run: 0.0,
             behavior: ModuleBehaviorDef::Lab(LabDef {
-                domain: ResearchDomain::Exploration,
+                domain: ResearchDomain::Survey,
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
-                accepted_data: vec![DataKind::ScanData],
+                accepted_data: vec![DataKind::SurveyData],
                 research_interval_minutes: 1,
                 research_interval_ticks: 1,
             }),
@@ -108,7 +108,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
         },
     );
 
-    content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Exploration, 100.0)]);
+    content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Survey, 100.0)]);
     content.techs[0].difficulty = 1_000_000.0; // very high
 
     let mut state = base_state(&content);

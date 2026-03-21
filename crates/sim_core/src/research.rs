@@ -167,17 +167,23 @@ mod data_generation_tests {
 
         let amount = generate_data(
             &mut research,
-            crate::DataKind::ScanData,
+            crate::DataKind::SurveyData,
             "survey",
             &constants,
         );
         assert!(amount > 0.0);
-        assert!(*research.data_pool.get(&crate::DataKind::ScanData).unwrap() > 0.0);
+        assert!(
+            *research
+                .data_pool
+                .get(&crate::DataKind::SurveyData)
+                .unwrap()
+                > 0.0
+        );
         assert_eq!(research.action_counts["survey"], 1);
 
         let amount2 = generate_data(
             &mut research,
-            crate::DataKind::ScanData,
+            crate::DataKind::SurveyData,
             "survey",
             &constants,
         );
@@ -210,7 +216,7 @@ mod research_roll_tests {
         state.research.evidence.insert(
             TechId("tech_deep_scan_v1".to_string()),
             DomainProgress {
-                points: HashMap::from([(ResearchDomain::Exploration, 10000.0)]),
+                points: HashMap::from([(ResearchDomain::Survey, 10000.0)]),
             },
         );
 
@@ -240,7 +246,7 @@ mod research_roll_tests {
         state.research.evidence.insert(
             TechId("tech_deep_scan_v1".to_string()),
             DomainProgress {
-                points: HashMap::from([(ResearchDomain::Exploration, 10000.0)]),
+                points: HashMap::from([(ResearchDomain::Survey, 10000.0)]),
             },
         );
 
@@ -273,8 +279,7 @@ mod research_roll_tests {
     fn zero_domain_progress_means_zero_probability() {
         let mut content = base_content();
         // Set domain requirements so sufficiency matters
-        content.techs[0].domain_requirements =
-            HashMap::from([(ResearchDomain::Exploration, 100.0)]);
+        content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Survey, 100.0)]);
 
         let mut state = research_state_at_tick(60);
         // No evidence at all — zero progress
@@ -330,7 +335,7 @@ mod research_roll_tests {
         state.research.evidence.insert(
             TechId("tech_deep_scan_v1".to_string()),
             DomainProgress {
-                points: HashMap::from([(ResearchDomain::Exploration, 100.0)]),
+                points: HashMap::from([(ResearchDomain::Survey, 100.0)]),
             },
         );
 

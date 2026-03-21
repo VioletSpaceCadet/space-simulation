@@ -80,7 +80,7 @@ mod tests {
                 power_consumption_per_run: 8.0,
                 wear_per_run: 0.003,
                 behavior: ModuleBehaviorDef::SensorArray(SensorArrayDef {
-                    data_kind: DataKind::ScanData,
+                    data_kind: DataKind::SurveyData,
                     action_key: "sensor_scan".to_string(),
                     scan_interval_minutes: 5,
                     scan_interval_ticks: 5,
@@ -174,7 +174,7 @@ mod tests {
         let scan_data = state
             .research
             .data_pool
-            .get(&DataKind::ScanData)
+            .get(&DataKind::SurveyData)
             .copied()
             .unwrap_or(0.0);
         assert!(scan_data > 0.0, "ScanData should be > 0 after sensor run");
@@ -236,7 +236,7 @@ mod tests {
         let scan_data = state
             .research
             .data_pool
-            .get(&DataKind::ScanData)
+            .get(&DataKind::SurveyData)
             .copied()
             .unwrap_or(0.0);
         assert!(

@@ -5,8 +5,8 @@
       "id": "tech_deep_scan_v1",
       "name": "Deep Scan v1",
       "prereqs": [],
-      "domain_requirements": { "Exploration": 100.0 },
-      "accepted_data": ["ScanData"],
+      "domain_requirements": { "Survey": 100.0 },
+      "accepted_data": ["SurveyData"],
       "difficulty": 200.0,
       "effects": [
         { "type": "EnableDeepScan" },
@@ -17,8 +17,8 @@
       "id": "tech_advanced_refining",
       "name": "Advanced Refining",
       "prereqs": [],
-      "domain_requirements": { "Materials": 150.0, "Engineering": 50.0 },
-      "accepted_data": ["MiningData", "EngineeringData"],
+      "domain_requirements": { "Materials": 150.0, "Manufacturing": 50.0 },
+      "accepted_data": ["AssayData", "ManufacturingData"],
       "difficulty": 400.0,
       "effects": []
     },
@@ -26,8 +26,8 @@
       "id": "tech_ship_construction",
       "name": "Ship Construction",
       "prereqs": [],
-      "domain_requirements": { "Engineering": 200.0 },
-      "accepted_data": ["EngineeringData", "MiningData"],
+      "domain_requirements": { "Manufacturing": 200.0 },
+      "accepted_data": ["ManufacturingData", "AssayData"],
       "difficulty": 500.0,
       "effects": [
         { "type": "EnableShipConstruction" }

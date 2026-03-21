@@ -7,15 +7,15 @@ import { ResearchPanel } from './ResearchPanel';
 
 const research: ResearchState = {
   unlocked: [],
-  data_pool: { ScanData: 42.5 },
-  evidence: { tech_deep_scan_v1: { points: { Exploration: 120.0 } } },
+  data_pool: { SurveyData: 42.5 },
+  evidence: { tech_deep_scan_v1: { points: { Survey: 120.0 } } },
   action_counts: {},
 };
 
 const researchUnlocked: ResearchState = {
   unlocked: ['tech_deep_scan_v1'],
-  data_pool: { ScanData: 200.0 },
-  evidence: { tech_deep_scan_v1: { points: { Exploration: 300.0 } } },
+  data_pool: { SurveyData: 200.0 },
+  evidence: { tech_deep_scan_v1: { points: { Survey: 300.0 } } },
   action_counts: {},
 };
 

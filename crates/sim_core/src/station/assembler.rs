@@ -395,7 +395,7 @@ fn resolve_assembler_run(
     // Generate engineering data from assembly
     crate::research::generate_data(
         &mut state.research,
-        crate::DataKind::EngineeringData,
+        crate::DataKind::ManufacturingData,
         &format!("assemble_{}", recipe.id),
         &content.constants,
     );
