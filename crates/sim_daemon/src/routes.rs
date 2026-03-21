@@ -322,7 +322,8 @@ pub async fn content_handler(State(app_state): State<AppState>) -> Json<ContentR
                                     .as_ref()
                                     .map(|t| t.0.clone()),
                                 domain: format!("{:?}", def.domain),
-                                points_per_hour: f64::from(def.research_points_per_run) * runs_per_hour,
+                                points_per_hour: f64::from(def.research_points_per_run)
+                                    * runs_per_hour,
                                 starved: lab_state.starved,
                             });
                         }
@@ -350,7 +351,8 @@ pub async fn content_handler(State(app_state): State<AppState>) -> Json<ContentR
                                 60.0 / (def.research_interval_ticks as f64
                                     * f64::from(minutes_per_tick))
                             };
-                            let consumption = f64::from(def.data_consumption_per_run) * runs_per_hour;
+                            let consumption =
+                                f64::from(def.data_consumption_per_run) * runs_per_hour;
                             for kind in &def.accepted_data {
                                 *data_rates.entry(kind.clone()).or_insert(0.0) -=
                                     consumption / def.accepted_data.len() as f64;
@@ -371,10 +373,12 @@ pub async fn content_handler(State(app_state): State<AppState>) -> Json<ContentR
                         let runs_per_hour = if sensor_def.scan_interval_minutes > 0 {
                             60.0 / sensor_def.scan_interval_minutes as f64
                         } else {
-                            60.0 / (sensor_def.scan_interval_ticks as f64 * f64::from(minutes_per_tick))
+                            60.0 / (sensor_def.scan_interval_ticks as f64
+                                * f64::from(minutes_per_tick))
                         };
                         // Approximate: sensors generate ~peak amount initially, diminishes
-                        let approx_yield = f64::from(sim.content.constants.data_generation_peak) * 0.5;
+                        let approx_yield =
+                            f64::from(sim.content.constants.data_generation_peak) * 0.5;
                         *data_rates
                             .entry(sensor_def.data_kind.clone())
                             .or_insert(0.0) += approx_yield * runs_per_hour;
