@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchMeta, pauseGame, resumeGame, setSpeed } from './api';
 import { AsteroidTable } from './components/AsteroidTable';
 import { EconomyPanel } from './components/EconomyPanel';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { EventsFeed } from './components/EventsFeed';
 import { FleetPanel } from './components/FleetPanel';
 import { LayoutRenderer } from './components/LayoutRenderer';
@@ -105,26 +106,33 @@ export default function App() {
 
   const renderPanel = useCallback(
     (id: PanelId) => {
-      switch (id) {
-        case 'map':
-          return <SolarSystemMap snapshot={snapshot} currentTick={displayTick} />;
-        case 'events':
-          return <EventsFeed events={events} />;
-        case 'asteroids':
-          return <AsteroidTable asteroids={snapshot?.asteroids ?? {}} />;
-        case 'fleet':
-          return (
-            <FleetPanel
-              ships={snapshot?.ships ?? {}}
-              stations={snapshot?.stations ?? {}}
-              displayTick={displayTick}
-            />
-          );
-        case 'research':
-          return snapshot ? <ResearchPanel research={snapshot.research} /> : null;
-        case 'economy':
-          return <EconomyPanel snapshot={snapshot} events={events} />;
-      }
+      const content = (() => {
+        switch (id) {
+          case 'map':
+            return <SolarSystemMap snapshot={snapshot} currentTick={displayTick} />;
+          case 'events':
+            return <EventsFeed events={events} />;
+          case 'asteroids':
+            return <AsteroidTable asteroids={snapshot?.asteroids ?? {}} />;
+          case 'fleet':
+            return (
+              <FleetPanel
+                ships={snapshot?.ships ?? {}}
+                stations={snapshot?.stations ?? {}}
+                displayTick={displayTick}
+              />
+            );
+          case 'research':
+            return snapshot ? <ResearchPanel research={snapshot.research} /> : null;
+          case 'economy':
+            return <EconomyPanel snapshot={snapshot} events={events} />;
+        }
+      })();
+      return (
+        <ErrorBoundary key={id} panelName={PANEL_LABELS[id]}>
+          {content}
+        </ErrorBoundary>
+      );
     },
     [snapshot, events, displayTick],
   );
