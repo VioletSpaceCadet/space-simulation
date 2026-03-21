@@ -113,7 +113,9 @@ fn apply_commands(
                 {
                     Some(def) => {
                         let thermal_state = def.thermal.as_ref().map(|td| crate::ThermalState {
-                            temp_mk: content.constants.thermal_sink_temp_mk,
+                            temp_mk: td
+                                .operating_min_mk
+                                .unwrap_or(content.constants.thermal_sink_temp_mk),
                             thermal_group: td.thermal_group.clone(),
                             ..Default::default()
                         });

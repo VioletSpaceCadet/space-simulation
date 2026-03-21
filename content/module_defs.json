@@ -271,6 +271,8 @@
       "heat_capacity_j_per_k": 50000.0,
       "passive_cooling_coefficient": 5.0,
       "max_temp_mk": 2500000,
+      "operating_min_mk": 1800000,
+      "operating_max_mk": 2100000,
       "thermal_group": "default"
     }
   },
