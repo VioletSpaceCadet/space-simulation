@@ -35,6 +35,14 @@ Argument: $ARGUMENTS (Linear ticket identifier like VIO-123, or a brief descript
    - `./scripts/ci_event_sync.sh` if new Event variants were added
 4. **Update documentation** (reference.md, CLAUDE.md) if the change affects public APIs, types, or tick ordering.
 
+### Frontend/UI tickets: Design iteration
+
+If the ticket involves UI changes (components, panels, layout, styling):
+
+1. **Use the `compound-engineering:frontend-design` skill** for implementation — it produces polished, distinctive UI code rather than generic defaults.
+2. **After initial implementation, run the `design-iterator` agent** (subagent_type: `compound-engineering:design:design-iterator`) to iteratively refine the UI through screenshot→analyze→improve cycles. This requires `--chrome` flag and a running Vite dev server.
+3. If no `--chrome` flag is available, skip the design iterator and rely on vitest + manual review.
+
 ## Phase 4: PR & Review Loop
 
 1. **Push and create a PR** targeting main:
@@ -49,9 +57,11 @@ Argument: $ARGUMENTS (Linear ticket identifier like VIO-123, or a brief descript
 
 3. **Dispatch the pr-reviewer agent** using the Agent tool (subagent_type: "pr-reviewer"). Wait for the review.
 
-4. **Fix review findings** — fix should-fix items, address nits you agree with. Commit, push, and re-run CI. Do not ask for confirmation — just fix and push (per memory: "After review: fix, commit, and push without asking").
+4. **For UI tickets: dispatch the design-implementation-reviewer** (subagent_type: `compound-engineering:design:design-implementation-reviewer`) in parallel with or after the pr-reviewer. It compares the live UI against expected design quality and flags visual issues (spacing, contrast, hierarchy, responsiveness).
 
-5. **Re-review if needed** — if the reviewer found Important or Critical issues, dispatch the pr-reviewer again after fixes. Repeat until clean.
+5. **Fix review findings** — fix should-fix items from both code review and design review. Commit, push, and re-run CI. Do not ask for confirmation — just fix and push (per memory: "After review: fix, commit, and push without asking").
+
+6. **Re-review if needed** — if reviewers found Important or Critical issues, dispatch them again after fixes. Repeat until clean.
 
 ## Phase 5: Compound (auto for non-trivial)
 
