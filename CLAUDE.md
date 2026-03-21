@@ -52,7 +52,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **e2e** — Playwright E2E smoke tests. Global setup spawns daemon (port 3002) + Vite (port 5174). Kept minimal for CI stability; use Chrome browser tools for ad-hoc UI testing.
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
 
-**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
+**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance, 3.6 thermal) → 4. Advance research → 5. Replenish scan sites → 6. Increment tick.
 
 **Key design rules:**
 - Asteroids created on discovery (scan_sites → AsteroidState), not pre-populated.
@@ -63,6 +63,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - sim_core takes `&mut impl rand::Rng` — concrete ChaCha8Rng in sim_cli/sim_daemon.
 - **Wear system:** `WearState` (0.0–1.0) on each module. 3-band efficiency: nominal/degraded/critical. Auto-disables at 1.0. Maintenance Bay repairs most-worn, consumes RepairKit.
 - **Economy system:** Balance starts at $1B. Import/export in apply_commands. Ship construction requires tech_ship_construction. Pricing from pricing.json.
+- **Thermal system:** Modules with `ThermalDef` track temperature in milli-Kelvin (`ThermalState`). Smelter (Processor with thermal req) generates heat per run, stalls if too cold, yield/quality scale with temp. Radiator provides `cooling_capacity_w` shared across thermal group. Passive cooling via Newton's law. Overheat zones: Nominal/Warning (2x wear)/Critical (4x wear, auto-disable). Tick step 3.6 (after maintenance, before research).
 - **Event sync:** When adding a new `Event` variant to `sim_core/src/types.rs`, you MUST also add a handler in `ui_web/src/hooks/applyEvents.ts` (or add to the allow-list in `scripts/ci_event_sync.sh` if intentionally skipped). CI enforces this.
 - **Time scale:** `minutes_per_tick` in constants.json (default 60 = 1 tick per hour). Test fixtures use 1. Helpers: `Constants::game_minutes_to_ticks()`, `Constants::rate_per_minute_to_per_tick()`. `trade_unlock_tick()` derives from this constant.
 
