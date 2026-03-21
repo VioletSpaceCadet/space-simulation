@@ -148,3 +148,5 @@ See `.claude/skills/README.md` for how to add or edit skills.
 - **`cargo` is on PATH.** Never prefix with `PATH=`, `export PATH=`, or `~/.cargo/bin/`. Just use `cargo test`, `cargo build`, etc. For worktrees use `--manifest-path`. The PreToolUse hook (`check-bash.sh`) enforces this.
 - **For `gh pr` bodies**, use `--body-file /tmp/pr-body.md` instead of inline `--body`. Claude Code blocks `$()`, `${}`, and quoted flag-like strings in inline text.
 - **For multi-line Python**, write to `/tmp/script.py` with the Write tool, then run `python3 /tmp/script.py`. Never use `python3 -c` with multi-line strings — Claude Code blocks commands with quoted newlines followed by `#` comments.
+- **Never use `cat` heredoc/redirect** to create files. Use the Write tool instead. `cat > file << 'EOF'` triggers built-in safety checks when content contains `#` comments or backticks.
+- **For multi-line git commits**, write the message to `/tmp/commit-msg.txt` with the Write tool, then run `git commit -F /tmp/commit-msg.txt`. Never use `git commit -m "$(cat <<'EOF' ...)"` — Claude Code blocks `$()` as a shell operator.

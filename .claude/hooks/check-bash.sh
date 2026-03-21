@@ -6,7 +6,9 @@
 # 2. "---" or "--flag" — Claude Code blocks quoted characters in flag names
 # 3. Long inline --body on gh pr — likely to hit various safety checks
 # 4. Multiline python3 -c — triggers "quoted newline + #-prefixed line" safety check
-# 5. PATH-prefixed cargo commands — unnecessary and creates approval sprawl
+# 5. git commit with $() heredoc — triggers "shell operators" safety check
+# 6. cat heredoc/redirect — triggers "quote characters inside # comment" safety check
+# 7. PATH-prefixed cargo commands — unnecessary and creates approval sprawl
 #
 # For complex gh pr bodies: use --body-file with a temp file.
 set -euo pipefail
@@ -75,7 +77,33 @@ if [[ "$CMD" =~ ^python3\ -c ]]; then
   fi
 fi
 
-# --- Check 5: PATH-prefixed cargo commands ---
+# --- Check 5: git commit with $() heredoc ---
+# git commit -m "$(cat <<'EOF' ...)" triggers "shell operators" safety check.
+# Write the message to a temp file and use git commit -F instead.
+if [[ "$CMD" =~ ^git\ commit.*\$\( ]]; then
+  echo "STOP: git commit with \$() triggers Claude Code's shell operator safety check."
+  echo ""
+  echo "Instead:"
+  echo "  1. Use the Write tool to create /tmp/commit-msg.txt"
+  echo "  2. Run: git commit -F /tmp/commit-msg.txt"
+  exit 2
+fi
+
+# --- Check 6: cat heredoc/redirect to write files ---
+# cat with heredoc or echo redirect triggers various built-in safety checks when
+# the content contains # comments, backticks, or other special characters.
+# Use the Write tool instead.
+if [[ "$CMD" =~ ^cat\ *(\>|\ *\<\<) ]]; then
+  echo "STOP: Use the Write tool instead of cat heredoc/redirect to create files."
+  echo "Claude Code's built-in safety checks block cat commands with special characters."
+  echo ""
+  echo "Instead:"
+  echo "  1. Use the Write tool to create the file directly"
+  echo "  2. Then reference it in subsequent commands"
+  exit 2
+fi
+
+# --- Check 7: PATH-prefixed cargo commands ---
 # cargo is on PATH. Prefixing with PATH= or ~/.cargo/bin creates unique command
 # strings that each require separate user approval. Just use "cargo" directly.
 if [[ "$CMD" =~ (PATH=|\.cargo/bin/cargo|export\ PATH=).*cargo ]]; then
