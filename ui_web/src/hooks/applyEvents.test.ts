@@ -1358,7 +1358,7 @@ describe('applyEvents', () => {
 
       const result = applyEvents({}, { ship_0001: ship }, {}, emptyResearch, [], defaultBalance, events);
       expect(result.ships['ship_0001'].task!.kind).toEqual({
-        Transit: { destination: 'node_b', total_ticks: 0, then: { Idle: {} } },
+        Transit: { destination: { parent_body: 'node_b', radius_au_um: 0, angle_mdeg: 0 }, total_ticks: 0, then: { Idle: {} } },
       });
     });
 

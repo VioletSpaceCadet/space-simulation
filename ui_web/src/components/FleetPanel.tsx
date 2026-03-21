@@ -174,7 +174,7 @@ function ShipDetail({ ship, displayTick }: { ship: ShipState; displayTick: numbe
             <div className="text-fg">{taskType}</div>
             <TaskProgress task={task} displayTick={displayTick} />
             {taskType === 'Transit' && 'Transit' in task.kind && (
-              <div className="text-dim">destination: {task.kind.Transit.destination}</div>
+              <div className="text-dim">destination: {task.kind.Transit.destination.parent_body}</div>
             )}
             {taskType === 'Mine' && 'Mine' in task.kind && (
               <div className="text-dim">asteroid: {task.kind.Mine.asteroid}</div>

@@ -16,7 +16,7 @@ export interface TaskState {
     | { DeepScan: { asteroid: string } }
     | { Mine: { asteroid: string; duration_ticks: number } }
     | { Deposit: { station: string; blocked: boolean } }
-    | { Transit: { destination: string; total_ticks: number; then: Record<string, unknown> } }
+    | { Transit: { destination: Position; total_ticks: number; then: Record<string, unknown> } }
   started_tick: number
   eta_tick: number
 }
@@ -199,6 +199,42 @@ export interface ResearchState {
   action_counts: Record<string, number>
 }
 
+export interface AbsolutePos {
+  x_au_um: number
+  y_au_um: number
+}
+
+export type BodyType = 'Star' | 'Planet' | 'Moon' | 'Belt' | 'Zone'
+export type ResourceClass = 'MetalRich' | 'Mixed' | 'VolatileRich'
+
+export interface ZoneDef {
+  radius_min_au_um: number
+  radius_max_au_um: number
+  angle_start_mdeg: number
+  angle_span_mdeg: number
+  resource_class: ResourceClass
+  scan_site_weight: number
+}
+
+export interface OrbitalBodyDef {
+  id: string
+  name: string
+  parent: string | null
+  body_type: BodyType
+  radius_au_um: number
+  angle_mdeg: number
+  solar_intensity: number
+  zone: ZoneDef | null
+}
+
+export interface SolarSystemConfig {
+  bodies: OrbitalBodyDef[]
+  body_absolutes: Record<string, AbsolutePos>
+  ticks_per_au: number
+  min_transit_ticks: number
+  docking_range_au_um: number
+}
+
 export interface SimSnapshot {
   meta: MetaInfo
   balance: number
@@ -207,6 +243,7 @@ export interface SimSnapshot {
   ships: Record<string, ShipState>
   stations: Record<string, StationState>
   research: ResearchState
+  body_absolutes: Record<string, AbsolutePos>
 }
 
 export interface SimEvent {

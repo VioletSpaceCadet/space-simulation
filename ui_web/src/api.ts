@@ -1,4 +1,4 @@
-import type { MetaInfo, SimSnapshot } from './types';
+import type { MetaInfo, SimSnapshot, SolarSystemConfig } from './types';
 
 export async function fetchSnapshot(): Promise<SimSnapshot> {
   const response = await fetch('/api/v1/snapshot');
@@ -40,6 +40,12 @@ export async function setSpeed(ticksPerSec: number): Promise<{ ticks_per_sec: nu
     body: JSON.stringify({ ticks_per_sec: ticksPerSec }),
   });
   if (!response.ok) {throw new Error(`Speed change failed: ${response.status}`);}
+  return response.json();
+}
+
+export async function fetchSpatialConfig(): Promise<SolarSystemConfig> {
+  const response = await fetch('/api/v1/spatial-config');
+  if (!response.ok) {throw new Error(`Spatial config fetch failed: ${response.status}`);}
   return response.json();
 }
 

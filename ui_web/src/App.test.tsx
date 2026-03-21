@@ -13,6 +13,7 @@ const snapshot: SimSnapshot = {
   ships: {},
   stations: {},
   research: { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} },
+  body_absolutes: {},
 };
 
 beforeEach(() => {

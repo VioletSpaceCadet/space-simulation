@@ -22,6 +22,7 @@ const baseSnapshot: SimSnapshot = {
   },
   stations: {},
   research: { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} },
+  body_absolutes: {},
 };
 
 class MockEventSource {

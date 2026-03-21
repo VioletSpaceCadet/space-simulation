@@ -12,6 +12,7 @@ const emptySnapshot: SimSnapshot = {
   ships: {},
   stations: {},
   research: { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} },
+  body_absolutes: {},
   balance: 0,
 };
 
