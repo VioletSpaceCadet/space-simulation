@@ -1,6 +1,6 @@
 //! Fixed-point spatial types, angle helpers, and distance functions.
 //!
-//! All positions use micro-AU (µAU) for radii and milli-degrees (m°) for angles.
+//! All positions use micro-AU (`µAU`) for radii and milli-degrees (m°) for angles.
 //! Integer math throughout for determinism.
 
 use serde::{Deserialize, Serialize};
@@ -24,11 +24,11 @@ pub const FULL_CIRCLE: u32 = 360_000;
 // Newtypes
 // ---------------------------------------------------------------------------
 
-/// Radius in micro-AU (µAU). 1 AU = 1,000,000 µAU.
+/// Radius in micro-AU. 1 AU = 1,000,000 units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RadiusAuMicro(pub u64);
 
-/// Angle in milli-degrees. 360° = 360,000 m°.
+/// Angle in milli-degrees. 360° = 360,000 units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct AngleMilliDeg(pub u32);
 
@@ -48,7 +48,7 @@ pub enum ResourceClass {
 // Structs
 // ---------------------------------------------------------------------------
 
-/// Sun-centered absolute cartesian position in µAU.
+/// Sun-centered absolute cartesian position in micro-AU.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct AbsolutePos {
     pub x_au_um: i64,
@@ -64,26 +64,32 @@ pub struct Position {
 }
 
 // ---------------------------------------------------------------------------
-// AngleMilliDeg methods
+// AngleMilliDeg — ops trait + methods
 // ---------------------------------------------------------------------------
 
-impl AngleMilliDeg {
+impl std::ops::Add for AngleMilliDeg {
+    type Output = Self;
+
     /// Wrapping addition mod 360,000.
-    pub fn add(self, other: Self) -> Self {
+    fn add(self, other: Self) -> Self {
         Self((self.0 + other.0) % FULL_CIRCLE)
     }
+}
 
+impl AngleMilliDeg {
     /// Smallest signed difference in [-180,000, +180,000].
     /// Positive means `to` is clockwise from `self`.
+    #[allow(clippy::cast_possible_truncation)] // result is in [-180_000, 180_000]
     pub fn signed_delta(self, to: Self) -> i32 {
-        let raw = to.0 as i32 - self.0 as i32;
-        let half = FULL_CIRCLE as i32 / 2;
+        let raw = i64::from(to.0) - i64::from(self.0);
+        let full = i64::from(FULL_CIRCLE);
+        let half = full / 2;
         if raw > half {
-            raw - FULL_CIRCLE as i32
+            (raw - full) as i32
         } else if raw < -half {
-            raw + FULL_CIRCLE as i32
+            (raw + full) as i32
         } else {
-            raw
+            raw as i32
         }
     }
 
@@ -100,14 +106,15 @@ impl AngleMilliDeg {
 // ---------------------------------------------------------------------------
 
 impl AbsolutePos {
-    /// Squared distance between two absolute positions. Returns u128 to avoid overflow.
+    /// Squared distance between two absolute positions. Returns `u128` to avoid overflow.
+    #[allow(clippy::cast_sign_loss)] // sum of squares is always non-negative
     pub fn distance_squared(self, other: Self) -> u128 {
         let dx = i128::from(self.x_au_um) - i128::from(other.x_au_um);
         let dy = i128::from(self.y_au_um) - i128::from(other.y_au_um);
         (dx * dx + dy * dy) as u128
     }
 
-    /// Distance in µAU between two absolute positions.
+    /// Distance in micro-AU between two absolute positions.
     pub fn distance(self, other: Self) -> u64 {
         integer_sqrt(self.distance_squared(other))
     }
@@ -117,7 +124,9 @@ impl AbsolutePos {
 // Conversion helpers
 // ---------------------------------------------------------------------------
 
-/// Convert polar coordinates (radius µAU, angle m°) to cartesian offset (x, y) in µAU.
+/// Convert polar coordinates (radius micro-AU, angle milli-degrees) to cartesian offset in
+/// micro-AU.
+#[allow(clippy::cast_possible_truncation)] // values are within i64 range after rounding
 pub fn polar_to_cart(radius: RadiusAuMicro, angle: AngleMilliDeg) -> (i64, i64) {
     let rad = f64::from(angle.0) * std::f64::consts::PI / 180_000.0;
     let x = (radius.0 as f64 * rad.cos()).round() as i64;
@@ -130,15 +139,15 @@ pub fn polar_to_cart(radius: RadiusAuMicro, angle: AngleMilliDeg) -> (i64, i64) 
 // ---------------------------------------------------------------------------
 
 /// Deterministic integer square root via Newton's method. Returns `floor(sqrt(n))`.
+#[allow(clippy::cast_possible_truncation)] // sqrt of u128 always fits in u64
 pub fn integer_sqrt(n: u128) -> u64 {
     if n <= 1 {
         return n as u64;
     }
-    // Initial estimate: 2^(ceil(bits/2))
-    let shift = (128 - n.leading_zeros() + 1) / 2;
+    let shift = (128 - n.leading_zeros()).div_ceil(2);
     let mut x: u128 = 1u128 << shift;
     loop {
-        let x1 = (x + n / x) / 2;
+        let x1 = u128::midpoint(x, n / x);
         if x1 >= x {
             break;
         }
@@ -155,19 +164,19 @@ mod tests {
 
     #[test]
     fn angle_add_no_wrap() {
-        let result = AngleMilliDeg(90_000).add(AngleMilliDeg(45_000));
+        let result = AngleMilliDeg(90_000) + AngleMilliDeg(45_000);
         assert_eq!(result, AngleMilliDeg(135_000));
     }
 
     #[test]
     fn angle_add_wraps_at_boundary() {
-        let result = AngleMilliDeg(350_000).add(AngleMilliDeg(20_000));
+        let result = AngleMilliDeg(350_000) + AngleMilliDeg(20_000);
         assert_eq!(result, AngleMilliDeg(10_000));
     }
 
     #[test]
     fn angle_add_exact_full_circle() {
-        let result = AngleMilliDeg(180_000).add(AngleMilliDeg(180_000));
+        let result = AngleMilliDeg(180_000) + AngleMilliDeg(180_000);
         assert_eq!(result, AngleMilliDeg(0));
     }
 
