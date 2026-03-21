@@ -10,7 +10,8 @@ use axum::{
     Router,
 };
 use sim_core::{
-    AbsolutePos, BodyId, CommandEnvelope, CommandId, EventEnvelope, OrbitalBodyDef, PrincipalId,
+    AbsolutePos, BodyId, CommandEnvelope, CommandId, DataKind, EventEnvelope, ModuleBehaviorDef,
+    ModuleKindState, OrbitalBodyDef, PrincipalId, TechDef,
 };
 use std::collections::VecDeque;
 use std::convert::Infallible;
@@ -44,6 +45,7 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> Router {
         .route("/api/v1/command", post(command_handler))
         .route("/api/v1/pricing", get(pricing_handler))
         .route("/api/v1/spatial-config", get(spatial_config_handler))
+        .route("/api/v1/content", get(content_handler))
         .route("/api/v1/speed", post(speed_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -289,6 +291,102 @@ async fn spatial_config_handler(State(app_state): State<AppState>) -> Json<Solar
         min_transit_ticks: sim.content.constants.min_transit_ticks,
         docking_range_au_um: sim.content.constants.docking_range_au_um,
     })
+}
+
+fn runs_per_hour(interval_minutes: u64, interval_ticks: u64, minutes_per_tick: u32) -> f64 {
+    if interval_minutes > 0 {
+        60.0 / interval_minutes as f64
+    } else {
+        60.0 / (interval_ticks as f64 * f64::from(minutes_per_tick))
+    }
+}
+
+/// Serves tech definitions needed for the research panel DAG.
+pub async fn content_handler(State(app_state): State<AppState>) -> Json<ContentResponse> {
+    let sim = app_state.sim.lock();
+    let mpt = sim.content.constants.minutes_per_tick;
+
+    let mut lab_rates = Vec::new();
+    let mut data_rates: std::collections::HashMap<DataKind, f64> = std::collections::HashMap::new();
+
+    for (station_id, station) in &sim.game_state.stations {
+        for module in &station.modules {
+            let Some(mod_def) = sim.content.module_defs.get(&module.def_id) else {
+                continue;
+            };
+
+            match (&module.kind_state, &mod_def.behavior) {
+                (ModuleKindState::Lab(lab_state), ModuleBehaviorDef::Lab(def)) => {
+                    let rph = runs_per_hour(
+                        def.research_interval_minutes,
+                        def.research_interval_ticks,
+                        mpt,
+                    );
+                    lab_rates.push(LabRateInfo {
+                        station_id: station_id.0.clone(),
+                        module_id: module.id.0.clone(),
+                        module_name: mod_def.name.clone(),
+                        assigned_tech: lab_state.assigned_tech.as_ref().map(|t| t.0.clone()),
+                        domain: serde_json::to_value(&def.domain)
+                            .ok()
+                            .and_then(|v| v.as_str().map(String::from))
+                            .unwrap_or_default(),
+                        points_per_hour: f64::from(def.research_points_per_run) * rph,
+                        starved: lab_state.starved,
+                        enabled: module.enabled,
+                    });
+
+                    // Consumption: only from enabled labs with assigned tech that aren't starved
+                    if module.enabled && lab_state.assigned_tech.is_some() && !lab_state.starved {
+                        let consumption = f64::from(def.data_consumption_per_run) * rph;
+                        for kind in &def.accepted_data {
+                            *data_rates.entry(kind.clone()).or_insert(0.0) -=
+                                consumption / def.accepted_data.len() as f64;
+                        }
+                    }
+                }
+                (_, ModuleBehaviorDef::SensorArray(sensor_def)) if module.enabled => {
+                    let rph = runs_per_hour(
+                        sensor_def.scan_interval_minutes,
+                        sensor_def.scan_interval_ticks,
+                        mpt,
+                    );
+                    let approx_yield = f64::from(sim.content.constants.data_generation_peak) * 0.5;
+                    *data_rates
+                        .entry(sensor_def.data_kind.clone())
+                        .or_insert(0.0) += approx_yield * rph;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Json(ContentResponse {
+        techs: sim.content.techs.clone(),
+        lab_rates,
+        data_rates,
+        minutes_per_tick: mpt,
+    })
+}
+
+#[derive(serde::Serialize)]
+pub struct ContentResponse {
+    pub techs: Vec<TechDef>,
+    pub lab_rates: Vec<LabRateInfo>,
+    pub data_rates: std::collections::HashMap<DataKind, f64>,
+    pub minutes_per_tick: u32,
+}
+
+#[derive(serde::Serialize)]
+pub struct LabRateInfo {
+    pub station_id: String,
+    pub module_id: String,
+    pub module_name: String,
+    pub assigned_tech: Option<String>,
+    pub domain: String,
+    pub points_per_hour: f64,
+    pub starved: bool,
+    pub enabled: bool,
 }
 
 pub async fn speed_handler(
