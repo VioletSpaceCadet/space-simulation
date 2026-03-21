@@ -43,6 +43,7 @@ string_id!(AsteroidId);
 string_id!(StationId);
 string_id!(TechId);
 string_id!(NodeId);
+string_id!(BodyId);
 string_id!(SiteId);
 string_id!(CommandId);
 string_id!(EventId);
