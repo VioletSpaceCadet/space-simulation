@@ -9,7 +9,7 @@ describe('DetailCard', () => {
   it('renders station detail with inventory', () => {
     const station: StationState = {
       id: 'station_earth_orbit',
-      location_node: 'node_earth_orbit',
+      position: { parent_body: 'node_earth_orbit', radius_au_um: 0, angle_mdeg: 0 },
       power_available_per_tick: 100,
       inventory: [{ kind: 'Material', element: 'Fe', kg: 500.0, quality: 0.85 }],
       cargo_capacity_m3: 100.0,
@@ -28,7 +28,7 @@ describe('DetailCard', () => {
   it('renders ship detail with task', () => {
     const ship: ShipState = {
       id: 'ship_0001',
-      location_node: 'node_belt_inner',
+      position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 },
       owner: 'principal_autopilot',
       inventory: [],
       cargo_capacity_m3: 20.0,
@@ -46,7 +46,7 @@ describe('DetailCard', () => {
   it('renders asteroid detail with composition', () => {
     const asteroid: AsteroidState = {
       id: 'asteroid_0001',
-      location_node: 'node_belt_inner',
+      position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 },
       anomaly_tags: ['IronRich'],
       mass_kg: 50000,
       knowledge: {
@@ -63,7 +63,7 @@ describe('DetailCard', () => {
   it('renders scan-site detail', () => {
     const site: ScanSite = {
       id: 'site_0001',
-      node: 'node_belt_outer',
+      position: { parent_body: 'node_belt_outer', radius_au_um: 0, angle_mdeg: 0 },
       template_id: 'template_rocky',
     };
     render(<DetailCard entity={{ type: 'scan-site', data: site }} onClose={() => {}} />);
@@ -73,7 +73,7 @@ describe('DetailCard', () => {
 
   it('calls onClose when close button clicked', () => {
     const onClose = vi.fn();
-    const site: ScanSite = { id: 'site_0001', node: 'node_belt_outer', template_id: 'template_rocky' };
+    const site: ScanSite = { id: 'site_0001', position: { parent_body: 'node_belt_outer', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_rocky' };
     render(<DetailCard entity={{ type: 'scan-site', data: site }} onClose={onClose} />);
     fireEvent.click(screen.getByText('✕'));
     expect(onClose).toHaveBeenCalledOnce();

@@ -64,7 +64,7 @@ const inventoryItemSchema = z.discriminatedUnion('kind', [
 export const eventSchemas = {
   AsteroidDiscovered: z.object({
     asteroid_id: z.string(),
-    location_node: z.string(),
+    parent_body: z.string(),
   }),
 
   OreMined: z.object({
@@ -214,14 +214,14 @@ export const eventSchemas = {
 
   ScanSiteSpawned: z.object({
     site_id: z.string(),
-    node: z.string(),
+    parent_body: z.string(),
     template_id: z.string(),
   }),
 
   ShipConstructed: z.object({
     ship_id: z.string(),
     station_id: z.string(),
-    location_node: z.string(),
+    parent_body: z.string(),
     cargo_capacity_m3: z.number(),
   }),
 
@@ -263,7 +263,7 @@ export const eventSchemas = {
 
   ShipArrived: z.object({
     ship_id: z.string(),
-    node: z.string(),
+    parent_body: z.string(),
   }),
 
   DataGenerated: z.object({

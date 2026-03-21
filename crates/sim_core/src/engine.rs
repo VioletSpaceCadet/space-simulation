@@ -5,8 +5,8 @@ use crate::tasks::{
     resolve_survey, resolve_transit, task_duration, task_kind_label, task_target,
 };
 use crate::{
-    trade, Command, CommandEnvelope, EventLevel, GameContent, GameState, InventoryItem, NodeId,
-    ScanSite, ShipId, SiteId, TaskKind, TaskState,
+    trade, Command, CommandEnvelope, EventLevel, GameContent, GameState, InventoryItem, ScanSite,
+    ShipId, SiteId, TaskKind, TaskState,
 };
 use rand::Rng;
 
@@ -555,10 +555,16 @@ fn replenish_scan_sites(
         return;
     }
 
-    let node_ids: Vec<&NodeId> = content.solar_system.nodes.iter().map(|n| &n.id).collect();
+    // Collect bodies that have zones (potential scan site locations).
+    let zone_bodies: Vec<&crate::OrbitalBodyDef> = content
+        .solar_system
+        .bodies
+        .iter()
+        .filter(|b| b.zone.is_some())
+        .collect();
     let templates = &content.asteroid_templates;
 
-    if node_ids.is_empty() || templates.is_empty() {
+    if zone_bodies.is_empty() || templates.is_empty() {
         return;
     }
 
@@ -566,13 +572,23 @@ fn replenish_scan_sites(
 
     for _ in 0..REPLENISH_BATCH_SIZE {
         let template = &templates[rng.gen_range(0..templates.len())];
-        let node = node_ids[rng.gen_range(0..node_ids.len())].clone();
+        let body = zone_bodies[rng.gen_range(0..zone_bodies.len())];
+        let zone = body.zone.as_ref().expect("filtered to zone bodies");
+        // Random position within the zone
+        let radius = rng.gen_range(zone.radius_min_au_um..=zone.radius_max_au_um);
+        let angle =
+            (zone.angle_start_mdeg + rng.gen_range(0..zone.angle_span_mdeg)) % crate::FULL_CIRCLE;
+        let position = crate::Position {
+            parent_body: body.id.clone(),
+            radius_au_um: crate::RadiusAuMicro(radius),
+            angle_mdeg: crate::AngleMilliDeg(angle),
+        };
         let uuid = crate::generate_uuid(rng);
         let site_id = SiteId(format!("site_{uuid}"));
 
         state.scan_sites.push(ScanSite {
             id: site_id.clone(),
-            node: node.clone(),
+            position: position.clone(),
             template_id: template.id.clone(),
         });
 
@@ -581,7 +597,7 @@ fn replenish_scan_sites(
             current_tick,
             crate::Event::ScanSiteSpawned {
                 site_id,
-                node,
+                parent_body: position.parent_body,
                 template_id: template.id.clone(),
             },
         ));

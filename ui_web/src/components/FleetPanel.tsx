@@ -290,7 +290,7 @@ function ExpandableTable<T extends { id: string }>({
 
 interface ShipRow {
   id: string
-  location_node: string
+  parent_body: string
   task: string
   cargo_kg: number
   ship: ShipState
@@ -299,7 +299,7 @@ interface ShipRow {
 function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: number }) {
   const rows: ShipRow[] = ships.map((ship) => ({
     id: ship.id,
-    location_node: ship.location_node,
+    parent_body: ship.position.parent_body,
     task: taskLabel(ship.task),
     cargo_kg: totalInventoryKg(ship.inventory),
     ship,
@@ -307,7 +307,7 @@ function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: n
 
   const columns: ColumnDef<ShipRow>[] = [
     { key: 'id', label: 'ID', render: (r) => r.id },
-    { key: 'location_node', label: 'Location', render: (r) => r.location_node },
+    { key: 'parent_body', label: 'Location', render: (r) => r.parent_body },
     { key: 'task', label: 'Task', render: (r) => r.task },
     { key: 'progress', label: 'Progress', sortable: false, render: (r) => <TaskProgress task={r.ship.task} displayTick={displayTick} /> },
     { key: 'cargo_kg', label: 'Cargo', render: (r) => r.cargo_kg === 0
@@ -505,7 +505,7 @@ function StationDetail({ station }: { station: StationState }) {
 
 interface StationRow {
   id: string
-  location_node: string
+  parent_body: string
   cargo_kg: number
   station: StationState
 }
@@ -513,14 +513,14 @@ interface StationRow {
 function StationsTable({ stations }: { stations: StationState[] }) {
   const rows: StationRow[] = stations.map((station) => ({
     id: station.id,
-    location_node: station.location_node,
+    parent_body: station.position.parent_body,
     cargo_kg: totalInventoryKg(station.inventory),
     station,
   }));
 
   const columns: ColumnDef<StationRow>[] = [
     { key: 'id', label: 'ID', render: (r) => r.id },
-    { key: 'location_node', label: 'Location', render: (r) => r.location_node },
+    { key: 'parent_body', label: 'Location', render: (r) => r.parent_body },
     { key: 'cargo_kg', label: 'Storage', render: (r) => r.cargo_kg === 0
       ? <span className="text-faint">empty</span>
       : <span className="text-cargo">{formatKg(r.cargo_kg)} kg</span>

@@ -4,18 +4,28 @@
 //! integration-level tests (techs, templates, all elements, compressed durations).
 //! `minimal_content()` provides the bare minimum for content-validation tests.
 
+use crate::{AngleMilliDeg, BodyId, Position, RadiusAuMicro};
 use crate::{
-    AnomalyTag, AsteroidId, AsteroidTemplateDef, Constants, Counters, DataKind, ElementDef,
-    GameContent, GameState, InputAmount, InputFilter, ItemKind, LotId, MetaState, ModuleDef,
-    ModuleInstanceId, ModuleKindState, ModuleState, NodeDef, NodeId, OutputSpec, PricingTable,
-    PrincipalId, ProcessorDef, ProcessorState, QualityFormula, RadiatorDef, RadiatorState,
-    RecipeDef, RecipeThermalReq, ResearchState, ScanSite, ShipId, ShipState, SiteId,
-    SolarSystemDef, StationId, StationState, TechDef, TechEffect, TechId, ThermalDef, ThermalState,
-    WearState, YieldFormula,
+    AnomalyTag, AsteroidId, AsteroidTemplateDef, BodyType, Constants, Counters, DataKind,
+    ElementDef, GameContent, GameState, InputAmount, InputFilter, ItemKind, LotId, MetaState,
+    ModuleDef, ModuleInstanceId, ModuleKindState, ModuleState, NodeDef, NodeId, OrbitalBodyDef,
+    OutputSpec, PricingTable, PrincipalId, ProcessorDef, ProcessorState, QualityFormula,
+    RadiatorDef, RadiatorState, RecipeDef, RecipeThermalReq, ResearchState, ScanSite, ShipId,
+    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechEffect, TechId,
+    ThermalDef, ThermalState, WearState, YieldFormula,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
+
+/// Standard test position used across fixtures.
+pub fn test_position() -> Position {
+    Position {
+        parent_body: BodyId("test_body".to_string()),
+        radius_au_um: RadiusAuMicro(0),
+        angle_mdeg: AngleMilliDeg(0),
+    }
+}
 
 /// Full-featured content: `deep_scan_v1` tech, `iron_rich` template, ore/Fe/Si/slag elements,
 /// single-node solar system, compressed durations for fast tests.
@@ -37,7 +47,16 @@ pub fn base_content() -> GameContent {
             ],
         }],
         solar_system: SolarSystemDef {
-            bodies: vec![],
+            bodies: vec![OrbitalBodyDef {
+                id: BodyId("test_body".to_string()),
+                name: "Test Body".to_string(),
+                parent: None,
+                body_type: BodyType::Belt,
+                radius_au_um: 0,
+                angle_mdeg: 0,
+                solar_intensity: 1.0,
+                zone: None,
+            }],
             nodes: vec![NodeDef {
                 id: NodeId("node_test".to_string()),
                 name: "Test Node".to_string(),
@@ -129,6 +148,10 @@ pub fn base_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
             minutes_per_tick: 1,
+            // Spatial system
+            docking_range_au_um: 10_000,
+            ticks_per_au: 2_133,
+            min_transit_ticks: 1,
             // Thermal system
             thermal_sink_temp_mk: 293_000,
             thermal_overheat_warning_offset_mk: 200_000,
@@ -227,6 +250,10 @@ pub fn minimal_content() -> GameContent {
             wear_band_degraded_efficiency: 0.75,
             wear_band_critical_efficiency: 0.5,
             minutes_per_tick: 1,
+            // Spatial system
+            docking_range_au_um: 10_000,
+            ticks_per_au: 2_133,
+            min_transit_ticks: 1,
             // Thermal system
             thermal_sink_temp_mk: 293_000,
             thermal_overheat_warning_offset_mk: 200_000,
@@ -249,9 +276,8 @@ pub fn minimal_content() -> GameContent {
     content
 }
 
-/// Standard game state: 1 ship, 1 station, 1 scan site at `node_test`.
+/// Standard game state: 1 ship, 1 station, 1 scan site at `test_body`.
 pub fn base_state(content: &GameContent) -> GameState {
-    let node_id = NodeId("node_test".to_string());
     let ship_id = ShipId("ship_0001".to_string());
     let station_id = StationId("station_earth_orbit".to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
@@ -265,7 +291,7 @@ pub fn base_state(content: &GameContent) -> GameState {
         },
         scan_sites: vec![ScanSite {
             id: SiteId("site_0001".to_string()),
-            node: node_id.clone(),
+            position: test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         }],
         asteroids: std::collections::HashMap::new(),
@@ -273,7 +299,7 @@ pub fn base_state(content: &GameContent) -> GameState {
             ship_id.clone(),
             ShipState {
                 id: ship_id,
-                location_node: node_id.clone(),
+                position: test_position(),
                 owner,
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
@@ -284,7 +310,7 @@ pub fn base_state(content: &GameContent) -> GameState {
             station_id.clone(),
             StationState {
                 id: station_id,
-                location_node: node_id,
+                position: test_position(),
                 inventory: vec![],
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
@@ -309,7 +335,7 @@ pub fn base_state(content: &GameContent) -> GameState {
             next_lot_id: 0,
             next_module_instance_id: 0,
         },
-        body_cache: std::collections::HashMap::new(),
+        body_cache: crate::build_body_cache(&content.solar_system.bodies),
     }
 }
 

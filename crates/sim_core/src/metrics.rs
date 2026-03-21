@@ -625,10 +625,11 @@ fn open_csv_file(
 mod tests {
     use super::*;
     use crate::{
-        test_fixtures::base_content, AsteroidId, AsteroidKnowledge, AsteroidState, Counters,
-        DataKind, DomainProgress, GameState, LotId, MetaState, ModuleInstanceId, ModuleState,
-        NodeId, PrincipalId, ProcessorState, ResearchDomain, ResearchState, ShipId, ShipState,
-        StationId, StationState, TaskState, TechId,
+        test_fixtures::{base_content, test_position},
+        AsteroidId, AsteroidKnowledge, AsteroidState, Counters, DataKind, DomainProgress,
+        GameState, LotId, MetaState, ModuleInstanceId, ModuleState, PrincipalId, ProcessorState,
+        ResearchDomain, ResearchState, ShipId, ShipState, StationId, StationState, TaskState,
+        TechId,
     };
     use std::collections::{HashMap, HashSet};
 
@@ -671,7 +672,7 @@ mod tests {
     fn make_station(inventory: Vec<InventoryItem>, modules: Vec<ModuleState>) -> StationState {
         StationState {
             id: StationId("station_0001".to_string()),
-            location_node: NodeId("node_test".to_string()),
+            position: test_position(),
             inventory,
             cargo_capacity_m3: 10_000.0,
             power_available_per_tick: 100.0,
@@ -684,7 +685,7 @@ mod tests {
     fn make_ship(task: Option<TaskState>) -> ShipState {
         ShipState {
             id: ShipId("ship_0001".to_string()),
-            location_node: NodeId("node_test".to_string()),
+            position: test_position(),
             owner: PrincipalId("principal_autopilot".to_string()),
             inventory: vec![],
             cargo_capacity_m3: 20.0,
@@ -826,7 +827,7 @@ mod tests {
             id: ShipId("ship_transit".to_string()),
             ..make_ship(Some(TaskState {
                 kind: TaskKind::Transit {
-                    destination: NodeId("node_b".to_string()),
+                    destination: test_position(),
                     total_ticks: 5,
                     then: Box::new(TaskKind::Idle),
                 },
@@ -984,7 +985,7 @@ mod tests {
             AsteroidId("ast_0001".to_string()),
             AsteroidState {
                 id: AsteroidId("ast_0001".to_string()),
-                location_node: NodeId("node_test".to_string()),
+                position: test_position(),
                 true_composition: HashMap::from([("Fe".to_string(), 0.7)]),
                 anomaly_tags: vec![],
                 mass_kg: 500.0,
@@ -1103,12 +1104,12 @@ mod tests {
 
         state.scan_sites.push(crate::ScanSite {
             id: crate::SiteId("site_0001".to_string()),
-            node: NodeId("node_test".to_string()),
+            position: test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         });
         state.scan_sites.push(crate::ScanSite {
             id: crate::SiteId("site_0002".to_string()),
-            node: NodeId("node_test".to_string()),
+            position: test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         });
 
@@ -1116,7 +1117,7 @@ mod tests {
             AsteroidId("ast_0001".to_string()),
             AsteroidState {
                 id: AsteroidId("ast_0001".to_string()),
-                location_node: NodeId("node_test".to_string()),
+                position: test_position(),
                 true_composition: HashMap::new(),
                 anomaly_tags: vec![],
                 mass_kg: 500.0,
@@ -1131,7 +1132,7 @@ mod tests {
             AsteroidId("ast_0002".to_string()),
             AsteroidState {
                 id: AsteroidId("ast_0002".to_string()),
-                location_node: NodeId("node_test".to_string()),
+                position: test_position(),
                 true_composition: HashMap::new(),
                 anomaly_tags: vec![],
                 mass_kg: 0.0,

@@ -37,7 +37,7 @@ function StationDetail({ station }: { station: StationState }) {
   const oreItems = station.inventory.filter((i): i is OreItem => i.kind === 'Ore');
   return (
     <>
-      <div className="text-dim">{station.location_node}</div>
+      <div className="text-dim">{station.position.parent_body}</div>
       <div className="text-muted mt-1">inventory: {totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</div>
       {oreItems.length > 0 && (
         <div className="text-dim mt-1">
@@ -64,7 +64,7 @@ function ShipDetail({ ship }: { ship: ShipState }) {
   const totalKg = inventoryKg(ship.inventory);
   return (
     <>
-      <div className="text-dim">{ship.location_node} · {taskKey.toLowerCase()}</div>
+      <div className="text-dim">{ship.position.parent_body} · {taskKey.toLowerCase()}</div>
       <div className="text-muted mt-1">inventory: {totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</div>
     </>
   );
@@ -73,7 +73,7 @@ function ShipDetail({ ship }: { ship: ShipState }) {
 function AsteroidDetail({ asteroid }: { asteroid: AsteroidState }) {
   return (
     <>
-      <div className="text-dim">{asteroid.location_node}</div>
+      <div className="text-dim">{asteroid.position.parent_body}</div>
       {asteroid.mass_kg != null && (
         <div className="text-muted mt-1">mass: {asteroid.mass_kg.toLocaleString()} kg</div>
       )}
@@ -96,7 +96,7 @@ function AsteroidDetail({ asteroid }: { asteroid: AsteroidState }) {
 function ScanSiteDetail({ site }: { site: ScanSite }) {
   return (
     <>
-      <div className="text-dim">{site.node}</div>
+      <div className="text-dim">{site.position.parent_body}</div>
       <div className="text-muted mt-1">template: {site.template_id}</div>
     </>
   );

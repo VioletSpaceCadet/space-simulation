@@ -32,7 +32,7 @@ function primaryFraction(asteroid: AsteroidState): number {
 
 interface SortableAsteroid {
   id: string
-  location_node: string
+  parent_body: string
   mass_kg: number
   primary_fraction: number
   asteroid: AsteroidState
@@ -43,7 +43,7 @@ export function AsteroidTable({ asteroids }: Props) {
 
   const sortableRows: SortableAsteroid[] = rows.map((asteroid) => ({
     id: asteroid.id,
-    location_node: asteroid.location_node,
+    parent_body: asteroid.position.parent_body,
     mass_kg: asteroid.mass_kg ?? -1,
     primary_fraction: primaryFraction(asteroid),
     asteroid,
@@ -69,8 +69,8 @@ export function AsteroidTable({ asteroids }: Props) {
             <th className={headerClass} onClick={() => requestSort('id')}>
               ID<SortIndicator column="id" sortConfig={sortConfig} />
             </th>
-            <th className={headerClass} onClick={() => requestSort('location_node')}>
-              Node<SortIndicator column="location_node" sortConfig={sortConfig} />
+            <th className={headerClass} onClick={() => requestSort('parent_body')}>
+              Body<SortIndicator column="parent_body" sortConfig={sortConfig} />
             </th>
             <th className="text-left text-label px-2 py-1 border-b border-edge font-normal">Tags</th>
             <th className={headerClass} onClick={() => requestSort('primary_fraction')}>
@@ -85,7 +85,7 @@ export function AsteroidTable({ asteroids }: Props) {
           {sortedData.map(({ asteroid }) => (
             <tr key={asteroid.id}>
               <td className="px-2 py-0.5 border-b border-surface">{asteroid.id}</td>
-              <td className="px-2 py-0.5 border-b border-surface">{asteroid.location_node}</td>
+              <td className="px-2 py-0.5 border-b border-surface">{asteroid.position.parent_body}</td>
               <td className="px-2 py-0.5 border-b border-surface">{tagSummary(asteroid.knowledge.tag_beliefs)}</td>
               <td className="px-2 py-0.5 border-b border-surface text-cargo">{compositionSummary(asteroid.knowledge.composition)}</td>
               <td className="px-2 py-0.5 border-b border-surface">

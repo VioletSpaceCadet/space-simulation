@@ -31,5 +31,8 @@
   "thermal_overheat_warning_offset_mk": 200000,
   "thermal_overheat_critical_offset_mk": 500000,
   "thermal_wear_multiplier_warning": 2.0,
-  "thermal_wear_multiplier_critical": 4.0
+  "thermal_wear_multiplier_critical": 4.0,
+  "docking_range_au_um": 10000,
+  "ticks_per_au": 2133,
+  "min_transit_ticks": 1
 }

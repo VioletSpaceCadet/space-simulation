@@ -159,6 +159,58 @@ pub fn integer_sqrt(n: u128) -> u64 {
 }
 
 // ---------------------------------------------------------------------------
+// Travel and co-location helpers
+// ---------------------------------------------------------------------------
+
+/// Compute travel time in ticks between two absolute positions.
+pub fn travel_ticks(
+    from: AbsolutePos,
+    to: AbsolutePos,
+    ticks_per_au: u64,
+    min_transit: u64,
+) -> u64 {
+    let dist = from.distance(to);
+    let ticks = dist * ticks_per_au / 1_000_000;
+    ticks.max(min_transit)
+}
+
+/// Check if two entities are co-located (same parent body and within docking range).
+pub fn is_co_located<S: std::hash::BuildHasher>(
+    a: &Position,
+    b: &Position,
+    body_cache: &HashMap<BodyId, BodyCache, S>,
+    docking_range: u64,
+) -> bool {
+    // Fast path: same parent body
+    if a.parent_body != b.parent_body {
+        // Different parents — compute absolute distance
+        let abs_a = compute_entity_absolute(a, body_cache);
+        let abs_b = compute_entity_absolute(b, body_cache);
+        return abs_a.distance(abs_b) <= docking_range;
+    }
+    // Same parent — compute local distance directly
+    let (ax, ay) = polar_to_cart(a.radius_au_um, a.angle_mdeg);
+    let (bx, by) = polar_to_cart(b.radius_au_um, b.angle_mdeg);
+    let dx = u128::from((ax - bx).unsigned_abs());
+    let dy = u128::from((ay - by).unsigned_abs());
+    let dist_sq = dx * dx + dy * dy;
+    dist_sq <= u128::from(docking_range) * u128::from(docking_range)
+}
+
+/// Compute an entity's absolute position from its Position and the body cache.
+pub fn compute_entity_absolute<S: std::hash::BuildHasher>(
+    pos: &Position,
+    body_cache: &HashMap<BodyId, BodyCache, S>,
+) -> AbsolutePos {
+    let parent = &body_cache[&pos.parent_body];
+    let (dx, dy) = polar_to_cart(pos.radius_au_um, pos.angle_mdeg);
+    AbsolutePos {
+        x_au_um: parent.absolute.x_au_um + dx,
+        y_au_um: parent.absolute.y_au_um + dy,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Body position cache
 // ---------------------------------------------------------------------------
 
@@ -179,10 +231,10 @@ pub struct EntityCache {
 impl EntityCache {
     /// Recompute this entity's absolute position if the parent body's epoch has changed,
     /// or if the cache is empty (epoch 0).
-    pub fn get_or_recompute(
+    pub fn get_or_recompute<S: std::hash::BuildHasher>(
         &mut self,
         position: &Position,
-        body_cache: &HashMap<BodyId, BodyCache>,
+        body_cache: &HashMap<BodyId, BodyCache, S>,
     ) -> AbsolutePos {
         let parent = &body_cache[&position.parent_body];
         if self.cached_parent_epoch != parent.epoch {

@@ -495,9 +495,9 @@ mod tests {
     // ── Thermal recipe gating integration tests ──────────────────────
 
     use crate::{
-        Counters, InputFilter, MetaState, ModuleDef, ModuleInstanceId, ModuleState, NodeId,
-        PowerState, ProcessorDef, ProcessorState, RecipeInput, RecipeThermalReq, StationState,
-        ThermalDef, ThermalState, WearState,
+        Counters, InputFilter, MetaState, ModuleDef, ModuleInstanceId, ModuleState, PowerState,
+        ProcessorDef, ProcessorState, RecipeInput, RecipeThermalReq, StationState, ThermalDef,
+        ThermalState, WearState,
     };
     use std::collections::HashSet;
 
@@ -569,7 +569,7 @@ mod tests {
                 station_id.clone(),
                 StationState {
                     id: station_id,
-                    location_node: NodeId("node_test".to_string()),
+                    position: crate::test_fixtures::test_position(),
                     inventory: vec![InventoryItem::Ore {
                         lot_id: LotId("lot_0001".to_string()),
                         asteroid_id: AsteroidId("ast_0001".to_string()),

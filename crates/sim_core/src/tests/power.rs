@@ -189,11 +189,15 @@ fn power_budget_deficit_when_insufficient() {
 #[test]
 fn power_budget_solar_intensity_affects_output() {
     let mut content = solar_array_content();
-    // Set the test node to low solar intensity (like inner belt)
-    for node in &mut content.solar_system.nodes {
-        if node.id == NodeId("node_test".to_string()) {
-            node.solar_intensity = 0.4;
-        }
+    // Set "test_body" (the station's parent body) to low solar intensity (like inner belt).
+    // base_content() already provides a "test_body" body; we update its solar_intensity.
+    if let Some(body) = content
+        .solar_system
+        .bodies
+        .iter_mut()
+        .find(|b| b.id.0 == "test_body")
+    {
+        body.solar_intensity = 0.4;
     }
 
     let mut state = state_with_solar_array(&content);
