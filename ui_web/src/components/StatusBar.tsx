@@ -54,7 +54,8 @@ export function StatusBar({
         playSave();
         setTimeout(() => setSaveStatus('idle'), 2000);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        console.error('Save failed:', err);
         setSaveStatus('error');
         setTimeout(() => setSaveStatus('idle'), 3000);
       });

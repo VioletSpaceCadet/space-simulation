@@ -88,7 +88,7 @@ export function EconomyPanel({ snapshot, events }: Props) {
         return response.json();
       })
       .then((data: PricingTable) => setPricing(data))
-      .catch(() => {});
+      .catch((err: unknown) => console.error('Failed to fetch pricing:', err));
   }, []);
 
   const categorizedItems = useMemo(() => {
