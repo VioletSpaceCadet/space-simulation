@@ -690,10 +690,16 @@ function updateModuleThermalZone(
   overheatDisabled: boolean,
 ): SimState {
   return mapStationModule(state, stationId, moduleId, (m) => {
-    const thermal = m.thermal ?? { temp_mk: tempMk, thermal_group: null, overheat_zone: zone, overheat_disabled: overheatDisabled };
+    const thermal = m.thermal ?? {
+      temp_mk: tempMk, thermal_group: null,
+      overheat_zone: zone, overheat_disabled: overheatDisabled,
+    };
     return {
       ...m,
-      thermal: { ...thermal, temp_mk: tempMk, overheat_zone: zone, overheat_disabled: overheatDisabled },
+      thermal: {
+        ...thermal, temp_mk: tempMk,
+        overheat_zone: zone, overheat_disabled: overheatDisabled,
+      },
       enabled: overheatDisabled ? false : m.enabled,
     };
   });
