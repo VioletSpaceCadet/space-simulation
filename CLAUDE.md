@@ -66,6 +66,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **Thermal system:** Modules with `ThermalDef` track temperature in milli-Kelvin (`ThermalState`). Smelter (Processor with thermal req) generates heat per run, stalls if too cold, yield/quality scale with temp. Radiator provides `cooling_capacity_w` shared across thermal group. Passive cooling via Newton's law. Overheat zones: Nominal/Warning (2x wear)/Critical (4x wear, auto-disable). Tick step 3.6 (after maintenance, before research).
 - **Event sync:** When adding a new `Event` variant to `sim_core/src/types.rs`, you MUST also add a handler in `ui_web/src/hooks/applyEvents.ts` (or add to the allow-list in `scripts/ci_event_sync.sh` if intentionally skipped). CI enforces this.
 - **Time scale:** `minutes_per_tick` in constants.json (default 60 = 1 tick per hour). Test fixtures use 1. Helpers: `Constants::game_minutes_to_ticks()`, `Constants::rate_per_minute_to_per_tick()`. `trade_unlock_tick()` derives from this constant.
+- **Content-driven types:** `AnomalyTag`, `DataKind`, `ResearchDomain` are loaded from content JSON. Adding a new type = adding a JSON entry, not a Rust enum variant. Enums are reserved for engine mechanics (Command, Event, TaskKind), not content categories.
 
 ## Development Workflow
 

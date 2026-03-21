@@ -57,9 +57,9 @@ If the ticket involves UI changes (components, panels, layout, styling):
 2. **Watch CI**: `gh pr checks <PR_NUMBER> --watch`
    - If CI fails: read failed logs with `gh run view <RUN_ID> --log-failed`, fix, push, watch again.
 
-3. **Dispatch review agents:**
-   - **All PRs:** Dispatch the `pr-reviewer` agent (subagent_type: "pr-reviewer").
-   - **Non-trivial PRs** (multi-file, new systems, 200+ lines): Also run `ce:review` for deeper multi-agent analysis.
+3. **Dispatch review agents (in parallel):**
+   - **All PRs:** Dispatch the `pr-reviewer` agent (subagent_type: "pr-reviewer") for correctness, tests, error handling (checklist items 1-10).
+   - **Non-trivial PRs** (200+ lines, multi-file, new systems): Also dispatch `pattern-recognition-specialist` agent (subagent_type: `compound-engineering:review:pattern-recognition-specialist`) for scalability, duplication, hardcoded content (checklist items 11-14).
    - **UI tickets:** Also dispatch `design-implementation-reviewer` (subagent_type: `compound-engineering:design:design-implementation-reviewer`) for visual quality review.
 
 4. **Fix review findings** — fix should-fix items from all reviewers. Commit, push, and re-run CI. Do not ask for confirmation — just fix and push.
