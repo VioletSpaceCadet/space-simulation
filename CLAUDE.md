@@ -80,13 +80,9 @@ Claude **auto-merges into main** after CI green + pr-reviewer clean (no unresolv
 
 See `.claude/commands/implement.md` for the full process.
 
-### Large Projects: Multi-Ticket Workflow (`/project-implementation`)
+### Batch: Multi-Ticket Workflow (`/project-implementation`)
 
-Use `/project-implementation <project>` for 5+ tightly coupled tickets that need to land atomically. Uses an intermediate feature branch:
-
-1. **Feature branch** from main: `feat/<project-name>`
-2. **Ticket branches** off feature branch → PR per ticket into feature branch (Claude auto-merges)
-3. **Final PR** from feature branch into main → requires owner (@VioletSpaceCadet) approval
+Use `/project-implementation <project>` or `/project-implementation VIO-1 VIO-2 VIO-3` to queue multiple tickets. Same direct-to-main flow as `/implement`, but loops through all tickets in dependency order with `/compact` between each to keep context fresh.
 
 See `.claude/commands/project-implementation.md` for the full process.
 

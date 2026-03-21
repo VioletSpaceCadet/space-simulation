@@ -104,11 +104,6 @@ If the ticket was routine (simple feature, straightforward fix, well-trodden pat
 - **One ticket at a time.** Finish, PR, merge, then move to the next.
 - **Compound selectively.** Not every fix needs a doc — only non-trivial learnings.
 
-## When to use /project-implementation instead
+## Multiple tickets
 
-Use `/project-implementation` when:
-- A Linear project has 5+ tightly coupled tickets with dependency chains
-- The work needs to land atomically (all tickets or none)
-- You want an intermediate feature branch for integration testing before main
-
-For most day-to-day work (1-3 tickets, independent changes), use `/implement`.
+For batching multiple tickets, use `/project-implementation` instead — it accepts a project name or list of ticket IDs, processes them in dependency order, compacts between each, and merges each one into main independently.
