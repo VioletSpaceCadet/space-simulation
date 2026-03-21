@@ -102,3 +102,117 @@ fn test_future_command_not_applied_early() {
         "command scheduled for a future tick should not apply yet"
     );
 }
+
+#[test]
+fn test_install_module_initializes_thermal_state_for_thermal_modules() {
+    use crate::test_fixtures::thermal_content;
+
+    let content = thermal_content();
+    let mut state = base_state(&content);
+    let mut rng = make_rng();
+
+    let station_id = StationId("station_earth_orbit".to_string());
+    let module_item_id = ModuleItemId("smelter_item_001".to_string());
+
+    // Add smelter module item to station inventory
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.inventory.push(InventoryItem::Module {
+        item_id: module_item_id.clone(),
+        module_def_id: "module_basic_smelter".to_string(),
+    });
+    station.invalidate_volume_cache();
+
+    let install_cmd = CommandEnvelope {
+        id: CommandId("cmd_install_001".to_string()),
+        issued_by: PrincipalId("principal_autopilot".to_string()),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::InstallModule {
+            station_id: station_id.clone(),
+            module_item_id,
+        },
+    };
+
+    tick(
+        &mut state,
+        &[install_cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+    );
+
+    let station = state.stations.get(&station_id).unwrap();
+    let smelter = station
+        .modules
+        .iter()
+        .find(|m| m.def_id == "module_basic_smelter")
+        .expect("smelter should be installed");
+
+    assert!(
+        smelter.thermal.is_some(),
+        "installed thermal module must have ThermalState initialized"
+    );
+    let thermal = smelter.thermal.as_ref().unwrap();
+    assert_eq!(
+        thermal.temp_mk, content.constants.thermal_sink_temp_mk,
+        "initial temp should be ambient (sink) temperature"
+    );
+    assert_eq!(
+        thermal.overheat_zone,
+        OverheatZone::Nominal,
+        "initial overheat zone should be Nominal"
+    );
+    assert!(
+        !thermal.overheat_disabled,
+        "module should not be overheat-disabled on install"
+    );
+}
+
+#[test]
+fn test_install_module_no_thermal_state_for_non_thermal_modules() {
+    let content = refinery_content();
+    let mut state = test_state(&content);
+    let mut rng = make_rng();
+
+    let station_id = StationId("station_earth_orbit".to_string());
+    let module_item_id = ModuleItemId("refinery_item_001".to_string());
+
+    // Add a non-thermal module (refinery) to station inventory
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.inventory.push(InventoryItem::Module {
+        item_id: module_item_id.clone(),
+        module_def_id: "module_basic_iron_refinery".to_string(),
+    });
+    station.invalidate_volume_cache();
+
+    let install_cmd = CommandEnvelope {
+        id: CommandId("cmd_install_002".to_string()),
+        issued_by: PrincipalId("principal_autopilot".to_string()),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::InstallModule {
+            station_id: station_id.clone(),
+            module_item_id,
+        },
+    };
+
+    tick(
+        &mut state,
+        &[install_cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+    );
+
+    let station = state.stations.get(&station_id).unwrap();
+    let refinery = station
+        .modules
+        .iter()
+        .find(|m| m.def_id == "module_basic_iron_refinery")
+        .expect("refinery should be installed");
+
+    assert!(
+        refinery.thermal.is_none(),
+        "non-thermal module should have thermal: None"
+    );
+}

@@ -107,64 +107,81 @@ fn apply_commands(
                 state.counters.next_module_instance_id += 1;
                 let module_id = crate::ModuleInstanceId(module_id_str);
 
-                let (kind_state, behavior_type) = match content.module_defs.get(&module_def_id) {
-                    Some(def) => match &def.behavior {
-                        crate::ModuleBehaviorDef::Processor(_) => (
-                            crate::ModuleKindState::Processor(crate::ProcessorState {
-                                threshold_kg: 0.0,
-                                ticks_since_last_run: 0,
-                                stalled: false,
-                            }),
-                            crate::BehaviorType::Processor,
-                        ),
-                        crate::ModuleBehaviorDef::Storage { .. } => (
-                            crate::ModuleKindState::Storage,
-                            crate::BehaviorType::Storage,
-                        ),
-                        crate::ModuleBehaviorDef::Maintenance(_) => (
-                            crate::ModuleKindState::Maintenance(crate::MaintenanceState {
-                                ticks_since_last_run: 0,
-                            }),
-                            crate::BehaviorType::Maintenance,
-                        ),
-                        crate::ModuleBehaviorDef::Assembler(_) => (
-                            crate::ModuleKindState::Assembler(crate::AssemblerState {
-                                ticks_since_last_run: 0,
-                                stalled: false,
-                                capped: false,
-                                cap_override: std::collections::HashMap::new(),
-                            }),
-                            crate::BehaviorType::Assembler,
-                        ),
-                        crate::ModuleBehaviorDef::Lab(_) => (
-                            crate::ModuleKindState::Lab(crate::LabState {
-                                ticks_since_last_run: 0,
-                                assigned_tech: None,
-                                starved: false,
-                            }),
-                            crate::BehaviorType::Lab,
-                        ),
-                        crate::ModuleBehaviorDef::SensorArray(_) => (
-                            crate::ModuleKindState::SensorArray(crate::SensorArrayState::default()),
-                            crate::BehaviorType::SensorArray,
-                        ),
-                        crate::ModuleBehaviorDef::SolarArray(_) => (
-                            crate::ModuleKindState::SolarArray(crate::SolarArrayState::default()),
-                            crate::BehaviorType::SolarArray,
-                        ),
-                        crate::ModuleBehaviorDef::Battery(_) => (
-                            crate::ModuleKindState::Battery(crate::BatteryState {
-                                charge_kwh: 0.0,
-                            }),
-                            crate::BehaviorType::Battery,
-                        ),
-                        crate::ModuleBehaviorDef::Radiator(_) => (
-                            crate::ModuleKindState::Radiator(crate::RadiatorState::default()),
-                            crate::BehaviorType::Radiator,
-                        ),
-                    },
-                    None => continue,
-                };
+                let (kind_state, behavior_type, thermal) =
+                    match content.module_defs.get(&module_def_id) {
+                        Some(def) => {
+                            let thermal_state =
+                                def.thermal.as_ref().map(|td| crate::ThermalState {
+                                    temp_mk: content.constants.thermal_sink_temp_mk,
+                                    thermal_group: td.thermal_group.clone(),
+                                    ..Default::default()
+                                });
+                            let (ks, bt) = match &def.behavior {
+                                crate::ModuleBehaviorDef::Processor(_) => (
+                                    crate::ModuleKindState::Processor(crate::ProcessorState {
+                                        threshold_kg: 0.0,
+                                        ticks_since_last_run: 0,
+                                        stalled: false,
+                                    }),
+                                    crate::BehaviorType::Processor,
+                                ),
+                                crate::ModuleBehaviorDef::Storage { .. } => {
+                                    (crate::ModuleKindState::Storage, crate::BehaviorType::Storage)
+                                }
+                                crate::ModuleBehaviorDef::Maintenance(_) => (
+                                    crate::ModuleKindState::Maintenance(
+                                        crate::MaintenanceState {
+                                            ticks_since_last_run: 0,
+                                        },
+                                    ),
+                                    crate::BehaviorType::Maintenance,
+                                ),
+                                crate::ModuleBehaviorDef::Assembler(_) => (
+                                    crate::ModuleKindState::Assembler(crate::AssemblerState {
+                                        ticks_since_last_run: 0,
+                                        stalled: false,
+                                        capped: false,
+                                        cap_override: std::collections::HashMap::new(),
+                                    }),
+                                    crate::BehaviorType::Assembler,
+                                ),
+                                crate::ModuleBehaviorDef::Lab(_) => (
+                                    crate::ModuleKindState::Lab(crate::LabState {
+                                        ticks_since_last_run: 0,
+                                        assigned_tech: None,
+                                        starved: false,
+                                    }),
+                                    crate::BehaviorType::Lab,
+                                ),
+                                crate::ModuleBehaviorDef::SensorArray(_) => (
+                                    crate::ModuleKindState::SensorArray(
+                                        crate::SensorArrayState::default(),
+                                    ),
+                                    crate::BehaviorType::SensorArray,
+                                ),
+                                crate::ModuleBehaviorDef::SolarArray(_) => (
+                                    crate::ModuleKindState::SolarArray(
+                                        crate::SolarArrayState::default(),
+                                    ),
+                                    crate::BehaviorType::SolarArray,
+                                ),
+                                crate::ModuleBehaviorDef::Battery(_) => (
+                                    crate::ModuleKindState::Battery(crate::BatteryState {
+                                        charge_kwh: 0.0,
+                                    }),
+                                    crate::BehaviorType::Battery,
+                                ),
+                                crate::ModuleBehaviorDef::Radiator(_) => (
+                                    crate::ModuleKindState::Radiator(
+                                        crate::RadiatorState::default(),
+                                    ),
+                                    crate::BehaviorType::Radiator,
+                                ),
+                            };
+                            (ks, bt, thermal_state)
+                        }
+                        None => continue,
+                    };
 
                 let Some(station) = state.stations.get_mut(station_id) else {
                     continue;
@@ -175,7 +192,7 @@ fn apply_commands(
                     enabled: false,
                     kind_state,
                     wear: crate::WearState::default(),
-                    thermal: None,
+                    thermal,
                     power_stalled: false,
                 });
 
