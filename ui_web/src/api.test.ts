@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchMeta, fetchSnapshot, saveGame, setSpeed } from './api';
+import { fetchContent, fetchMeta, fetchSnapshot, saveGame, setSpeed } from './api';
 
 describe('fetchSnapshot', () => {
   beforeEach(() => {
@@ -78,5 +78,19 @@ describe('setSpeed', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticks_per_sec: 1000 }),
     });
+  });
+});
+
+describe('fetchContent', () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  it('fetchContent returns content response', async () => {
+    const mock = { techs: [], lab_rates: [], data_rates: {}, minutes_per_tick: 60 };
+    vi.mocked(global.fetch).mockResolvedValueOnce(new Response(JSON.stringify(mock)));
+    const result = await fetchContent();
+    expect(result.techs).toEqual([]);
+    expect(result.minutes_per_tick).toBe(60);
   });
 });
