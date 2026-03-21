@@ -58,6 +58,8 @@ pub fn compute_summary(snapshots: &[(u64, &MetricsSnapshot)]) -> SummaryStats {
         ),
         ("balance", Box::new(|s| s.balance)),
         ("thruster_count", Box::new(|s| f64::from(s.thruster_count))),
+        ("export_revenue_total", Box::new(|s| s.export_revenue_total)),
+        ("export_count", Box::new(|s| f64::from(s.export_count))),
         (
             "power_generated_kw",
             Box::new(|s| f64::from(s.power_generated_kw)),
@@ -193,6 +195,8 @@ pub fn build_aggregated_metrics(snapshots: &[&MetricsSnapshot]) -> serde_json::V
         ),
         ("balance", Box::new(|s| s.balance)),
         ("thruster_count", Box::new(|s| f64::from(s.thruster_count))),
+        ("export_revenue_total", Box::new(|s| s.export_revenue_total)),
+        ("export_count", Box::new(|s| f64::from(s.export_count))),
         (
             "power_generated_kw",
             Box::new(|s| f64::from(s.power_generated_kw)),
@@ -326,6 +330,8 @@ mod tests {
             repair_kits_remaining: repair_kits,
             balance: 0.0,
             thruster_count: 0,
+            export_revenue_total: 0.0,
+            export_count: 0,
             power_generated_kw: 0.0,
             power_consumed_kw: 0.0,
             power_deficit_kw: 0.0,
@@ -412,6 +418,8 @@ mod tests {
             "scan_sites_remaining",
             "balance",
             "thruster_count",
+            "export_revenue_total",
+            "export_count",
             "power_generated_kw",
             "power_consumed_kw",
             "power_deficit_kw",
@@ -422,7 +430,7 @@ mod tests {
             "overheat_critical_count",
             "heat_wear_multiplier_avg",
         ];
-        assert_eq!(obj.len(), 29);
+        assert_eq!(obj.len(), 31);
         for key in &expected_keys {
             let entry = obj
                 .get(*key)

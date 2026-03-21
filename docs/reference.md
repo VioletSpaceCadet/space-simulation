@@ -260,7 +260,7 @@ runs/<name>_<timestamp>/
     ...
 ```
 
-**Summary metrics:** `storage_saturation_pct`, `fleet_idle_pct`, `refinery_starved_count`, `techs_unlocked`, `avg_module_wear`, `repair_kits_remaining`. Each reports mean, min, max, stddev across seeds.
+**Summary metrics:** `storage_saturation_pct`, `fleet_idle_pct`, `refinery_starved_count`, `techs_unlocked`, `avg_module_wear`, `repair_kits_remaining`, `export_revenue_total`, `export_count`. Each reports mean, min, max, stddev across seeds.
 
 **Collapse detection:** A seed is "collapsed" if the final snapshot has `refinery_starved_count > 0` AND `fleet_idle == fleet_total`.
 
