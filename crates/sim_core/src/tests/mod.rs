@@ -5,6 +5,7 @@ use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
 
 mod assembler;
+mod cold_refinery_regression;
 mod commands;
 mod deep_scan;
 mod deposit;
