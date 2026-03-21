@@ -66,7 +66,7 @@ pub fn base_content() -> GameContent {
         },
         asteroid_templates: vec![AsteroidTemplateDef {
             id: "tmpl_iron_rich".to_string(),
-            anomaly_tags: vec![AnomalyTag::IronRich],
+            anomaly_tags: vec![AnomalyTag::new("IronRich")],
             composition_ranges: HashMap::from([
                 // Fixed ranges so true_composition is deterministic.
                 ("Fe".to_string(), (0.7, 0.7)),

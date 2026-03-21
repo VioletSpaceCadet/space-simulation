@@ -71,7 +71,7 @@ fn test_survey_detects_tags_with_prob_one() {
         .expect("ScanResult should be emitted");
 
     assert!(
-        tags.iter().any(|(tag, _)| *tag == AnomalyTag::IronRich),
+        tags.iter().any(|(tag, _)| tag.0 == "IronRich"),
         "IronRich tag should be detected when probability is 1.0"
     );
 }
