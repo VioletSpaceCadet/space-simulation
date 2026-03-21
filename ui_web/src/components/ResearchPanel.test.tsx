@@ -1,42 +1,45 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ResearchState } from '../types';
 
 import { ResearchPanel } from './ResearchPanel';
 
+vi.mock('../hooks/useContent', () => ({
+  useContent: () => ({
+    content: {
+      techs: [{ id: 'tech_a', name: 'Alpha', prereqs: [], domain_requirements: { Survey: 100 }, accepted_data: [], difficulty: 200, effects: [] }],
+      lab_rates: [{ station_id: 's1', module_id: 'm1', module_name: 'Survey Lab', assigned_tech: 'tech_a', domain: 'Survey', points_per_hour: 4.0, starved: false, enabled: true }],
+      data_rates: { SurveyData: 1.2 },
+      minutes_per_tick: 60,
+    },
+    refetch: vi.fn(),
+  }),
+}));
+
 const research: ResearchState = {
   unlocked: [],
   data_pool: { SurveyData: 42.5 },
-  evidence: { tech_deep_scan_v1: { points: { Survey: 120.0 } } },
-  action_counts: {},
-};
-
-const researchUnlocked: ResearchState = {
-  unlocked: ['tech_deep_scan_v1'],
-  data_pool: { SurveyData: 200.0 },
-  evidence: { tech_deep_scan_v1: { points: { Survey: 300.0 } } },
+  evidence: { tech_a: { points: { Survey: 50 } } },
   action_counts: {},
 };
 
 describe('ResearchPanel', () => {
-  it('renders tech ID', () => {
+  it('renders data pool section', () => {
     render(<ResearchPanel research={research} />);
-    expect(screen.getByText(/tech_deep_scan_v1/)).toBeInTheDocument();
+    // "Survey" appears in DataPoolSection and in TechTreeDAG domain bars; check count
+    expect(screen.getAllByText(/Survey/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/42\.5/)).toBeInTheDocument();
   });
 
-  it('renders evidence value', () => {
+  it('renders lab status section', () => {
     render(<ResearchPanel research={research} />);
-    expect(screen.getByText(/120/)).toBeInTheDocument();
+    expect(screen.getByText('Survey Lab')).toBeInTheDocument();
   });
 
-  it('shows unlocked label when tech is unlocked', () => {
-    render(<ResearchPanel research={researchUnlocked} />);
-    expect(screen.getByText(/unlocked/i)).toBeInTheDocument();
-  });
-
-  it('shows data pool amount', () => {
+  it('renders tech tree with tech name', () => {
     render(<ResearchPanel research={research} />);
-    expect(screen.getByText(/42/)).toBeInTheDocument();
+    // Alpha appears in both TechTreeDAG and LabStatusSection (as assigned tech name)
+    expect(screen.getAllByText('Alpha').length).toBeGreaterThan(0);
   });
 });

@@ -280,3 +280,36 @@ export interface ActiveAlert {
   suggested_action: string
   tick: number
 }
+
+export interface TechEffect {
+  type: string
+  sigma?: number
+}
+
+export interface TechDef {
+  id: string
+  name: string
+  prereqs: string[]
+  domain_requirements: Record<string, number>
+  accepted_data: string[]
+  difficulty: number
+  effects: TechEffect[]
+}
+
+export interface LabRateInfo {
+  station_id: string
+  module_id: string
+  module_name: string
+  assigned_tech: string | null
+  domain: string
+  points_per_hour: number
+  starved: boolean
+  enabled: boolean
+}
+
+export interface ContentResponse {
+  techs: TechDef[]
+  lab_rates: LabRateInfo[]
+  data_rates: Record<string, number>
+  minutes_per_tick: number
+}
