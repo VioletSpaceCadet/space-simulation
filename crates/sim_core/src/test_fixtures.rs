@@ -72,6 +72,7 @@ pub fn base_content() -> GameContent {
                 ("Fe".to_string(), (0.7, 0.7)),
                 ("Si".to_string(), (0.3, 0.3)),
             ]),
+            preferred_class: Some(crate::spatial::ResourceClass::MetalRich),
         }],
         elements: vec![
             ElementDef {
@@ -151,6 +152,8 @@ pub fn base_content() -> GameContent {
             docking_range_au_um: 10_000,
             ticks_per_au: 2_133,
             min_transit_ticks: 1,
+            replenish_check_interval_ticks: 1,
+            replenish_target_count: 5,
             // Thermal system
             thermal_sink_temp_mk: 293_000,
             thermal_overheat_warning_offset_mk: 200_000,
@@ -251,6 +254,8 @@ pub fn minimal_content() -> GameContent {
             docking_range_au_um: 10_000,
             ticks_per_au: 2_133,
             min_transit_ticks: 1,
+            replenish_check_interval_ticks: 1,
+            replenish_target_count: 5,
             // Thermal system
             thermal_sink_temp_mk: 293_000,
             thermal_overheat_warning_offset_mk: 200_000,

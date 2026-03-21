@@ -23,9 +23,10 @@ pub use metrics::{
     MetricsFileWriter, MetricsSnapshot,
 };
 pub use spatial::{
-    build_body_cache, compute_entity_absolute, integer_sqrt, is_co_located, polar_to_cart,
-    travel_ticks, AbsolutePos, AngleMilliDeg, BodyCache, EntityCache, Position, RadiusAuMicro,
-    ResourceClass, FULL_CIRCLE, METERS_PER_AU, METERS_PER_MICRO_AU,
+    build_body_cache, compute_entity_absolute, integer_sqrt, is_co_located, pick_template_biased,
+    pick_zone_weighted, polar_to_cart, random_angle_in_span, random_position_in_zone,
+    random_radius_in_band, travel_ticks, AbsolutePos, AngleMilliDeg, BodyCache, EntityCache,
+    Position, RadiusAuMicro, ResourceClass, FULL_CIRCLE, METERS_PER_AU, METERS_PER_MICRO_AU,
 };
 pub use tasks::{inventory_volume_m3, mine_duration};
 pub use types::*;

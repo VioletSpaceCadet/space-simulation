@@ -17,7 +17,6 @@ pub fn trade_unlock_tick(minutes_per_tick: u32) -> u64 {
     YEAR_MINUTES.div_ceil(u64::from(minutes_per_tick))
 }
 
-const MIN_UNSCANNED_SITES: usize = 5;
 const REPLENISH_BATCH_SIZE: usize = 5;
 
 /// Advance the simulation by one tick.
@@ -551,7 +550,14 @@ fn replenish_scan_sites(
     rng: &mut impl Rng,
     events: &mut Vec<crate::EventEnvelope>,
 ) {
-    if state.scan_sites.len() >= MIN_UNSCANNED_SITES {
+    // Interval gating: only check on the configured tick interval.
+    let interval = content.constants.replenish_check_interval_ticks;
+    if interval > 0 && !state.meta.tick.is_multiple_of(interval) {
+        return;
+    }
+
+    let target = content.constants.replenish_target_count as usize;
+    if state.scan_sites.len() >= target {
         return;
     }
 
@@ -569,20 +575,14 @@ fn replenish_scan_sites(
     }
 
     let current_tick = state.meta.tick;
+    let deficit = target - state.scan_sites.len();
+    let batch = deficit.min(REPLENISH_BATCH_SIZE);
 
-    for _ in 0..REPLENISH_BATCH_SIZE {
-        let template = &templates[rng.gen_range(0..templates.len())];
-        let body = zone_bodies[rng.gen_range(0..zone_bodies.len())];
-        let zone = body.zone.as_ref().expect("filtered to zone bodies");
-        // Random position within the zone
-        let radius = rng.gen_range(zone.radius_min_au_um..=zone.radius_max_au_um);
-        let angle =
-            (zone.angle_start_mdeg + rng.gen_range(0..zone.angle_span_mdeg)) % crate::FULL_CIRCLE;
-        let position = crate::Position {
-            parent_body: body.id.clone(),
-            radius_au_um: crate::RadiusAuMicro(radius),
-            angle_mdeg: crate::AngleMilliDeg(angle),
-        };
+    for _ in 0..batch {
+        let body = crate::pick_zone_weighted(&zone_bodies, rng);
+        let zone_class = body.zone.as_ref().expect("zone body").resource_class;
+        let template = crate::pick_template_biased(templates, zone_class, rng);
+        let position = crate::random_position_in_zone(body, rng);
         let uuid = crate::generate_uuid(rng);
         let site_id = SiteId(format!("site_{uuid}"));
 

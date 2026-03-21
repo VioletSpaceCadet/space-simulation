@@ -33,5 +33,7 @@
   "thermal_wear_multiplier_critical": 4.0,
   "docking_range_au_um": 10000,
   "ticks_per_au": 2133,
-  "min_transit_ticks": 1
+  "min_transit_ticks": 1,
+  "replenish_check_interval_ticks": 24,
+  "replenish_target_count": 10
 }
