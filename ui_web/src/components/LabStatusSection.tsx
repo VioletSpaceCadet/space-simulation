@@ -1,3 +1,4 @@
+import { LAB_STATUS_STYLES } from '../config/theme';
 import type { LabRateInfo } from '../types';
 
 export interface LabStatusSectionProps {
@@ -18,12 +19,7 @@ interface StatusBadgeProps {
 }
 
 function StatusBadge({ status }: StatusBadgeProps) {
-  const styles: Record<LabStatus, { bg: string; text: string; label: string }> = {
-    active: { bg: 'rgba(76,175,125,0.15)', text: '#4caf7d', label: 'active' },
-    starved: { bg: 'rgba(224,82,82,0.15)', text: '#e05252', label: 'starved' },
-    idle: { bg: 'rgba(90,96,110,0.2)', text: '#6b7280', label: 'idle' },
-  };
-  const { bg, text, label } = styles[status];
+  const { bg, text, label } = LAB_STATUS_STYLES[status] ?? LAB_STATUS_STYLES.idle;
 
   return (
     <span
