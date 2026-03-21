@@ -89,6 +89,20 @@ pub fn thermal_quality_factor(temp_mk: u32, req: &RecipeThermalReq) -> f32 {
     1.0 - 0.4 * progress
 }
 
+/// Returns the wear rate multiplier for a module's overheat zone.
+///
+/// - Nominal: 1.0 (no extra wear)
+/// - Warning: `thermal_wear_multiplier_warning` (default 2.0)
+/// - Critical: `thermal_wear_multiplier_critical` (default 4.0)
+#[inline]
+pub fn heat_wear_multiplier(zone: crate::OverheatZone, constants: &Constants) -> f32 {
+    match zone {
+        crate::OverheatZone::Nominal => 1.0,
+        crate::OverheatZone::Warning => constants.thermal_wear_multiplier_warning,
+        crate::OverheatZone::Critical => constants.thermal_wear_multiplier_critical,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,5 +263,34 @@ mod tests {
             heat_per_run_j: 0,
         };
         assert!((thermal_quality_factor(2_000_000, &req) - 1.0).abs() < f32::EPSILON);
+    }
+
+    // ── heat_wear_multiplier tests ────────────────────────────────────
+
+    #[test]
+    fn heat_wear_multiplier_nominal_is_1() {
+        let constants = &crate::test_fixtures::base_content().constants;
+        assert!(
+            (heat_wear_multiplier(crate::OverheatZone::Nominal, constants) - 1.0).abs()
+                < f32::EPSILON
+        );
+    }
+
+    #[test]
+    fn heat_wear_multiplier_warning_is_2() {
+        let constants = &crate::test_fixtures::base_content().constants;
+        assert!(
+            (heat_wear_multiplier(crate::OverheatZone::Warning, constants) - 2.0).abs()
+                < f32::EPSILON
+        );
+    }
+
+    #[test]
+    fn heat_wear_multiplier_critical_is_4() {
+        let constants = &crate::test_fixtures::base_content().constants;
+        assert!(
+            (heat_wear_multiplier(crate::OverheatZone::Critical, constants) - 4.0).abs()
+                < f32::EPSILON
+        );
     }
 }

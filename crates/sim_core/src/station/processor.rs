@@ -32,7 +32,7 @@ pub(super) fn tick_station_modules(
         }
 
         let outcome = execute(&ctx, state, content, events);
-        super::apply_run_result(state, &ctx, outcome, events);
+        super::apply_run_result(state, &ctx, outcome, content, events);
     }
 }
 
@@ -595,6 +595,7 @@ mod tests {
                         thermal: Some(ThermalState {
                             temp_mk,
                             thermal_group: Some("smelting".to_string()),
+                            ..Default::default()
                         }),
                     }],
                     power: PowerState::default(),

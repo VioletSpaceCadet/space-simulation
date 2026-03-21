@@ -34,7 +34,7 @@ pub(super) fn tick_lab_modules(
         }
 
         let outcome = execute(&ctx, &lab_def, state, content, events);
-        super::apply_run_result(state, &ctx, outcome, events);
+        super::apply_run_result(state, &ctx, outcome, content, events);
     }
 }
 

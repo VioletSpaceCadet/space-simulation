@@ -74,6 +74,26 @@ pub fn compute_summary(snapshots: &[(u64, &MetricsSnapshot)]) -> SummaryStats {
             "battery_charge_pct",
             Box::new(|s| f64::from(s.battery_charge_pct)),
         ),
+        (
+            "station_max_temp_mk",
+            Box::new(|s| f64::from(s.station_max_temp_mk)),
+        ),
+        (
+            "station_avg_temp_mk",
+            Box::new(|s| f64::from(s.station_avg_temp_mk)),
+        ),
+        (
+            "overheat_warning_count",
+            Box::new(|s| f64::from(s.overheat_warning_count)),
+        ),
+        (
+            "overheat_critical_count",
+            Box::new(|s| f64::from(s.overheat_critical_count)),
+        ),
+        (
+            "heat_wear_multiplier_avg",
+            Box::new(|s| f64::from(s.heat_wear_multiplier_avg)),
+        ),
     ];
 
     let metrics = extractors
@@ -110,7 +130,8 @@ fn compute_metric_summary(name: &str, values: &[f64]) -> MetricSummary {
 
 /// Build aggregated metrics in the contract format:
 /// `{ "key": { "mean": ..., "min": ..., "max": ..., "stddev": ... }, ... }`
-/// Covers all 24 `SummaryMetrics` keys.
+/// Covers all `SummaryMetrics` keys.
+#[allow(clippy::too_many_lines)]
 pub fn build_aggregated_metrics(snapshots: &[&MetricsSnapshot]) -> serde_json::Value {
     let contract_extractors: Vec<Extractor> = vec![
         ("total_ore_kg", Box::new(|s| f64::from(s.total_ore_kg))),
@@ -187,6 +208,26 @@ pub fn build_aggregated_metrics(snapshots: &[&MetricsSnapshot]) -> serde_json::V
         (
             "battery_charge_pct",
             Box::new(|s| f64::from(s.battery_charge_pct)),
+        ),
+        (
+            "station_max_temp_mk",
+            Box::new(|s| f64::from(s.station_max_temp_mk)),
+        ),
+        (
+            "station_avg_temp_mk",
+            Box::new(|s| f64::from(s.station_avg_temp_mk)),
+        ),
+        (
+            "overheat_warning_count",
+            Box::new(|s| f64::from(s.overheat_warning_count)),
+        ),
+        (
+            "overheat_critical_count",
+            Box::new(|s| f64::from(s.overheat_critical_count)),
+        ),
+        (
+            "heat_wear_multiplier_avg",
+            Box::new(|s| f64::from(s.heat_wear_multiplier_avg)),
         ),
     ];
 
@@ -289,6 +330,11 @@ mod tests {
             power_consumed_kw: 0.0,
             power_deficit_kw: 0.0,
             battery_charge_pct: 0.0,
+            station_max_temp_mk: 0,
+            station_avg_temp_mk: 0,
+            overheat_warning_count: 0,
+            overheat_critical_count: 0,
+            heat_wear_multiplier_avg: 0.0,
         }
     }
 
@@ -338,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_aggregated_metrics_has_all_24_keys() {
+    fn test_build_aggregated_metrics_has_all_keys() {
         let s1 = make_snapshot(100, 0.5, 2, 0, 0, 3, 0.2, 5);
         let s2 = make_snapshot(100, 0.7, 2, 1, 1, 5, 0.4, 3);
         let snapshots: Vec<&MetricsSnapshot> = vec![&s1, &s2];
@@ -370,8 +416,13 @@ mod tests {
             "power_consumed_kw",
             "power_deficit_kw",
             "battery_charge_pct",
+            "station_max_temp_mk",
+            "station_avg_temp_mk",
+            "overheat_warning_count",
+            "overheat_critical_count",
+            "heat_wear_multiplier_avg",
         ];
-        assert_eq!(obj.len(), 24);
+        assert_eq!(obj.len(), 29);
         for key in &expected_keys {
             let entry = obj
                 .get(*key)

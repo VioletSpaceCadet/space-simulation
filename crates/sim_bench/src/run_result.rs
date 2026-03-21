@@ -58,6 +58,11 @@ pub struct SummaryMetrics {
     pub power_consumed_kw: f64,
     pub power_deficit_kw: f64,
     pub battery_charge_pct: f64,
+    pub station_max_temp_mk: u32,
+    pub station_avg_temp_mk: u32,
+    pub overheat_warning_count: u32,
+    pub overheat_critical_count: u32,
+    pub heat_wear_multiplier_avg: f64,
 }
 
 impl SummaryMetrics {
@@ -87,6 +92,11 @@ impl SummaryMetrics {
             power_consumed_kw: f64::from(snapshot.power_consumed_kw),
             power_deficit_kw: f64::from(snapshot.power_deficit_kw),
             battery_charge_pct: f64::from(snapshot.battery_charge_pct),
+            station_max_temp_mk: snapshot.station_max_temp_mk,
+            station_avg_temp_mk: snapshot.station_avg_temp_mk,
+            overheat_warning_count: snapshot.overheat_warning_count,
+            overheat_critical_count: snapshot.overheat_critical_count,
+            heat_wear_multiplier_avg: f64::from(snapshot.heat_wear_multiplier_avg),
         }
     }
 }
@@ -168,6 +178,11 @@ mod tests {
             power_consumed_kw: 0.0,
             power_deficit_kw: 0.0,
             battery_charge_pct: 0.0,
+            station_max_temp_mk: 0,
+            station_avg_temp_mk: 0,
+            overheat_warning_count: 0,
+            overheat_critical_count: 0,
+            heat_wear_multiplier_avg: 0.0,
         }
     }
 

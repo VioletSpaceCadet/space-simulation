@@ -720,6 +720,9 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   ShipArrived: handleShipArrived,
   DataGenerated: handleDataGenerated,
   ProcessorTooCold: noOp,
+  OverheatWarning: noOp,
+  OverheatCritical: noOp,
+  OverheatCleared: noOp,
 };
 
 export function applyEvents(

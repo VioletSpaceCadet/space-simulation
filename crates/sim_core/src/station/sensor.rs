@@ -31,7 +31,7 @@ pub(super) fn tick_sensor_array_modules(
         }
 
         let outcome = execute(&ctx, &sensor_def, state, content, events);
-        super::apply_run_result(state, &ctx, outcome, events);
+        super::apply_run_result(state, &ctx, outcome, content, events);
     }
 }
 
