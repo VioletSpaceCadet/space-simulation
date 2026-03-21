@@ -21,9 +21,7 @@ const HOT_SMELTER_TEMP_MK: u32 = 1_900_000;
 /// Uses `state_with_smelter_at_temp` for the smelter, then manually adds
 /// the two radiators so the full thermal loop (heat generation + cooling) is
 /// active from the start.
-fn hot_smelter_with_radiators_state(
-    content: &crate::GameContent,
-) -> crate::GameState {
+fn hot_smelter_with_radiators_state(content: &crate::GameContent) -> crate::GameState {
     let mut state = crate::test_fixtures::state_with_smelter_at_temp(content, HOT_SMELTER_TEMP_MK);
     let station = state
         .stations
@@ -74,10 +72,8 @@ fn run_thermal_simulation() -> (String, String) {
         all_events.extend(events);
     }
 
-    let state_json =
-        serde_json::to_string(&state).expect("GameState should serialize to JSON");
-    let events_json =
-        serde_json::to_string(&all_events).expect("events should serialize to JSON");
+    let state_json = serde_json::to_string(&state).expect("GameState should serialize to JSON");
+    let events_json = serde_json::to_string(&all_events).expect("events should serialize to JSON");
 
     (state_json, events_json)
 }

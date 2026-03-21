@@ -122,3 +122,17 @@ if [[ "$CMD" =~ (PATH=|\.cargo/bin/cargo|export\ PATH=).*cargo ]]; then
   echo "  cargo test --manifest-path /path/Cargo.toml   (for worktrees)"
   exit 2
 fi
+
+# --- Check 8: cd <repo> && git compound commands ---
+# Triggers Claude Code's built-in safety prompt for "compound commands with cd and git".
+# git works from the repo root without cd. Use git -C for other directories.
+if [[ "$CMD" =~ ^cd\ .*&&.*git\  ]]; then
+  echo "STOP: Do not use 'cd <path> && git <command>'."
+  echo "This triggers a Claude Code safety prompt that cannot be overridden."
+  echo ""
+  echo "Instead, run git commands directly (they work from the repo root):"
+  echo "  git add <files>"
+  echo "  git commit -m \"message\""
+  echo "  git -C /other/path status   (for other directories)"
+  exit 2
+fi
