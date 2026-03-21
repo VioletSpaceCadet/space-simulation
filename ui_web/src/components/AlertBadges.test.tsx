@@ -75,4 +75,65 @@ describe('AlertBadges', () => {
     fireEvent.click(screen.getByText('low fuel'));
     expect(screen.queryByText('Message for low_fuel')).not.toBeInTheDocument();
   });
+
+  it('renders thermal alerts with readable labels', () => {
+    const alerts = new Map([
+      ['OVERHEAT_WARNING', makeAlert('OVERHEAT_WARNING')],
+      ['OVERHEAT_CRITICAL', makeAlert('OVERHEAT_CRITICAL', 'Critical')],
+    ]);
+    render(
+      <AlertBadges alerts={alerts} dismissed={new Set()} onDismiss={() => {}} />,
+    );
+    expect(screen.getByText('Overheat Warning')).toBeInTheDocument();
+    expect(screen.getByText('Overheat Critical')).toBeInTheDocument();
+  });
+
+  it('navigates to fleet panel when thermal alert clicked', () => {
+    const onNavigate = vi.fn();
+    const alerts = new Map([
+      ['OVERHEAT_WARNING', makeAlert('OVERHEAT_WARNING')],
+    ]);
+    render(
+      <AlertBadges
+        alerts={alerts}
+        dismissed={new Set()}
+        onDismiss={() => {}}
+        onNavigateToPanel={onNavigate}
+      />,
+    );
+    fireEvent.click(screen.getByText('Overheat Warning'));
+    expect(onNavigate).toHaveBeenCalledWith('fleet');
+  });
+
+  it('does not navigate when non-thermal alert clicked', () => {
+    const onNavigate = vi.fn();
+    const alerts = new Map([['low_fuel', makeAlert('low_fuel')]]);
+    render(
+      <AlertBadges
+        alerts={alerts}
+        dismissed={new Set()}
+        onDismiss={() => {}}
+        onNavigateToPanel={onNavigate}
+      />,
+    );
+    fireEvent.click(screen.getByText('low fuel'));
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it('navigates to fleet panel for OVERHEAT_CRITICAL', () => {
+    const onNavigate = vi.fn();
+    const alerts = new Map([
+      ['OVERHEAT_CRITICAL', makeAlert('OVERHEAT_CRITICAL', 'Critical')],
+    ]);
+    render(
+      <AlertBadges
+        alerts={alerts}
+        dismissed={new Set()}
+        onDismiss={() => {}}
+        onNavigateToPanel={onNavigate}
+      />,
+    );
+    fireEvent.click(screen.getByText('Overheat Critical'));
+    expect(onNavigate).toHaveBeenCalledWith('fleet');
+  });
 });

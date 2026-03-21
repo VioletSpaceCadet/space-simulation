@@ -25,6 +25,7 @@ interface Props {
   alerts: Map<string, ActiveAlert>
   dismissedAlerts: Set<string>
   onDismissAlert: (alertId: string) => void
+  onNavigateToPanel?: (panelId: string) => void
   minutesPerTick: number
   activeSpeed: number
   onSetSpeed: (tps: number) => void
@@ -34,7 +35,7 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 export function StatusBar({
   tick, connected, measuredTickRate, paused, balance,
-  onTogglePause, alerts, dismissedAlerts, onDismissAlert,
+  onTogglePause, alerts, dismissedAlerts, onDismissAlert, onNavigateToPanel,
   minutesPerTick, activeSpeed, onSetSpeed,
 }: Props) {
   const roundedTick = Math.floor(tick);
@@ -96,7 +97,12 @@ export function StatusBar({
         </span>
       )}
       <div className="ml-auto flex items-center gap-3">
-        <AlertBadges alerts={alerts} dismissed={dismissedAlerts} onDismiss={onDismissAlert} />
+        <AlertBadges
+          alerts={alerts}
+          dismissed={dismissedAlerts}
+          onDismiss={onDismissAlert}
+          onNavigateToPanel={onNavigateToPanel}
+        />
         <div className="flex items-center gap-0.5">
           {SPEED_PRESETS.map(({ label, tps }) => (
             <button
