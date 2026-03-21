@@ -858,6 +858,10 @@ pub struct AsteroidTemplateDef {
     pub id: String,
     pub anomaly_tags: Vec<AnomalyTag>,
     pub composition_ranges: HashMap<ElementId, (f32, f32)>,
+    /// Preferred zone resource class for weighted template selection.
+    /// match=3x, none=2x, mismatch=1x weight.
+    #[serde(default)]
+    pub preferred_class: Option<crate::spatial::ResourceClass>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1148,6 +1152,12 @@ pub struct Constants {
     /// Floor for short trips (e.g., same-zone travel).
     #[serde(default = "default_min_transit_ticks")]
     pub min_transit_ticks: u64,
+    /// How often (in ticks) to check whether new scan sites should spawn.
+    #[serde(default = "default_replenish_check_interval_ticks")]
+    pub replenish_check_interval_ticks: u64,
+    /// Target number of unscanned scan sites. Deficit is spawned each check.
+    #[serde(default = "default_replenish_target_count")]
+    pub replenish_target_count: u32,
     // Thermal system
     /// Ambient/radiator sink temperature in milli-Kelvin (20 C, not cosmic background).
     #[serde(default = "default_thermal_sink_temp_mk")]
@@ -1316,6 +1326,12 @@ fn default_ticks_per_au() -> u64 {
 }
 fn default_min_transit_ticks() -> u64 {
     1
+}
+fn default_replenish_check_interval_ticks() -> u64 {
+    1 // check every tick (backward compat)
+}
+fn default_replenish_target_count() -> u32 {
+    5 // matches legacy MIN_UNSCANNED_SITES
 }
 
 // ---------------------------------------------------------------------------

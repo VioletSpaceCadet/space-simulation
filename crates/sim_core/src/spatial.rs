@@ -5,9 +5,10 @@
 
 use std::collections::HashMap;
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::{BodyId, OrbitalBodyDef};
+use crate::{AsteroidTemplateDef, BodyId, OrbitalBodyDef};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -308,9 +309,111 @@ pub fn build_body_cache(bodies: &[OrbitalBodyDef]) -> HashMap<BodyId, BodyCache>
     cache
 }
 
+// ---------------------------------------------------------------------------
+// World-gen sampling helpers (integer math, no floats in RNG path)
+// ---------------------------------------------------------------------------
+
+/// Area-weighted radius sampling within an annular band.
+/// `r = integer_sqrt(uniform(r_min², r_max²))` prevents inner-edge clustering.
+pub fn random_radius_in_band(r_min: u64, r_max: u64, rng: &mut impl Rng) -> RadiusAuMicro {
+    if r_min == r_max {
+        return RadiusAuMicro(r_min);
+    }
+    let r_min_sq = u128::from(r_min) * u128::from(r_min);
+    let r_max_sq = u128::from(r_max) * u128::from(r_max);
+    let uniform = rng.gen_range(r_min_sq..=r_max_sq);
+    RadiusAuMicro(integer_sqrt(uniform))
+}
+
+/// Wrap-safe angle generation within a zone span.
+/// `(start + uniform(0..span)) % 360_000` handles zones that wrap past 360°.
+pub fn random_angle_in_span(start: u32, span: u32, rng: &mut impl Rng) -> AngleMilliDeg {
+    AngleMilliDeg((start + rng.gen_range(0..span)) % FULL_CIRCLE)
+}
+
+/// Generate a random Position within a zone body's defined zone.
+///
+/// Panics if the body has no zone.
+pub fn random_position_in_zone(body: &OrbitalBodyDef, rng: &mut impl Rng) -> Position {
+    let zone = body
+        .zone
+        .as_ref()
+        .expect("random_position_in_zone requires a body with a zone");
+    Position {
+        parent_body: body.id.clone(),
+        radius_au_um: random_radius_in_band(zone.radius_min_au_um, zone.radius_max_au_um, rng),
+        angle_mdeg: random_angle_in_span(zone.angle_start_mdeg, zone.angle_span_mdeg, rng),
+    }
+}
+
+/// Weighted random selection from zone bodies using `scan_site_weight`.
+/// Integer accumulation — no floats in the RNG path.
+///
+/// Panics if `zone_bodies` is empty.
+pub fn pick_zone_weighted<'a>(
+    zone_bodies: &[&'a OrbitalBodyDef],
+    rng: &mut impl Rng,
+) -> &'a OrbitalBodyDef {
+    let total_weight: u32 = zone_bodies
+        .iter()
+        .map(|b| {
+            b.zone
+                .as_ref()
+                .expect("zone body must have zone")
+                .scan_site_weight
+        })
+        .sum();
+    let roll = rng.gen_range(0..total_weight);
+    let mut acc = 0u32;
+    for body in zone_bodies {
+        acc += body
+            .zone
+            .as_ref()
+            .expect("zone body must have zone")
+            .scan_site_weight;
+        if roll < acc {
+            return body;
+        }
+    }
+    zone_bodies.last().expect("zone_bodies must not be empty")
+}
+
+/// Biased template selection based on zone resource class.
+/// Weight: match=3, none=2, mismatch=1. Integer math throughout.
+///
+/// Panics if `templates` is empty.
+pub fn pick_template_biased<'a>(
+    templates: &'a [AsteroidTemplateDef],
+    zone_class: ResourceClass,
+    rng: &mut impl Rng,
+) -> &'a AsteroidTemplateDef {
+    let total_weight: u32 = templates
+        .iter()
+        .map(|t| match &t.preferred_class {
+            Some(pc) if *pc == zone_class => 3,
+            None => 2,
+            _ => 1,
+        })
+        .sum();
+    let roll = rng.gen_range(0..total_weight);
+    let mut acc = 0u32;
+    for template in templates {
+        acc += match &template.preferred_class {
+            Some(pc) if *pc == zone_class => 3,
+            None => 2,
+            _ => 1,
+        };
+        if roll < acc {
+            return template;
+        }
+    }
+    templates.last().expect("templates must not be empty")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
 
     // -- AngleMilliDeg --
 
@@ -765,5 +868,236 @@ mod tests {
             }
         );
         assert_eq!(ec.cached_parent_epoch, 2);
+    }
+
+    // -- random_radius_in_band --
+
+    #[test]
+    fn radius_band_equal_min_max() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let r = random_radius_in_band(500, 500, &mut rng);
+        assert_eq!(r, RadiusAuMicro(500));
+    }
+
+    #[test]
+    fn radius_band_stays_within_bounds() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        for _ in 0..1000 {
+            let r = random_radius_in_band(1000, 2000, &mut rng);
+            assert!(r.0 >= 1000 && r.0 <= 2000, "radius {} out of bounds", r.0);
+        }
+    }
+
+    #[test]
+    fn radius_band_area_weighted_not_inner_clustered() {
+        // With area weighting, the median radius should be closer to r_max
+        // than a uniform distribution would give. For r_min=0, r_max=1000,
+        // area-weighted median is ~707 (sqrt(0.5) * 1000).
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let mut samples = Vec::new();
+        for _ in 0..10_000 {
+            samples.push(random_radius_in_band(0, 1000, &mut rng).0);
+        }
+        samples.sort_unstable();
+        let median = samples[5000];
+        // Area-weighted median should be around 707, not 500 (uniform)
+        assert!(
+            median > 600 && median < 800,
+            "median {median} suggests non-area-weighted sampling"
+        );
+    }
+
+    // -- random_angle_in_span --
+
+    #[test]
+    fn angle_in_span_stays_within_bounds() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        for _ in 0..1000 {
+            let angle = random_angle_in_span(0, 90_000, &mut rng);
+            assert!(angle.0 < 90_000, "angle {} out of span", angle.0);
+        }
+    }
+
+    #[test]
+    fn angle_in_span_wraps_around() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let mut saw_wrapped = false;
+        for _ in 0..1000 {
+            let angle = random_angle_in_span(350_000, 40_000, &mut rng);
+            // Valid: 350_000..360_000 or 0..30_000 (wrapped)
+            assert!(
+                angle.0 < FULL_CIRCLE,
+                "angle {} exceeds full circle",
+                angle.0
+            );
+            if angle.0 < 30_000 {
+                saw_wrapped = true;
+            }
+        }
+        assert!(saw_wrapped, "wrap-around angles should be generated");
+    }
+
+    #[test]
+    fn angle_in_span_full_circle() {
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        for _ in 0..100 {
+            let angle = random_angle_in_span(0, FULL_CIRCLE, &mut rng);
+            assert!(
+                angle.0 < FULL_CIRCLE,
+                "angle {} exceeds full circle",
+                angle.0
+            );
+        }
+    }
+
+    // -- random_position_in_zone --
+
+    #[test]
+    fn position_in_zone_uses_body_id() {
+        let body = OrbitalBodyDef {
+            id: BodyId("test_belt".to_string()),
+            name: "Test Belt".to_string(),
+            parent: None,
+            body_type: crate::BodyType::Belt,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: Some(crate::ZoneDef {
+                radius_min_au_um: 1000,
+                radius_max_au_um: 2000,
+                angle_start_mdeg: 0,
+                angle_span_mdeg: FULL_CIRCLE,
+                resource_class: ResourceClass::MetalRich,
+                scan_site_weight: 1,
+            }),
+        };
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let pos = random_position_in_zone(&body, &mut rng);
+        assert_eq!(pos.parent_body, BodyId("test_belt".to_string()));
+        assert!(pos.radius_au_um.0 >= 1000 && pos.radius_au_um.0 <= 2000);
+    }
+
+    // -- pick_zone_weighted --
+
+    #[test]
+    fn zone_weighted_respects_weights() {
+        let heavy = OrbitalBodyDef {
+            id: BodyId("heavy".to_string()),
+            name: "Heavy".to_string(),
+            parent: None,
+            body_type: crate::BodyType::Belt,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: Some(crate::ZoneDef {
+                radius_min_au_um: 100,
+                radius_max_au_um: 200,
+                angle_start_mdeg: 0,
+                angle_span_mdeg: FULL_CIRCLE,
+                resource_class: ResourceClass::MetalRich,
+                scan_site_weight: 9,
+            }),
+        };
+        let light = OrbitalBodyDef {
+            id: BodyId("light".to_string()),
+            name: "Light".to_string(),
+            parent: None,
+            body_type: crate::BodyType::Zone,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: Some(crate::ZoneDef {
+                radius_min_au_um: 100,
+                radius_max_au_um: 200,
+                angle_start_mdeg: 0,
+                angle_span_mdeg: FULL_CIRCLE,
+                resource_class: ResourceClass::Mixed,
+                scan_site_weight: 1,
+            }),
+        };
+        let zone_bodies: Vec<&OrbitalBodyDef> = vec![&heavy, &light];
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let mut heavy_count = 0u32;
+        for _ in 0..1000 {
+            let picked = pick_zone_weighted(&zone_bodies, &mut rng);
+            if picked.id == BodyId("heavy".to_string()) {
+                heavy_count += 1;
+            }
+        }
+        // Weight 9:1, expect ~900 heavy picks. Allow ±50 for randomness.
+        assert!(
+            heavy_count > 850 && heavy_count < 950,
+            "heavy_count {heavy_count} outside expected range for 9:1 weighting"
+        );
+    }
+
+    // -- pick_template_biased --
+
+    #[test]
+    fn template_bias_favors_matching_class() {
+        let metal = AsteroidTemplateDef {
+            id: "metal".to_string(),
+            anomaly_tags: vec![],
+            composition_ranges: HashMap::new(),
+            preferred_class: Some(ResourceClass::MetalRich),
+        };
+        let generic = AsteroidTemplateDef {
+            id: "generic".to_string(),
+            anomaly_tags: vec![],
+            composition_ranges: HashMap::new(),
+            preferred_class: None,
+        };
+        let volatile = AsteroidTemplateDef {
+            id: "volatile".to_string(),
+            anomaly_tags: vec![],
+            composition_ranges: HashMap::new(),
+            preferred_class: Some(ResourceClass::VolatileRich),
+        };
+        let templates = vec![metal, generic, volatile];
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let mut counts = HashMap::new();
+        for _ in 0..6000 {
+            let t = pick_template_biased(&templates, ResourceClass::MetalRich, &mut rng);
+            *counts.entry(t.id.clone()).or_insert(0u32) += 1;
+        }
+        // Weights: metal=3, generic=2, volatile=1, total=6
+        // Expected: metal=3000, generic=2000, volatile=1000
+        let metal_count = counts.get("metal").copied().unwrap_or(0);
+        let generic_count = counts.get("generic").copied().unwrap_or(0);
+        let volatile_count = counts.get("volatile").copied().unwrap_or(0);
+        assert!(
+            metal_count > generic_count && generic_count > volatile_count,
+            "expected metal({metal_count}) > generic({generic_count}) > volatile({volatile_count})"
+        );
+    }
+
+    // -- Determinism --
+
+    #[test]
+    fn sampling_is_deterministic() {
+        let body = OrbitalBodyDef {
+            id: BodyId("belt".to_string()),
+            name: "Belt".to_string(),
+            parent: None,
+            body_type: crate::BodyType::Belt,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: Some(crate::ZoneDef {
+                radius_min_au_um: 1000,
+                radius_max_au_um: 5000,
+                angle_start_mdeg: 45_000,
+                angle_span_mdeg: 90_000,
+                resource_class: ResourceClass::MetalRich,
+                scan_site_weight: 1,
+            }),
+        };
+        let mut rng1 = rand_chacha::ChaCha8Rng::seed_from_u64(99);
+        let mut rng2 = rand_chacha::ChaCha8Rng::seed_from_u64(99);
+        for _ in 0..100 {
+            let p1 = random_position_in_zone(&body, &mut rng1);
+            let p2 = random_position_in_zone(&body, &mut rng2);
+            assert_eq!(p1, p2);
+        }
     }
 }

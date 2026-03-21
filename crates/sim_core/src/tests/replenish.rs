@@ -40,6 +40,7 @@ fn replenish_test_content() -> GameContent {
                 ("Fe".to_string(), (0.7, 0.7)),
                 ("Si".to_string(), (0.3, 0.3)),
             ]),
+            preferred_class: Some(ResourceClass::MetalRich),
         }],
         elements: vec![ElementDef {
             id: "ore".to_string(),
@@ -89,6 +90,8 @@ fn replenish_test_content() -> GameContent {
             docking_range_au_um: 10_000,
             ticks_per_au: 2_133,
             min_transit_ticks: 1,
+            replenish_check_interval_ticks: 1,
+            replenish_target_count: 5,
             // Thermal system
             thermal_sink_temp_mk: 293_000,
             thermal_overheat_warning_offset_mk: 200_000,
@@ -327,4 +330,112 @@ fn replenish_is_deterministic() {
     let ids1: Vec<_> = state1.scan_sites.iter().map(|s| s.id.0.clone()).collect();
     let ids2: Vec<_> = state2.scan_sites.iter().map(|s| s.id.0.clone()).collect();
     assert_eq!(ids1, ids2);
+}
+
+#[test]
+fn replenish_interval_gating_skips_off_ticks() {
+    let mut content = replenish_test_content();
+    content.constants.replenish_check_interval_ticks = 10;
+    content.constants.derive_tick_values();
+
+    let mut state = empty_sites_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Tick 0 is a multiple of 10 — should spawn
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    assert_eq!(state.scan_sites.len(), 5);
+
+    // Consume all sites to trigger replenish again
+    state.scan_sites.clear();
+
+    // Tick 1 is NOT a multiple of 10 — should NOT spawn
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    assert_eq!(state.scan_sites.len(), 0, "tick 1 should skip replenish");
+
+    // Advance to tick 10: replenish checks happen BEFORE tick increment,
+    // so we need tick() called when state.meta.tick == 10.
+    // After 2 calls, tick=2. Need 9 more calls to reach tick 10 check + increment to 11.
+    for _ in 0..9 {
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    }
+    assert_eq!(state.meta.tick, 11);
+    assert_eq!(
+        state.scan_sites.len(),
+        5,
+        "replenish should fire at tick 10"
+    );
+}
+
+#[test]
+fn replenish_target_count_controls_threshold() {
+    let mut content = replenish_test_content();
+    content.constants.replenish_target_count = 3;
+    content.constants.derive_tick_values();
+
+    let mut state = empty_sites_state(&content);
+    // Pre-fill with 3 sites (at target)
+    for i in 0..3 {
+        state.scan_sites.push(ScanSite {
+            id: SiteId(format!("site_existing_{i}")),
+            position: crate::test_fixtures::test_position(),
+            template_id: "tmpl_iron_rich".to_string(),
+        });
+    }
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    assert_eq!(state.scan_sites.len(), 3, "should not spawn when at target");
+}
+
+#[test]
+fn replenish_spawns_deficit_up_to_batch() {
+    let mut content = replenish_test_content();
+    content.constants.replenish_target_count = 8;
+    content.constants.derive_tick_values();
+
+    let mut state = empty_sites_state(&content);
+    // Pre-fill with 5 sites (deficit = 3, less than batch size 5)
+    for i in 0..5 {
+        state.scan_sites.push(ScanSite {
+            id: SiteId(format!("site_existing_{i}")),
+            position: crate::test_fixtures::test_position(),
+            template_id: "tmpl_iron_rich".to_string(),
+        });
+    }
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let spawned: Vec<_> = events
+        .iter()
+        .filter(|e| matches!(e.event, Event::ScanSiteSpawned { .. }))
+        .collect();
+    assert_eq!(
+        spawned.len(),
+        3,
+        "should spawn only the deficit (3), not batch (5)"
+    );
+    assert_eq!(state.scan_sites.len(), 8);
+}
+
+#[test]
+fn replenish_uses_zone_weighted_positions() {
+    let content = replenish_test_content();
+    let mut state = empty_sites_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+
+    // All sites should be in the test_body zone (radius 1000-2000)
+    for site in &state.scan_sites {
+        assert_eq!(
+            site.position.parent_body,
+            BodyId("test_body".to_string()),
+            "site should be placed in zone body"
+        );
+        assert!(
+            site.position.radius_au_um.0 >= 1000 && site.position.radius_au_um.0 <= 2000,
+            "radius {} should be within zone bounds",
+            site.position.radius_au_um.0
+        );
+    }
 }

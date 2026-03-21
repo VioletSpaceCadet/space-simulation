@@ -7,7 +7,8 @@
         "Fe": [0.55, 0.80],
         "Si": [0.10, 0.30],
         "He": [0.00, 0.15]
-      }
+      },
+      "preferred_class": "MetalRich"
     },
     {
       "id": "tmpl_silicate",
@@ -16,7 +17,8 @@
         "Fe": [0.10, 0.25],
         "Si": [0.55, 0.80],
         "He": [0.00, 0.10]
-      }
+      },
+      "preferred_class": null
     }
   ]
 }

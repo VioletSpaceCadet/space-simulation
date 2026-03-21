@@ -213,6 +213,15 @@ fn apply_constant_override(
         "thermal_wear_multiplier_critical" => {
             constants.thermal_wear_multiplier_critical = as_f32(key, value)?;
         }
+        "docking_range_au_um" => constants.docking_range_au_um = as_u64(key, value)?,
+        "ticks_per_au" => constants.ticks_per_au = as_u64(key, value)?,
+        "min_transit_ticks" => constants.min_transit_ticks = as_u64(key, value)?,
+        "replenish_check_interval_ticks" => {
+            constants.replenish_check_interval_ticks = as_u64(key, value)?;
+        }
+        "replenish_target_count" => {
+            constants.replenish_target_count = as_u32(key, value)?;
+        }
         _ => bail!(
             "unknown override key '{key}'. Constant keys or module.<type>.<field> keys are supported."
         ),

@@ -417,32 +417,27 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         cargo_capacity_m3: c.ship_cargo_capacity_m3,
         task: None,
     };
-    // Place scan sites in zone bodies.
+    // Place scan sites in zone bodies using weighted picking + area-sampled positions.
     let zone_bodies: Vec<&sim_core::OrbitalBodyDef> = content
         .solar_system
         .bodies
         .iter()
         .filter(|b| b.zone.is_some())
         .collect();
+    let templates = &content.asteroid_templates;
     let mut scan_sites = Vec::new();
-    for template in &content.asteroid_templates {
-        for _ in 0..c.asteroid_count_per_template {
-            if zone_bodies.is_empty() {
-                break;
-            }
-            let body = zone_bodies[rng.gen_range(0..zone_bodies.len())];
-            let zone = body.zone.as_ref().expect("filtered to zone bodies");
-            let radius = rng.gen_range(zone.radius_min_au_um..=zone.radius_max_au_um);
-            let angle = (zone.angle_start_mdeg + rng.gen_range(0..zone.angle_span_mdeg))
-                % sim_core::FULL_CIRCLE;
+    if !zone_bodies.is_empty() && !templates.is_empty() {
+        let template_count = u32::try_from(content.asteroid_templates.len()).unwrap_or(u32::MAX);
+        let total_sites = c.asteroid_count_per_template * template_count;
+        for _ in 0..total_sites {
+            let body = sim_core::pick_zone_weighted(&zone_bodies, rng);
+            let zone_class = body.zone.as_ref().expect("zone body").resource_class;
+            let template = sim_core::pick_template_biased(templates, zone_class, rng);
+            let position = sim_core::random_position_in_zone(body, rng);
             let uuid = sim_core::generate_uuid(rng);
             scan_sites.push(ScanSite {
                 id: SiteId(format!("site_{uuid}")),
-                position: sim_core::Position {
-                    parent_body: body.id.clone(),
-                    radius_au_um: sim_core::RadiusAuMicro(radius),
-                    angle_mdeg: sim_core::AngleMilliDeg(angle),
-                },
+                position,
                 template_id: template.id.clone(),
             });
         }
@@ -611,6 +606,7 @@ mod tests {
             id: "tmpl_test".to_string(),
             anomaly_tags: vec![],
             composition_ranges: HashMap::from([("NoSuchElement".to_string(), (0.5_f32, 0.5_f32))]),
+            preferred_class: None,
         });
         validate_content(&content);
     }
