@@ -323,7 +323,103 @@ describe('FleetPanel', () => {
     expect(screen.getByText('226.9 °C')).toBeInTheDocument();
   });
 
-  it('overheat-disabled module shows OVERHEAT badge', () => {
+  it('module in Warning zone shows HOT badge', () => {
+    const warningModule: ModuleState = {
+      id: 'mod_warm',
+      def_id: 'module_smelter',
+      enabled: true,
+      kind_state: { Processor: { threshold_kg: 50, ticks_since_last_run: 0, stalled: false } },
+      wear: { wear: 0 },
+      thermal: {
+        temp_mk: 700_000,
+        thermal_group: 'smelter',
+        overheat_zone: 'Warning',
+        overheat_disabled: false,
+      },
+    };
+    const stations: Record<string, StationState> = {
+      station_1: {
+        id: 'station_1',
+        location_node: 'node_earth_orbit',
+        power_available_per_tick: 100,
+        inventory: [],
+        cargo_capacity_m3: 100,
+        modules: [warningModule],
+        power: zeroPower,
+      },
+    };
+    render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
+    fireEvent.click(screen.getByText('station_1').closest('tr')!);
+    expect(screen.getByText('HOT')).toBeInTheDocument();
+    expect(screen.queryByText('OVERHEAT')).not.toBeInTheDocument();
+    expect(screen.queryByText('CRITICAL')).not.toBeInTheDocument();
+  });
+
+  it('module in Critical zone (not disabled) shows CRITICAL badge', () => {
+    const criticalModule: ModuleState = {
+      id: 'mod_crit',
+      def_id: 'module_smelter',
+      enabled: true,
+      kind_state: { Processor: { threshold_kg: 50, ticks_since_last_run: 0, stalled: false } },
+      wear: { wear: 0 },
+      thermal: {
+        temp_mk: 850_000,
+        thermal_group: 'smelter',
+        overheat_zone: 'Critical',
+        overheat_disabled: false,
+      },
+    };
+    const stations: Record<string, StationState> = {
+      station_1: {
+        id: 'station_1',
+        location_node: 'node_earth_orbit',
+        power_available_per_tick: 100,
+        inventory: [],
+        cargo_capacity_m3: 100,
+        modules: [criticalModule],
+        power: zeroPower,
+      },
+    };
+    render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
+    fireEvent.click(screen.getByText('station_1').closest('tr')!);
+    expect(screen.getByText('CRITICAL')).toBeInTheDocument();
+    expect(screen.queryByText('OVERHEAT')).not.toBeInTheDocument();
+    expect(screen.queryByText('HOT')).not.toBeInTheDocument();
+  });
+
+  it('module in Nominal zone shows no thermal badge', () => {
+    const nominalModule: ModuleState = {
+      id: 'mod_nominal',
+      def_id: 'module_smelter',
+      enabled: true,
+      kind_state: { Processor: { threshold_kg: 50, ticks_since_last_run: 0, stalled: false } },
+      wear: { wear: 0 },
+      thermal: {
+        temp_mk: 400_000,
+        thermal_group: 'smelter',
+        overheat_zone: 'Nominal',
+        overheat_disabled: false,
+      },
+    };
+    const stations: Record<string, StationState> = {
+      station_1: {
+        id: 'station_1',
+        location_node: 'node_earth_orbit',
+        power_available_per_tick: 100,
+        inventory: [],
+        cargo_capacity_m3: 100,
+        modules: [nominalModule],
+        power: zeroPower,
+      },
+    };
+    render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
+    fireEvent.click(screen.getByText('station_1').closest('tr')!);
+    expect(screen.queryByText('HOT')).not.toBeInTheDocument();
+    expect(screen.queryByText('CRITICAL')).not.toBeInTheDocument();
+    expect(screen.queryByText('OVERHEAT')).not.toBeInTheDocument();
+  });
+
+  it('overheat-disabled module shows OVERHEAT badge but not CRITICAL', () => {
     const overheatedModule: ModuleState = {
       id: 'mod_hot',
       def_id: 'module_smelter',
@@ -351,6 +447,8 @@ describe('FleetPanel', () => {
     render(<FleetPanel ships={{}} stations={stations} displayTick={0} />);
     fireEvent.click(screen.getByText('station_1').closest('tr')!);
     expect(screen.getByText('OVERHEAT')).toBeInTheDocument();
+    expect(screen.queryByText('CRITICAL')).not.toBeInTheDocument();
+    expect(screen.queryByText('HOT')).not.toBeInTheDocument();
   });
 });
 
