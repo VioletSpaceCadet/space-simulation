@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchContent, fetchMeta, fetchSnapshot, saveGame, setSpeed } from './api';
+import { API_PATHS, fetchContent, fetchMeta, fetchSnapshot, saveGame, setSpeed } from './api';
 
 describe('fetchSnapshot', () => {
   beforeEach(() => {
@@ -11,7 +11,7 @@ describe('fetchSnapshot', () => {
     const mock = { meta: { tick: 0, seed: 42, content_version: 'test' }, scan_sites: [], asteroids: {}, ships: {}, stations: {}, research: { unlocked: [], data_pool: {}, evidence: {}, action_counts: {} } };
     vi.mocked(global.fetch).mockResolvedValueOnce(new Response(JSON.stringify(mock)));
     await fetchSnapshot();
-    expect(global.fetch).toHaveBeenCalledWith('/api/v1/snapshot');
+    expect(global.fetch).toHaveBeenCalledWith(API_PATHS.snapshot);
   });
 
   it('returns parsed snapshot with correct tick', async () => {
@@ -30,7 +30,7 @@ describe('fetchMeta', () => {
   it('calls /api/v1/meta', async () => {
     vi.mocked(global.fetch).mockResolvedValueOnce(new Response(JSON.stringify({ tick: 0, seed: 1, content_version: 'test' })));
     await fetchMeta();
-    expect(global.fetch).toHaveBeenCalledWith('/api/v1/meta');
+    expect(global.fetch).toHaveBeenCalledWith(API_PATHS.meta);
   });
 
   it('returns parsed meta with ticks_per_sec', async () => {
@@ -52,7 +52,7 @@ describe('saveGame', () => {
       new Response(JSON.stringify({ path: 'runs/test/saves/save_0.json', tick: 0 }))
     );
     await saveGame();
-    expect(global.fetch).toHaveBeenCalledWith('/api/v1/save', { method: 'POST' });
+    expect(global.fetch).toHaveBeenCalledWith(API_PATHS.save, { method: 'POST' });
   });
 
   it('throws on error response', async () => {
@@ -73,7 +73,7 @@ describe('setSpeed', () => {
       new Response(JSON.stringify({ ticks_per_sec: 1000 }))
     );
     await setSpeed(1000);
-    expect(global.fetch).toHaveBeenCalledWith('/api/v1/speed', {
+    expect(global.fetch).toHaveBeenCalledWith(API_PATHS.speed, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticks_per_sec: 1000 }),
