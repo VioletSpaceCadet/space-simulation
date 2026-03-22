@@ -516,6 +516,162 @@ server.tool(
   },
 );
 
+// ---------- Tool 11: update_playbook ----------
+
+const PLAYBOOK_PATH = path.join(CONTENT_DIR, "knowledge", "playbook.md");
+
+/**
+ * Find a section in a markdown document by matching header text.
+ * Supports nested headers via ">" separator (e.g. "Bottleneck Resolutions > Ore Supply").
+ * Returns the start index (end of header line) and end index (start of next same-or-higher-level header).
+ */
+function findSection(
+  lines: string[],
+  sectionPath: string,
+): { startLine: number; endLine: number; level: number } | null {
+  const parts = sectionPath.split(">").map((s) => s.trim().toLowerCase());
+  const target = parts[parts.length - 1];
+
+  // Build a heading index for parent validation
+  const headings: { level: number; text: string; line: number }[] = [];
+  for (let index = 0; index < lines.length; index++) {
+    const match = lines[index].match(/^(#{1,6})\s+(.+)$/);
+    if (match) {
+      headings.push({ level: match[1].length, text: match[2].trim().toLowerCase(), line: index });
+    }
+  }
+
+  for (let hi = 0; hi < headings.length; hi++) {
+    const heading = headings[hi];
+    if (heading.text !== target) continue;
+
+    // Validate parent path: walk up the heading hierarchy
+    if (parts.length > 1) {
+      let valid = true;
+      let checkIdx = hi;
+      for (let pi = parts.length - 2; pi >= 0; pi--) {
+        // Find the nearest ancestor heading with a lower level
+        let found = false;
+        for (let ai = checkIdx - 1; ai >= 0; ai--) {
+          if (headings[ai].level < headings[checkIdx].level) {
+            if (headings[ai].text !== parts[pi]) {
+              valid = false;
+            }
+            checkIdx = ai;
+            found = true;
+            break;
+          }
+        }
+        if (!found) { valid = false; }
+        if (!valid) break;
+      }
+      if (!valid) continue;
+    }
+
+    // Found a match — compute section end
+    const index = heading.line;
+    let endLine = lines.length;
+    for (let j = hi + 1; j < headings.length; j++) {
+      if (headings[j].level <= heading.level) {
+        endLine = headings[j].line;
+        break;
+      }
+    }
+    return { startLine: index, endLine, level: heading.level };
+  }
+  return null;
+}
+
+server.tool(
+  "update_playbook",
+  "Append to or replace a section of the strategy playbook (content/knowledge/playbook.md)",
+  {
+    section: z.string()
+      .describe("Section header to update (e.g. 'Bottleneck Resolutions > Ore Supply')"),
+    content: z.string()
+      .describe("Markdown content to append or replace"),
+    mode: z.enum(["append", "replace"]).default("append")
+      .describe("'append' adds to end of section, 'replace' replaces section content"),
+  },
+  async ({ section, content: newContent, mode }) => {
+    try {
+      let fileContent: string;
+      try {
+        fileContent = await fsPromises.readFile(PLAYBOOK_PATH, "utf-8");
+      } catch {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({
+            status: "error",
+            message: "Playbook not found at content/knowledge/playbook.md",
+          }) }],
+        };
+      }
+
+      const lines = fileContent.split("\n");
+      const found = findSection(lines, section);
+
+      if (!found) {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({
+            status: "error",
+            message: `Section not found: "${section}". Available top-level sections: ${
+              lines
+                .filter((l) => /^##\s+/.test(l))
+                .map((l) => l.replace(/^##\s+/, ""))
+                .join(", ")
+            }`,
+          }) }],
+        };
+      }
+
+      const contentLines = newContent.split("\n");
+      let updatedLines: string[];
+
+      if (mode === "replace") {
+        // Keep the header, replace everything until next section
+        updatedLines = [
+          ...lines.slice(0, found.startLine + 1),
+          "",
+          ...contentLines,
+          "",
+          ...lines.slice(found.endLine),
+        ];
+      } else {
+        // Append before the next section boundary, trimming trailing blanks to avoid accumulation
+        let insertAt = found.endLine;
+        while (insertAt > found.startLine + 1 && lines[insertAt - 1].trim() === "") {
+          insertAt--;
+        }
+        updatedLines = [
+          ...lines.slice(0, insertAt),
+          ...contentLines,
+          "",
+          ...lines.slice(found.endLine),
+        ];
+      }
+
+      await fsPromises.writeFile(PLAYBOOK_PATH, updatedLines.join("\n"));
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "updated",
+          section,
+          mode,
+          lines_added: contentLines.length,
+        }) }],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to update playbook: ${message}`,
+        }) }],
+      };
+    }
+  },
+);
+
 // ---------- Startup validation ----------
 
 function validateContentDir(): void {
