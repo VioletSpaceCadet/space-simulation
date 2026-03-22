@@ -319,12 +319,15 @@ fn classify_overheat_zone(
     max_temp_mk: u32,
     constants: &crate::Constants,
 ) -> OverheatZone {
+    let damage_threshold = max_temp_mk.saturating_add(constants.thermal_overheat_damage_offset_mk);
     let critical_threshold =
         max_temp_mk.saturating_add(constants.thermal_overheat_critical_offset_mk);
     let warning_threshold =
         max_temp_mk.saturating_add(constants.thermal_overheat_warning_offset_mk);
 
-    if temp_mk >= critical_threshold {
+    if temp_mk >= damage_threshold {
+        OverheatZone::Damage
+    } else if temp_mk >= critical_threshold {
         OverheatZone::Critical
     } else if temp_mk >= warning_threshold {
         OverheatZone::Warning
@@ -394,17 +397,38 @@ fn check_overheat_zones(
             thermal.overheat_zone = new_zone;
         }
 
-        // Auto-disable on entering critical.
-        if new_zone == OverheatZone::Critical {
+        // Auto-disable on entering critical or damage.
+        if new_zone == OverheatZone::Critical || new_zone == OverheatZone::Damage {
             module.enabled = false;
             if let Some(ref mut thermal) = module.thermal {
                 thermal.overheat_disabled = true;
             }
         }
 
-        // Re-enable on leaving critical, but only if overheat caused the disable.
+        // Damage zone: wear jumps to critical band (0.8).
+        if new_zone == OverheatZone::Damage {
+            let wear_before = module.wear.wear;
+            module.wear.wear = module.wear.wear.max(0.8);
+            // Emit damage event with wear_before for diagnostics.
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                crate::Event::OverheatDamage {
+                    station_id: station_id.clone(),
+                    module_id: module.id.clone(),
+                    temp_mk,
+                    max_temp_mk,
+                    wear_before,
+                },
+            ));
+        }
+
+        // Re-enable on leaving critical/damage, but only if overheat caused the disable.
         // Preserves player-disabled and wear-disabled states.
-        if old_zone == OverheatZone::Critical && new_zone != OverheatZone::Critical {
+        if (old_zone == OverheatZone::Critical || old_zone == OverheatZone::Damage)
+            && new_zone != OverheatZone::Critical
+            && new_zone != OverheatZone::Damage
+        {
             let was_overheat_disabled =
                 module.thermal.as_ref().is_some_and(|t| t.overheat_disabled);
             if was_overheat_disabled {
@@ -415,44 +439,42 @@ fn check_overheat_zones(
             }
         }
 
-        // Emit events.
-        match new_zone {
-            OverheatZone::Warning => {
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    crate::Event::OverheatWarning {
-                        station_id: station_id.clone(),
-                        module_id,
-                        temp_mk,
-                        max_temp_mk,
-                    },
-                ));
-            }
-            OverheatZone::Critical => {
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    crate::Event::OverheatCritical {
-                        station_id: station_id.clone(),
-                        module_id,
-                        temp_mk,
-                        max_temp_mk,
-                    },
-                ));
-            }
-            OverheatZone::Nominal => {
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    crate::Event::OverheatCleared {
-                        station_id: station_id.clone(),
-                        module_id,
-                        temp_mk,
-                    },
-                ));
-            }
+        // Emit zone transition events (skip for Damage — already emitted above).
+        if let Some(event) =
+            overheat_zone_event(new_zone, station_id, module_id, temp_mk, max_temp_mk)
+        {
+            events.push(crate::emit(&mut state.counters, current_tick, event));
         }
+    }
+}
+
+/// Build an overheat zone transition event, or `None` for Damage (emitted separately).
+fn overheat_zone_event(
+    zone: OverheatZone,
+    station_id: &StationId,
+    module_id: crate::ModuleInstanceId,
+    temp_mk: u32,
+    max_temp_mk: u32,
+) -> Option<crate::Event> {
+    match zone {
+        OverheatZone::Warning => Some(crate::Event::OverheatWarning {
+            station_id: station_id.clone(),
+            module_id,
+            temp_mk,
+            max_temp_mk,
+        }),
+        OverheatZone::Critical => Some(crate::Event::OverheatCritical {
+            station_id: station_id.clone(),
+            module_id,
+            temp_mk,
+            max_temp_mk,
+        }),
+        OverheatZone::Nominal => Some(crate::Event::OverheatCleared {
+            station_id: station_id.clone(),
+            module_id,
+            temp_mk,
+        }),
+        OverheatZone::Damage => None,
     }
 }
 
@@ -1378,6 +1400,75 @@ mod tests {
         assert_eq!(
             temp, sink,
             "module without idle_heat_generation_w at sink should stay at sink"
+        );
+    }
+
+    #[test]
+    fn damage_zone_sets_wear_to_critical_band() {
+        let content = thermal_test_content();
+        // Smelter max_temp_mk is 2_500_000. Damage offset is 800_000.
+        // Damage threshold = 2_500_000 + 800_000 = 3_300_000.
+        // Set well above so passive cooling doesn't drop below threshold.
+        let damage_temp = 3_500_000;
+        let mut state = thermal_test_state(&content, damage_temp);
+        let station_id = StationId("station_test".to_string());
+
+        // Set initial wear to something low.
+        state.stations.get_mut(&station_id).unwrap().modules[0]
+            .wear
+            .wear = 0.1;
+
+        let mut events = Vec::new();
+        tick_thermal(&mut state, &station_id, &content, &mut events);
+
+        let module = &state.stations.get(&station_id).unwrap().modules[0];
+        let thermal = module.thermal.as_ref().unwrap();
+
+        assert_eq!(
+            thermal.overheat_zone,
+            OverheatZone::Damage,
+            "module should be in damage zone"
+        );
+        assert!(
+            module.wear.wear >= 0.8,
+            "wear should jump to at least 0.8; got {}",
+            module.wear.wear
+        );
+        assert!(!module.enabled, "module should be auto-disabled");
+        assert!(thermal.overheat_disabled, "overheat_disabled should be set");
+
+        // Verify OverheatDamage event was emitted.
+        let damage_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e.event, crate::Event::OverheatDamage { .. }))
+            .collect();
+        assert_eq!(
+            damage_events.len(),
+            1,
+            "exactly one OverheatDamage event should be emitted"
+        );
+    }
+
+    #[test]
+    fn damage_zone_does_not_lower_existing_high_wear() {
+        let content = thermal_test_content();
+        let damage_temp = 3_500_000;
+        let mut state = thermal_test_state(&content, damage_temp);
+        let station_id = StationId("station_test".to_string());
+
+        // Module already has high wear.
+        state.stations.get_mut(&station_id).unwrap().modules[0]
+            .wear
+            .wear = 0.95;
+
+        tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
+
+        let wear = state.stations.get(&station_id).unwrap().modules[0]
+            .wear
+            .wear;
+        assert!(
+            (wear - 0.95).abs() < f32::EPSILON,
+            "wear should not decrease; got {wear}"
         );
     }
 }

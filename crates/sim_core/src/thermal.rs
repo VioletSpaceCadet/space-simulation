@@ -99,7 +99,9 @@ pub fn heat_wear_multiplier(zone: crate::OverheatZone, constants: &Constants) ->
     match zone {
         crate::OverheatZone::Nominal => 1.0,
         crate::OverheatZone::Warning => constants.thermal_wear_multiplier_warning,
-        crate::OverheatZone::Critical => constants.thermal_wear_multiplier_critical,
+        crate::OverheatZone::Critical | crate::OverheatZone::Damage => {
+            constants.thermal_wear_multiplier_critical
+        }
     }
 }
 

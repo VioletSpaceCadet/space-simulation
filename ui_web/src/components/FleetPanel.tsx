@@ -389,6 +389,11 @@ function ModuleCard({
             CRITICAL
           </span>
         )}
+        {m.thermal && m.thermal.overheat_zone === 'Damage' && (
+          <span className="text-[9px] px-1 rounded text-red-300 bg-red-500/20 font-bold">
+            DAMAGE
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-2 mt-1 text-[10px]">
         <span className="text-dim">health</span>

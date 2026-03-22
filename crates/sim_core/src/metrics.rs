@@ -252,7 +252,9 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
                 }
                 match thermal.overheat_zone {
                     crate::OverheatZone::Warning => overheat_warning_count += 1,
-                    crate::OverheatZone::Critical => overheat_critical_count += 1,
+                    crate::OverheatZone::Critical | crate::OverheatZone::Damage => {
+                        overheat_critical_count += 1;
+                    }
                     crate::OverheatZone::Nominal => {}
                 }
                 heat_wear_multiplier_sum +=

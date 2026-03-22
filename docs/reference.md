@@ -225,8 +225,9 @@ After temperature updates, checks all thermal modules for overheat zone transiti
 | Nominal | Below `max_temp_mk` + warning offset | Normal operation (1x wear) |
 | Warning | `max_temp_mk` + 200K (`thermal_overheat_warning_offset_mk`) | 2x wear (`thermal_wear_multiplier_warning`) |
 | Critical | `max_temp_mk` + 500K (`thermal_overheat_critical_offset_mk`) | 4x wear (`thermal_wear_multiplier_critical`), module auto-disabled |
+| Damage | `max_temp_mk` + 800K (`thermal_overheat_damage_offset_mk`) | Wear jumps to 0.8, module auto-disabled. Recoverable with maintenance. |
 
-Zone transitions emit `OverheatWarning`, `OverheatCritical`, or `OverheatCleared` events.
+Zone transitions emit `OverheatWarning`, `OverheatCritical`, `OverheatDamage`, or `OverheatCleared` events.
 
 **Thermal constants (in `Constants`):**
 

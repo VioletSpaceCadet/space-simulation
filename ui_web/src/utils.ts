@@ -36,6 +36,7 @@ export function thermalColorClass(
     Nominal: 'text-emerald-500',
     Warning: 'text-amber-500',
     Critical: 'text-red-500',
+    Damage: 'text-red-500',
   };
   return zoneColors[thermal.overheat_zone];
 }

@@ -341,6 +341,14 @@ export const eventSchemas = {
     temp_mk: z.number(),
   }),
 
+  OverheatDamage: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+    temp_mk: z.number(),
+    max_temp_mk: z.number(),
+    wear_before: z.number(),
+  }),
+
   BoiloffLoss: z.object({
     station_id: z.string(),
     element: z.string(),

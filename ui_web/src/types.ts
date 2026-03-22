@@ -116,7 +116,7 @@ export interface WearState {
   wear: number
 }
 
-export type OverheatZone = 'Nominal' | 'Warning' | 'Critical'
+export type OverheatZone = 'Nominal' | 'Warning' | 'Critical' | 'Damage'
 
 export interface ThermalState {
   temp_mk: number
