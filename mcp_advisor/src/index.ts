@@ -672,6 +672,155 @@ server.tool(
   },
 );
 
+// ---------- Tool 12: query_knowledge ----------
+
+const JOURNALS_DIR = path.join(CONTENT_DIR, "knowledge", "journals");
+
+interface JournalSummary {
+  file: string;
+  seed: number;
+  tick_range: [number, number];
+  timestamp: string;
+  tags: string[];
+  matching_notes: string[];
+  matching_observations: string[];
+}
+
+interface PlaybookMatch {
+  section: string;
+  snippet: string;
+}
+
+server.tool(
+  "query_knowledge",
+  "Search past run journals and the strategy playbook for relevant context. Use before starting analysis to recall past observations.",
+  {
+    query: z.string().optional()
+      .describe("Text to search for in notes, observations, and playbook content"),
+    tags: z.array(z.string()).optional()
+      .describe("Filter journals by tags"),
+    source: z.enum(["journals", "playbook", "all"]).default("all")
+      .describe("Which knowledge source to search"),
+    limit: z.number().int().min(1).default(5)
+      .describe("Maximum results to return"),
+  },
+  async ({ query, tags, source, limit }) => {
+    try {
+      const results: { journals: JournalSummary[]; playbook: PlaybookMatch[] } = {
+        journals: [],
+        playbook: [],
+      };
+      const queryLower = query?.toLowerCase();
+
+      // Search journals
+      if (source === "journals" || source === "all") {
+        let journalFiles: string[] = [];
+        try {
+          const entries = await fsPromises.readdir(JOURNALS_DIR);
+          journalFiles = entries
+            .filter((f) => f.endsWith(".json") && f !== "example.json")
+            .sort()
+            .reverse(); // newest first
+        } catch {
+          // Directory may not exist yet
+        }
+
+        for (const file of journalFiles) {
+          if (results.journals.length >= limit) break;
+          try {
+            const raw = await fsPromises.readFile(path.join(JOURNALS_DIR, file), "utf-8");
+            const journal = JSON.parse(raw) as Record<string, unknown>;
+
+            // Tag filter
+            const journalTags = (journal["tags"] as string[]) ?? [];
+            if (tags && tags.length > 0) {
+              const hasTag = tags.some((t) => journalTags.includes(t));
+              if (!hasTag) continue;
+            }
+
+            // Text search
+            const strategyNotes = (journal["strategy_notes"] as string[]) ?? [];
+            const observations = (journal["observations"] as Array<{ metric: string; interpretation: string }>) ?? [];
+
+            let matchingNotes: string[] = [];
+            let matchingObs: string[] = [];
+
+            if (queryLower) {
+              matchingNotes = strategyNotes.filter((n) => n.toLowerCase().includes(queryLower));
+              matchingObs = observations
+                .filter((o) => o.interpretation.toLowerCase().includes(queryLower)
+                  || o.metric.toLowerCase().includes(queryLower))
+                .map((o) => `${o.metric}: ${o.interpretation}`);
+
+              if (matchingNotes.length === 0 && matchingObs.length === 0) continue;
+            } else {
+              matchingNotes = strategyNotes;
+              matchingObs = observations.map((o) => `${o.metric}: ${o.interpretation}`);
+            }
+
+            results.journals.push({
+              file,
+              seed: journal["seed"] as number,
+              tick_range: journal["tick_range"] as [number, number],
+              timestamp: journal["timestamp"] as string,
+              tags: journalTags,
+              matching_notes: matchingNotes,
+              matching_observations: matchingObs,
+            });
+          } catch {
+            // Skip unparseable files
+          }
+        }
+      }
+
+      // Search playbook
+      if (source === "playbook" || source === "all") {
+        try {
+          const playbookContent = await fsPromises.readFile(PLAYBOOK_PATH, "utf-8");
+          if (queryLower) {
+            const lines = playbookContent.split("\n");
+            let currentSection = "";
+            for (const line of lines) {
+              const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
+              if (headerMatch) {
+                currentSection = headerMatch[2].trim();
+                continue;
+              }
+              if (line.toLowerCase().includes(queryLower) && line.trim().length > 0) {
+                if (results.playbook.length < limit) {
+                  results.playbook.push({
+                    section: currentSection,
+                    snippet: line.trim(),
+                  });
+                }
+              }
+            }
+          }
+        } catch {
+          // Playbook may not exist
+        }
+      }
+
+      const totalResults = results.journals.length + results.playbook.length;
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "ok",
+          total_results: totalResults,
+          ...results,
+        }, null, 2) }],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to query knowledge: ${message}`,
+        }) }],
+      };
+    }
+  },
+);
+
 // ---------- Startup validation ----------
 
 function validateContentDir(): void {
