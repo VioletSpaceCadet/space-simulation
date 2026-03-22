@@ -334,6 +334,7 @@ pub fn base_state(content: &GameContent) -> GameState {
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
                 task: None,
+                modifiers: crate::modifiers::ModifierSet::default(),
             },
         )]),
         stations: std::collections::HashMap::from([(
@@ -345,6 +346,7 @@ pub fn base_state(content: &GameContent) -> GameState {
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
                 modules: vec![],
+                modifiers: crate::modifiers::ModifierSet::default(),
                 power: crate::PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
@@ -365,6 +367,7 @@ pub fn base_state(content: &GameContent) -> GameState {
             next_lot_id: 0,
             next_module_instance_id: 0,
         },
+        modifiers: crate::modifiers::ModifierSet::default(),
         body_cache: crate::build_body_cache(&content.solar_system.bodies),
     }
 }

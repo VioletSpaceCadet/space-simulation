@@ -122,6 +122,7 @@ mod tests {
                         power_stalled: false,
                         thermal: None,
                     }],
+                    modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
@@ -142,6 +143,7 @@ mod tests {
                 next_lot_id: 0,
                 next_module_instance_id: 2,
             },
+            modifiers: crate::modifiers::ModifierSet::default(),
             body_cache: std::collections::HashMap::new(),
         }
     }

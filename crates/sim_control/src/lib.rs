@@ -1149,6 +1149,7 @@ mod tests {
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
                 task: None,
+                modifiers: sim_core::modifiers::ModifierSet::default(),
             },
         );
 

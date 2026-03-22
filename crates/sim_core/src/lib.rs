@@ -7,6 +7,7 @@ mod composition;
 mod engine;
 mod id;
 pub mod metrics;
+pub mod modifiers;
 mod research;
 pub mod spatial;
 mod station;
