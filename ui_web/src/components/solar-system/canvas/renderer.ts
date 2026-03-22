@@ -1,5 +1,6 @@
 import {
   BODY_COLORS,
+  IDLE_COLOR,
   MAP_COLORS,
   TAG_COLORS,
   ZONE_COLORS,
@@ -22,7 +23,7 @@ import { entityAbsolute, mdegToRad, shipTransitAbsolute } from '../../../utils/s
 
 import { worldToScreen } from './camera';
 import type { Camera } from './types';
-import { SIZE_CAPS, auUmToWorld } from './types';
+import { SIZE_CAPS, auUmToWorld, smoothStep } from './types';
 
 export interface DrawContext {
   ctx: CanvasRenderingContext2D;
@@ -93,7 +94,12 @@ function drawOrbitRings(dc: DrawContext, bodies: OrbitalBodyDef[]): void {
 
     if (radiusPx < 3) { continue; }
 
-    ctx.globalAlpha = 0.4;
+    // Fade in based on body type — planets fade at system zoom, moons at region
+    const lodMin = body.body_type === 'Moon' ? 0.8 : 0.12;
+    const alpha = smoothStep(camera.zoom, lodMin * 0.5, lodMin * 1.5);
+    if (alpha < 0.01) { continue; }
+
+    ctx.globalAlpha = alpha * 0.4;
     ctx.beginPath();
     ctx.arc(center.sx, center.sy, radiusPx, 0, Math.PI * 2);
     ctx.strokeStyle = MAP_COLORS.orbitRing;
@@ -128,11 +134,16 @@ function drawZones(dc: DrawContext, bodies: OrbitalBodyDef[]): void {
 
     if (rMax < 3) { continue; }
 
+    // Zones fade in at system zoom
+    const alpha = smoothStep(camera.zoom, 0.04, 0.16);
+    if (alpha < 0.01) { continue; }
+
     const fillColor =
       ZONE_COLORS[body.zone.resource_class] ?? ZONE_COLORS.Mixed;
     const strokeColor =
       ZONE_STROKES[body.zone.resource_class] ?? ZONE_STROKES.Mixed;
 
+    ctx.globalAlpha = alpha;
     ctx.beginPath();
     if (body.zone.angle_span_mdeg >= 360_000) {
       ctx.arc(center.sx, center.sy, rMax, 0, Math.PI * 2);
@@ -151,6 +162,26 @@ function drawZones(dc: DrawContext, bodies: OrbitalBodyDef[]): void {
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 0.8;
     ctx.stroke();
+
+    // Zone label — only at region+ zoom
+    const labelAlpha = smoothStep(camera.zoom, 0.2, 0.5);
+    if (labelAlpha > 0.01 && rMax > 50) {
+      const midR = (rMin + rMax) / 2;
+      const startRad = body.zone.angle_span_mdeg >= 360_000
+        ? -Math.PI / 4
+        : mdegToRad(body.zone.angle_start_mdeg + body.zone.angle_span_mdeg / 2);
+      ctx.globalAlpha = alpha * labelAlpha * 0.7;
+      ctx.font = '11px monospace';
+      ctx.fillStyle = MAP_COLORS.bodyLabelOther;
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        body.name,
+        center.sx + midR * Math.cos(startRad),
+        center.sy + midR * Math.sin(startRad),
+      );
+    }
+
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -170,6 +201,14 @@ function drawBodies(
     const { sx, sy } = toScreen(abs, dc);
     const color = BODY_COLORS[body.body_type] ?? '#888';
 
+    // LOD fade — stars always visible, planets/moons fade in at appropriate zoom
+    const lodMin = body.body_type === 'Star' ? 0
+      : body.body_type === 'Moon' ? 0.8
+        : 0.12;
+    const bodyAlpha = body.body_type === 'Star' ? 1
+      : smoothStep(camera.zoom, lodMin * 0.5, lodMin * 1.5);
+    if (bodyAlpha < 0.01 && body.body_type !== 'Star') { continue; }
+
     const caps =
       body.body_type === 'Star'
         ? SIZE_CAPS.Star
@@ -181,7 +220,7 @@ function drawBodies(
     const screenR = entitySize(baseRadius, camera.zoom, caps);
 
     // Body circle
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = body.body_type === 'Star' ? 1 : bodyAlpha;
     ctx.beginPath();
     ctx.arc(sx, sy, screenR, 0, Math.PI * 2);
     ctx.fillStyle = color;
@@ -206,29 +245,33 @@ function drawBodies(
       ctx.fill();
     }
 
-    // Body label — hide planet label if station is nearby (avoid overlap)
-    let hideForStation = false;
-    if (body.body_type === 'Planet' || body.body_type === 'Moon') {
-      for (const st of stations) {
-        const stAbs = entityAbsolute(st.position, dc.bodyAbsolutes);
-        const stScreen = toScreen(stAbs, dc);
-        if (Math.hypot(sx - stScreen.sx, sy - stScreen.sy) < 40) {
-          hideForStation = camera.zoom > 0.5;
-          break;
+    // Body label — with LOD-based fade and station collision
+    const labelAlpha = body.body_type === 'Star' ? 1
+      : smoothStep(camera.zoom, lodMin, lodMin * 2);
+    if (labelAlpha > 0.01) {
+      let hideForStation = false;
+      if (body.body_type === 'Planet' || body.body_type === 'Moon') {
+        for (const st of stations) {
+          const stAbs = entityAbsolute(st.position, dc.bodyAbsolutes);
+          const stScreen = toScreen(stAbs, dc);
+          if (Math.hypot(sx - stScreen.sx, sy - stScreen.sy) < 40) {
+            hideForStation = camera.zoom > 0.5;
+            break;
+          }
         }
       }
-    }
 
-    if (!hideForStation) {
-      ctx.globalAlpha = body.body_type === 'Star' ? 0.8 : 0.5;
-      ctx.font = `${body.body_type === 'Star' ? 12 : 11}px monospace`;
-      ctx.fillStyle = body.body_type === 'Star' ? MAP_COLORS.bodyLabelStar : MAP_COLORS.bodyLabelOther;
-      if (body.body_type === 'Moon') {
-        ctx.textAlign = 'left';
-        ctx.fillText(body.name, sx + screenR + 4, sy + 3);
-      } else {
-        ctx.textAlign = 'center';
-        ctx.fillText(body.name, sx, sy - screenR - 6);
+      if (!hideForStation) {
+        ctx.globalAlpha = labelAlpha * (body.body_type === 'Star' ? 0.8 : 0.5);
+        ctx.font = `${body.body_type === 'Star' ? 12 : 11}px monospace`;
+        ctx.fillStyle = body.body_type === 'Star' ? MAP_COLORS.bodyLabelStar : MAP_COLORS.bodyLabelOther;
+        if (body.body_type === 'Moon') {
+          ctx.textAlign = 'left';
+          ctx.fillText(body.name, sx + screenR + 4, sy + 3);
+        } else {
+          ctx.textAlign = 'center';
+          ctx.fillText(body.name, sx, sy - screenR - 6);
+        }
       }
     }
 
@@ -239,13 +282,29 @@ function drawBodies(
 function drawStations(dc: DrawContext, stations: StationState[]): void {
   const { ctx, camera } = dc;
 
+  // Stations visible from system zoom as dots, full at region+
+  const stationAlpha = smoothStep(camera.zoom, 0.1, 0.3);
+
   for (const station of stations) {
     const abs = entityAbsolute(station.position, dc.bodyAbsolutes);
     const { sx, sy } = toScreen(abs, dc);
+
+    // At system zoom: tiny dot
+    if (camera.zoom < 0.1) {
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+      ctx.fillStyle = MAP_COLORS.stationAccent;
+      ctx.globalAlpha = 0.5;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+
     const size = entitySize(4, camera.zoom, SIZE_CAPS.Station);
 
-    // Diamond shape (rotated square)
+    // Diamond shape
     ctx.save();
+    ctx.globalAlpha = stationAlpha;
     ctx.translate(sx, sy);
     ctx.rotate(Math.PI / 4);
     ctx.fillStyle = MAP_COLORS.stationAccent;
@@ -256,16 +315,19 @@ function drawStations(dc: DrawContext, stations: StationState[]): void {
     const pulse = 0.2 + 0.15 * Math.sin(performance.now() * 0.003);
     ctx.beginPath();
     ctx.arc(sx, sy, size + 3, 0, Math.PI * 2);
-    ctx.strokeStyle = `${MAP_COLORS.stationPulse}${pulse})`;
+    ctx.strokeStyle = `${MAP_COLORS.stationPulse}${pulse * stationAlpha})`;
     ctx.lineWidth = 0.8;
     ctx.stroke();
 
-    // Label
-    ctx.globalAlpha = 0.7;
-    ctx.font = '11px sans-serif';
-    ctx.fillStyle = MAP_COLORS.stationAccent;
-    ctx.textAlign = 'left';
-    ctx.fillText(station.id, sx + size + 6, sy + 3);
+    // Label — fade in at region zoom
+    const labelAlpha = smoothStep(camera.zoom, 0.3, 0.8);
+    if (labelAlpha > 0.01) {
+      ctx.globalAlpha = labelAlpha;
+      ctx.font = '11px sans-serif';
+      ctx.fillStyle = MAP_COLORS.stationAccent;
+      ctx.textAlign = 'left';
+      ctx.fillText(station.id, sx + size + 6, sy + 3);
+    }
     ctx.globalAlpha = 1;
   }
 }
@@ -273,14 +335,30 @@ function drawStations(dc: DrawContext, stations: StationState[]): void {
 function drawShips(dc: DrawContext, ships: ShipState[]): void {
   const { ctx, camera } = dc;
 
+  // Ships visible as dots at system, triangles at region+
+  const shipAlpha = smoothStep(camera.zoom, 0.15, 0.4);
+
   for (const ship of ships) {
     const abs = shipAbsolutePos(ship, dc);
     const { sx, sy } = toScreen(abs, dc);
-    const size = entitySize(3.5, camera.zoom, SIZE_CAPS.Ship);
     const kind = getTaskKind(ship.task) ?? 'idle';
     const color = shipTaskColor(kind);
 
+    // At system zoom: tiny dot
+    if (camera.zoom < 0.15) {
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.4;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+
+    const size = entitySize(3.5, camera.zoom, SIZE_CAPS.Ship);
+
     // Triangle shape
+    ctx.globalAlpha = shipAlpha;
     ctx.beginPath();
     ctx.moveTo(sx, sy - size);
     ctx.lineTo(sx - size * 0.6, sy + size * 0.5);
@@ -288,6 +366,17 @@ function drawShips(dc: DrawContext, ships: ShipState[]): void {
     ctx.closePath();
     ctx.fillStyle = color;
     ctx.fill();
+
+    // Ship name label — local zoom only
+    const nameFade = smoothStep(camera.zoom, 0.6, 1.5);
+    if (nameFade > 0.01) {
+      ctx.globalAlpha = shipAlpha * nameFade * 0.6;
+      ctx.font = '11px monospace';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.fillText(ship.id, sx, sy + size + 10);
+    }
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -318,6 +407,10 @@ export function shipAbsolutePos(
 function drawAsteroids(dc: DrawContext, asteroids: AsteroidState[]): void {
   const { ctx, camera } = dc;
 
+  // Asteroids fade in at region zoom
+  const astAlpha = smoothStep(camera.zoom, 0.25, 0.7);
+  if (astAlpha < 0.01) { return; }
+
   for (const asteroid of asteroids) {
     const abs = entityAbsolute(asteroid.position, dc.bodyAbsolutes);
     const { sx, sy } = toScreen(abs, dc);
@@ -332,10 +425,10 @@ function drawAsteroids(dc: DrawContext, asteroids: AsteroidState[]): void {
     const matchedTag = asteroid.anomaly_tags.find(
       (t: string) => TAG_COLORS[t],
     );
-    const color = matchedTag ? tagColor(matchedTag) : '#8a8e98';
+    const color = matchedTag ? tagColor(matchedTag) : IDLE_COLOR;
 
     // Irregular 6-sided polygon with seeded wobble
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = astAlpha * 0.85;
     ctx.beginPath();
     const sides = 6;
     for (let i = 0; i < sides; i++) {
@@ -359,12 +452,16 @@ function drawAsteroids(dc: DrawContext, asteroids: AsteroidState[]): void {
 function drawScanSites(dc: DrawContext, scanSites: ScanSite[]): void {
   const { ctx, camera } = dc;
 
+  // Scan sites fade in at region zoom
+  const siteAlpha = smoothStep(camera.zoom, 0.3, 0.8);
+  if (siteAlpha < 0.01) { return; }
+
   for (const site of scanSites) {
     const abs = entityAbsolute(site.position, dc.bodyAbsolutes);
     const { sx, sy } = toScreen(abs, dc);
     const r = entitySize(3.5, camera.zoom, SIZE_CAPS.ScanSite);
 
-    ctx.globalAlpha = 0.8;
+    ctx.globalAlpha = siteAlpha * 0.8;
     ctx.beginPath();
     ctx.arc(sx, sy, r, 0, Math.PI * 2);
     ctx.fillStyle = MAP_COLORS.scanSiteBg;
