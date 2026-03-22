@@ -1,5 +1,6 @@
 import {
   BODY_COLORS,
+  MAP_COLORS,
   TAG_COLORS,
   ZONE_COLORS,
   ZONE_STROKES,
@@ -95,7 +96,7 @@ function drawOrbitRings(dc: DrawContext, bodies: OrbitalBodyDef[]): void {
     ctx.globalAlpha = 0.4;
     ctx.beginPath();
     ctx.arc(center.sx, center.sy, radiusPx, 0, Math.PI * 2);
-    ctx.strokeStyle = '#2a2e38';
+    ctx.strokeStyle = MAP_COLORS.orbitRing;
     ctx.lineWidth = 0.8;
     ctx.setLineDash([4, 6]);
     ctx.stroke();
@@ -103,7 +104,7 @@ function drawOrbitRings(dc: DrawContext, bodies: OrbitalBodyDef[]): void {
 
     if (radiusPx > 50) {
       ctx.font = '11px monospace';
-      ctx.fillStyle = '#2a2e38';
+      ctx.fillStyle = MAP_COLORS.orbitLabel;
       ctx.textAlign = 'center';
       ctx.fillText(`${body.name} orbit`, center.sx, center.sy - radiusPx - 4);
     }
@@ -190,14 +191,14 @@ function drawBodies(
     if (body.body_type === 'Star') {
       ctx.beginPath();
       ctx.arc(sx, sy, screenR * 1.6, 0, Math.PI * 2);
-      ctx.strokeStyle = color + '30';
+      ctx.strokeStyle = `${color}30`;
       ctx.lineWidth = 2;
       ctx.stroke();
 
       const glowR = Math.max(25, 70 * camera.zoom);
       const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
-      grad.addColorStop(0, 'rgba(245,200,66,0.12)');
-      grad.addColorStop(0.4, 'rgba(245,200,66,0.04)');
+      grad.addColorStop(0, MAP_COLORS.starGlow);
+      grad.addColorStop(0.4, MAP_COLORS.starGlowMid);
       grad.addColorStop(1, 'rgba(245,200,66,0)');
       ctx.beginPath();
       ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
@@ -221,7 +222,7 @@ function drawBodies(
     if (!hideForStation) {
       ctx.globalAlpha = body.body_type === 'Star' ? 0.8 : 0.5;
       ctx.font = `${body.body_type === 'Star' ? 12 : 11}px monospace`;
-      ctx.fillStyle = body.body_type === 'Star' ? '#c8ccd4' : '#6b7080';
+      ctx.fillStyle = body.body_type === 'Star' ? MAP_COLORS.bodyLabelStar : MAP_COLORS.bodyLabelOther;
       if (body.body_type === 'Moon') {
         ctx.textAlign = 'left';
         ctx.fillText(body.name, sx + screenR + 4, sy + 3);
@@ -247,7 +248,7 @@ function drawStations(dc: DrawContext, stations: StationState[]): void {
     ctx.save();
     ctx.translate(sx, sy);
     ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = '#5ca0c8';
+    ctx.fillStyle = MAP_COLORS.stationAccent;
     ctx.fillRect(-size / 2, -size / 2, size, size);
     ctx.restore();
 
@@ -255,14 +256,14 @@ function drawStations(dc: DrawContext, stations: StationState[]): void {
     const pulse = 0.2 + 0.15 * Math.sin(performance.now() * 0.003);
     ctx.beginPath();
     ctx.arc(sx, sy, size + 3, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(92,160,200,${pulse})`;
+    ctx.strokeStyle = `${MAP_COLORS.stationPulse}${pulse})`;
     ctx.lineWidth = 0.8;
     ctx.stroke();
 
     // Label
     ctx.globalAlpha = 0.7;
     ctx.font = '11px sans-serif';
-    ctx.fillStyle = '#5ca0c8';
+    ctx.fillStyle = MAP_COLORS.stationAccent;
     ctx.textAlign = 'left';
     ctx.fillText(station.id, sx + size + 6, sy + 3);
     ctx.globalAlpha = 1;
@@ -366,15 +367,15 @@ function drawScanSites(dc: DrawContext, scanSites: ScanSite[]): void {
     ctx.globalAlpha = 0.8;
     ctx.beginPath();
     ctx.arc(sx, sy, r, 0, Math.PI * 2);
-    ctx.fillStyle = '#1a1d26';
+    ctx.fillStyle = MAP_COLORS.scanSiteBg;
     ctx.fill();
-    ctx.strokeStyle = '#5c6070';
+    ctx.strokeStyle = MAP_COLORS.scanSiteStroke;
     ctx.lineWidth = 1;
     ctx.stroke();
 
     // Question mark
     ctx.font = 'bold 10px monospace';
-    ctx.fillStyle = '#8a8e98';
+    ctx.fillStyle = MAP_COLORS.scanSiteText;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('?', sx, sy + 0.5);

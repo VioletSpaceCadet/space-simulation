@@ -78,12 +78,15 @@ export const SHIP_TASK_COLORS: Record<string, string> = {
   DeepScan: '#7b68ee',
   Mine: '#d4a44c',
   Deposit: '#4caf7d',
-  Transit: 'var(--color-accent)',
+  Transit: '#5ca0c8',
 };
 
+/** Color for idle/unknown tasks — works in both CSS and canvas contexts. */
+export const IDLE_COLOR = '#8a8e98';
+
 export function shipTaskColor(taskKind: string | null): string {
-  if (!taskKind) {return 'var(--color-dim)';}
-  return SHIP_TASK_COLORS[taskKind] ?? 'var(--color-dim)';
+  if (!taskKind) {return IDLE_COLOR;}
+  return SHIP_TASK_COLORS[taskKind] ?? IDLE_COLOR;
 }
 
 // --- Research data kinds ---
@@ -115,6 +118,21 @@ export const LAB_STATUS_STYLES: Record<string, { bg: string; text: string; label
   starved: { bg: 'rgba(224,82,82,0.15)', text: '#e05252', label: 'starved' },
   idle: { bg: 'rgba(90,96,110,0.2)', text: '#6b7280', label: 'idle' },
 };
+
+// --- Map rendering colors (canvas-safe hex, no CSS vars) ---
+export const MAP_COLORS = {
+  orbitRing: '#2a2e38',
+  orbitLabel: '#2a2e38',
+  stationAccent: '#5ca0c8',
+  scanSiteBg: '#1a1d26',
+  scanSiteStroke: '#5c6070',
+  scanSiteText: '#8a8e98',
+  bodyLabelStar: '#c8ccd4',
+  bodyLabelOther: '#6b7080',
+  starGlow: 'rgba(245,200,66,0.12)',
+  starGlowMid: 'rgba(245,200,66,0.04)',
+  stationPulse: 'rgba(92,160,200,',
+} as const;
 
 // --- Semantic colors (positive/negative indicators) ---
 export const SEMANTIC_COLORS = {

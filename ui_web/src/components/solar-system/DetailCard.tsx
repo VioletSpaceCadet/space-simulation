@@ -2,7 +2,7 @@ import { tagColor } from '../../config/theme';
 import type { AsteroidState, InventoryItem, OreItem, ScanSite, ShipState, StationState } from '../../types';
 import { getTaskKind } from '../../utils';
 
-type EntityInfo =
+export type EntityInfo =
   | { type: 'station'; data: StationState }
   | { type: 'ship'; data: ShipState }
   | { type: 'asteroid'; data: AsteroidState }

@@ -2,12 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fetchSpatialConfig } from '../api';
 import type {
-  AsteroidState,
-  ScanSite,
-  ShipState,
   SimSnapshot,
   SolarSystemConfig,
-  StationState,
 } from '../types';
 import { entityAbsolute } from '../utils/spatial';
 
@@ -25,6 +21,7 @@ import {
   ZOOM_OUT_RATIO,
   auUmToWorld,
 } from './solar-system/canvas/types';
+import type { EntityInfo } from './solar-system/DetailCard';
 import { DetailCard } from './solar-system/DetailCard';
 import { Tooltip } from './solar-system/Tooltip';
 
@@ -33,14 +30,11 @@ interface Props {
   currentTick: number;
 }
 
-type EntityInfo =
-  | { type: 'station'; data: StationState }
-  | { type: 'ship'; data: ShipState }
-  | { type: 'asteroid'; data: AsteroidState }
-  | { type: 'scan-site'; data: ScanSite };
-
 /** Hit test radius in screen pixels. */
 const HIT_RADIUS = 12;
+
+/** Minimum drag distance (px) before suppressing click. */
+const DRAG_THRESHOLD = 4;
 
 export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -55,6 +49,8 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
   // Dragging state — use state for cursor since it affects render
   const draggingRef = useRef(false);
   const lastMouseRef = useRef({ x: 0, y: 0 });
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const didDragRef = useRef(false);
   const [dragging, setDragging] = useState(false);
 
   const [config, setConfig] = useState<SolarSystemConfig | null>(null);
@@ -134,6 +130,32 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
     return () => observer.disconnect();
   }, []);
 
+  // --- Wheel handler (native, non-passive to allow preventDefault) ---
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) { return; }
+
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      const target = targetCameraRef.current;
+      const { width, height } = sizeRef.current;
+
+      const rect = container!.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const before = screenToWorld(mouseX, mouseY, target, width, height);
+      const ratio = e.deltaY < 0 ? ZOOM_IN_RATIO : ZOOM_OUT_RATIO;
+      target.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, target.zoom * ratio));
+      const after = screenToWorld(mouseX, mouseY, target, width, height);
+      target.x += before.wx - after.wx;
+      target.y += before.wy - after.wy;
+    }
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => container.removeEventListener('wheel', onWheel);
+  }, []);
+
   // --- Animation loop ---
   useEffect(() => {
     function frame() {
@@ -149,14 +171,11 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
       const { width, height } = sizeRef.current;
       if (width === 0 || height === 0) { return; }
 
-      // Lerp camera
       lerpCamera(cameraRef.current, targetCameraRef.current);
 
-      // DPR transform
       const dpr = window.devicePixelRatio || 1;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Update starfield parallax
       if (starBgRef.current) {
         const cam = cameraRef.current;
         const ox = -(cam.x * PARALLAX_FACTOR) % STAR_TILE_SIZE;
@@ -164,7 +183,6 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
         starBgRef.current.style.backgroundPosition = `${ox}px ${oy}px`;
       }
 
-      // Collect entities
       const snap = snapshotRef.current;
       const stations = snap ? Object.values(snap.stations) : [];
       const ships = snap ? Object.values(snap.ships) : [];
@@ -233,7 +251,6 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
       let closestDist = HIT_RADIUS;
       let closestHit: { type: string; id: string } | null = null;
 
-      // Check stations
       for (const station of Object.values(snap.stations)) {
         const abs = entityAbsolute(station.position, ba);
         const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
@@ -245,7 +262,6 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
         }
       }
 
-      // Check ships
       for (const ship of Object.values(snap.ships)) {
         const abs = shipAbsolutePos(ship, {
           bodyAbsolutes: ba,
@@ -260,7 +276,6 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
         }
       }
 
-      // Check asteroids
       for (const asteroid of Object.values(snap.asteroids)) {
         const abs = entityAbsolute(asteroid.position, ba);
         const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
@@ -272,7 +287,6 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
         }
       }
 
-      // Check scan sites
       for (const site of snap.scan_sites) {
         const abs = entityAbsolute(site.position, ba);
         const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
@@ -290,34 +304,13 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
   );
 
   // --- Mouse handlers ---
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const target = targetCameraRef.current;
-    const { width, height } = sizeRef.current;
-
-    // Zoom toward cursor
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // World position under cursor before zoom
-    const before = screenToWorld(mouseX, mouseY, target, width, height);
-
-    // Apply zoom
-    const ratio = e.deltaY < 0 ? ZOOM_IN_RATIO : ZOOM_OUT_RATIO;
-    target.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, target.zoom * ratio));
-
-    // Adjust camera so cursor stays over same world point
-    const after = screenToWorld(mouseX, mouseY, target, width, height);
-    target.x += before.wx - after.wx;
-    target.y += before.wy - after.wy;
-  }, []);
-
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) { return; }
     draggingRef.current = true;
+    didDragRef.current = false;
     setDragging(true);
     lastMouseRef.current = { x: e.clientX, y: e.clientY };
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
   }, []);
 
   const handleMouseMove = useCallback(
@@ -326,6 +319,13 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
         const dx = e.clientX - lastMouseRef.current.x;
         const dy = e.clientY - lastMouseRef.current.y;
         lastMouseRef.current = { x: e.clientX, y: e.clientY };
+
+        // Track if we've moved enough to count as a drag
+        const totalDx = e.clientX - dragStartRef.current.x;
+        const totalDy = e.clientY - dragStartRef.current.y;
+        if (Math.hypot(totalDx, totalDy) > DRAG_THRESHOLD) {
+          didDragRef.current = true;
+        }
 
         const target = targetCameraRef.current;
         target.x -= dx / target.zoom;
@@ -360,6 +360,9 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      // Suppress click if this was a drag gesture
+      if (didDragRef.current) { return; }
+
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -404,7 +407,6 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
         background: 'var(--color-void)',
         cursor: dragging ? 'grabbing' : 'grab',
       }}
-      onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
