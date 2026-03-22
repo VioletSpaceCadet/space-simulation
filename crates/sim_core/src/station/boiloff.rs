@@ -15,10 +15,10 @@ fn boiloff_temp_multiplier(temp_mk: u32, boiling_point_mk: u32) -> f64 {
     if temp_mk <= boiling_point_mk {
         0.1
     } else if temp_mk <= t_amb {
-        let frac = (temp_mk - boiling_point_mk) as f64 / (t_amb - boiling_point_mk) as f64;
+        let frac = f64::from(temp_mk - boiling_point_mk) / f64::from(t_amb - boiling_point_mk);
         0.1 + 0.9 * frac
     } else if temp_mk <= t_hot {
-        let frac = (temp_mk - t_amb) as f64 / 100_000.0;
+        let frac = f64::from(temp_mk - t_amb) / 100_000.0;
         1.0 + 2.0 * frac
     } else {
         3.0
@@ -56,9 +56,8 @@ pub(super) fn apply_boiloff(
         };
 
         let element_def = content.elements.iter().find(|e| &e.id == element);
-        let rate_per_day = match element_def.and_then(|e| e.boiloff_rate_per_day_at_293k) {
-            Some(rate) => rate,
-            None => continue,
+        let Some(rate_per_day) = element_def.and_then(|e| e.boiloff_rate_per_day_at_293k) else {
+            continue;
         };
 
         let base_rate = boiloff_rate_per_tick(rate_per_day, minutes_per_tick);
@@ -72,7 +71,8 @@ pub(super) fn apply_boiloff(
             _ => 1.0,
         };
 
-        let loss = (*kg as f64 * base_rate * multiplier) as f32;
+        #[allow(clippy::cast_possible_truncation)]
+        let loss = (f64::from(*kg) * base_rate * multiplier) as f32;
         if loss > MIN_MEANINGFUL_KG {
             *kg -= loss;
             losses.push((element.clone(), loss));
