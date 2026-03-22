@@ -54,7 +54,7 @@ export function LabStatusSection({ labs, techNames }: LabStatusSectionProps) {
 
         return (
           <div key={`${lab.station_id}-${lab.module_id}`} className="flex items-center gap-2 text-[11px]">
-            <span className="text-label flex-1 min-w-0 truncate">{lab.module_name}</span>
+            <span className="text-label flex-1 min-w-[4rem] truncate">{lab.module_name}</span>
             {techName !== null && (
               <span className="text-muted truncate max-w-[8rem]">{techName}</span>
             )}
