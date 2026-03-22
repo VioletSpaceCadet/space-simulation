@@ -447,7 +447,7 @@ mod tests {
             game_state,
             content,
             rng,
-            autopilot: AutopilotController,
+            autopilot: AutopilotController::new(),
             next_command_id: 1,
             metrics_every: 0,
             metrics_history: VecDeque::new(),

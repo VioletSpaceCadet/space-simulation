@@ -39,7 +39,7 @@ pub fn run_seed(
     } else {
         sim_world::build_initial_state(content, seed, &mut rng)
     };
-    let mut autopilot = AutopilotController;
+    let mut autopilot = AutopilotController::new();
     let mut next_command_id = 0u64;
 
     std::fs::create_dir_all(seed_dir)

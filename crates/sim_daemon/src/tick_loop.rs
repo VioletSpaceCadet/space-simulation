@@ -154,7 +154,7 @@ mod tests {
             game_state,
             content,
             rng,
-            autopilot: sim_control::AutopilotController,
+            autopilot: sim_control::AutopilotController::new(),
             next_command_id: 0,
             metrics_every: 0,
             metrics_history: VecDeque::new(),
