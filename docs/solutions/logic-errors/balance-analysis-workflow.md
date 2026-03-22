@@ -66,8 +66,11 @@ Applied balance_v1 changes based on sim evidence:
 The `mcp_advisor` MCP server connects to the running `sim_daemon` and provides:
 - `get_metrics_digest`: trend analysis, rates, bottleneck detection
 - `suggest_parameter_change`: data-driven rebalancing proposals
+- `query_knowledge`: search past journals and the strategy playbook for relevant context
+- `save_run_journal`: persist analysis session findings (observations, bottlenecks, strategy notes)
+- `update_playbook`: append to or replace strategy playbook sections
 
-Workflow: run sim → analyze metrics via MCP → propose parameter changes → test via sim_bench override → verify with extended scenario.
+Workflow: recall past knowledge → run sim → analyze metrics via MCP → propose parameter changes → test via sim_bench override → verify with extended scenario → save journal → update playbook if pattern confirmed.
 
 ## Prevention
 
@@ -75,3 +78,6 @@ Workflow: run sim → analyze metrics via MCP → propose parameter changes → 
 - Use sim_bench module overrides to test changes before committing to content files.
 - Watch for accumulation metrics: storage utilization, kit counts, tech unlock counts.
 - The MCP advisor's `get_metrics_digest` surfaces bottlenecks automatically — use it after any balance change.
+- Before starting analysis, call `query_knowledge` to check if the issue has been observed before.
+- After completing analysis, call `save_run_journal` to persist findings for future sessions.
+- Consult `content/knowledge/playbook.md` for known strategy patterns and parameter relationships.
