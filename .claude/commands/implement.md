@@ -59,7 +59,7 @@ If the ticket involves UI changes (components, panels, layout, styling):
 
 3. **Dispatch review agents (in parallel):**
    - **All PRs:** Dispatch the `pr-reviewer` agent (subagent_type: "pr-reviewer") for correctness, tests, error handling (checklist items 1-10).
-   - **Non-trivial PRs** (200+ lines, multi-file, new systems): Also dispatch `pattern-recognition-specialist` agent (subagent_type: `compound-engineering:review:pattern-recognition-specialist`) for scalability, duplication, hardcoded content (checklist items 11-14).
+   - **Non-trivial PRs** (200+ lines or 3+ files changed): Also dispatch `ce:review` agent (subagent_type: `compound-engineering:ce-review`) for exhaustive multi-agent analysis using ultra-thinking and worktrees, plus `pattern-recognition-specialist` agent (subagent_type: `compound-engineering:review:pattern-recognition-specialist`) for scalability, duplication, hardcoded content (checklist items 11-14).
    - **UI tickets:** Also dispatch `design-implementation-reviewer` (subagent_type: `compound-engineering:design:design-implementation-reviewer`) for visual quality review.
 
 4. **Fix review findings** — fix should-fix items from all reviewers. Commit, push, and re-run CI. Do not ask for confirmation — just fix and push.
