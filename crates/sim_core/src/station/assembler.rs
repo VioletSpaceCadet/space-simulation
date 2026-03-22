@@ -3,7 +3,7 @@ use crate::tasks::{ship_construction_enabled, ship_construction_tech_id};
 use crate::{
     Event, EventEnvelope, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
     ModuleBehaviorDef, OutputSpec, PrincipalId, QualityFormula, RecipeDef, ShipId, ShipState,
-    StationId, TechId,
+    StationId,
 };
 
 pub(super) fn tick_assembler_modules(

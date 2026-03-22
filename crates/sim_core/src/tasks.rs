@@ -59,7 +59,7 @@ pub(crate) fn ship_construction_enabled(research: &ResearchState, content: &Game
         .any(|effect| matches!(effect, TechEffect::EnableShipConstruction))
 }
 
-/// Returns the TechId of the first tech with `EnableShipConstruction` effect, if any.
+/// Returns the `TechId` of the first tech with `EnableShipConstruction` effect, if any.
 pub(crate) fn ship_construction_tech_id(content: &GameContent) -> Option<&crate::TechId> {
     content.techs.iter().find_map(|tech| {
         if tech
