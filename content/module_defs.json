@@ -41,6 +41,47 @@
     }
   },
   {
+    "id": "module_electrolysis_unit",
+    "name": "Electrolysis Unit",
+    "mass_kg": 800.0,
+    "volume_m3": 3.0,
+    "power_consumption_per_run": 25.0,
+    "wear_per_run": 0.012,
+    "behavior": {
+      "Processor": {
+        "processing_interval_minutes": 60,
+        "recipes": [
+          {
+            "id": "recipe_electrolysis",
+            "inputs": [
+              {
+                "filter": { "Element": "H2O" },
+                "amount": { "Kg": 1000.0 }
+              }
+            ],
+            "outputs": [
+              {
+                "Material": {
+                  "element": "LH2",
+                  "yield_formula": { "FixedFraction": 0.111 },
+                  "quality_formula": { "Fixed": 1.0 }
+                }
+              },
+              {
+                "Material": {
+                  "element": "LOX",
+                  "yield_formula": { "FixedFraction": 0.889 },
+                  "quality_formula": { "Fixed": 1.0 }
+                }
+              }
+            ],
+            "efficiency": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
     "id": "module_heating_unit",
     "name": "Heating Unit",
     "mass_kg": 500.0,
