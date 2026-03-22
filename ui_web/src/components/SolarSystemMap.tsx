@@ -21,6 +21,7 @@ import type {
   SolarSystemConfig,
   StationState,
 } from '../types';
+import { getTaskKind } from '../utils';
 import {
   auUmToAu,
   distanceAuUm,
@@ -29,7 +30,6 @@ import {
   mdegToRad,
   shipTransitAbsolute,
 } from '../utils/spatial';
-import { getTaskKind } from '../utils';
 
 import { DetailCard } from './solar-system/DetailCard';
 import { Tooltip } from './solar-system/Tooltip';
