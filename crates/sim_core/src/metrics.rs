@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-/// v9: Replace element-specific fields with per_element_material_kg and per_element_ore_stats.
+/// v9: Replace element-specific fields with dynamic per-element maps.
 const METRICS_VERSION: u32 = 9;
 
 /// Per-element ore composition statistics (avg/min/max fraction across all ore lots).
@@ -544,7 +544,7 @@ struct Averages {
 }
 
 /// Write the CSV header row for metrics. `element_ids` defines the dynamic
-/// per-element columns (material_kg_X, ore_avg_X, ore_min_X, ore_max_X).
+/// per-element columns (`material_kg_X`, `ore_avg_X`, `ore_min_X`, `ore_max_X`).
 pub fn write_metrics_header(
     writer: &mut impl std::io::Write,
     element_ids: &[String],
