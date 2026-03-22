@@ -334,6 +334,7 @@ pub fn base_state(content: &GameContent) -> GameState {
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
                 task: None,
+                speed_ticks_per_au: None,
                 modifiers: crate::modifiers::ModifierSet::default(),
             },
         )]),

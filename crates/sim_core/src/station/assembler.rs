@@ -383,6 +383,7 @@ fn resolve_assembler_run(
                     inventory: vec![],
                     cargo_capacity_m3: *cargo_capacity_m3,
                     task: None,
+                    speed_ticks_per_au: None,
                     modifiers: crate::modifiers::ModifierSet::default(),
                 };
                 state.ships.insert(ship_id.clone(), ship);

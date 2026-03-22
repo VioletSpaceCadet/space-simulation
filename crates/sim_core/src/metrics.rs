@@ -715,6 +715,7 @@ mod tests {
             inventory: vec![],
             cargo_capacity_m3: 20.0,
             task,
+            speed_ticks_per_au: None,
             modifiers: crate::modifiers::ModifierSet::default(),
         }
     }

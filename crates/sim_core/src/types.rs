@@ -335,9 +335,19 @@ pub struct ShipState {
     pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
     pub task: Option<TaskState>,
+    /// Per-ship travel speed. If `None`, uses the global `constants.ticks_per_au`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed_ticks_per_au: Option<u64>,
     /// Per-ship modifiers (from equipment, buffs).
     #[serde(default)]
     pub modifiers: crate::modifiers::ModifierSet,
+}
+
+impl ShipState {
+    /// Returns this ship's travel speed, falling back to the global default.
+    pub fn ticks_per_au(&self, global_default: u64) -> u64 {
+        self.speed_ticks_per_au.unwrap_or(global_default)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]

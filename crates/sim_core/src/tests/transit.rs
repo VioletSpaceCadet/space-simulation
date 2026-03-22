@@ -63,6 +63,7 @@ fn transit_moves_ship_and_starts_next_task() {
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
                 task: None,
+                speed_ticks_per_au: None,
                 modifiers: crate::modifiers::ModifierSet::default(),
             },
         )]),
@@ -246,6 +247,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
                 task: None,
+                speed_ticks_per_au: None,
                 modifiers: crate::modifiers::ModifierSet::default(),
             },
         )]),
@@ -369,5 +371,73 @@ fn transit_generates_transit_data_with_diminishing_returns() {
     assert_eq!(
         state.research.action_counts["transit"], 2,
         "transit action counter should be 2 after two transits"
+    );
+}
+
+#[test]
+fn ship_ticks_per_au_uses_per_ship_override() {
+    let ship_default = ShipState {
+        id: ShipId("ship_default".to_string()),
+        position: test_position(),
+        owner: PrincipalId("test".to_string()),
+        inventory: vec![],
+        cargo_capacity_m3: 20.0,
+        task: None,
+        speed_ticks_per_au: None,
+        modifiers: crate::modifiers::ModifierSet::default(),
+    };
+    let ship_fast = ShipState {
+        id: ShipId("ship_fast".to_string()),
+        position: test_position(),
+        owner: PrincipalId("test".to_string()),
+        inventory: vec![],
+        cargo_capacity_m3: 20.0,
+        task: None,
+        speed_ticks_per_au: Some(1000),
+        modifiers: crate::modifiers::ModifierSet::default(),
+    };
+    let ship_slow = ShipState {
+        id: ShipId("ship_slow".to_string()),
+        position: test_position(),
+        owner: PrincipalId("test".to_string()),
+        inventory: vec![],
+        cargo_capacity_m3: 20.0,
+        task: None,
+        speed_ticks_per_au: Some(5000),
+        modifiers: crate::modifiers::ModifierSet::default(),
+    };
+
+    let global = 2133;
+    assert_eq!(
+        ship_default.ticks_per_au(global),
+        2133,
+        "None → global default"
+    );
+    assert_eq!(
+        ship_fast.ticks_per_au(global),
+        1000,
+        "fast ship uses override"
+    );
+    assert_eq!(
+        ship_slow.ticks_per_au(global),
+        5000,
+        "slow ship uses override"
+    );
+
+    // Different speeds produce different travel times for the same distance.
+    let a = AbsolutePos {
+        x_au_um: 0,
+        y_au_um: 0,
+    };
+    let b = AbsolutePos {
+        x_au_um: 2_000_000,
+        y_au_um: 0,
+    };
+    let min_transit = 1;
+    let fast_ticks = travel_ticks(a, b, ship_fast.ticks_per_au(global), min_transit);
+    let slow_ticks = travel_ticks(a, b, ship_slow.ticks_per_au(global), min_transit);
+    assert!(
+        fast_ticks < slow_ticks,
+        "fast ship should arrive sooner: fast={fast_ticks}, slow={slow_ticks}"
     );
 }

@@ -1,5 +1,5 @@
 use super::*;
-use crate::test_fixtures::{base_content, base_state, make_rng};
+use crate::test_fixtures::{base_content, base_state, make_rng, test_position};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
