@@ -12,14 +12,14 @@ A living document of strategy patterns, bottleneck resolutions, and parameter re
 
 ### Slag Backpressure
 
-- **Steady-state slag ratio:** Iron smelting produces ~43% slag by mass at typical ore compositions. With 3 active refineries, slag accumulation reaches storage saturation around tick 3500.
+- **Steady-state slag ratio:** Iron smelting produces 20-45% slag by mass depending on ore Fe fraction. Higher Fe fraction ores produce less slag. With 3 active refineries, slag accumulation reaches storage saturation around tick 3500.
 - **Jettison threshold:** `autopilot_slag_jettison_pct` (0.75) controls when autopilot jettisons slag. Lowering this reduces storage pressure but wastes potential reprocessing feedstock.
 - **Slag export:** Slag is not exportable in current pricing config. Jettison is the only disposal path until slag reprocessing recipes are added.
 
 ### Storage Saturation
 
 - **Early warning at 70%:** Storage pressure above 70% signals imminent saturation. Primary drivers: slag accumulation, unprocessed ore backlog, or unexported materials.
-- **Material export as relief:** Exporting refined Fe at $50/kg + $50/kg surcharge provides both storage relief and revenue. Autopilot exports when Fe exceeds `autopilot_fe_reserve_kg` (12,000 kg).
+- **Material export as relief:** Export revenue = `base_price_per_unit * quantity - mass * export_surcharge_per_kg`. For Fe: $50/kg base - $50/kg surcharge = $0/kg net revenue. Fe export provides storage relief but no profit. Higher-value materials (He at $200/kg, LH2 at $500/kg) yield positive export revenue. Repair kits at $8K each minus mass surcharge are the most profitable export. Autopilot exports when Fe exceeds `autopilot_fe_reserve_kg` (12,000 kg) and revenue meets `autopilot_export_min_revenue` ($1,000).
 
 ### Power Deficit
 
@@ -31,21 +31,21 @@ A living document of strategy patterns, bottleneck resolutions, and parameter re
 - **`ticks_per_au` vs fleet utilization:** Lower values = faster transit = higher mining throughput per ship. At default (2133), a single ship spends ~80% of time in transit. Halving to ~1000 roughly doubles effective mining rate.
 - **`mining_rate_kg_per_minute` vs refinery throughput:** Mining rate of 15 kg/min produces ~900 kg/hr. A single refinery processes faster than one ship can mine, so refinery starvation is the norm with a single ship.
 - **`minutes_per_tick` (60):** 1 tick = 1 game hour. All rate-based parameters are per-minute and get converted via `Constants::rate_per_minute_to_per_tick()`. Test fixtures use `minutes_per_tick: 1`.
-- **`autopilot_refinery_threshold_kg` (2000):** Refineries only process when ore exceeds this threshold. Higher values batch larger runs but increase idle time. Lower values reduce idle time but cause more frequent small batches.
+- **`autopilot_refinery_threshold_kg` (2000):** Autopilot default threshold for enabling refineries — refineries are enabled when station ore exceeds this value. Note: the threshold is an autopilot heuristic, not a refinery-level config. Higher values batch larger runs but increase idle time.
 
 ## Fleet Sizing
 
 - **Single ship:** Sufficient for 1 refinery. Chronic starvation with 2+ refineries. Viable only in early game before assembler produces additional ships.
 - **Two ships:** Can sustain 2 refineries with staggered mining runs. Transit overlap reduces starvation windows.
 - **Ship construction priority:** Early assembler should prioritize thrusters + ship construction. Each additional ship has multiplicative impact on ore throughput.
-- **Ship construction cost:** 1 thruster ($1M) + Fe for hull. Thrusters are the gating component and require assembler recipe.
+- **Ship construction cost:** 8 thrusters ($1M each = $8M total) + 10,000 kg Fe. Assembly takes 20,160 minutes (336 ticks at default `minutes_per_tick`). Thrusters are the gating component — imported via trade or assembled.
 
 ## Economy
 
 - **Starting balance:** $1B. Sufficient for initial module imports but depletes quickly with large purchases.
-- **Trade unlock timing:** Trade (import/export) unlocks after `trade_unlock_tick` derived from `minutes_per_tick`. Available early in default config.
+- **Trade unlock timing:** Trade (import/export) unlocks after 1 simulated year (525,600 game-minutes). At default `minutes_per_tick` (60), this is tick 8,760. Station must be self-sufficient on initial balance + imports placed before this threshold during that first year.
 - **Import vs manufacture:** Importing modules ($1.5M-$10M each + surcharge) is faster but expensive. Manufacturing requires assembler + recipe chain but is cheaper long-term.
-- **Export strategy:** Fe export at $50/kg base + $50/kg surcharge = $100/kg effective price. Export batches of 500 kg minimum ($50K revenue min). Steady Fe export is the primary revenue source.
+- **Export strategy:** Export revenue formula: `base_price * quantity - mass * export_surcharge`. Fe yields $0/kg (base $50 minus $50 surcharge). Profitable exports: He ($200 - $50 surcharge = net positive per unit), repair kits ($8K per unit minus mass-based surcharge). Fe export is useful for storage relief but not revenue. Autopilot requires revenue >= `autopilot_export_min_revenue` ($1,000) per batch.
 - **Propellant economics:** LH2 at $500/kg and LOX at $150/kg make propellant import expensive. On-station electrolysis (H2O → LH2 + LOX) is significantly cheaper once the module is installed.
 
 ## Research
