@@ -102,9 +102,10 @@ fn execute(
         f64::from(ctx.efficiency),
         crate::modifiers::ModifierSource::Wear,
     ));
-    let points = lab_mods.resolve_f32(
+    let points = lab_mods.resolve_with_f32(
         crate::modifiers::StatId::ResearchSpeed,
         lab_def.research_points_per_run * ratio,
+        &state.modifiers,
     );
 
     // Add points to evidence

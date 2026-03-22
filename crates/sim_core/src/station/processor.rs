@@ -238,9 +238,10 @@ fn resolve_processor_run(
                     }
                     YieldFormula::FixedFraction(f) => *f,
                 };
-                material_kg = proc_mods.resolve_f32(
+                material_kg = proc_mods.resolve_with_f32(
                     crate::modifiers::StatId::ProcessingYield,
                     consumed_kg * yield_frac,
+                    &state.modifiers,
                 );
                 let base_quality = match quality_formula {
                     QualityFormula::ElementFractionTimesMultiplier {
@@ -250,8 +251,11 @@ fn resolve_processor_run(
                         .clamp(0.0, 1.0),
                     QualityFormula::Fixed(q) => *q,
                 };
-                material_quality = proc_mods
-                    .resolve_f32(crate::modifiers::StatId::ProcessingQuality, base_quality);
+                material_quality = proc_mods.resolve_with_f32(
+                    crate::modifiers::StatId::ProcessingQuality,
+                    base_quality,
+                    &state.modifiers,
+                );
                 if material_kg > MIN_MEANINGFUL_KG {
                     if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                         merge_material_lot(
