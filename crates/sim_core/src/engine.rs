@@ -48,7 +48,7 @@ pub fn tick(
     events
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Thin dispatcher — all logic in commands.rs
 fn apply_commands(
     state: &mut GameState,
     commands: &[CommandEnvelope],
