@@ -118,6 +118,18 @@ pub(crate) fn advance_research(
 
         if rolled < probability {
             state.research.unlocked.insert(tech_id.clone());
+            // Apply stat modifier effects to global modifiers.
+            for effect in &tech_def.effects {
+                if let crate::TechEffect::StatModifier { stat, op, value } = effect {
+                    state.modifiers.add(crate::modifiers::Modifier {
+                        stat: *stat,
+                        op: *op,
+                        value: *value,
+                        source: crate::modifiers::ModifierSource::Tech(tech_id.0.clone()),
+                        condition: None,
+                    });
+                }
+            }
             events.push(crate::emit(
                 &mut state.counters,
                 current_tick,
@@ -356,5 +368,81 @@ mod research_roll_tests {
                 .contains(&TechId("tech_deep_scan_v1".to_string())),
             "tech should unlock with no domain requirements and sufficient points"
         );
+    }
+
+    #[test]
+    fn tech_unlock_applies_stat_modifiers_to_global_set() {
+        let mut content = base_content();
+        // Set up a tech with a StatModifier effect, easy to unlock.
+        content.techs = vec![TechDef {
+            id: TechId("tech_test_modifier".to_string()),
+            name: "Test Modifier".to_string(),
+            prereqs: vec![],
+            domain_requirements: HashMap::new(),
+            accepted_data: vec![crate::DataKind::SurveyData],
+            difficulty: 0.001,
+            effects: vec![TechEffect::StatModifier {
+                stat: crate::modifiers::StatId::ProcessingYield,
+                op: crate::modifiers::ModifierOp::PctAdditive,
+                value: 0.25,
+            }],
+        }];
+
+        let mut state = research_state_at_tick(60);
+        state.research.evidence.insert(
+            TechId("tech_test_modifier".to_string()),
+            DomainProgress {
+                points: HashMap::from([(ResearchDomain::Survey, 100.0)]),
+            },
+        );
+
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let mut events = Vec::new();
+        advance_research(
+            &mut state,
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            &mut events,
+        );
+
+        // Tech should have unlocked.
+        assert!(
+            state
+                .research
+                .unlocked
+                .contains(&TechId("tech_test_modifier".to_string())),
+            "test tech should unlock"
+        );
+        // Global modifiers should contain the stat modifier.
+        assert_eq!(state.modifiers.len(), 1);
+        let result = state
+            .modifiers
+            .resolve(crate::modifiers::StatId::ProcessingYield, 100.0);
+        // 100 × (1 + 0.25) = 125
+        assert!(
+            (result - 125.0).abs() < 1e-10,
+            "modifier should increase yield by 25%: got {result}"
+        );
+    }
+
+    #[test]
+    fn stat_modifiers_survive_serde_roundtrip() {
+        let mut state = research_state_at_tick(0);
+        state.modifiers.add(crate::modifiers::Modifier {
+            stat: crate::modifiers::StatId::ShipSpeed,
+            op: crate::modifiers::ModifierOp::PctAdditive,
+            value: 0.10,
+            source: crate::modifiers::ModifierSource::Tech("tech_efficient_transit".into()),
+            condition: None,
+        });
+
+        let json = serde_json::to_string(&state).expect("serialize");
+        let deserialized: GameState = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized.modifiers.len(), 1);
+        let result = deserialized
+            .modifiers
+            .resolve(crate::modifiers::StatId::ShipSpeed, 100.0);
+        assert!((result - 110.0).abs() < 1e-10);
     }
 }
