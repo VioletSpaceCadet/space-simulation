@@ -30,7 +30,7 @@ import { Minimap } from './solar-system/hud/Minimap';
 import type { FlyTarget } from './solar-system/hud/QuickNav';
 import { QuickNav } from './solar-system/hud/QuickNav';
 import { ZoomInfo } from './solar-system/hud/ZoomInfo';
-import { Tooltip } from './solar-system/Tooltip';
+import { RichTooltip } from './solar-system/RichTooltip';
 
 interface Props {
   snapshot: SimSnapshot | null;
@@ -471,10 +471,12 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
     const entity = lookupEntity(hovered, snapshot);
     if (!entity) { return null; }
     return (
-      <Tooltip x={hovered.screenX} y={hovered.screenY}>
-        <div className="text-accent">{entity.data.id}</div>
-        <div className="text-dim">{entity.type}</div>
-      </Tooltip>
+      <RichTooltip
+        entity={entity}
+        x={hovered.screenX}
+        y={hovered.screenY}
+        currentTick={currentTick}
+      />
     );
   })();
 
