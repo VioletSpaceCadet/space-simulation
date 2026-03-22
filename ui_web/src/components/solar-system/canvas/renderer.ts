@@ -72,6 +72,7 @@ export function drawMap(
   drawOrbitRings(dc, dc.config.bodies);
   drawZones(dc, dc.config.bodies);
   drawBodies(dc, dc.config.bodies, stations);
+  drawTransitLines(dc, ships);
   drawStations(dc, stations);
   drawShips(dc, ships);
   drawAsteroids(dc, asteroids);
@@ -277,6 +278,95 @@ function drawBodies(
 
     ctx.globalAlpha = 1;
   }
+}
+
+function drawTransitLines(dc: DrawContext, ships: ShipState[]): void {
+  const { ctx, camera } = dc;
+
+  // Transit lines visible at REGION+ zoom
+  const transitAlpha = smoothStep(camera.zoom, 0.15, 0.4);
+  if (transitAlpha < 0.01) { return; }
+
+  for (const ship of ships) {
+    const taskKind = getTaskKind(ship.task);
+    if (taskKind !== 'Transit' || !ship.task || !('Transit' in ship.task.kind)) { continue; }
+
+    const transit = (ship.task.kind as { Transit: { destination: Position } }).Transit;
+    const originAbs = entityAbsolute(ship.position, dc.bodyAbsolutes);
+    const destAbs = entityAbsolute(transit.destination, dc.bodyAbsolutes);
+    const progress = ship.task.eta_tick > ship.task.started_tick
+      ? (dc.currentTick - ship.task.started_tick) / (ship.task.eta_tick - ship.task.started_tick)
+      : 1;
+
+    const from = toScreen(originAbs, dc);
+    const to = toScreen(destAbs, dc);
+    const progX = from.sx + (to.sx - from.sx) * Math.max(0, Math.min(1, progress));
+    const progY = from.sy + (to.sy - from.sy) * Math.max(0, Math.min(1, progress));
+    const color = shipTaskColor('Transit');
+
+    // Full path — dim dashed line
+    ctx.globalAlpha = transitAlpha * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(from.sx, from.sy);
+    ctx.lineTo(to.sx, to.sy);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Completed portion — solid brighter line
+    ctx.globalAlpha = transitAlpha * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(from.sx, from.sy);
+    ctx.lineTo(progX, progY);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Progress pip — small glowing dot
+    ctx.globalAlpha = transitAlpha;
+    ctx.beginPath();
+    ctx.arc(progX, progY, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    // Outer glow
+    ctx.beginPath();
+    ctx.arc(progX, progY, 5, 0, Math.PI * 2);
+    ctx.strokeStyle = `${color}33`;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Destination marker — small hollow circle
+    ctx.globalAlpha = transitAlpha * 0.4;
+    ctx.beginPath();
+    ctx.arc(to.sx, to.sy, 3, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // ETA label at LOCAL zoom
+    const etaFade = smoothStep(camera.zoom, 0.5, 1.0);
+    if (etaFade > 0.01) {
+      const etaLeft = Math.max(0, ship.task.eta_tick - dc.currentTick);
+      const angle = Math.atan2(to.sy - from.sy, to.sx - from.sx);
+      const labelX = progX + 12 * Math.cos(angle + Math.PI / 2);
+      const labelY = progY + 12 * Math.sin(angle + Math.PI / 2);
+      ctx.globalAlpha = transitAlpha * etaFade * 0.7;
+      ctx.font = '11px monospace';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.round(progress * 100)}% \u00b7 ${ticksToTime(etaLeft)}`, labelX, labelY);
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
+}
+
+function ticksToTime(ticks: number): string {
+  if (ticks < 24) { return `${ticks}h`; }
+  const days = Math.floor(ticks / 24);
+  return `${days}d ${ticks % 24}h`;
 }
 
 function drawStations(dc: DrawContext, stations: StationState[]): void {
