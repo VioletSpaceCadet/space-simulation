@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use crate::InventoryItem;
+use crate::{InventoryItem, MaterialThermalProps};
 
 /// Returns a mass-weighted average composition given a slice of
 /// `(composition, kg)` pairs.
@@ -59,15 +59,55 @@ pub(crate) fn blend_slag_composition(
         .collect()
 }
 
+/// Blend two optional thermal property sets, weighted by mass.
+///
+/// If both are `None`, returns `None`. If only one is set, returns that one.
+/// If both are set, produces a mass-weighted average of temperature and latent
+/// heat, keeping the phase of the larger batch.
+pub(crate) fn blend_thermal(
+    a: Option<&MaterialThermalProps>,
+    a_kg: f32,
+    b: Option<&MaterialThermalProps>,
+    b_kg: f32,
+) -> Option<MaterialThermalProps> {
+    match (a, b) {
+        (None, None) => None,
+        (Some(t), None) | (None, Some(t)) => Some(t.clone()),
+        (Some(ta), Some(tb)) => {
+            let total = f64::from(a_kg) + f64::from(b_kg);
+            if total <= 0.0 {
+                return Some(ta.clone());
+            }
+            let wa = f64::from(a_kg) / total;
+            let wb = f64::from(b_kg) / total;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let blended_temp =
+                (f64::from(ta.temp_mk) * wa + f64::from(tb.temp_mk) * wb).round() as u32;
+            #[allow(clippy::cast_possible_truncation)]
+            let blended_latent = (ta.latent_heat_buffer_j as f64 * wa
+                + tb.latent_heat_buffer_j as f64 * wb)
+                .round() as i64;
+            let phase = if a_kg >= b_kg { ta.phase } else { tb.phase };
+            Some(MaterialThermalProps {
+                temp_mk: blended_temp,
+                phase,
+                latent_heat_buffer_j: blended_latent,
+            })
+        }
+    }
+}
+
 /// Merges a material lot into an inventory vec.
 ///
 /// If an existing `Material` item with the same element and exact quality is
-/// found, its kg is incremented. Otherwise a new item is pushed.
+/// found, its kg is incremented and thermal properties are blended by mass.
+/// Otherwise a new item is pushed.
 pub(crate) fn merge_material_lot(
     inventory: &mut Vec<InventoryItem>,
     element: String,
     kg: f32,
     quality: f32,
+    thermal: Option<MaterialThermalProps>,
 ) {
     #[allow(clippy::float_cmp)]
     let existing = inventory.iter_mut().find(|item| {
@@ -81,16 +121,25 @@ pub(crate) fn merge_material_lot(
         )
     });
     if let Some(InventoryItem::Material {
-        kg: existing_kg, ..
+        kg: existing_kg,
+        thermal: existing_thermal,
+        ..
     }) = existing
     {
+        let blended = blend_thermal(
+            existing_thermal.as_ref(),
+            *existing_kg,
+            thermal.as_ref(),
+            kg,
+        );
         *existing_kg += kg;
+        *existing_thermal = blended;
     } else {
         inventory.push(InventoryItem::Material {
             element,
             kg,
             quality,
-            thermal: None,
+            thermal,
         });
     }
 }
@@ -144,7 +193,7 @@ mod tests {
     #[test]
     fn merge_material_lot_pushes_new_item_when_inventory_empty() {
         let mut inventory: Vec<InventoryItem> = Vec::new();
-        merge_material_lot(&mut inventory, "Fe".to_string(), 50.0, 0.9);
+        merge_material_lot(&mut inventory, "Fe".to_string(), 50.0, 0.9, None);
 
         assert_eq!(inventory.len(), 1);
         match &inventory[0] {
@@ -170,7 +219,7 @@ mod tests {
             quality: 0.9,
             thermal: None,
         }];
-        merge_material_lot(&mut inventory, "Fe".to_string(), 20.0, 0.9);
+        merge_material_lot(&mut inventory, "Fe".to_string(), 20.0, 0.9, None);
 
         assert_eq!(inventory.len(), 1);
         match &inventory[0] {
@@ -187,9 +236,100 @@ mod tests {
             quality: 0.9,
             thermal: None,
         }];
-        merge_material_lot(&mut inventory, "Fe".to_string(), 20.0, 0.5);
+        merge_material_lot(&mut inventory, "Fe".to_string(), 20.0, 0.5, None);
 
         assert_eq!(inventory.len(), 2);
+    }
+
+    #[test]
+    fn blend_thermal_both_none_returns_none() {
+        assert!(blend_thermal(None, 100.0, None, 50.0).is_none());
+    }
+
+    #[test]
+    fn blend_thermal_one_some_returns_it() {
+        let t = MaterialThermalProps {
+            temp_mk: 500_000,
+            phase: crate::Phase::Liquid,
+            latent_heat_buffer_j: 1000,
+        };
+        let result = blend_thermal(Some(&t), 100.0, None, 50.0);
+        assert_eq!(result.unwrap().temp_mk, 500_000);
+    }
+
+    #[test]
+    fn blend_thermal_weighted_average() {
+        let a = MaterialThermalProps {
+            temp_mk: 300_000,
+            phase: crate::Phase::Solid,
+            latent_heat_buffer_j: 0,
+        };
+        let b = MaterialThermalProps {
+            temp_mk: 500_000,
+            phase: crate::Phase::Liquid,
+            latent_heat_buffer_j: 1000,
+        };
+        // 100kg at 300K + 100kg at 500K => 400K, latent = 500
+        let result = blend_thermal(Some(&a), 100.0, Some(&b), 100.0).unwrap();
+        assert_eq!(result.temp_mk, 400_000);
+        assert_eq!(result.latent_heat_buffer_j, 500);
+        // Equal mass => phase from a (a_kg >= b_kg)
+        assert_eq!(result.phase, crate::Phase::Solid);
+    }
+
+    #[test]
+    fn blend_thermal_larger_batch_phase_wins() {
+        let a = MaterialThermalProps {
+            temp_mk: 300_000,
+            phase: crate::Phase::Solid,
+            latent_heat_buffer_j: 0,
+        };
+        let b = MaterialThermalProps {
+            temp_mk: 500_000,
+            phase: crate::Phase::Liquid,
+            latent_heat_buffer_j: 0,
+        };
+        // 50kg solid + 200kg liquid => liquid phase wins
+        let result = blend_thermal(Some(&a), 50.0, Some(&b), 200.0).unwrap();
+        assert_eq!(result.phase, crate::Phase::Liquid);
+        // temp = (300K*50 + 500K*200) / 250 = 460K
+        assert_eq!(result.temp_mk, 460_000);
+    }
+
+    #[test]
+    fn merge_material_lot_blends_thermal() {
+        let mut inventory = vec![InventoryItem::Material {
+            element: "Fe".to_string(),
+            kg: 100.0,
+            quality: 0.9,
+            thermal: Some(MaterialThermalProps {
+                temp_mk: 300_000,
+                phase: crate::Phase::Solid,
+                latent_heat_buffer_j: 0,
+            }),
+        }];
+        merge_material_lot(
+            &mut inventory,
+            "Fe".to_string(),
+            100.0,
+            0.9,
+            Some(MaterialThermalProps {
+                temp_mk: 500_000,
+                phase: crate::Phase::Liquid,
+                latent_heat_buffer_j: 1000,
+            }),
+        );
+
+        assert_eq!(inventory.len(), 1);
+        match &inventory[0] {
+            InventoryItem::Material { kg, thermal, .. } => {
+                assert!((kg - 200.0).abs() < 1e-6);
+                let t = thermal.as_ref().unwrap();
+                assert_eq!(t.temp_mk, 400_000);
+                assert_eq!(t.latent_heat_buffer_j, 500);
+            }
+            other => panic!("expected Material, got {other:?}"),
+        }
     }
 
     #[test]

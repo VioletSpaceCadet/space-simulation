@@ -240,6 +240,7 @@ fn resolve_processor_run(
                             element.clone(),
                             material_kg,
                             material_quality,
+                            None,
                         );
                     }
                 }

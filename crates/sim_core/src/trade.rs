@@ -1,5 +1,6 @@
 //! Trade helpers for import/export pricing and inventory manipulation.
 
+use crate::composition::blend_thermal;
 use crate::{GameContent, InventoryItem, ModuleItemId, PricingEntry, PricingTable, TradeItemSpec};
 use rand::Rng;
 
@@ -236,17 +237,26 @@ pub fn merge_into_inventory(inventory: &mut Vec<InventoryItem>, new_items: Vec<I
                 element,
                 kg,
                 quality,
-                ..
+                ref thermal,
             } => {
                 let existing = inventory.iter_mut().find(|item| {
                     matches!(item, InventoryItem::Material { element: el, quality: q, .. }
                         if el == element && (*q - quality).abs() < f32::EPSILON)
                 });
                 if let Some(InventoryItem::Material {
-                    kg: existing_kg, ..
+                    kg: existing_kg,
+                    thermal: existing_thermal,
+                    ..
                 }) = existing
                 {
+                    let blended = blend_thermal(
+                        existing_thermal.as_ref(),
+                        *existing_kg,
+                        thermal.as_ref(),
+                        *kg,
+                    );
                     *existing_kg += kg;
+                    *existing_thermal = blended;
                 } else {
                     inventory.push(new_item);
                 }
