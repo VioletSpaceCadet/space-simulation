@@ -516,6 +516,133 @@ server.tool(
   },
 );
 
+// ---------- Tool 11: update_playbook ----------
+
+const PLAYBOOK_PATH = path.join(CONTENT_DIR, "knowledge", "playbook.md");
+
+/**
+ * Find a section in a markdown document by matching header text.
+ * Supports nested headers via ">" separator (e.g. "Bottleneck Resolutions > Ore Supply").
+ * Returns the start index (end of header line) and end index (start of next same-or-higher-level header).
+ */
+function findSection(
+  lines: string[],
+  sectionPath: string,
+): { startLine: number; endLine: number; level: number } | null {
+  const parts = sectionPath.split(">").map((s) => s.trim());
+  const target = parts[parts.length - 1].toLowerCase();
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (!match) continue;
+
+    const level = match[1].length;
+    const heading = match[2].trim().toLowerCase();
+
+    if (heading === target) {
+      // Find the end of this section (next header at same or higher level)
+      let endLine = lines.length;
+      for (let j = index + 1; j < lines.length; j++) {
+        const nextMatch = lines[j].match(/^(#{1,6})\s+/);
+        if (nextMatch && nextMatch[1].length <= level) {
+          endLine = j;
+          break;
+        }
+      }
+      return { startLine: index, endLine, level };
+    }
+  }
+  return null;
+}
+
+server.tool(
+  "update_playbook",
+  "Append to or replace a section of the strategy playbook (content/knowledge/playbook.md)",
+  {
+    section: z.string()
+      .describe("Section header to update (e.g. 'Bottleneck Resolutions > Ore Supply')"),
+    content: z.string()
+      .describe("Markdown content to append or replace"),
+    mode: z.enum(["append", "replace"]).default("append")
+      .describe("'append' adds to end of section, 'replace' replaces section content"),
+  },
+  async ({ section, content: newContent, mode }) => {
+    try {
+      let fileContent: string;
+      try {
+        fileContent = await fsPromises.readFile(PLAYBOOK_PATH, "utf-8");
+      } catch {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({
+            status: "error",
+            message: "Playbook not found at content/knowledge/playbook.md",
+          }) }],
+        };
+      }
+
+      const lines = fileContent.split("\n");
+      const found = findSection(lines, section);
+
+      if (!found) {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({
+            status: "error",
+            message: `Section not found: "${section}". Available top-level sections: ${
+              lines
+                .filter((l) => /^##\s+/.test(l))
+                .map((l) => l.replace(/^##\s+/, ""))
+                .join(", ")
+            }`,
+          }) }],
+        };
+      }
+
+      const contentLines = newContent.split("\n");
+      let updatedLines: string[];
+
+      if (mode === "replace") {
+        // Keep the header, replace everything until next section
+        updatedLines = [
+          ...lines.slice(0, found.startLine + 1),
+          "",
+          ...contentLines,
+          "",
+          ...lines.slice(found.endLine),
+        ];
+      } else {
+        // Append before the next section boundary
+        const insertAt = found.endLine;
+        updatedLines = [
+          ...lines.slice(0, insertAt),
+          ...contentLines,
+          "",
+          ...lines.slice(insertAt),
+        ];
+      }
+
+      await fsPromises.writeFile(PLAYBOOK_PATH, updatedLines.join("\n"));
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "updated",
+          section,
+          mode,
+          lines_added: contentLines.length,
+        }) }],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to update playbook: ${message}`,
+        }) }],
+      };
+    }
+  },
+);
+
 // ---------- Startup validation ----------
 
 function validateContentDir(): void {
