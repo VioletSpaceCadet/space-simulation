@@ -431,6 +431,43 @@ pub enum TaskKind {
     },
 }
 
+impl TaskKind {
+    /// Task duration in ticks.
+    pub fn duration(&self, constants: &Constants) -> u64 {
+        match self {
+            Self::Transit { total_ticks, .. } => *total_ticks,
+            Self::Survey { .. } => constants.survey_scan_ticks,
+            Self::DeepScan { .. } => constants.deep_scan_ticks,
+            Self::Mine { duration_ticks, .. } => *duration_ticks,
+            Self::Deposit { .. } => constants.deposit_ticks,
+            Self::Idle => 0,
+        }
+    }
+
+    /// Human-readable label for this task kind.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "Idle",
+            Self::Transit { .. } => "Transit",
+            Self::Survey { .. } => "Survey",
+            Self::DeepScan { .. } => "DeepScan",
+            Self::Mine { .. } => "Mine",
+            Self::Deposit { .. } => "Deposit",
+        }
+    }
+
+    /// Target entity ID (if any) for display/events.
+    pub fn target(&self) -> Option<String> {
+        match self {
+            Self::Idle => None,
+            Self::Transit { destination, .. } => Some(destination.parent_body.0.clone()),
+            Self::Survey { site } => Some(site.0.clone()),
+            Self::DeepScan { asteroid } | Self::Mine { asteroid, .. } => Some(asteroid.0.clone()),
+            Self::Deposit { station, .. } => Some(station.0.clone()),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Trade types
 // ---------------------------------------------------------------------------

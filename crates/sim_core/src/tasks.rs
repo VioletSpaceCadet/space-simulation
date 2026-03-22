@@ -1,41 +1,38 @@
 use crate::{
-    AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, CompositionVec, Constants, DataKind,
-    Event, EventEnvelope, GameContent, GameState, InventoryItem, LotId, ResearchState, ShipId,
-    ShipState, SiteId, StationId, TaskKind, TaskState, TechEffect,
+    AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, CompositionVec, DataKind, Event,
+    EventEnvelope, GameContent, GameState, InventoryItem, LotId, ResearchState, ShipId, ShipState,
+    SiteId, StationId, TaskKind, TaskState, TechEffect,
 };
 use rand::Rng;
 
-pub(crate) fn task_duration(kind: &TaskKind, constants: &Constants) -> u64 {
-    match kind {
-        TaskKind::Transit { total_ticks, .. } => *total_ticks,
-        TaskKind::Survey { .. } => constants.survey_scan_ticks,
-        TaskKind::DeepScan { .. } => constants.deep_scan_ticks,
-        TaskKind::Mine { duration_ticks, .. } => *duration_ticks,
-        TaskKind::Deposit { .. } => constants.deposit_ticks,
-        TaskKind::Idle => 0,
-    }
-}
-
-pub(crate) fn task_kind_label(kind: &TaskKind) -> &'static str {
-    match kind {
-        TaskKind::Idle => "Idle",
-        TaskKind::Transit { .. } => "Transit",
-        TaskKind::Survey { .. } => "Survey",
-        TaskKind::DeepScan { .. } => "DeepScan",
-        TaskKind::Mine { .. } => "Mine",
-        TaskKind::Deposit { .. } => "Deposit",
-    }
-}
-
-pub(crate) fn task_target(kind: &TaskKind) -> Option<String> {
-    match kind {
-        TaskKind::Idle => None,
-        TaskKind::Transit { destination, .. } => Some(destination.parent_body.0.clone()),
-        TaskKind::Survey { site } => Some(site.0.clone()),
-        TaskKind::DeepScan { asteroid } | TaskKind::Mine { asteroid, .. } => {
-            Some(asteroid.0.clone())
+/// Resolve a completed ship task — dispatches to the appropriate handler.
+pub(crate) fn resolve_task(
+    task_kind: &TaskKind,
+    state: &mut GameState,
+    ship_id: &ShipId,
+    content: &GameContent,
+    rng: &mut impl Rng,
+    events: &mut Vec<EventEnvelope>,
+) {
+    match task_kind {
+        TaskKind::Transit {
+            ref destination,
+            ref then,
+            ..
+        } => resolve_transit(state, ship_id, destination, then, content, events),
+        TaskKind::Survey { ref site } => {
+            resolve_survey(state, ship_id, site, content, rng, events);
         }
-        TaskKind::Deposit { station, .. } => Some(station.0.clone()),
+        TaskKind::DeepScan { ref asteroid } => {
+            resolve_deep_scan(state, ship_id, asteroid, content, rng, events);
+        }
+        TaskKind::Mine { ref asteroid, .. } => {
+            resolve_mine(state, ship_id, asteroid, content, events);
+        }
+        TaskKind::Deposit { ref station, .. } => {
+            resolve_deposit(state, ship_id, station, content, events);
+        }
+        TaskKind::Idle => {}
     }
 }
 
@@ -220,9 +217,9 @@ pub(crate) fn resolve_transit(
     ));
 
     // Start the follow-on task immediately.
-    let duration = task_duration(then, &content.constants);
-    let label = task_kind_label(then).to_string();
-    let target = task_target(then);
+    let duration = then.duration(&content.constants);
+    let label = then.label().to_string();
+    let target = then.target();
 
     if let Some(ship) = state.ships.get_mut(ship_id) {
         ship.task = Some(TaskState {

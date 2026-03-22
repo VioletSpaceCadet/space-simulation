@@ -4,9 +4,7 @@
 //! when the command should be skipped (invalid target, insufficient resources,
 //! etc.) — the caller uses this to `continue` the command loop.
 
-use crate::tasks::{
-    deep_scan_enabled, inventory_volume_m3, task_duration, task_kind_label, task_target,
-};
+use crate::tasks::{deep_scan_enabled, inventory_volume_m3};
 use crate::{
     trade, EventEnvelope, GameContent, GameState, InventoryItem, ShipId, TaskKind, TaskState,
 };
@@ -477,9 +475,9 @@ pub(crate) fn apply_ship_assignments(
     events: &mut Vec<EventEnvelope>,
 ) {
     for (ship_id, task_kind) in assignments {
-        let duration = task_duration(&task_kind, &content.constants);
-        let label = task_kind_label(&task_kind).to_string();
-        let target = task_target(&task_kind);
+        let duration = task_kind.duration(&content.constants);
+        let label = task_kind.label().to_string();
+        let target = task_kind.target();
 
         if let Some(ship) = state.ships.get_mut(&ship_id) {
             ship.task = Some(TaskState {
