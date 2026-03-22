@@ -51,6 +51,8 @@ fn replenish_test_content() -> GameContent {
             melting_point_mk: None,
             latent_heat_j_per_kg: None,
             specific_heat_j_per_kg_k: None,
+            boiloff_rate_per_day_at_293k: None,
+            boiling_point_mk: None,
         }],
         module_defs: HashMap::new(),
         component_defs: vec![],

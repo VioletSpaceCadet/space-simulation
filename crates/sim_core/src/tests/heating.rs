@@ -12,6 +12,8 @@ fn heating_content() -> GameContent {
         melting_point_mk: None,
         latent_heat_j_per_kg: None,
         specific_heat_j_per_kg_k: None,
+        boiloff_rate_per_day_at_293k: None,
+        boiling_point_mk: None,
     });
     content.module_defs = HashMap::from([(
         "module_heating_unit".to_string(),
