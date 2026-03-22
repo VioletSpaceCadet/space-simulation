@@ -413,6 +413,26 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
                 item_id: ModuleItemId("module_item_0014".to_string()),
                 module_def_id: "module_basic_radiator".to_string(),
             },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0015".to_string()),
+                module_def_id: "module_basic_solar_array".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0016".to_string()),
+                module_def_id: "module_heating_unit".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0017".to_string()),
+                module_def_id: "module_electrolysis_unit".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0018".to_string()),
+                module_def_id: "module_basic_solar_array".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0019".to_string()),
+                module_def_id: "module_propulsion_lab".to_string(),
+            },
             InventoryItem::Material {
                 element: "Fe".to_string(),
                 kg: 500.0,
@@ -1135,5 +1155,49 @@ mod tests {
 
         assert_eq!(setup.game_state.meta.seed, 7);
         assert!(setup.run_dir.is_none());
+    }
+
+    /// Verify build_initial_state() produces the same module set as dev_base_state.json.
+    /// Prevents drift between the two initial state sources.
+    #[test]
+    fn build_initial_state_matches_dev_base_state_modules() {
+        let content = load_content("../../content").unwrap();
+        let mut rng = rand::rngs::mock::StepRng::new(42, 1);
+        let built = build_initial_state(&content, 42, &mut rng);
+
+        let json = std::fs::read_to_string("../../content/dev_base_state.json").unwrap();
+        let loaded: GameState = serde_json::from_str(&json).unwrap();
+
+        let station_id = StationId("station_earth_orbit".to_string());
+        let built_station = &built.stations[&station_id];
+        let loaded_station = &loaded.stations[&station_id];
+
+        // Extract module def_ids from both, sorted for comparison
+        let mut built_modules: Vec<&str> = built_station
+            .inventory
+            .iter()
+            .filter_map(|item| match item {
+                InventoryItem::Module { module_def_id, .. } => Some(module_def_id.as_str()),
+                _ => None,
+            })
+            .collect();
+        built_modules.sort();
+
+        let mut loaded_modules: Vec<&str> = loaded_station
+            .inventory
+            .iter()
+            .filter_map(|item| match item {
+                InventoryItem::Module { module_def_id, .. } => Some(module_def_id.as_str()),
+                _ => None,
+            })
+            .collect();
+        loaded_modules.sort();
+
+        assert_eq!(
+            built_modules, loaded_modules,
+            "build_initial_state() modules differ from dev_base_state.json.\n\
+             Built: {built_modules:?}\n\
+             Loaded: {loaded_modules:?}"
+        );
     }
 }
