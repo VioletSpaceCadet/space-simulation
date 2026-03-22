@@ -21,7 +21,7 @@ This is a Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_dae
 
 ## MCP Tools Reference
 
-You have 9 MCP tools via the `balance-advisor` server. **The daemon must be running** for all tools except `start_simulation` and `get_game_parameters`.
+You have 12 MCP tools via the `balance-advisor` server. **The daemon must be running** for lifecycle and analysis tools. Knowledge tools work standalone (filesystem only).
 
 ### Lifecycle Tools
 
@@ -67,6 +67,23 @@ You have 9 MCP tools via the `balance-advisor` server. **The daemon must be runn
 - Parameters (all required strings): `parameter_path` (dotted path, e.g. `constants.mining_rate_kg_per_tick`), `current_value`, `proposed_value`, `rationale`, `expected_impact`.
 - Returns: `{ status: "saved", path: "content/advisor_proposals/proposal_<timestamp>.json" }`
 
+### Knowledge Tools
+
+**`query_knowledge`** — Search past run journals and the strategy playbook. Use before starting analysis to check past observations.
+- Parameters: `query?: string`, `tags?: string[]`, `source?: "journals"|"playbook"|"all"` (default "all"), `limit?: integer` (default 5)
+- Returns: `{ status: "ok", total_results, journals: JournalSummary[], playbook: PlaybookMatch[] }`
+- No daemon needed.
+
+**`save_run_journal`** — Persist analysis session findings. Auto-generates UUID + timestamp.
+- Parameters: `seed: integer`, `tick_range: [int, int]`, `observations: Observation[]`, `bottlenecks: Bottleneck[]`, `alerts_seen: JournalAlert[]`, `parameter_changes: ParameterChange[]`, `strategy_notes: string[]`, `tags: string[]`, plus optional ML fields (`final_score`, `collapse_tick`, `bottleneck_timeline`, `autopilot_config_hash`, `parquet_path`).
+- Returns: `{ status: "saved", id, path, timestamp }`
+- No daemon needed.
+
+**`update_playbook`** — Append to or replace a section of the strategy playbook.
+- Parameters: `section: string` (e.g. "Bottleneck Resolutions > Ore Supply"), `content: string`, `mode?: "append"|"replace"` (default "append")
+- Returns: `{ status: "updated", section, mode, lines_added }`
+- No daemon needed.
+
 ### Sequencing Constraints
 
 1. Call `start_simulation` before any other tool (except `get_game_parameters`).
@@ -78,14 +95,17 @@ You have 9 MCP tools via the `balance-advisor` server. **The daemon must be runn
 ## Testing Workflows
 
 ### Standard E2E Simulation Test
-1. Start a simulation with `start_simulation` (use a specific seed for reproducibility).
-2. Set speed to 1000+ tps with `set_speed` for fast data accumulation.
-3. Wait for sufficient data — at least 50+ metric samples (captured every 60 ticks, so ~3000+ ticks minimum). For ship transit analysis, wait 2,880+ ticks per hop.
-4. Use `get_metrics_digest` to analyze trends, production rates, and bottlenecks.
-5. Use `get_active_alerts` to check for operational issues.
-6. If anomalies found, use `get_game_parameters` to compare current values.
-7. If a fix is warranted, use `suggest_parameter_change` with clear rationale.
-8. Stop the simulation with `stop_simulation` when done.
+1. **Recall:** Call `query_knowledge` with relevant tags/keywords to check past observations.
+2. Start a simulation with `start_simulation` (use a specific seed for reproducibility).
+3. Set speed to 1000+ tps with `set_speed` for fast data accumulation.
+4. Wait for sufficient data — at least 50+ metric samples (captured every 60 ticks, so ~3000+ ticks minimum). For ship transit analysis, wait 2,880+ ticks per hop.
+5. Use `get_metrics_digest` to analyze trends, production rates, and bottlenecks.
+6. Use `get_active_alerts` to check for operational issues.
+7. If anomalies found, use `get_game_parameters` to compare current values.
+8. If a fix is warranted, use `suggest_parameter_change` with clear rationale.
+9. **Record:** Call `save_run_journal` with observations, bottlenecks, alerts, and strategy notes.
+10. Stop the simulation with `stop_simulation` when done.
+11. **Generalize:** If a pattern is confirmed across multiple runs, call `update_playbook` to add it.
 
 ### Bulk Simulation Testing
 1. Use `sim_bench` for multi-seed scenario testing:
