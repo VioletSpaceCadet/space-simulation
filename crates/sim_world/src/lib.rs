@@ -446,7 +446,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         meta: MetaState {
             tick: 0,
             seed,
-            schema_version: 1,
+            schema_version: sim_core::CURRENT_SCHEMA_VERSION,
             content_version: content.content_version.clone(),
         },
         scan_sites,
@@ -534,6 +534,16 @@ pub fn load_or_build_state(
             std::fs::read_to_string(path).with_context(|| format!("reading state file: {path}"))?;
         let mut loaded: GameState =
             serde_json::from_str(&json).with_context(|| format!("parsing state file: {path}"))?;
+
+        // Validate schema version
+        let expected = sim_core::CURRENT_SCHEMA_VERSION;
+        let actual = loaded.meta.schema_version;
+        anyhow::ensure!(
+            actual == expected,
+            "Save file '{path}' has schema version {actual}, but the engine expects version {expected}. \
+             This save is incompatible with the current engine."
+        );
+
         loaded.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
         let rng = ChaCha8Rng::seed_from_u64(loaded.meta.seed);
         validate_state(&loaded, content);
@@ -909,5 +919,50 @@ mod tests {
             body_cache: std::collections::HashMap::new(),
         };
         validate_state(&state, &content);
+    }
+
+    #[test]
+    fn schema_version_match_loads_successfully() {
+        let content = base_content();
+        let mut rng = ChaCha8Rng::seed_from_u64(1);
+        let state = build_initial_state(&content, 1, &mut rng);
+        assert_eq!(state.meta.schema_version, sim_core::CURRENT_SCHEMA_VERSION);
+
+        // Write state to temp file and load it back
+        let dir = std::env::temp_dir().join("sim_test_schema_match");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("state.json");
+        let json = serde_json::to_string_pretty(&state).unwrap();
+        std::fs::write(&path, &json).unwrap();
+
+        let result = load_or_build_state(&content, None, Some(path.to_str().unwrap()));
+        assert!(
+            result.is_ok(),
+            "current schema version should load: {result:?}"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn schema_version_mismatch_returns_error() {
+        let content = base_content();
+        let mut rng = ChaCha8Rng::seed_from_u64(1);
+        let mut state = build_initial_state(&content, 1, &mut rng);
+        state.meta.schema_version = 999; // future version
+
+        let dir = std::env::temp_dir().join("sim_test_schema_mismatch");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("state.json");
+        let json = serde_json::to_string_pretty(&state).unwrap();
+        std::fs::write(&path, &json).unwrap();
+
+        let result = load_or_build_state(&content, None, Some(path.to_str().unwrap()));
+        assert!(result.is_err(), "mismatched schema version should error");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("schema version 999"),
+            "error should mention actual version: {err_msg}"
+        );
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

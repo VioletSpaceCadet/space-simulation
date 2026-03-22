@@ -31,6 +31,14 @@ pub const TAG_IRON_RICH: &str = "IronRich";
 pub const TAG_VOLATILE_RICH: &str = "VolatileRich";
 
 // ---------------------------------------------------------------------------
+// Schema version
+// ---------------------------------------------------------------------------
+
+/// Current save-file schema version. Bump when state shape changes in a
+/// backward-incompatible way (new required fields, removed fields, type changes).
+pub const CURRENT_SCHEMA_VERSION: u32 = 1;
+
+// ---------------------------------------------------------------------------
 // ID newtypes
 // ---------------------------------------------------------------------------
 
