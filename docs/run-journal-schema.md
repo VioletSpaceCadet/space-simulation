@@ -13,7 +13,7 @@ A run journal captures observations, bottlenecks, parameter changes, and learnin
 | `ticks_per_sec` | `number` | no | Simulation speed used during observation |
 | `observations` | `Observation[]` | yes | Structured observations from the session (may be empty) |
 | `bottlenecks` | `Bottleneck[]` | yes | Bottlenecks detected during the session (may be empty) |
-| `alerts_seen` | `Alert[]` | yes | Alerts that fired during the session (may be empty) |
+| `alerts_seen` | `JournalAlert[]` | yes | Alerts that fired during the session (may be empty) |
 | `parameter_changes` | `ParameterChange[]` | yes | Parameter changes proposed or applied (may be empty) |
 | `strategy_notes` | `string[]` | yes | Free-form learnings and insights (may be empty) |
 | `tags` | `string[]` | yes | Categorization tags (e.g. `"ore-supply"`, `"fleet-sizing"`, `"slag-management"`) |
@@ -36,7 +36,7 @@ A run journal captures observations, bottlenecks, parameter changes, and learnin
 | `tick_range` | `[integer, integer]` | yes | `[start_tick, end_tick]` when bottleneck was active |
 | `description` | `string` | yes | Human-readable description of the bottleneck |
 
-### Alert
+### JournalAlert
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -50,8 +50,8 @@ A run journal captures observations, bottlenecks, parameter changes, and learnin
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `parameter_path` | `string` | yes | Dotted path to the parameter (e.g. `"constants.survey_scan_ticks"`) |
-| `old_value` | `string` | yes | Value before change |
-| `new_value` | `string` | yes | Value after change |
+| `current_value` | `string` | yes | Value before change |
+| `proposed_value` | `string` | yes | Value after change |
 | `rationale` | `string` | yes | Why the change was made |
 
 ## File Naming

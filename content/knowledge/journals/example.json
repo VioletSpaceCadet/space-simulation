@@ -55,8 +55,8 @@
   "parameter_changes": [
     {
       "parameter_path": "constants.ticks_per_au",
-      "old_value": "720",
-      "new_value": "360",
+      "current_value": "720",
+      "proposed_value": "360",
       "rationale": "Halving transit time to test whether ore starvation resolves with faster fleet turnaround"
     }
   ],

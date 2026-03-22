@@ -23,7 +23,7 @@ export interface Bottleneck {
 }
 
 /** An alert that fired during the session. */
-export interface Alert {
+export interface JournalAlert {
   /** Alert rule ID matching AlertEngine IDs (e.g. "ORE_STARVATION"). */
   alert_id: string;
   /** Alert severity level. */
@@ -39,9 +39,9 @@ export interface ParameterChange {
   /** Dotted path to the parameter (e.g. "constants.survey_scan_ticks"). */
   parameter_path: string;
   /** Value before change. */
-  old_value: string;
+  current_value: string;
   /** Value after change. */
-  new_value: string;
+  proposed_value: string;
   /** Why the change was made. */
   rationale: string;
 }
@@ -69,7 +69,7 @@ export interface RunJournal {
   /** Bottlenecks detected during the session. */
   bottlenecks: Bottleneck[];
   /** Alerts that fired during the session. */
-  alerts_seen: Alert[];
+  alerts_seen: JournalAlert[];
   /** Parameter changes proposed or applied. */
   parameter_changes: ParameterChange[];
   /** Free-form learnings and insights. */
