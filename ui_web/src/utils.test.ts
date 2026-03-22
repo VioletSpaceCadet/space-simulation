@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { getEventKey, getTaskKind } from './utils';
 
 describe('getEventKey', () => {
