@@ -2384,4 +2384,179 @@ mod tests {
             }
         }
     }
+
+    // ── Propellant pipeline tests ───────────────────────────────────────
+
+    fn add_electrolysis_module(state: &mut sim_core::GameState, enabled: bool) {
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("electrolysis_inst_001".to_string()),
+            def_id: "module_electrolysis_unit".to_string(),
+            enabled,
+            kind_state: sim_core::ModuleKindState::Processor(sim_core::ProcessorState {
+                threshold_kg: 200.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+            }),
+            wear: sim_core::WearState::default(),
+            power_stalled: false,
+            thermal: None,
+        });
+    }
+
+    fn add_heating_module(state: &mut sim_core::GameState, enabled: bool) {
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("heating_inst_001".to_string()),
+            def_id: "module_heating_unit".to_string(),
+            enabled,
+            kind_state: sim_core::ModuleKindState::Processor(sim_core::ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+            }),
+            wear: sim_core::WearState::default(),
+            power_stalled: false,
+            thermal: None,
+        });
+    }
+
+    fn add_lh2_inventory(state: &mut sim_core::GameState, kg: f32) {
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.inventory.push(InventoryItem::Material {
+            element: "LH2".to_string(),
+            kg,
+            quality: 1.0,
+            thermal: None,
+        });
+    }
+
+    #[test]
+    fn test_propellant_noop_without_electrolysis() {
+        let content = autopilot_content();
+        let state = autopilot_state(&content);
+        let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
+        let mut next_id = 0u64;
+
+        let commands = propellant_pipeline_commands(&state, &content, &owner, &mut next_id);
+        assert!(
+            commands.is_empty(),
+            "should emit no commands when station has no electrolysis module"
+        );
+    }
+
+    #[test]
+    fn test_propellant_enables_when_lh2_low() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+        add_electrolysis_module(&mut state, false);
+        add_heating_module(&mut state, false);
+        // LH2 = 0 (below threshold of 5000)
+
+        let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
+        let mut next_id = 0u64;
+        let commands = propellant_pipeline_commands(&state, &content, &owner, &mut next_id);
+
+        let enables_electrolysis = commands.iter().any(|cmd| {
+            matches!(
+                &cmd.command,
+                Command::SetModuleEnabled { module_id, enabled: true, .. }
+                if module_id.0 == "electrolysis_inst_001"
+            )
+        });
+        let enables_heating = commands.iter().any(|cmd| {
+            matches!(
+                &cmd.command,
+                Command::SetModuleEnabled { module_id, enabled: true, .. }
+                if module_id.0 == "heating_inst_001"
+            )
+        });
+
+        assert!(
+            enables_electrolysis,
+            "should enable disabled electrolysis when LH2 is low"
+        );
+        assert!(
+            enables_heating,
+            "should enable disabled heating when LH2 is low"
+        );
+    }
+
+    #[test]
+    fn test_propellant_disables_when_lh2_abundant() {
+        let mut content = autopilot_content();
+        content.constants.autopilot_lh2_threshold_kg = 1000.0;
+        let mut state = autopilot_state(&content);
+        add_electrolysis_module(&mut state, true);
+        add_lh2_inventory(&mut state, 3000.0); // > 2x threshold (2000)
+
+        let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
+        let mut next_id = 0u64;
+        let commands = propellant_pipeline_commands(&state, &content, &owner, &mut next_id);
+
+        let disables = commands.iter().any(|cmd| {
+            matches!(
+                &cmd.command,
+                Command::SetModuleEnabled { module_id, enabled: false, .. }
+                if module_id.0 == "electrolysis_inst_001"
+            )
+        });
+
+        assert!(
+            disables,
+            "should disable electrolysis when LH2 > 2x threshold"
+        );
+    }
+
+    #[test]
+    fn test_propellant_dead_band_no_commands() {
+        let mut content = autopilot_content();
+        content.constants.autopilot_lh2_threshold_kg = 1000.0;
+        let mut state = autopilot_state(&content);
+        add_electrolysis_module(&mut state, true);
+        add_lh2_inventory(&mut state, 1500.0); // Between threshold (1000) and 2x (2000)
+
+        let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
+        let mut next_id = 0u64;
+        let commands = propellant_pipeline_commands(&state, &content, &owner, &mut next_id);
+
+        assert!(
+            commands.is_empty(),
+            "should emit no commands in dead band (threshold < LH2 < 2x threshold)"
+        );
+    }
+
+    #[test]
+    fn test_propellant_skips_max_worn_module() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("electrolysis_inst_001".to_string()),
+            def_id: "module_electrolysis_unit".to_string(),
+            enabled: false,
+            kind_state: sim_core::ModuleKindState::Processor(sim_core::ProcessorState {
+                threshold_kg: 200.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+            }),
+            wear: sim_core::WearState { wear: 1.0 },
+            power_stalled: false,
+            thermal: None,
+        });
+        // LH2 = 0 (below threshold)
+
+        let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
+        let mut next_id = 0u64;
+        let commands = propellant_pipeline_commands(&state, &content, &owner, &mut next_id);
+
+        assert!(
+            commands.is_empty(),
+            "should not enable max-worn electrolysis module"
+        );
+    }
 }
