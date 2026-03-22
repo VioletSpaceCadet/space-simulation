@@ -15,9 +15,6 @@ use std::collections::HashMap;
 /// Minimum meaningful mass — amounts below this are discarded as rounding noise.
 const MIN_MEANINGFUL_KG: f32 = 1e-3;
 
-/// Tech ID required for ship construction recipes.
-const TECH_SHIP_CONSTRUCTION: &str = "tech_ship_construction";
-
 /// Estimate the total output volume (m3) a recipe would produce given the
 /// consumed lots and their weighted-average composition.
 fn estimate_output_volume_m3(

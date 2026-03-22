@@ -49,6 +49,31 @@ pub(crate) fn deep_scan_enabled(research: &ResearchState, content: &GameContent)
         .any(|effect| matches!(effect, TechEffect::EnableDeepScan))
 }
 
+/// True if any unlocked tech grants the `EnableShipConstruction` effect.
+pub(crate) fn ship_construction_enabled(research: &ResearchState, content: &GameContent) -> bool {
+    content
+        .techs
+        .iter()
+        .filter(|tech| research.unlocked.contains(&tech.id))
+        .flat_map(|tech| &tech.effects)
+        .any(|effect| matches!(effect, TechEffect::EnableShipConstruction))
+}
+
+/// Returns the `TechId` of the first tech with `EnableShipConstruction` effect, if any.
+pub(crate) fn ship_construction_tech_id(content: &GameContent) -> Option<&crate::TechId> {
+    content.techs.iter().find_map(|tech| {
+        if tech
+            .effects
+            .iter()
+            .any(|e| matches!(e, TechEffect::EnableShipConstruction))
+        {
+            Some(&tech.id)
+        } else {
+            None
+        }
+    })
+}
+
 /// Composition noise sigma from unlocked tech effects, defaulting to 0.0.
 fn composition_noise_sigma(research: &ResearchState, content: &GameContent) -> f32 {
     content
