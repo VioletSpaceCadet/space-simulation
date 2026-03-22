@@ -1493,7 +1493,7 @@ pub enum OverheatZone {
     Warning,
     /// Above `max_temp_mk` + critical offset — auto-stall + accelerated wear (4x default).
     Critical,
-    /// Above `max_temp_mk` + damage offset — wear jumps to critical band (0.8), auto-disable.
+    /// Above `max_temp_mk` + damage offset — wear jumps to `wear_band_critical_threshold`, auto-disable.
     Damage,
 }
 

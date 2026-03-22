@@ -405,10 +405,11 @@ fn check_overheat_zones(
             }
         }
 
-        // Damage zone: wear jumps to critical band (0.8).
+        // Damage zone: wear jumps to critical band threshold.
         if new_zone == OverheatZone::Damage {
             let wear_before = module.wear.wear;
-            module.wear.wear = module.wear.wear.max(0.8);
+            let critical_threshold = content.constants.wear_band_critical_threshold;
+            module.wear.wear = module.wear.wear.max(critical_threshold);
             // Emit damage event with wear_before for diagnostics.
             events.push(crate::emit(
                 &mut state.counters,
