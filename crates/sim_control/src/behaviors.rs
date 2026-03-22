@@ -95,10 +95,18 @@ fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
     ships
 }
 
-/// Returns asteroid IDs above confidence threshold with unknown composition, sorted by ID.
-/// Includes both `IronRich` and `VolatileRich` candidates.
-fn collect_deep_scan_candidates(state: &GameState, content: &GameContent) -> Vec<AsteroidId> {
-    let mut candidates: Vec<AsteroidId> = state
+/// Returns asteroid IDs above confidence threshold with unknown composition,
+/// sorted by distance from `reference_pos` (nearest first), with ID tiebreak for determinism.
+fn collect_deep_scan_candidates(
+    state: &GameState,
+    content: &GameContent,
+    reference_pos: &Position,
+) -> Vec<AsteroidId> {
+    if state.asteroids.is_empty() {
+        return Vec::new();
+    }
+    let ref_abs = compute_entity_absolute(reference_pos, &state.body_cache);
+    let mut candidates: Vec<(AsteroidId, u128)> = state
         .asteroids
         .values()
         .filter(|asteroid| {
@@ -110,10 +118,14 @@ fn collect_deep_scan_candidates(state: &GameState, content: &GameContent) -> Vec
                             && *conf > content.constants.autopilot_volatile_confidence_threshold)
                 })
         })
-        .map(|a| a.id.clone())
+        .map(|a| {
+            let dist =
+                ref_abs.distance_squared(compute_entity_absolute(&a.position, &state.body_cache));
+            (a.id.clone(), dist)
+        })
         .collect();
-    candidates.sort_by(|a, b| a.0.cmp(&b.0));
-    candidates
+    candidates.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0 .0.cmp(&b.0 .0)));
+    candidates.into_iter().map(|(id, _)| id).collect()
 }
 
 /// Check if any station has a heating module installed.
@@ -734,13 +746,33 @@ impl AutopilotBehavior for ShipTaskScheduler {
         let mut commands = Vec::new();
 
         let idle_ships = collect_idle_ships(state, owner);
+        if idle_ships.is_empty() {
+            return commands;
+        }
         let deep_scan_unlocked = state
             .research
             .unlocked
             .contains(&TechId("tech_deep_scan_v1".to_string()));
-        let deep_scan_candidates = collect_deep_scan_candidates(state, content);
+
+        // Use first idle ship's position as reference for distance sorting.
+        let reference_pos = &state.ships[&idle_ships[0]].position;
+
+        let deep_scan_candidates = collect_deep_scan_candidates(state, content, reference_pos);
         let mut next_deep_scan = deep_scan_candidates.iter();
-        let mut next_site = state.scan_sites.iter();
+
+        // Sort survey sites by distance from reference position (nearest first).
+        let mut sorted_sites: Vec<&sim_core::ScanSite> = state.scan_sites.iter().collect();
+        if !sorted_sites.is_empty() {
+            let ref_abs = compute_entity_absolute(reference_pos, &state.body_cache);
+            sorted_sites.sort_by(|a, b| {
+                let da = ref_abs
+                    .distance_squared(compute_entity_absolute(&a.position, &state.body_cache));
+                let db = ref_abs
+                    .distance_squared(compute_entity_absolute(&b.position, &state.body_cache));
+                da.cmp(&db).then_with(|| a.id.0.cmp(&b.id.0))
+            });
+        }
+        let mut next_site = sorted_sites.iter();
 
         // Determine if we need volatile-rich mining (for H2O or propellant pipeline)
         let has_electrolysis = state.stations.values().any(|s| {
@@ -841,8 +873,8 @@ impl AutopilotBehavior for ShipTaskScheduler {
                 }
             }
 
-            // Priority 4: survey unscanned sites.
-            if let Some(site) = next_site.next() {
+            // Priority 4: survey unscanned sites (nearest first).
+            if let Some(&site) = next_site.next() {
                 let task = maybe_transit(
                     TaskKind::Survey {
                         site: SiteId(site.id.0.clone()),
@@ -897,6 +929,7 @@ pub(crate) fn test_propellant_pipeline_commands(
 pub(crate) fn test_collect_deep_scan_candidates(
     state: &GameState,
     content: &GameContent,
+    reference_pos: &Position,
 ) -> Vec<AsteroidId> {
-    collect_deep_scan_candidates(state, content)
+    collect_deep_scan_candidates(state, content, reference_pos)
 }
