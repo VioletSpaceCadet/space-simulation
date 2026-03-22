@@ -183,8 +183,8 @@ function DomainBar({ domain, required, evidence }: DomainBarProps) {
             lineHeight: 1,
           }}
         >
-          <span>{domain}</span>
-          <span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{domain}</span>
+          <span style={{ flexShrink: 0, marginLeft: 4 }}>
             {Math.round(evidence)}/{required}
           </span>
         </div>
