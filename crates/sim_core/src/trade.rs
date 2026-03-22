@@ -249,7 +249,12 @@ pub fn merge_into_inventory(inventory: &mut Vec<InventoryItem>, new_items: Vec<I
                     ..
                 }) = existing
                 {
-                    let blended = blend_thermal(existing_thermal, *existing_kg, thermal, *kg);
+                    let blended = blend_thermal(
+                        existing_thermal.as_ref(),
+                        *existing_kg,
+                        thermal.as_ref(),
+                        *kg,
+                    );
                     *existing_kg += kg;
                     *existing_thermal = blended;
                 } else {

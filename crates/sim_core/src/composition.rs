@@ -65,23 +65,25 @@ pub(crate) fn blend_slag_composition(
 /// If both are set, produces a mass-weighted average of temperature and latent
 /// heat, keeping the phase of the larger batch.
 pub(crate) fn blend_thermal(
-    a: &Option<MaterialThermalProps>,
+    a: Option<&MaterialThermalProps>,
     a_kg: f32,
-    b: &Option<MaterialThermalProps>,
+    b: Option<&MaterialThermalProps>,
     b_kg: f32,
 ) -> Option<MaterialThermalProps> {
     match (a, b) {
         (None, None) => None,
         (Some(t), None) | (None, Some(t)) => Some(t.clone()),
         (Some(ta), Some(tb)) => {
-            let total = a_kg + b_kg;
+            let total = f64::from(a_kg) + f64::from(b_kg);
             if total <= 0.0 {
                 return Some(ta.clone());
             }
-            let wa = a_kg as f64 / total as f64;
-            let wb = b_kg as f64 / total as f64;
+            let wa = f64::from(a_kg) / total;
+            let wb = f64::from(b_kg) / total;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let blended_temp =
                 (f64::from(ta.temp_mk) * wa + f64::from(tb.temp_mk) * wb).round() as u32;
+            #[allow(clippy::cast_possible_truncation)]
             let blended_latent = (ta.latent_heat_buffer_j as f64 * wa
                 + tb.latent_heat_buffer_j as f64 * wb)
                 .round() as i64;
@@ -124,7 +126,12 @@ pub(crate) fn merge_material_lot(
         ..
     }) = existing
     {
-        let blended = blend_thermal(existing_thermal, *existing_kg, &thermal, kg);
+        let blended = blend_thermal(
+            existing_thermal.as_ref(),
+            *existing_kg,
+            thermal.as_ref(),
+            kg,
+        );
         *existing_kg += kg;
         *existing_thermal = blended;
     } else {
@@ -236,7 +243,7 @@ mod tests {
 
     #[test]
     fn blend_thermal_both_none_returns_none() {
-        assert!(blend_thermal(&None, 100.0, &None, 50.0).is_none());
+        assert!(blend_thermal(None, 100.0, None, 50.0).is_none());
     }
 
     #[test]
@@ -246,7 +253,7 @@ mod tests {
             phase: crate::Phase::Liquid,
             latent_heat_buffer_j: 1000,
         };
-        let result = blend_thermal(&Some(t.clone()), 100.0, &None, 50.0);
+        let result = blend_thermal(Some(&t), 100.0, None, 50.0);
         assert_eq!(result.unwrap().temp_mk, 500_000);
     }
 
@@ -263,7 +270,7 @@ mod tests {
             latent_heat_buffer_j: 1000,
         };
         // 100kg at 300K + 100kg at 500K => 400K, latent = 500
-        let result = blend_thermal(&Some(a), 100.0, &Some(b), 100.0).unwrap();
+        let result = blend_thermal(Some(&a), 100.0, Some(&b), 100.0).unwrap();
         assert_eq!(result.temp_mk, 400_000);
         assert_eq!(result.latent_heat_buffer_j, 500);
         // Equal mass => phase from a (a_kg >= b_kg)
@@ -283,7 +290,7 @@ mod tests {
             latent_heat_buffer_j: 0,
         };
         // 50kg solid + 200kg liquid => liquid phase wins
-        let result = blend_thermal(&Some(a), 50.0, &Some(b), 200.0).unwrap();
+        let result = blend_thermal(Some(&a), 50.0, Some(&b), 200.0).unwrap();
         assert_eq!(result.phase, crate::Phase::Liquid);
         // temp = (300K*50 + 500K*200) / 250 = 460K
         assert_eq!(result.temp_mk, 460_000);
