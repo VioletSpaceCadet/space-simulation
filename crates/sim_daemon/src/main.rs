@@ -138,7 +138,7 @@ async fn main() -> Result<()> {
                 run_dir,
                 paused: Arc::new(AtomicBool::new(paused)),
             };
-            let router = make_router_with_cors(app_state.clone(), &cors_origin);
+            let router = make_router_with_cors(app_state.clone(), &cors_origin)?;
             let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
             let speed = if ticks_per_sec == 0.0 {
                 "max".to_string()

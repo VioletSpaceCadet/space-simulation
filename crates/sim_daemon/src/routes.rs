@@ -23,16 +23,23 @@ use tower_http::trace::TraceLayer;
 
 #[cfg(test)]
 pub fn make_router(state: AppState) -> Router {
-    make_router_with_cors(state, "http://localhost:5173")
+    make_router_with_cors(state, "http://localhost:5173").expect("test CORS origin is valid")
 }
 
-pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> Router {
+pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
+    let header_value = cors_origin
+        .parse::<axum::http::HeaderValue>()
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "Invalid CORS origin '{cors_origin}': must be a valid HTTP header value"
+            )
+        })?;
     let cors = CorsLayer::new()
-        .allow_origin(cors_origin.parse::<axum::http::HeaderValue>().unwrap())
+        .allow_origin(header_value)
         .allow_methods([Method::GET, Method::POST])
         .allow_headers(Any);
 
-    Router::new()
+    Ok(Router::new()
         .route("/api/v1/meta", get(meta_handler))
         .route("/api/v1/snapshot", get(snapshot_handler))
         .route("/api/v1/metrics", get(metrics_handler))
@@ -49,7 +56,7 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> Router {
         .route("/api/v1/speed", post(speed_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(state)
+        .with_state(state))
 }
 
 pub async fn meta_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
@@ -415,6 +422,62 @@ pub async fn speed_handler(
         StatusCode::OK,
         Json(serde_json::json!({"ticks_per_sec": tps})),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::{AppState, SimState};
+    use parking_lot::Mutex;
+    use sim_control::AutopilotController;
+    use std::collections::VecDeque;
+    use std::sync::atomic::{AtomicBool, AtomicU64};
+    use std::sync::Arc;
+
+    fn test_app_state() -> AppState {
+        let content_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../content")
+            .to_string_lossy()
+            .to_string();
+        let content = sim_world::load_content(&content_dir).expect("load content");
+        let (game_state, rng) =
+            sim_world::load_or_build_state(&content, Some(1), None).expect("build state");
+        let (event_tx, _) = broadcast::channel(16);
+        let sim = Arc::new(Mutex::new(SimState {
+            game_state,
+            content,
+            rng,
+            autopilot: AutopilotController,
+            next_command_id: 1,
+            metrics_every: 0,
+            metrics_history: VecDeque::new(),
+            metrics_writer: None,
+            alert_engine: None,
+        }));
+        AppState {
+            sim,
+            command_queue: Arc::new(Mutex::new(Vec::new())),
+            event_tx,
+            ticks_per_sec: Arc::new(AtomicU64::new(0)),
+            run_dir: None,
+            paused: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    #[test]
+    fn valid_cors_origin_succeeds() {
+        let state = test_app_state();
+        assert!(make_router_with_cors(state, "http://localhost:5173").is_ok());
+    }
+
+    #[test]
+    fn invalid_cors_origin_returns_error() {
+        let state = test_app_state();
+        let result = make_router_with_cors(state, "not a valid \x00 header");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid CORS origin"), "got: {err_msg}");
+    }
 }
 
 pub async fn stream_handler(
