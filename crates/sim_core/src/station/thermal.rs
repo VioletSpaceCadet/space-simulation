@@ -174,12 +174,13 @@ fn apply_idle_heat(
         return;
     };
     if let Some(ref mut thermal) = station.modules[module_index].thermal {
-        let new_temp = if delta_mk >= 0 {
-            #[allow(clippy::cast_sign_loss)]
-            thermal.temp_mk.saturating_add(delta_mk as u32)
-        } else {
-            thermal.temp_mk.saturating_sub(delta_mk.unsigned_abs())
-        };
+        // idle_w > 0 guaranteed by early return, so delta_mk is always non-negative.
+        debug_assert!(
+            delta_mk >= 0,
+            "idle heat delta must be >= 0, got {delta_mk}"
+        );
+        #[allow(clippy::cast_sign_loss)]
+        let new_temp = thermal.temp_mk.saturating_add(delta_mk as u32);
         thermal.temp_mk = new_temp.min(T_MAX_ABSOLUTE_MK);
     }
 }
