@@ -140,6 +140,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
                 modules: vec![],
+                modifiers: crate::modifiers::ModifierSet::default(),
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
@@ -160,6 +161,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
             next_lot_id: 0,
             next_module_instance_id: 0,
         },
+        modifiers: crate::modifiers::ModifierSet::default(),
         body_cache: std::collections::HashMap::new(),
     }
 }

@@ -554,6 +554,7 @@ mod tests {
                             ..Default::default()
                         }),
                     }],
+                    modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
@@ -574,6 +575,7 @@ mod tests {
                 next_lot_id: 0,
                 next_module_instance_id: 0,
             },
+            modifiers: crate::modifiers::ModifierSet::default(),
             body_cache: std::collections::HashMap::new(),
         }
     }

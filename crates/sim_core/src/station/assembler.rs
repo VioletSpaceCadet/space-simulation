@@ -373,6 +373,7 @@ fn resolve_assembler_run(
                     inventory: vec![],
                     cargo_capacity_m3: *cargo_capacity_m3,
                     task: None,
+                    modifiers: crate::modifiers::ModifierSet::default(),
                 };
                 state.ships.insert(ship_id.clone(), ship);
                 events.push(crate::emit(
@@ -507,6 +508,7 @@ mod assembler_component_tests {
                         power_stalled: false,
                         thermal: None,
                     }],
+                    modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
@@ -527,6 +529,7 @@ mod assembler_component_tests {
                 next_lot_id: 0,
                 next_module_instance_id: 0,
             },
+            modifiers: crate::modifiers::ModifierSet::default(),
             body_cache: std::collections::HashMap::new(),
         }
     }
@@ -806,6 +809,7 @@ mod assembler_component_tests {
                         power_stalled: false,
                         thermal: None,
                     }],
+                    modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
@@ -826,6 +830,7 @@ mod assembler_component_tests {
                 next_lot_id: 0,
                 next_module_instance_id: 0,
             },
+            modifiers: crate::modifiers::ModifierSet::default(),
             body_cache: std::collections::HashMap::new(),
         }
     }

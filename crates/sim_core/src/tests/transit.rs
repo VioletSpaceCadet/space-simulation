@@ -63,6 +63,7 @@ fn transit_moves_ship_and_starts_next_task() {
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
                 task: None,
+                modifiers: crate::modifiers::ModifierSet::default(),
             },
         )]),
         stations: HashMap::from([(
@@ -74,6 +75,7 @@ fn transit_moves_ship_and_starts_next_task() {
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
                 modules: vec![],
+                modifiers: crate::modifiers::ModifierSet::default(),
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
@@ -94,6 +96,7 @@ fn transit_moves_ship_and_starts_next_task() {
             next_lot_id: 0,
             next_module_instance_id: 0,
         },
+        modifiers: crate::modifiers::ModifierSet::default(),
         body_cache: std::collections::HashMap::new(),
     };
 
@@ -243,6 +246,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
                 task: None,
+                modifiers: crate::modifiers::ModifierSet::default(),
             },
         )]),
         stations: HashMap::from([(
@@ -254,6 +258,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 cargo_capacity_m3: 10_000.0,
                 power_available_per_tick: 100.0,
                 modules: vec![],
+                modifiers: crate::modifiers::ModifierSet::default(),
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
@@ -274,6 +279,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
             next_lot_id: 0,
             next_module_instance_id: 0,
         },
+        modifiers: crate::modifiers::ModifierSet::default(),
         body_cache: std::collections::HashMap::new(),
     };
 

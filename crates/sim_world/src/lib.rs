@@ -407,6 +407,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         modules: vec![],
+        modifiers: sim_core::modifiers::ModifierSet::default(),
         power: PowerState::default(),
         cached_inventory_volume_m3: None,
     };
@@ -419,6 +420,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         inventory: vec![],
         cargo_capacity_m3: c.ship_cargo_capacity_m3,
         task: None,
+        modifiers: sim_core::modifiers::ModifierSet::default(),
     };
     // Place scan sites in zone bodies using weighted picking + area-sampled positions.
     let zone_bodies: Vec<&sim_core::OrbitalBodyDef> = content
@@ -472,6 +474,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             next_lot_id: 0,
             next_module_instance_id: 0,
         },
+        modifiers: sim_core::modifiers::ModifierSet::default(),
         body_cache: sim_core::build_body_cache(&content.solar_system.bodies),
     }
 }
@@ -1001,6 +1004,7 @@ mod tests {
                     cargo_capacity_m3: 1000.0,
                     power_available_per_tick: 100.0,
                     modules: vec![],
+                    modifiers: sim_core::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
@@ -1021,6 +1025,7 @@ mod tests {
                 next_lot_id: 0,
                 next_module_instance_id: 0,
             },
+            modifiers: sim_core::modifiers::ModifierSet::default(),
             body_cache: std::collections::HashMap::new(),
         };
         validate_state(&state, &content);

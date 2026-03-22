@@ -147,6 +147,9 @@ pub struct GameState {
     #[serde(default)]
     pub export_count: u32,
     pub counters: Counters,
+    /// Global modifiers (from research, game-wide buffs).
+    #[serde(default)]
+    pub modifiers: crate::modifiers::ModifierSet,
     /// Cached absolute positions for orbital bodies. Not serialized — recomputed on load.
     #[serde(skip, default)]
     pub body_cache: std::collections::HashMap<BodyId, crate::spatial::BodyCache>,
@@ -328,6 +331,9 @@ pub struct ShipState {
     pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
     pub task: Option<TaskState>,
+    /// Per-ship modifiers (from equipment, buffs).
+    #[serde(default)]
+    pub modifiers: crate::modifiers::ModifierSet,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -351,6 +357,9 @@ pub struct StationState {
     pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
     pub modules: Vec<ModuleState>,
+    /// Per-station modifiers (from equipment, location).
+    #[serde(default)]
+    pub modifiers: crate::modifiers::ModifierSet,
     /// Computed fresh each tick — not persisted across ticks.
     #[serde(skip_deserializing, default)]
     pub power: PowerState,
