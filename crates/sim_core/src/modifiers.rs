@@ -104,6 +104,20 @@ pub struct Modifier {
     pub condition: Option<Condition>,
 }
 
+impl Modifier {
+    /// Shorthand for a `PctMultiplicative` modifier (the most common type).
+    #[must_use]
+    pub fn pct_mult(stat: StatId, value: f64, source: ModifierSource) -> Self {
+        Self {
+            stat,
+            op: ModifierOp::PctMultiplicative,
+            value,
+            source,
+            condition: None,
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ModifierSet
 // ---------------------------------------------------------------------------
@@ -132,6 +146,14 @@ impl ModifierSet {
     #[must_use]
     pub fn resolve(&self, stat: StatId, base: f64) -> f64 {
         resolve_pipeline(stat, base, self.modifiers.iter())
+    }
+
+    /// Resolve a stat and truncate to `f32`. Convenience for call sites
+    /// that operate in the sim's native `f32` precision.
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn resolve_f32(&self, stat: StatId, base: f32) -> f32 {
+        resolve_pipeline(stat, f64::from(base), self.modifiers.iter()) as f32
     }
 
     /// Resolve a stat by merging this set with a global/parent set.

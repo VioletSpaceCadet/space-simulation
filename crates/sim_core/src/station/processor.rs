@@ -203,8 +203,23 @@ fn resolve_processor_run(
         }
     });
 
-    // Use pre-computed wear efficiency from context
-    let efficiency = ctx.efficiency;
+    // Build modifier set for this processor run.
+    let mut proc_mods = crate::modifiers::ModifierSet::new();
+    proc_mods.add(crate::modifiers::Modifier::pct_mult(
+        crate::modifiers::StatId::ProcessingYield,
+        f64::from(ctx.efficiency),
+        crate::modifiers::ModifierSource::Wear,
+    ));
+    proc_mods.add(crate::modifiers::Modifier::pct_mult(
+        crate::modifiers::StatId::ProcessingYield,
+        f64::from(thermal_efficiency),
+        crate::modifiers::ModifierSource::Thermal,
+    ));
+    proc_mods.add(crate::modifiers::Modifier::pct_mult(
+        crate::modifiers::StatId::ProcessingQuality,
+        f64::from(thermal_quality),
+        crate::modifiers::ModifierSource::Thermal,
+    ));
 
     let mut material_kg = 0.0_f32;
     let mut material_quality = 0.0_f32;
@@ -223,7 +238,10 @@ fn resolve_processor_run(
                     }
                     YieldFormula::FixedFraction(f) => *f,
                 };
-                material_kg = consumed_kg * yield_frac * efficiency * thermal_efficiency;
+                material_kg = proc_mods.resolve_f32(
+                    crate::modifiers::StatId::ProcessingYield,
+                    consumed_kg * yield_frac,
+                );
                 let base_quality = match quality_formula {
                     QualityFormula::ElementFractionTimesMultiplier {
                         element: el,
@@ -232,7 +250,8 @@ fn resolve_processor_run(
                         .clamp(0.0, 1.0),
                     QualityFormula::Fixed(q) => *q,
                 };
-                material_quality = base_quality * thermal_quality;
+                material_quality = proc_mods
+                    .resolve_f32(crate::modifiers::StatId::ProcessingQuality, base_quality);
                 if material_kg > MIN_MEANINGFUL_KG {
                     if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                         merge_material_lot(

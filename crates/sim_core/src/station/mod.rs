@@ -176,6 +176,7 @@ fn apply_battery_buffering(
 /// Batteries buffer power: surplus charges them, deficit discharges them.
 /// Wear reduces effective battery capacity.
 /// Modules are only stalled when batteries cannot cover the remaining deficit.
+#[allow(clippy::too_many_lines)]
 fn compute_power_budget(
     state: &mut GameState,
     station_id: &StationId,
@@ -212,8 +213,24 @@ fn compute_power_budget(
         match &def.behavior {
             crate::ModuleBehaviorDef::SolarArray(solar_def) => {
                 has_power_infrastructure = true;
-                let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
-                generated_kw += solar_def.base_output_kw * solar_intensity * efficiency;
+                let mut power_mods = crate::modifiers::ModifierSet::new();
+                power_mods.add(crate::modifiers::Modifier::pct_mult(
+                    crate::modifiers::StatId::PowerOutput,
+                    f64::from(solar_intensity),
+                    crate::modifiers::ModifierSource::Environment,
+                ));
+                power_mods.add(crate::modifiers::Modifier::pct_mult(
+                    crate::modifiers::StatId::PowerOutput,
+                    f64::from(crate::wear::wear_efficiency(
+                        module.wear.wear,
+                        &content.constants,
+                    )),
+                    crate::modifiers::ModifierSource::Wear,
+                ));
+                generated_kw += power_mods.resolve_f32(
+                    crate::modifiers::StatId::PowerOutput,
+                    solar_def.base_output_kw,
+                );
                 consumed_kw += def.power_consumption_per_run;
                 if def.wear_per_run > 0.0 {
                     wear_targets.push((idx, def.wear_per_run));
@@ -221,7 +238,17 @@ fn compute_power_budget(
             }
             crate::ModuleBehaviorDef::Battery(battery_def) => {
                 has_power_infrastructure = true;
-                let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
+                let mut battery_mods = crate::modifiers::ModifierSet::new();
+                battery_mods.add(crate::modifiers::Modifier::pct_mult(
+                    crate::modifiers::StatId::PowerOutput,
+                    f64::from(crate::wear::wear_efficiency(
+                        module.wear.wear,
+                        &content.constants,
+                    )),
+                    crate::modifiers::ModifierSource::Wear,
+                ));
+                let efficiency =
+                    battery_mods.resolve_f32(crate::modifiers::StatId::PowerOutput, 1.0);
                 let current_charge =
                     if let crate::ModuleKindState::Battery(ref bs) = module.kind_state {
                         bs.charge_kwh
@@ -635,7 +662,8 @@ fn apply_run_result(
             handle_resume_if_stalled(state, ctx, events);
             // Reset timer
             reset_timer(state, ctx);
-            // Compute heat wear multiplier from overheat zone.
+            // Compute wear through modifier system (heat zone multiplier).
+            let mut wear_mods = crate::modifiers::ModifierSet::new();
             let heat_multiplier = state
                 .stations
                 .get(&ctx.station_id)
@@ -644,12 +672,18 @@ fn apply_run_result(
                 .map_or(1.0, |t| {
                     crate::thermal::heat_wear_multiplier(t.overheat_zone, &content.constants)
                 });
-            // Apply wear with heat multiplier.
+            wear_mods.add(crate::modifiers::Modifier::pct_mult(
+                crate::modifiers::StatId::WearRate,
+                f64::from(heat_multiplier),
+                crate::modifiers::ModifierSource::Thermal,
+            ));
+            let effective_wear =
+                wear_mods.resolve_f32(crate::modifiers::StatId::WearRate, ctx.wear_per_run);
             apply_wear(
                 state,
                 &ctx.station_id,
                 ctx.module_idx,
-                ctx.wear_per_run * heat_multiplier,
+                effective_wear,
                 events,
             );
             // Invalidate volume cache (inventory may have changed)
