@@ -721,6 +721,18 @@ function handleOverheatCleared(state: SimState, event: EventPayload<'OverheatCle
   return updateModuleThermalZone(state, event.station_id, event.module_id, 'Nominal', event.temp_mk, false);
 }
 
+function handleOverheatDamage(state: SimState, event: EventPayload<'OverheatDamage'>): SimState {
+  // Damage zone: update thermal zone + set wear to critical band threshold.
+  // Note: 0.8 matches wear_band_critical_threshold from constants.json.
+  // Engine is source of truth; this keeps local FE state consistent until next snapshot.
+  const CRITICAL_THRESHOLD = 0.8;
+  const updated = updateModuleThermalZone(state, event.station_id, event.module_id, 'Damage', event.temp_mk, true);
+  return mapStationModule(updated, event.station_id, event.module_id, (m) => ({
+    ...m,
+    wear: { ...m.wear, wear: Math.max(m.wear.wear, CRITICAL_THRESHOLD) },
+  }));
+}
+
 function updateModuleThermalZone(
   state: SimState,
   stationId: string,
@@ -801,6 +813,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   OverheatWarning: handleOverheatWarning,
   OverheatCritical: handleOverheatCritical,
   OverheatCleared: handleOverheatCleared,
+  OverheatDamage: handleOverheatDamage,
   BoiloffLoss: handleBoiloffLoss,
 };
 

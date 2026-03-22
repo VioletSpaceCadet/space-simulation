@@ -776,6 +776,13 @@ pub enum Event {
         module_id: ModuleInstanceId,
         temp_mk: u32,
     },
+    OverheatDamage {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        temp_mk: u32,
+        max_temp_mk: u32,
+        wear_before: f32,
+    },
     BoiloffLoss {
         station_id: StationId,
         element: ElementId,
@@ -1286,6 +1293,9 @@ pub struct Constants {
     /// Offset above max operating temp that triggers overheat critical.
     #[serde(default = "default_thermal_overheat_critical_offset_mk")]
     pub thermal_overheat_critical_offset_mk: u32,
+    /// Offset above max operating temp that triggers overheat damage.
+    #[serde(default = "default_thermal_overheat_damage_offset_mk")]
+    pub thermal_overheat_damage_offset_mk: u32,
     /// Wear rate multiplier when module is in overheat warning zone.
     #[serde(default = "default_thermal_wear_multiplier_warning")]
     pub thermal_wear_multiplier_warning: f32,
@@ -1440,6 +1450,9 @@ fn default_thermal_overheat_warning_offset_mk() -> u32 {
 fn default_thermal_overheat_critical_offset_mk() -> u32 {
     500_000
 }
+fn default_thermal_overheat_damage_offset_mk() -> u32 {
+    800_000
+}
 fn default_thermal_wear_multiplier_warning() -> f32 {
     2.0
 }
@@ -1480,6 +1493,8 @@ pub enum OverheatZone {
     Warning,
     /// Above `max_temp_mk` + critical offset — auto-stall + accelerated wear (4x default).
     Critical,
+    /// Above `max_temp_mk` + damage offset — wear jumps to `wear_band_critical_threshold`, auto-disable.
+    Damage,
 }
 
 /// Per-module thermal state, tracked in milli-Kelvin for deterministic integer arithmetic.

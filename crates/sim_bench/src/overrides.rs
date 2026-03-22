@@ -207,6 +207,9 @@ fn apply_constant_override(
         "thermal_overheat_critical_offset_mk" => {
             constants.thermal_overheat_critical_offset_mk = as_u32(key, value)?;
         }
+        "thermal_overheat_damage_offset_mk" => {
+            constants.thermal_overheat_damage_offset_mk = as_u32(key, value)?;
+        }
         "thermal_wear_multiplier_warning" => {
             constants.thermal_wear_multiplier_warning = as_f32(key, value)?;
         }

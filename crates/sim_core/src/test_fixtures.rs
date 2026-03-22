@@ -173,6 +173,7 @@ pub fn base_content() -> GameContent {
             thermal_sink_temp_mk: 293_000,
             thermal_overheat_warning_offset_mk: 200_000,
             thermal_overheat_critical_offset_mk: 500_000,
+            thermal_overheat_damage_offset_mk: 800_000,
             thermal_wear_multiplier_warning: 2.0,
             thermal_wear_multiplier_critical: 4.0,
             // Derived fields — filled by derive_tick_values()
@@ -287,6 +288,7 @@ pub fn minimal_content() -> GameContent {
             thermal_sink_temp_mk: 293_000,
             thermal_overheat_warning_offset_mk: 200_000,
             thermal_overheat_critical_offset_mk: 500_000,
+            thermal_overheat_damage_offset_mk: 800_000,
             thermal_wear_multiplier_warning: 2.0,
             thermal_wear_multiplier_critical: 4.0,
             // Derived fields — filled by derive_tick_values()
