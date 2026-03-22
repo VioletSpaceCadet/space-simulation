@@ -3,6 +3,7 @@
 //! No IO, no network. All randomness via the passed-in Rng.
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]
 
+pub(crate) mod commands;
 mod composition;
 mod engine;
 mod id;
