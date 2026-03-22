@@ -80,7 +80,7 @@ fn run(
         println!("Run directory: {}", dir.display());
     }
 
-    let mut autopilot = AutopilotController;
+    let mut autopilot = AutopilotController::new();
     let mut next_command_id = 0u64;
 
     println!(

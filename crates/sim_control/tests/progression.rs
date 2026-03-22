@@ -320,7 +320,7 @@ fn run_with_autopilot(
     rng: &mut ChaCha8Rng,
     ticks: u64,
 ) {
-    let mut autopilot = AutopilotController;
+    let mut autopilot = AutopilotController::new();
     let mut next_cmd_id = state.counters.next_command_id;
 
     for _ in 0..ticks {
