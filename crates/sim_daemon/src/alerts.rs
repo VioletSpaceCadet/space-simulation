@@ -146,6 +146,13 @@ const RULES: &[AlertRule] = &[
         message: "Modules in critical overheat zone — auto-disabled and wearing rapidly",
         suggested_action: "Immediately reduce thermal load or add cooling capacity",
     },
+    AlertRule {
+        id: "PROPELLANT_LOW",
+        severity: sim_core::AlertSeverity::Warning,
+        check: |h, _| latest(h).is_some_and(|s| s.total_lh2_kg > 0.0 && s.total_lh2_kg < 500.0),
+        message: "LH2 propellant reserves critically low",
+        suggested_action: "Increase electrolysis output or import LH2",
+    },
 ];
 
 // --- Helpers for querying recent snapshots ---
