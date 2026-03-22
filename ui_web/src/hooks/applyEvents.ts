@@ -632,6 +632,24 @@ function handleSlagJettisoned(state: SimState, event: EventPayload<'SlagJettison
   };
 }
 
+function handleBoiloffLoss(state: SimState, event: EventPayload<'BoiloffLoss'>): SimState {
+  if (!state.stations[event.station_id]) {return state;}
+  const station = state.stations[event.station_id];
+  const inventory = station.inventory.map((item) => {
+    if (item.kind === 'Material' && item.element === event.element) {
+      return { ...item, kg: item.kg - event.kg_lost };
+    }
+    return item;
+  }).filter((item) => item.kind !== 'Material' || (item as MaterialItem).kg >= 0.001);
+  return {
+    ...state,
+    stations: {
+      ...state.stations,
+      [event.station_id]: { ...station, inventory },
+    },
+  };
+}
+
 function handlePowerStateUpdated(state: SimState, event: EventPayload<'PowerStateUpdated'>): SimState {
   if (!state.stations[event.station_id]) {return state;}
   return {
@@ -782,6 +800,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   OverheatWarning: handleOverheatWarning,
   OverheatCritical: handleOverheatCritical,
   OverheatCleared: handleOverheatCleared,
+  BoiloffLoss: handleBoiloffLoss,
 };
 
 export function applyEvents(

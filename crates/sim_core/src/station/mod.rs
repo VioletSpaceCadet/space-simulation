@@ -1,4 +1,5 @@
 mod assembler;
+mod boiloff;
 mod lab;
 mod maintenance;
 mod processor;
@@ -91,6 +92,8 @@ pub(crate) fn tick_stations(
         lab::tick_lab_modules(state, station_id, content, events);
         maintenance::tick_maintenance_modules(state, station_id, content, events);
         thermal::tick_thermal(state, station_id, content, events);
+        // Step 3.7: Boiloff — uses post-thermal temperatures (Contract A)
+        boiloff::apply_boiloff(state, station_id, content, events);
     }
 }
 

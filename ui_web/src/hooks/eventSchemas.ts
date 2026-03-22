@@ -340,6 +340,12 @@ export const eventSchemas = {
     module_id: z.string(),
     temp_mk: z.number(),
   }),
+
+  BoiloffLoss: z.object({
+    station_id: z.string(),
+    element: z.string(),
+    kg_lost: z.number(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

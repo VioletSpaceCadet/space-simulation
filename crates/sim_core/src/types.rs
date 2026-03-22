@@ -776,6 +776,11 @@ pub enum Event {
         module_id: ModuleInstanceId,
         temp_mk: u32,
     },
+    BoiloffLoss {
+        station_id: StationId,
+        element: ElementId,
+        kg_lost: f32,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -937,8 +942,8 @@ fn default_element_category() -> String {
 
 /// Derive per-tick boiloff rate from per-day rate using compounding.
 /// Tick-size-independent: changing `minutes_per_tick` doesn't break rates.
-pub fn boiloff_rate_per_tick(rate_per_day: f64, minutes_per_tick: u64) -> f64 {
-    let dt_days = (minutes_per_tick as f64) * 60.0 / 86400.0;
+pub fn boiloff_rate_per_tick(rate_per_day: f64, minutes_per_tick: u32) -> f64 {
+    let dt_days = f64::from(minutes_per_tick) * 60.0 / 86400.0;
     1.0 - (1.0 - rate_per_day).powf(dt_days)
 }
 
