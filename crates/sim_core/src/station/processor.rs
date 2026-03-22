@@ -46,19 +46,20 @@ fn execute(
     let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
         return super::RunOutcome::Skipped { reset_timer: false };
     };
-    let Some(recipe) = processor_def.recipes.first() else {
-        return super::RunOutcome::Skipped { reset_timer: false };
-    };
 
-    // Check input threshold using the recipe's actual input filter
-    let threshold_kg = {
+    // Read processor state for threshold and selected recipe
+    let (threshold_kg, recipe_idx) = {
         let Some(station) = state.stations.get(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: false };
         };
         match &station.modules[ctx.module_idx].kind_state {
-            ModuleKindState::Processor(ps) => ps.threshold_kg,
+            ModuleKindState::Processor(ps) => (ps.threshold_kg, ps.selected_recipe_idx),
             _ => return super::RunOutcome::Skipped { reset_timer: false },
         }
+    };
+
+    let Some(recipe) = processor_def.recipes.get(recipe_idx) else {
+        return super::RunOutcome::Skipped { reset_timer: false };
     };
 
     let input_filter_for_threshold = recipe.inputs.first().map(|i| &i.filter);
@@ -166,7 +167,17 @@ fn resolve_processor_run(
     let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
         return;
     };
-    let Some(recipe) = processor_def.recipes.first() else {
+
+    let recipe_idx = state
+        .stations
+        .get(&ctx.station_id)
+        .and_then(|s| match &s.modules[ctx.module_idx].kind_state {
+            ModuleKindState::Processor(ps) => Some(ps.selected_recipe_idx),
+            _ => None,
+        })
+        .unwrap_or(0);
+
+    let Some(recipe) = processor_def.recipes.get(recipe_idx) else {
         return;
     };
 
@@ -646,6 +657,7 @@ mod tests {
                             threshold_kg: 0.0,
                             ticks_since_last_run: 0,
                             stalled: false,
+                            selected_recipe_idx: 0,
                         }),
                         wear: WearState::default(),
                         power_stalled: false,

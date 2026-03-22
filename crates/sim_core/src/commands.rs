@@ -57,6 +57,7 @@ fn default_module_state(
                 threshold_kg: 0.0,
                 ticks_since_last_run: 0,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
             crate::BehaviorType::Processor,
         ),
@@ -76,6 +77,7 @@ fn default_module_state(
                 stalled: false,
                 capped: false,
                 cap_override: std::collections::HashMap::new(),
+                selected_recipe_idx: 0,
             }),
             crate::BehaviorType::Assembler,
         ),
@@ -283,6 +285,41 @@ pub(crate) fn handle_assign_lab_tech(
     };
     if let crate::ModuleKindState::Lab(ls) = &mut module.kind_state {
         ls.assigned_tech = tech_id.cloned();
+    }
+    true
+}
+
+/// Select a recipe on a processor or assembler module.
+pub(crate) fn handle_select_recipe(
+    state: &mut GameState,
+    content: &GameContent,
+    station_id: &crate::StationId,
+    module_id: &crate::ModuleInstanceId,
+    recipe_idx: usize,
+) -> bool {
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return false;
+    };
+    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+        return false;
+    };
+    let Some(def) = content.module_defs.get(&module.def_id) else {
+        return false;
+    };
+    match (&mut module.kind_state, &def.behavior) {
+        (crate::ModuleKindState::Processor(ps), crate::ModuleBehaviorDef::Processor(proc_def)) => {
+            if recipe_idx >= proc_def.recipes.len() {
+                return false;
+            }
+            ps.selected_recipe_idx = recipe_idx;
+        }
+        (crate::ModuleKindState::Assembler(asmb), crate::ModuleBehaviorDef::Assembler(asm_def)) => {
+            if recipe_idx >= asm_def.recipes.len() {
+                return false;
+            }
+            asmb.selected_recipe_idx = recipe_idx;
+        }
+        _ => return false,
     }
     true
 }

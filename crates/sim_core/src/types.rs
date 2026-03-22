@@ -279,6 +279,8 @@ pub struct ProcessorState {
     pub ticks_since_last_run: u64,
     #[serde(default)]
     pub stalled: bool,
+    #[serde(default)]
+    pub selected_recipe_idx: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -295,6 +297,8 @@ pub struct AssemblerState {
     pub capped: bool,
     #[serde(default)]
     pub cap_override: HashMap<ComponentId, u32>,
+    #[serde(default)]
+    pub selected_recipe_idx: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -572,6 +576,11 @@ pub enum Command {
     },
     JettisonSlag {
         station_id: StationId,
+    },
+    SelectRecipe {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        recipe_idx: usize,
     },
 }
 

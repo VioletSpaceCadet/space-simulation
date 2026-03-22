@@ -477,6 +477,7 @@ fn smelter_module(temp_mk: u32) -> ModuleState {
             threshold_kg: 500.0,
             ticks_since_last_run: 100,
             stalled: false,
+            selected_recipe_idx: 0,
         }),
         wear: WearState::default(),
         thermal: Some(ThermalState {

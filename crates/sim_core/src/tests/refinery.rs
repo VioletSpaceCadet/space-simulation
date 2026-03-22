@@ -75,6 +75,7 @@ fn test_refinery_skips_when_below_threshold() {
             threshold_kg: 9999.0,
             ticks_since_last_run: 0,
             stalled: false,
+            selected_recipe_idx: 0,
         }),
         wear: WearState::default(),
         power_stalled: false,
