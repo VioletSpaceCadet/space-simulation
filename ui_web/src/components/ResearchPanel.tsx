@@ -37,7 +37,7 @@ export function ResearchPanel({ research }: Props) {
   return (
     <div className="overflow-y-auto flex-1 flex flex-col">
       <DataPoolSection dataPool={research.data_pool} dataRates={content.data_rates} />
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-auto">
         <TechTreeDAG techs={content.techs} research={research} labAssignments={labAssignments} />
       </div>
       <LabStatusSection labs={content.lab_rates} techNames={techNames} />
