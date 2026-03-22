@@ -17,6 +17,8 @@ const CONTENT_DIR = process.env["CONTENT_DIR"] ?? path.resolve(
   "content",
 );
 
+const JOURNALS_DIR = path.join(CONTENT_DIR, "knowledge", "journals");
+
 const PROJECT_ROOT = process.env["PROJECT_ROOT"] ?? path.resolve(
   path.dirname(new URL(import.meta.url).pathname),
   "..",
@@ -460,15 +462,14 @@ server.tool(
   },
   async (params) => {
     try {
-      const journalsDir = path.join(CONTENT_DIR, "knowledge", "journals");
-      await fsPromises.mkdir(journalsDir, { recursive: true });
+      await fsPromises.mkdir(JOURNALS_DIR, { recursive: true });
 
       const id = crypto.randomUUID();
       const timestamp = new Date().toISOString();
       const fileTimestamp = timestamp.replace(/:/g, "-").replace(/\.\d+Z$/, "Z");
       const idFragment = id.split("-")[0];
       const filename = `${fileTimestamp}_${params.seed}_${idFragment}.json`;
-      const filePath = path.join(journalsDir, filename);
+      const filePath = path.join(JOURNALS_DIR, filename);
 
       const journal: RunJournal = {
         id,
@@ -674,8 +675,6 @@ server.tool(
 
 // ---------- Tool 12: query_knowledge ----------
 
-const JOURNALS_DIR = path.join(CONTENT_DIR, "knowledge", "journals");
-
 interface JournalSummary {
   file: string;
   seed: number;
@@ -702,7 +701,7 @@ server.tool(
     source: z.enum(["journals", "playbook", "all"]).default("all")
       .describe("Which knowledge source to search"),
     limit: z.number().int().min(1).default(5)
-      .describe("Maximum results to return"),
+      .describe("Maximum total results across all sources"),
   },
   async ({ query, tags, source, limit }) => {
     try {
@@ -726,7 +725,7 @@ server.tool(
         }
 
         for (const file of journalFiles) {
-          if (results.journals.length >= limit) break;
+          if (results.journals.length >= limit) break; // journals searched first, capped at global limit
           try {
             const raw = await fsPromises.readFile(path.join(JOURNALS_DIR, file), "utf-8");
             const journal = JSON.parse(raw) as Record<string, unknown>;
@@ -773,26 +772,47 @@ server.tool(
         }
       }
 
+      const remaining = () => limit - results.journals.length - results.playbook.length;
+
       // Search playbook
-      if (source === "playbook" || source === "all") {
+      if ((source === "playbook" || source === "all") && remaining() > 0) {
         try {
           const playbookContent = await fsPromises.readFile(PLAYBOOK_PATH, "utf-8");
+          const lines = playbookContent.split("\n");
+
+          // Build section path stack for full hierarchy display
+          const sectionStack: { level: number; text: string }[] = [];
+          const currentPath = (): string =>
+            sectionStack.map((s) => s.text).join(" > ");
+
           if (queryLower) {
-            const lines = playbookContent.split("\n");
-            let currentSection = "";
             for (const line of lines) {
               const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
               if (headerMatch) {
-                currentSection = headerMatch[2].trim();
+                const level = headerMatch[1].length;
+                const text = headerMatch[2].trim();
+                while (sectionStack.length > 0 && sectionStack[sectionStack.length - 1].level >= level) {
+                  sectionStack.pop();
+                }
+                sectionStack.push({ level, text });
                 continue;
               }
-              if (line.toLowerCase().includes(queryLower) && line.trim().length > 0) {
-                if (results.playbook.length < limit) {
-                  results.playbook.push({
-                    section: currentSection,
-                    snippet: line.trim(),
-                  });
-                }
+              if (line.toLowerCase().includes(queryLower) && line.trim().length > 0 && remaining() > 0) {
+                results.playbook.push({
+                  section: currentPath(),
+                  snippet: line.trim(),
+                });
+              }
+            }
+          } else {
+            // No query: return top-level section summaries
+            for (const line of lines) {
+              const headerMatch = line.match(/^##\s+(.+)$/);
+              if (headerMatch && remaining() > 0) {
+                results.playbook.push({
+                  section: headerMatch[1].trim(),
+                  snippet: "(section summary — use query to search within)",
+                });
               }
             }
           }
