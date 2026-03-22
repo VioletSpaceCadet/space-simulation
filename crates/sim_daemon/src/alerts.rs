@@ -56,7 +56,10 @@ fn get_metric_f64(snapshot: &MetricsSnapshot, name: &str) -> Option<f64> {
         "station_avg_temp_mk" => Some(f64::from(snapshot.station_avg_temp_mk)),
         "overheat_warning_count" => Some(f64::from(snapshot.overheat_warning_count)),
         "overheat_critical_count" => Some(f64::from(snapshot.overheat_critical_count)),
-        _ => None,
+        other => {
+            tracing::warn!("unknown metric field in alert rule: {other}");
+            None
+        }
     }
 }
 
@@ -67,7 +70,10 @@ fn check_condition(value: f64, condition: &str, threshold: f64) -> bool {
         "gte" => value >= threshold,
         "lte" => value <= threshold,
         "eq" => (value - threshold).abs() < f64::EPSILON,
-        _ => false,
+        other => {
+            tracing::warn!("unknown alert condition operator: {other}");
+            false
+        }
     }
 }
 
@@ -199,7 +205,11 @@ impl AlertEngine {
     }
 
     /// Evaluate a single rule against the metrics history.
-    fn evaluate_rule(&self, rule: &AlertRuleDef, history: &VecDeque<MetricsSnapshot>) -> bool {
+    fn evaluate_rule(
+        rule: &AlertRuleDef,
+        history: &VecDeque<MetricsSnapshot>,
+        total_techs: usize,
+    ) -> bool {
         match &rule.rule {
             AlertRuleType::ThresholdLatest {
                 metric,
@@ -249,9 +259,12 @@ impl AlertEngine {
                 "ship_idle_with_work" => builtin_ship_idle_with_work(history),
                 "throughput_drop" => builtin_throughput_drop(history),
                 "exploration_stall" => builtin_exploration_stall(history),
-                "research_stalled" => builtin_research_stalled(history, self.total_techs),
+                "research_stalled" => builtin_research_stalled(history, total_techs),
                 "overheat_warning" => builtin_overheat_warning(history),
-                _ => false,
+                other => {
+                    tracing::warn!("unknown builtin alert rule: {other}");
+                    false
+                }
             },
         }
     }
@@ -265,10 +278,8 @@ impl AlertEngine {
     ) -> Vec<sim_core::EventEnvelope> {
         let mut events = Vec::new();
 
-        // Clone rules to avoid borrow conflict with &mut self
-        let rules = self.rules.clone();
-        for rule in &rules {
-            let fired = self.evaluate_rule(rule, history);
+        for rule in &self.rules {
+            let fired = Self::evaluate_rule(rule, history, self.total_techs);
             let was_active = self.active.contains(&rule.id);
 
             if fired && !was_active {
