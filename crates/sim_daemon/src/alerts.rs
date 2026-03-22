@@ -149,7 +149,12 @@ const RULES: &[AlertRule] = &[
     AlertRule {
         id: "PROPELLANT_LOW",
         severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| latest(h).is_some_and(|s| s.total_lh2_kg > 0.0 && s.total_lh2_kg < 500.0),
+        check: |h, _| {
+            latest(h).is_some_and(|s| {
+                let lh2 = s.per_element_material_kg.get("LH2").copied().unwrap_or(0.0);
+                lh2 > 0.0 && lh2 < 500.0
+            })
+        },
         message: "LH2 propellant reserves critically low",
         suggested_action: "Increase electrolysis output or import LH2",
     },
@@ -284,13 +289,11 @@ mod tests {
             total_ore_kg: 0.0,
             total_material_kg: 0.0,
             total_slag_kg: 0.0,
-            total_iron_material_kg: 0.0,
+            per_element_material_kg: std::collections::BTreeMap::new(),
             station_storage_used_pct: 0.0,
             ship_cargo_used_pct: 0.0,
-            avg_ore_fe_fraction: 0.0,
+            per_element_ore_stats: std::collections::BTreeMap::new(),
             ore_lot_count: 0,
-            min_ore_fe_fraction: 0.0,
-            max_ore_fe_fraction: 0.0,
             avg_material_quality: 0.0,
             refinery_active_count: 0,
             refinery_starved_count: 0,
@@ -320,9 +323,6 @@ mod tests {
             power_consumed_kw: 0.0,
             power_deficit_kw: 0.0,
             battery_charge_pct: 0.0,
-            total_h2o_kg: 0.0,
-            total_lh2_kg: 0.0,
-            total_lox_kg: 0.0,
             station_max_temp_mk: 0,
             station_avg_temp_mk: 0,
             overheat_warning_count: 0,
