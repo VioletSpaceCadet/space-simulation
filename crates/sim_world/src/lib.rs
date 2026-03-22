@@ -35,14 +35,25 @@ struct ElementsFile {
 ///
 /// Catches mistakes like: referencing an unknown element in a recipe, a tech
 /// prereq that doesn't exist, or a solar-system edge pointing at an unknown node.
-#[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
 pub fn validate_content(content: &GameContent) {
+    validate_constants(content);
+    let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
+    validate_elements(&element_ids);
+    validate_techs(content, &element_ids);
+    validate_solar_system(content);
+    validate_orbital_bodies(content);
+    validate_asteroid_templates(content, &element_ids);
+    validate_module_recipes(content, &element_ids);
+}
+
+fn validate_constants(content: &GameContent) {
     assert!(
         content.constants.minutes_per_tick > 0,
         "minutes_per_tick must be > 0"
     );
+}
 
-    let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
+fn validate_elements(element_ids: &HashSet<&str>) {
     assert!(
         element_ids.contains("ore"),
         "required element 'ore' is missing from content.elements"
@@ -51,15 +62,10 @@ pub fn validate_content(content: &GameContent) {
         element_ids.contains("slag"),
         "required element 'slag' is missing from content.elements"
     );
-    let tech_ids: HashSet<&TechId> = content.techs.iter().map(|t| &t.id).collect();
-    let node_ids: HashSet<&str> = content
-        .solar_system
-        .nodes
-        .iter()
-        .map(|n| n.id.0.as_str())
-        .collect();
+}
 
-    // Validate tech prereqs and effects.
+fn validate_techs(content: &GameContent, _element_ids: &HashSet<&str>) {
+    let tech_ids: HashSet<&TechId> = content.techs.iter().map(|t| &t.id).collect();
     for tech in &content.techs {
         for prereq in &tech.prereqs {
             assert!(
@@ -69,7 +75,6 @@ pub fn validate_content(content: &GameContent) {
                 prereq.0,
             );
         }
-        // Validate StatModifier effect values are within reasonable bounds.
         for effect in &tech.effects {
             if let sim_core::TechEffect::StatModifier {
                 stat: _,
@@ -86,8 +91,15 @@ pub fn validate_content(content: &GameContent) {
             }
         }
     }
+}
 
-    // Validate solar system edges reference known nodes (legacy compat).
+fn validate_solar_system(content: &GameContent) {
+    let node_ids: HashSet<&str> = content
+        .solar_system
+        .nodes
+        .iter()
+        .map(|n| n.id.0.as_str())
+        .collect();
     for (from, to) in &content.solar_system.edges {
         assert!(
             node_ids.contains(from.0.as_str()),
@@ -100,8 +112,9 @@ pub fn validate_content(content: &GameContent) {
             to.0,
         );
     }
+}
 
-    // Validate orbital body tree.
+fn validate_orbital_bodies(content: &GameContent) {
     let body_ids: HashSet<&str> = content
         .solar_system
         .bodies
@@ -113,7 +126,6 @@ pub fn validate_content(content: &GameContent) {
         "duplicate body id in orbital body tree"
     );
     for body in &content.solar_system.bodies {
-        // All parents must reference existing bodies.
         if let Some(ref parent) = body.parent {
             assert!(
                 body_ids.contains(parent.0.as_str()),
@@ -122,7 +134,6 @@ pub fn validate_content(content: &GameContent) {
                 parent.0,
             );
         }
-        // Zone validation.
         if let Some(ref zone) = body.zone {
             assert!(
                 zone.radius_max_au_um > zone.radius_min_au_um,
@@ -141,7 +152,7 @@ pub fn validate_content(content: &GameContent) {
             );
         }
     }
-    // Verify no cycles: every body's ancestor chain must terminate at a root (parent=None).
+    // Verify no cycles: every body's ancestor chain must terminate at a root.
     for body in &content.solar_system.bodies {
         let mut visited = HashSet::new();
         let mut current_id = body.parent.as_ref();
@@ -159,8 +170,9 @@ pub fn validate_content(content: &GameContent) {
                 .and_then(|b| b.parent.as_ref());
         }
     }
+}
 
-    // Validate asteroid template composition element IDs.
+fn validate_asteroid_templates(content: &GameContent, element_ids: &HashSet<&str>) {
     for template in &content.asteroid_templates {
         for element_id in template.composition_ranges.keys() {
             assert!(
@@ -171,69 +183,15 @@ pub fn validate_content(content: &GameContent) {
             );
         }
     }
+}
 
-    // Validate module recipe element references.
+fn validate_module_recipes(content: &GameContent, element_ids: &HashSet<&str>) {
     for module_def in content.module_defs.values() {
         if let ModuleBehaviorDef::Processor(processor) = &module_def.behavior {
             for recipe in &processor.recipes {
-                // Validate inputs.
-                for input in &recipe.inputs {
-                    if let InputFilter::Element(element_id) = &input.filter {
-                        assert!(
-                            element_ids.contains(element_id.as_str()),
-                            "module '{}' recipe '{}' input element '{}' is not a known element",
-                            module_def.id,
-                            recipe.id,
-                            element_id,
-                        );
-                    }
-                }
-                // Validate outputs.
-                for output in &recipe.outputs {
-                    match output {
-                        OutputSpec::Material {
-                            element,
-                            yield_formula,
-                            quality_formula,
-                        } => {
-                            assert!(
-                                element_ids.contains(element.as_str()),
-                                "module '{}' recipe '{}' output element '{}' is not a known element",
-                                module_def.id,
-                                recipe.id,
-                                element,
-                            );
-                            if let YieldFormula::ElementFraction { element: fe } = yield_formula {
-                                assert!(
-                                    element_ids.contains(fe.as_str()),
-                                    "module '{}' recipe '{}' YieldFormula element '{}' is not a known element",
-                                    module_def.id,
-                                    recipe.id,
-                                    fe,
-                                );
-                            }
-                            if let QualityFormula::ElementFractionTimesMultiplier {
-                                element: fe,
-                                ..
-                            } = quality_formula
-                            {
-                                assert!(
-                                    element_ids.contains(fe.as_str()),
-                                    "module '{}' recipe '{}' QualityFormula element '{}' is not a known element",
-                                    module_def.id,
-                                    recipe.id,
-                                    fe,
-                                );
-                            }
-                        }
-                        OutputSpec::Slag { .. }
-                        | OutputSpec::Component { .. }
-                        | OutputSpec::Ship { .. } => {}
-                    }
-                }
+                validate_recipe_elements(element_ids, &module_def.id, recipe);
             }
         }
-
         if let ModuleBehaviorDef::Assembler(assembler) = &module_def.behavior {
             for recipe in &assembler.recipes {
                 for input in &recipe.inputs {
@@ -246,6 +204,62 @@ pub fn validate_content(content: &GameContent) {
                     }
                 }
             }
+        }
+    }
+}
+
+fn validate_recipe_elements(
+    element_ids: &HashSet<&str>,
+    module_id: &str,
+    recipe: &sim_core::RecipeDef,
+) {
+    for input in &recipe.inputs {
+        if let InputFilter::Element(element_id) = &input.filter {
+            assert!(
+                element_ids.contains(element_id.as_str()),
+                "module '{}' recipe '{}' input element '{}' is not a known element",
+                module_id,
+                recipe.id,
+                element_id,
+            );
+        }
+    }
+    for output in &recipe.outputs {
+        match output {
+            OutputSpec::Material {
+                element,
+                yield_formula,
+                quality_formula,
+            } => {
+                assert!(
+                    element_ids.contains(element.as_str()),
+                    "module '{}' recipe '{}' output element '{}' is not a known element",
+                    module_id,
+                    recipe.id,
+                    element,
+                );
+                if let YieldFormula::ElementFraction { element: fe } = yield_formula {
+                    assert!(
+                        element_ids.contains(fe.as_str()),
+                        "module '{}' recipe '{}' YieldFormula element '{}' is not a known element",
+                        module_id,
+                        recipe.id,
+                        fe,
+                    );
+                }
+                if let QualityFormula::ElementFractionTimesMultiplier { element: fe, .. } =
+                    quality_formula
+                {
+                    assert!(
+                        element_ids.contains(fe.as_str()),
+                        "module '{}' recipe '{}' QualityFormula element '{}' is not a known element",
+                        module_id,
+                        recipe.id,
+                        fe,
+                    );
+                }
+            }
+            OutputSpec::Slag { .. } | OutputSpec::Component { .. } | OutputSpec::Ship { .. } => {}
         }
     }
 }
