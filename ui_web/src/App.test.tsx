@@ -84,26 +84,23 @@ describe('App', () => {
     expect(handles.length).toBeGreaterThan(0);
   });
 
-  it('renders solar system map panel with SVG', async () => {
+  it('renders solar system map panel with canvas', () => {
     const { container } = render(<App />);
-    expect(container.querySelector('svg')).toBeInTheDocument();
-    // Body labels load async from fetchSpatialConfig
-    await screen.findByText('Sun');
-    expect(screen.getByText('Earth')).toBeInTheDocument();
+    expect(container.querySelector('canvas')).toBeInTheDocument();
   });
 
   it('can toggle map panel off and on', () => {
     const { container } = render(<App />);
-    expect(container.querySelector('svg')).toBeInTheDocument();
+    expect(container.querySelector('canvas')).toBeInTheDocument();
 
     const nav = screen.getByRole('navigation');
     const mapButton = Array.from(nav.querySelectorAll('button')).find(
       (b) => b.textContent === 'Map',
     )!;
     fireEvent.click(mapButton);
-    expect(container.querySelector('svg')).not.toBeInTheDocument();
+    expect(container.querySelector('canvas')).not.toBeInTheDocument();
 
     fireEvent.click(mapButton);
-    expect(container.querySelector('svg')).toBeInTheDocument();
+    expect(container.querySelector('canvas')).toBeInTheDocument();
   });
 });
