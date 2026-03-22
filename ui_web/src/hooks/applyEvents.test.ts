@@ -1675,4 +1675,74 @@ describe('applyEvents', () => {
       expect(mod.thermal?.temp_mk).toBe(1_900_000);
     });
   });
+
+  describe('BoiloffLoss', () => {
+    it('reduces material kg for matching element', () => {
+      const lh2Material: MaterialItem = {
+        kind: 'Material', element: 'LH2', kg: 10000, quality: 1.0,
+      };
+      const station = makeStation({
+        inventory: [lh2Material],
+      });
+
+      const events = [{
+        id: 'evt_1', tick: 2,
+        event: { BoiloffLoss: { station_id: 'station_001', element: 'LH2', kg_lost: 14.0 } },
+      }];
+
+      const result = applyEvents(
+        {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+      );
+      const remaining = result.stations['station_001'].inventory
+        .filter((i): i is MaterialItem => i.kind === 'Material' && i.element === 'LH2');
+      expect(remaining.length).toBe(1);
+      expect(remaining[0].kg).toBeCloseTo(9986.0);
+    });
+
+    it('removes material below threshold', () => {
+      const lh2Material: MaterialItem = {
+        kind: 'Material', element: 'LH2', kg: 0.005, quality: 1.0,
+      };
+      const station = makeStation({
+        inventory: [lh2Material],
+      });
+
+      const events = [{
+        id: 'evt_1', tick: 2,
+        event: { BoiloffLoss: { station_id: 'station_001', element: 'LH2', kg_lost: 0.005 } },
+      }];
+
+      const result = applyEvents(
+        {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+      );
+      const remaining = result.stations['station_001'].inventory
+        .filter((i): i is MaterialItem => i.kind === 'Material' && i.element === 'LH2');
+      expect(remaining.length).toBe(0);
+    });
+
+    it('does not affect other elements', () => {
+      const feMaterial: MaterialItem = {
+        kind: 'Material', element: 'Fe', kg: 500, quality: 0.8,
+      };
+      const lh2Material: MaterialItem = {
+        kind: 'Material', element: 'LH2', kg: 1000, quality: 1.0,
+      };
+      const station = makeStation({
+        inventory: [feMaterial, lh2Material],
+      });
+
+      const events = [{
+        id: 'evt_1', tick: 2,
+        event: { BoiloffLoss: { station_id: 'station_001', element: 'LH2', kg_lost: 10.0 } },
+      }];
+
+      const result = applyEvents(
+        {}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events,
+      );
+      const fe = result.stations['station_001'].inventory
+        .filter((i): i is MaterialItem => i.kind === 'Material' && i.element === 'Fe');
+      expect(fe.length).toBe(1);
+      expect(fe[0].kg).toBe(500);
+    });
+  });
 });
