@@ -227,9 +227,10 @@ fn compute_power_budget(
                     )),
                     crate::modifiers::ModifierSource::Wear,
                 ));
-                generated_kw += power_mods.resolve_f32(
+                generated_kw += power_mods.resolve_with_f32(
                     crate::modifiers::StatId::PowerOutput,
                     solar_def.base_output_kw,
+                    &state.modifiers,
                 );
                 consumed_kw += def.power_consumption_per_run;
                 if def.wear_per_run > 0.0 {
@@ -247,8 +248,11 @@ fn compute_power_budget(
                     )),
                     crate::modifiers::ModifierSource::Wear,
                 ));
-                let efficiency =
-                    battery_mods.resolve_f32(crate::modifiers::StatId::PowerOutput, 1.0);
+                let efficiency = battery_mods.resolve_with_f32(
+                    crate::modifiers::StatId::PowerOutput,
+                    1.0,
+                    &state.modifiers,
+                );
                 let current_charge =
                     if let crate::ModuleKindState::Battery(ref bs) = module.kind_state {
                         bs.charge_kwh
@@ -677,8 +681,11 @@ fn apply_run_result(
                 f64::from(heat_multiplier),
                 crate::modifiers::ModifierSource::Thermal,
             ));
-            let effective_wear =
-                wear_mods.resolve_f32(crate::modifiers::StatId::WearRate, ctx.wear_per_run);
+            let effective_wear = wear_mods.resolve_with_f32(
+                crate::modifiers::StatId::WearRate,
+                ctx.wear_per_run,
+                &state.modifiers,
+            );
             apply_wear(
                 state,
                 &ctx.station_id,

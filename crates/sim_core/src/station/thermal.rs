@@ -93,9 +93,10 @@ pub(crate) fn tick_thermal(
             )),
             crate::modifiers::ModifierSource::Wear,
         ));
-        let effective_cooling = cooling_mods.resolve_f32(
+        let effective_cooling = cooling_mods.resolve_with_f32(
             crate::modifiers::StatId::CoolingRate,
             radiator_def.cooling_capacity_w,
+            &state.modifiers,
         );
         *radiator_cooling_by_group.entry(group_key).or_default() += effective_cooling;
     }

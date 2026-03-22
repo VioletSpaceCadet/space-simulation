@@ -59,7 +59,7 @@ pub fn validate_content(content: &GameContent) {
         .map(|n| n.id.0.as_str())
         .collect();
 
-    // Validate tech prereqs.
+    // Validate tech prereqs and effects.
     for tech in &content.techs {
         for prereq in &tech.prereqs {
             assert!(
@@ -68,6 +68,22 @@ pub fn validate_content(content: &GameContent) {
                 tech.id.0,
                 prereq.0,
             );
+        }
+        // Validate StatModifier effect values are within reasonable bounds.
+        for effect in &tech.effects {
+            if let sim_core::TechEffect::StatModifier {
+                stat: _,
+                op: _,
+                value,
+            } = effect
+            {
+                assert!(
+                    value.abs() < 100.0,
+                    "tech '{}' has StatModifier with unreasonable value {} (expected -100..100)",
+                    tech.id.0,
+                    value,
+                );
+            }
         }
     }
 

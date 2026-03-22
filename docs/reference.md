@@ -26,7 +26,7 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `PricingEntry` | `base_price_per_unit`, `importable`, `exportable` |
 | `TradeItemSpec` | Enum: `Material { element, kg }`, `Component { component_id, count }`, `Module { module_def_id }` |
 | `OutputSpec` | Enum: `Material { ... }`, `Slag { ... }`, `Component { ... }`, `Ship { cargo_capacity_m3 }` |
-| `TechEffect` | `EnableDeepScan` or `DeepScanCompositionNoise { sigma }` |
+| `TechEffect` | `EnableDeepScan`, `DeepScanCompositionNoise { sigma }`, `EnableShipConstruction`, or `StatModifier { stat, op, value }` — numeric bonuses from research |
 | `ResearchDomain` | Enum: `Survey`, `Materials`, `Manufacturing`, `Propulsion` — categorises techs and lab output |
 | `DomainProgress` | Per-tech domain point tracking: `points: HashMap<ResearchDomain, f64>` |
 | `DataKind` | Enum: `SurveyData`, `AssayData`, `ManufacturingData`, `TransitData` — type of raw data a lab consumes |

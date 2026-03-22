@@ -167,6 +167,17 @@ impl ModifierSet {
         )
     }
 
+    /// Resolve with merge, returning `f32`. Convenience for the sim's native precision.
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn resolve_with_f32(&self, stat: StatId, base: f32, other: &ModifierSet) -> f32 {
+        resolve_pipeline(
+            stat,
+            f64::from(base),
+            self.modifiers.iter().chain(other.modifiers.iter()),
+        ) as f32
+    }
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.modifiers.is_empty()

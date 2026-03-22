@@ -862,8 +862,16 @@ pub struct TechDef {
 #[serde(tag = "type")]
 pub enum TechEffect {
     EnableDeepScan,
-    DeepScanCompositionNoise { sigma: f32 },
+    DeepScanCompositionNoise {
+        sigma: f32,
+    },
     EnableShipConstruction,
+    /// Content-driven numeric modifier applied to a game stat when this tech unlocks.
+    StatModifier {
+        stat: crate::modifiers::StatId,
+        op: crate::modifiers::ModifierOp,
+        value: f64,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
