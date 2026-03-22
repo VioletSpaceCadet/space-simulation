@@ -1,0 +1,74 @@
+{
+  "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "timestamp": "2026-03-21T14:30:00Z",
+  "seed": 42,
+  "tick_range": [0, 5000],
+  "ticks_per_sec": 1000,
+  "observations": [
+    {
+      "metric": "total_ore_kg",
+      "value": 12.5,
+      "trend": "falling",
+      "interpretation": "Ore reserves declining steadily — refinery consumption outpacing single-ship mining output"
+    },
+    {
+      "metric": "station_storage_used_pct",
+      "value": 0.73,
+      "trend": "rising",
+      "interpretation": "Slag accumulation driving storage toward saturation; jettison or export needed"
+    },
+    {
+      "metric": "refinery_starved_count",
+      "value": 2,
+      "trend": "stable",
+      "interpretation": "2 of 3 refineries consistently starved — fleet cannot keep up with processing capacity"
+    }
+  ],
+  "bottlenecks": [
+    {
+      "type": "ore_starvation",
+      "severity": "high",
+      "tick_range": [2880, 5000],
+      "description": "Single mining ship cannot supply 3 refineries. 2880-tick transit time creates chronic ore gaps."
+    },
+    {
+      "type": "storage_saturation",
+      "severity": "medium",
+      "tick_range": [3500, 5000],
+      "description": "Slag accumulation at ~0.3 kg/run with no jettison or export strategy."
+    }
+  ],
+  "alerts_seen": [
+    {
+      "alert_id": "ORE_STARVATION",
+      "severity": "warning",
+      "first_seen_tick": 2880,
+      "resolved_tick": null
+    },
+    {
+      "alert_id": "STORAGE_SATURATION",
+      "severity": "warning",
+      "first_seen_tick": 4200,
+      "resolved_tick": null
+    }
+  ],
+  "parameter_changes": [
+    {
+      "parameter_path": "constants.ticks_per_au",
+      "current_value": "720",
+      "proposed_value": "360",
+      "rationale": "Halving transit time to test whether ore starvation resolves with faster fleet turnaround"
+    }
+  ],
+  "strategy_notes": [
+    "Single ship fleet causes chronic ore starvation during 2880-tick transit periods — need 2+ mining ships or faster transit",
+    "Slag management becomes critical around tick 3500 with 3 active refineries — autopilot should prioritize jettison or export",
+    "Refinery count should match fleet mining throughput, not just available ore — over-provisioning refineries wastes power"
+  ],
+  "tags": [
+    "ore-supply",
+    "fleet-sizing",
+    "slag-management",
+    "transit-time"
+  ]
+}
