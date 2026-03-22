@@ -91,4 +91,17 @@ describe('TechTreeDAG', () => {
     expect(screen.getByText(/25/)).toBeInTheDocument();
     expect(screen.getByText(/50/)).toBeInTheDocument();
   });
+
+  it('shows full evidence bars for unlocked techs even with partial evidence', () => {
+    // Alpha Tech requires Survey: 100, but unlocked probabilistically with only 76 points
+    const partialResearch: ResearchState = {
+      unlocked: ['a'],
+      data_pool: {},
+      evidence: { a: { points: { Survey: 76 } } },
+      action_counts: {},
+    };
+    render(<TechTreeDAG techs={techs} research={partialResearch} labAssignments={[]} />);
+    // Should show 100/100 (full bar), not 76/100
+    expect(screen.getByText('100/100')).toBeInTheDocument();
+  });
 });
