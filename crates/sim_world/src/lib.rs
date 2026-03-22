@@ -456,6 +456,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         inventory: vec![],
         cargo_capacity_m3: c.ship_cargo_capacity_m3,
         task: None,
+        speed_ticks_per_au: None,
         modifiers: sim_core::modifiers::ModifierSet::default(),
     };
     // Place scan sites in zone bodies using weighted picking + area-sampled positions.

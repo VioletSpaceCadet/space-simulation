@@ -47,10 +47,12 @@ fn make_cmd(
 }
 
 /// Wraps `task` in a Transit if `from` and `to` are not co-located; else returns `task` as-is.
+/// Uses the provided `ship_ticks_per_au` for travel speed (call `ship.ticks_per_au(default)` to resolve).
 fn maybe_transit(
     task: TaskKind,
     from: &Position,
     to: &Position,
+    ship_ticks_per_au: u64,
     state: &GameState,
     content: &GameContent,
 ) -> TaskKind {
@@ -67,7 +69,7 @@ fn maybe_transit(
     let ticks = travel_ticks(
         from_abs,
         to_abs,
-        content.constants.ticks_per_au,
+        ship_ticks_per_au,
         content.constants.min_transit_ticks,
     );
     TaskKind::Transit {
@@ -213,6 +215,7 @@ fn deposit_priority(
         },
         &ship.position,
         &station.position,
+        ship.ticks_per_au(content.constants.ticks_per_au),
         state,
         content,
     ))
@@ -824,6 +827,7 @@ impl AutopilotBehavior for ShipTaskScheduler {
             }
 
             // Priority 2: mine best available asteroid.
+            let ship_speed = ship.ticks_per_au(content.constants.ticks_per_au);
             if let Some(asteroid) = next_mine.next() {
                 let task = maybe_transit(
                     TaskKind::Mine {
@@ -832,6 +836,7 @@ impl AutopilotBehavior for ShipTaskScheduler {
                     },
                     &ship.position,
                     &asteroid.position,
+                    ship_speed,
                     state,
                     content,
                 );
@@ -857,6 +862,7 @@ impl AutopilotBehavior for ShipTaskScheduler {
                         },
                         &ship.position,
                         &asteroid_pos,
+                        ship_speed,
                         state,
                         content,
                     );
@@ -881,6 +887,7 @@ impl AutopilotBehavior for ShipTaskScheduler {
                     },
                     &ship.position,
                     &site.position,
+                    ship_speed,
                     state,
                     content,
                 );

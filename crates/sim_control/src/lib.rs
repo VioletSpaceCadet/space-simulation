@@ -356,6 +356,7 @@ mod tests {
                 inventory: vec![],
                 cargo_capacity_m3: 20.0,
                 task: None,
+                speed_ticks_per_au: None,
                 modifiers: sim_core::modifiers::ModifierSet::default(),
             },
         );
