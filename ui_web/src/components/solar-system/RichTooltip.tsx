@@ -70,7 +70,7 @@ function StationContent({ station }: { station: StationState }) {
         value={`${powerSurplus >= 0 ? '+' : ''}${powerSurplus.toFixed(0)} kW`}
         color={powerColor}
       />
-      <Row label="Cargo" value={`${totalKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} / ${station.cargo_capacity_m3} m\u00B3`} />
+      <Row label="Cargo" value={`${totalKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`} />
       <Row label="Modules" value={`${station.modules.filter((m) => m.enabled).length} / ${station.modules.length}`} />
     </>
   );
@@ -93,7 +93,7 @@ function ShipContent({ ship, currentTick }: { ship: ShipState; currentTick: numb
             <div
               className="h-full rounded-full"
               style={{
-                width: `${Math.min(100, Math.round(((currentTick - ship.task.started_tick) / (ship.task.eta_tick - ship.task.started_tick)) * 100))}%`,
+                width: `${Math.min(100, ship.task.eta_tick > ship.task.started_tick ? Math.round(((currentTick - ship.task.started_tick) / (ship.task.eta_tick - ship.task.started_tick)) * 100) : 100)}%`,
                 background: color,
               }}
             />
@@ -101,7 +101,7 @@ function ShipContent({ ship, currentTick }: { ship: ShipState; currentTick: numb
           <Row label="ETA" value={`${Math.max(0, ship.task.eta_tick - currentTick)} ticks`} />
         </>
       )}
-      <Row label="Cargo" value={`${totalKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} / ${ship.cargo_capacity_m3} m\u00B3`} />
+      <Row label="Cargo" value={`${totalKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`} />
     </>
   );
 }
