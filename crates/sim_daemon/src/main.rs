@@ -5,14 +5,12 @@ mod state;
 mod tick_loop;
 
 use routes::make_router_with_cors;
-use sim_world::{
-    create_run_dir, generate_run_id, load_content, load_or_build_state, write_run_info,
-};
+use sim_world::RunSetupBuilder;
 use state::{AppState, SimState};
 use tick_loop::run_tick_loop;
 use tracing::info;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use clap::{Parser, Subcommand};
 use parking_lot::Mutex;
@@ -86,50 +84,42 @@ async fn main() -> Result<()> {
                 )
                 .init();
 
-            let content = load_content(&content_dir)?;
-            let (game_state, rng) = load_or_build_state(&content, seed, state_file.as_deref())?;
-
-            // Set up per-run metrics directory.
-            let (metrics_writer, run_dir) = if no_metrics {
-                (None, None)
-            } else {
-                let run_id = generate_run_id(game_state.meta.seed);
-                let run_dir = create_run_dir(&run_id)?;
-                write_run_info(
-                    &run_dir,
-                    &run_id,
-                    game_state.meta.seed,
-                    &content.content_version,
+            let mut builder = RunSetupBuilder::from_content_dir(&content_dir)?
+                .seed(seed)
+                .state_file(state_file);
+            if !no_metrics {
+                builder = builder.metrics(
                     metrics_every,
                     serde_json::json!({
                         "runner": "sim_daemon",
                         "max_ticks": max_ticks,
                     }),
-                )?;
-                let writer = sim_core::MetricsFileWriter::new(run_dir.clone())
-                    .with_context(|| format!("opening metrics CSV in {}", run_dir.display()))?;
-                info!("Run directory: {}", run_dir.display());
-                (Some(writer), Some(run_dir))
-            };
+                );
+            }
+            let setup = builder.build()?;
+            if let Some(ref dir) = setup.run_dir {
+                info!("Run directory: {}", dir.display());
+            }
 
             let alert_engine = if no_metrics {
                 None
             } else {
-                Some(alerts::AlertEngine::new(content.techs.len()))
+                Some(alerts::AlertEngine::new(setup.content.techs.len()))
             };
 
             let (event_tx, _) = broadcast::channel::<Vec<EventEnvelope>>(256);
             let ticks_per_sec_atomic = Arc::new(AtomicU64::new(ticks_per_sec.to_bits()));
+            let run_dir = setup.run_dir;
             let app_state = AppState {
                 sim: Arc::new(Mutex::new(SimState {
-                    game_state,
-                    content,
-                    rng,
+                    game_state: setup.game_state,
+                    content: setup.content,
+                    rng: setup.rng,
                     autopilot: AutopilotController,
                     next_command_id: 0,
                     metrics_every,
                     metrics_history: VecDeque::new(),
-                    metrics_writer,
+                    metrics_writer: setup.metrics_writer,
                     alert_engine,
                 })),
                 command_queue: Arc::new(Mutex::new(Vec::new())),

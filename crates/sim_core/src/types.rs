@@ -1345,6 +1345,18 @@ impl Constants {
         rate_per_minute * self.minutes_per_tick as f32
     }
 
+    /// Convert a tick number to game-day (0-indexed). Each day is 1440 game-minutes.
+    pub fn tick_to_game_day(&self, tick: u64) -> u64 {
+        let total_minutes = tick * u64::from(self.minutes_per_tick);
+        total_minutes / 1440
+    }
+
+    /// Convert a tick number to hour-of-day (0..23).
+    pub fn tick_to_game_hour(&self, tick: u64) -> u64 {
+        let total_minutes = tick * u64::from(self.minutes_per_tick);
+        (total_minutes % 1440) / 60
+    }
+
     /// Compute derived tick-based fields from game-time minutes fields.
     /// Must be called once after deserialization (in `load_content` / after overrides).
     pub fn derive_tick_values(&mut self) {
@@ -1638,5 +1650,48 @@ mod time_scale_tests {
         assert_eq!(c.constants.survey_scan_ticks, 1);
         assert_eq!(c.constants.deep_scan_ticks, 1);
         assert_eq!(c.constants.deposit_ticks, 1);
+    }
+
+    #[test]
+    fn tick_to_game_day_mpt_60() {
+        let mut c = base_content();
+        c.constants.minutes_per_tick = 60;
+        // 24 ticks * 60 min = 1440 min = 1 day
+        assert_eq!(c.constants.tick_to_game_day(0), 0);
+        assert_eq!(c.constants.tick_to_game_day(23), 0);
+        assert_eq!(c.constants.tick_to_game_day(24), 1);
+        assert_eq!(c.constants.tick_to_game_day(48), 2);
+    }
+
+    #[test]
+    fn tick_to_game_hour_mpt_60() {
+        let mut c = base_content();
+        c.constants.minutes_per_tick = 60;
+        assert_eq!(c.constants.tick_to_game_hour(0), 0);
+        assert_eq!(c.constants.tick_to_game_hour(1), 1);
+        assert_eq!(c.constants.tick_to_game_hour(23), 23);
+        // Wraps at day boundary
+        assert_eq!(c.constants.tick_to_game_hour(24), 0);
+        assert_eq!(c.constants.tick_to_game_hour(25), 1);
+    }
+
+    #[test]
+    fn tick_to_game_day_mpt_1() {
+        let c = base_content();
+        // minutes_per_tick = 1; 1440 ticks = 1 day
+        assert_eq!(c.constants.tick_to_game_day(0), 0);
+        assert_eq!(c.constants.tick_to_game_day(1439), 0);
+        assert_eq!(c.constants.tick_to_game_day(1440), 1);
+    }
+
+    #[test]
+    fn tick_to_game_hour_mpt_1() {
+        let c = base_content();
+        // minutes_per_tick = 1; 60 ticks = 1 hour
+        assert_eq!(c.constants.tick_to_game_hour(0), 0);
+        assert_eq!(c.constants.tick_to_game_hour(59), 0);
+        assert_eq!(c.constants.tick_to_game_hour(60), 1);
+        assert_eq!(c.constants.tick_to_game_hour(1439), 23);
+        assert_eq!(c.constants.tick_to_game_hour(1440), 0);
     }
 }

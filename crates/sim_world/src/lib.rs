@@ -2,15 +2,18 @@
 
 use anyhow::{Context, Result};
 use rand::Rng;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use serde::Deserialize;
 use sim_core::{
     AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, GameContent, GameState,
-    InputFilter, InventoryItem, MetaState, ModuleBehaviorDef, ModuleDef, ModuleItemId, OutputSpec,
-    PowerState, PricingTable, PrincipalId, QualityFormula, ResearchState, ScanSite, ShipId,
-    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId, YieldFormula,
+    InputFilter, InventoryItem, MetaState, MetricsFileWriter, ModuleBehaviorDef, ModuleDef,
+    ModuleItemId, OutputSpec, PowerState, PricingTable, PrincipalId, QualityFormula, ResearchState,
+    ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId,
+    YieldFormula,
 };
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Deserialize)]
 struct TechsFile {
@@ -525,10 +528,7 @@ pub fn load_or_build_state(
     content: &GameContent,
     seed: Option<u64>,
     state_file: Option<&str>,
-) -> Result<(GameState, rand_chacha::ChaCha8Rng)> {
-    use rand::SeedableRng;
-    use rand_chacha::ChaCha8Rng;
-
+) -> Result<(GameState, ChaCha8Rng)> {
     if let Some(path) = state_file {
         let json =
             std::fs::read_to_string(path).with_context(|| format!("reading state file: {path}"))?;
@@ -556,11 +556,116 @@ pub fn load_or_build_state(
     }
 }
 
+// ---------------------------------------------------------------------------
+// RunSetup — eliminates duplicated init across sim_cli / sim_daemon / sim_bench
+// ---------------------------------------------------------------------------
+
+/// Fully-initialized simulation ready to run.
+pub struct RunSetup {
+    pub content: GameContent,
+    pub game_state: GameState,
+    pub rng: ChaCha8Rng,
+    pub run_dir: Option<PathBuf>,
+    pub metrics_writer: Option<MetricsFileWriter>,
+}
+
+/// Builder for [`RunSetup`]. Loads content, builds/loads state, optionally
+/// creates a run directory and metrics writer.
+pub struct RunSetupBuilder {
+    content: GameContent,
+    seed: Option<u64>,
+    state_file: Option<String>,
+    enable_metrics: bool,
+    metrics_every: u64,
+    runner_args: serde_json::Value,
+}
+
+impl RunSetupBuilder {
+    /// Start a builder by loading content from `content_dir`.
+    pub fn from_content_dir(content_dir: &str) -> Result<Self> {
+        let content = load_content(content_dir)?;
+        Ok(Self {
+            content,
+            seed: None,
+            state_file: None,
+            enable_metrics: false,
+            metrics_every: 60,
+            runner_args: serde_json::Value::Null,
+        })
+    }
+
+    /// Use an already-loaded [`GameContent`] (useful for bench runner which
+    /// loads content once and reuses it across seeds).
+    pub fn from_content(content: GameContent) -> Self {
+        Self {
+            content,
+            seed: None,
+            state_file: None,
+            enable_metrics: false,
+            metrics_every: 60,
+            runner_args: serde_json::Value::Null,
+        }
+    }
+
+    /// Set the world-generation seed. Mutually exclusive with [`state_file`](Self::state_file).
+    #[must_use]
+    pub fn seed(mut self, seed: Option<u64>) -> Self {
+        self.seed = seed;
+        self
+    }
+
+    /// Load initial state from a JSON file. Mutually exclusive with [`seed`](Self::seed).
+    #[must_use]
+    pub fn state_file(mut self, path: Option<String>) -> Self {
+        self.state_file = path;
+        self
+    }
+
+    /// Enable run-directory creation, `run_info.json`, and metrics CSV writing.
+    #[must_use]
+    pub fn metrics(mut self, metrics_every: u64, runner_args: serde_json::Value) -> Self {
+        self.enable_metrics = true;
+        self.metrics_every = metrics_every;
+        self.runner_args = runner_args;
+        self
+    }
+
+    /// Consume the builder and produce a [`RunSetup`].
+    pub fn build(self) -> Result<RunSetup> {
+        let (game_state, rng) =
+            load_or_build_state(&self.content, self.seed, self.state_file.as_deref())?;
+
+        let (run_dir, metrics_writer) = if self.enable_metrics {
+            let run_id = generate_run_id(game_state.meta.seed);
+            let dir = create_run_dir(&run_id)?;
+            write_run_info(
+                &dir,
+                &run_id,
+                game_state.meta.seed,
+                &self.content.content_version,
+                self.metrics_every,
+                self.runner_args,
+            )?;
+            let writer = MetricsFileWriter::new(dir.clone())
+                .with_context(|| format!("opening metrics CSV in {}", dir.display()))?;
+            (Some(dir), Some(writer))
+        } else {
+            (None, None)
+        };
+
+        Ok(RunSetup {
+            content: self.content,
+            game_state,
+            rng,
+            run_dir,
+            metrics_writer,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
-    use rand_chacha::ChaCha8Rng;
     use sim_core::{
         test_fixtures::{base_content, minimal_content, test_position},
         AssemblerDef, AsteroidTemplateDef, Counters, GameState, InputAmount, InputFilter,
@@ -964,5 +1069,50 @@ mod tests {
             "error should mention actual version: {err_msg}"
         );
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn run_setup_builder_without_metrics() {
+        let setup = RunSetupBuilder::from_content_dir("../../content")
+            .unwrap()
+            .seed(Some(42))
+            .build()
+            .unwrap();
+
+        assert_eq!(setup.game_state.meta.seed, 42);
+        assert!(setup.run_dir.is_none());
+        assert!(setup.metrics_writer.is_none());
+        assert!(!setup.content.techs.is_empty());
+    }
+
+    #[test]
+    fn run_setup_builder_with_metrics() {
+        let setup = RunSetupBuilder::from_content_dir("../../content")
+            .unwrap()
+            .seed(Some(99))
+            .metrics(60, serde_json::json!({"runner": "test"}))
+            .build()
+            .unwrap();
+
+        assert_eq!(setup.game_state.meta.seed, 99);
+        assert!(setup.run_dir.is_some());
+        assert!(setup.metrics_writer.is_some());
+        let run_dir = setup.run_dir.as_ref().unwrap();
+        assert!(run_dir.join("run_info.json").exists());
+
+        // Clean up
+        std::fs::remove_dir_all(run_dir).ok();
+    }
+
+    #[test]
+    fn run_setup_builder_from_content() {
+        let content = load_content("../../content").unwrap();
+        let setup = RunSetupBuilder::from_content(content)
+            .seed(Some(7))
+            .build()
+            .unwrap();
+
+        assert_eq!(setup.game_state.meta.seed, 7);
+        assert!(setup.run_dir.is_none());
     }
 }

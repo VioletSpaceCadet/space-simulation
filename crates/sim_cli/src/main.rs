@@ -2,9 +2,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use sim_control::{AutopilotController, CommandSource};
 use sim_core::{EventLevel, GameState};
-use sim_world::{
-    create_run_dir, generate_run_id, load_content, load_or_build_state, write_run_info,
-};
+use sim_world::RunSetupBuilder;
 
 // ---------------------------------------------------------------------------
 // CLI definition
@@ -59,31 +57,27 @@ fn run(
     metrics_every: u64,
     no_metrics: bool,
 ) -> Result<()> {
-    let content = load_content(content_dir)?;
-
-    let (mut state, mut rng) = load_or_build_state(&content, seed, state_file.as_deref())?;
-
-    // Set up per-run metrics directory.
-    let mut metrics_writer: Option<sim_core::MetricsFileWriter> = None;
+    let mut builder = RunSetupBuilder::from_content_dir(content_dir)?
+        .seed(seed)
+        .state_file(state_file);
     if !no_metrics {
-        let run_id = generate_run_id(state.meta.seed);
-        let run_dir = create_run_dir(&run_id)?;
-        write_run_info(
-            &run_dir,
-            &run_id,
-            state.meta.seed,
-            &content.content_version,
+        builder = builder.metrics(
             metrics_every,
             serde_json::json!({
                 "runner": "sim_cli",
                 "ticks": ticks,
                 "print_every": print_every,
             }),
-        )?;
-        let writer = sim_core::MetricsFileWriter::new(run_dir.clone())
-            .with_context(|| format!("opening metrics CSV in {}", run_dir.display()))?;
-        metrics_writer = Some(writer);
-        println!("Run directory: {}", run_dir.display());
+        );
+    }
+    let setup = builder.build()?;
+    let content = setup.content;
+    let mut state = setup.game_state;
+    let mut rng = setup.rng;
+    let mut metrics_writer = setup.metrics_writer;
+
+    if let Some(ref dir) = setup.run_dir {
+        println!("Run directory: {}", dir.display());
     }
 
     let mut autopilot = AutopilotController;
@@ -113,7 +107,7 @@ fn run(
         }
 
         if state.meta.tick % print_every == 0 {
-            print_status(&state, content.constants.minutes_per_tick);
+            print_status(&state, &content.constants);
         }
 
         if let Some(ref mut writer) = metrics_writer {
@@ -126,7 +120,7 @@ fn run(
 
     println!("{}", "-".repeat(80));
     println!("Done. Final state at tick {}:", state.meta.tick);
-    print_status(&state, content.constants.minutes_per_tick);
+    print_status(&state, &content.constants);
 
     if let Some(ref mut writer) = metrics_writer {
         writer.flush().context("final metrics flush")?;
@@ -136,11 +130,10 @@ fn run(
     Ok(())
 }
 
-fn print_status(state: &GameState, minutes_per_tick: u32) {
+fn print_status(state: &GameState, constants: &sim_core::Constants) {
     let tick = state.meta.tick;
-    let total_minutes = tick * u64::from(minutes_per_tick);
-    let day = total_minutes / 1440;
-    let hour = (total_minutes % 1440) / 60;
+    let day = constants.tick_to_game_day(tick);
+    let hour = constants.tick_to_game_hour(tick);
 
     let unlocked: Vec<String> = state
         .research
