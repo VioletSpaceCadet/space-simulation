@@ -184,11 +184,11 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
       const { width, height } = sizeRef.current;
       if (width === 0 || height === 0) { return; }
 
-      const moved = lerpCamera(cameraRef.current, targetCameraRef.current);
+      lerpCamera(cameraRef.current, targetCameraRef.current);
 
-      // Throttle HUD camera state updates (~10Hz)
+      // Throttle HUD camera state updates (~10Hz, also fires on first frame)
       const now = performance.now();
-      if (moved && now - hudUpdateTimer.current > 100) {
+      if (now - hudUpdateTimer.current > 100) {
         hudUpdateTimer.current = now;
         setHudCamera({ ...cameraRef.current });
         setHudSize({ ...sizeRef.current });
@@ -453,9 +453,9 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
 
   const handleFlyToSystem = useCallback(() => {
     const cam = targetCameraRef.current;
-    cam.x = 0;
-    cam.y = 0;
-    cam.zoom = 0.12;
+    cam.x = INITIAL_CAMERA.x;
+    cam.y = INITIAL_CAMERA.y;
+    cam.zoom = INITIAL_CAMERA.zoom;
     setFocusName(null);
   }, []);
 
@@ -519,7 +519,7 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
 
       {/* HUD overlays */}
       <ZoomInfo camera={hudCamera} />
-      <div className="absolute top-4 left-4 z-10 pointer-events-none" style={{ top: 60 }}>
+      <div className="absolute left-4 z-10" style={{ top: 60 }}>
         <Breadcrumb focusName={focusName} onReset={handleFlyToSystem} />
       </div>
       {config && (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { BODY_COLORS, ZONE_COLORS } from '../../../config/theme';
+import { BODY_COLORS, MAP_COLORS, ZONE_COLORS } from '../../../config/theme';
 import type { AbsolutePos, OrbitalBodyDef } from '../../../types';
 import type { Camera } from '../canvas/types';
 import { auUmToWorld } from '../canvas/types';
@@ -90,7 +90,7 @@ export function Minimap({ bodies, bodyAbsolutes, camera, viewWidth, viewHeight, 
     const br = toMini(camera.x + halfW, camera.y + halfH);
     const rw = br.mx - tl.mx;
     const rh = br.my - tl.my;
-    ctx.strokeStyle = '#5ca0c8';
+    ctx.strokeStyle = MAP_COLORS.stationAccent;
     ctx.globalAlpha = 0.5;
     ctx.lineWidth = 1;
     ctx.strokeRect(

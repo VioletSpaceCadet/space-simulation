@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { MAP_COLORS } from '../../../config/theme';
+import { BODY_COLORS, IDLE_COLOR, MAP_COLORS } from '../../../config/theme';
 import type { OrbitalBodyDef, ShipState, StationState } from '../../../types';
 import { getTaskKind } from '../../../utils';
 
@@ -32,11 +32,7 @@ function bodyFlyZoom(bodyType: string): number {
   }
 }
 
-const BODY_NAV_COLORS: Record<string, string> = {
-  Star: '#f5c842',
-  Planet: '#6b9dba',
-  Moon: '#999',
-};
+// Reuse BODY_COLORS from theme — same mapping
 
 export function QuickNav({ bodies, stations, ships, onFlyTo, auUmToWorld, bodyAbsolutes }: QuickNavProps) {
   const [modifier, setModifier] = useState<'shift' | 'ctrl' | null>(null);
@@ -90,7 +86,7 @@ export function QuickNav({ bodies, stations, ships, onFlyTo, auUmToWorld, bodyAb
         return {
           id: sh.id,
           label: sh.id,
-          color: kind === 'idle' ? '#8a8e98' : MAP_COLORS.stationAccent,
+          color: kind === 'idle' ? IDLE_COLOR : MAP_COLORS.stationAccent,
           x: auUmToWorld(abs.x_au_um),
           y: auUmToWorld(abs.y_au_um),
           zoom: 5,
@@ -106,7 +102,7 @@ export function QuickNav({ bodies, stations, ships, onFlyTo, auUmToWorld, bodyAb
         return {
           id: b.id,
           label: b.name,
-          color: BODY_NAV_COLORS[b.body_type] ?? '#888',
+          color: BODY_COLORS[b.body_type] ?? '#888',
           x: auUmToWorld(abs.x_au_um),
           y: auUmToWorld(abs.y_au_um),
           zoom: bodyFlyZoom(b.body_type),
