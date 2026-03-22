@@ -12,7 +12,14 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/test-setup.ts', 'src/**/*.test.*', 'src/**/*.d.ts'],
+      exclude: [
+        'src/test-setup.ts',
+        'src/**/*.test.*',
+        'src/**/*.d.ts',
+        // Canvas draw code uses CanvasRenderingContext2D which jsdom lacks — tested via Chrome agent
+        'src/components/solar-system/canvas/renderer.ts',
+        'src/components/solar-system/canvas/starfield.ts',
+      ],
       thresholds: {
         lines: 58,
         branches: 47,

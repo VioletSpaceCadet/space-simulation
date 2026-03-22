@@ -44,3 +44,16 @@ export const SIZE_CAPS = {
 
 /** Default initial camera view — centered on solar system. */
 export const INITIAL_CAMERA: Camera = { x: 0, y: 0, zoom: 0.5 };
+
+// --- LOD system ---
+
+/**
+ * Hermite smoothstep: returns 0 when zoom <= fadeIn, 1 when zoom >= fullIn,
+ * smooth S-curve between. Used for LOD opacity transitions.
+ */
+export function smoothStep(zoom: number, fadeIn: number, fullIn: number): number {
+  if (zoom <= fadeIn) { return 0; }
+  if (zoom >= fullIn) { return 1; }
+  const t = (zoom - fadeIn) / (fullIn - fadeIn);
+  return t * t * (3 - 2 * t);
+}

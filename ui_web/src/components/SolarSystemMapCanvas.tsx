@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fetchSpatialConfig } from '../api';
 import type {
+  AbsolutePos,
   SimSnapshot,
   SolarSystemConfig,
 } from '../types';
@@ -20,6 +21,7 @@ import {
   ZOOM_IN_RATIO,
   ZOOM_OUT_RATIO,
   auUmToWorld,
+  smoothStep,
 } from './solar-system/canvas/types';
 import type { EntityInfo } from './solar-system/DetailCard';
 import { DetailCard } from './solar-system/DetailCard';
@@ -248,53 +250,47 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
       const cam = cameraRef.current;
       const ba = bodyAbsolutesRef.current;
 
+      const zoom = cam.zoom;
       let closestDist = HIT_RADIUS;
       let closestHit: { type: string; id: string } | null = null;
 
+      // Helper: check entity at screen position
+      function check(type: string, id: string, abs: AbsolutePos) {
+        const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
+        const s = worldToScreen(w.x, w.y, cam, width, height);
+        const dist = Math.hypot(s.sx - screenX, s.sy - screenY);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestHit = { type, id };
+        }
+      }
+
+      // Stations — visible from system zoom (as dots)
       for (const station of Object.values(snap.stations)) {
-        const abs = entityAbsolute(station.position, ba);
-        const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
-        const s = worldToScreen(w.x, w.y, cam, width, height);
-        const dist = Math.hypot(s.sx - screenX, s.sy - screenY);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestHit = { type: 'station', id: station.id };
+        check('station', station.id, entityAbsolute(station.position, ba));
+      }
+
+      // Ships — visible at region+ zoom (0.15+)
+      if (smoothStep(zoom, 0.1, 0.2) > 0.01) {
+        for (const ship of Object.values(snap.ships)) {
+          check('ship', ship.id, shipAbsolutePos(ship, {
+            bodyAbsolutes: ba,
+            currentTick: currentTickRef.current,
+          }));
         }
       }
 
-      for (const ship of Object.values(snap.ships)) {
-        const abs = shipAbsolutePos(ship, {
-          bodyAbsolutes: ba,
-          currentTick: currentTickRef.current,
-        });
-        const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
-        const s = worldToScreen(w.x, w.y, cam, width, height);
-        const dist = Math.hypot(s.sx - screenX, s.sy - screenY);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestHit = { type: 'ship', id: ship.id };
+      // Asteroids — match renderer threshold (fadeIn=0.25, fullIn=0.7)
+      if (smoothStep(zoom, 0.25, 0.7) > 0.01) {
+        for (const asteroid of Object.values(snap.asteroids)) {
+          check('asteroid', asteroid.id, entityAbsolute(asteroid.position, ba));
         }
       }
 
-      for (const asteroid of Object.values(snap.asteroids)) {
-        const abs = entityAbsolute(asteroid.position, ba);
-        const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
-        const s = worldToScreen(w.x, w.y, cam, width, height);
-        const dist = Math.hypot(s.sx - screenX, s.sy - screenY);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestHit = { type: 'asteroid', id: asteroid.id };
-        }
-      }
-
-      for (const site of snap.scan_sites) {
-        const abs = entityAbsolute(site.position, ba);
-        const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
-        const s = worldToScreen(w.x, w.y, cam, width, height);
-        const dist = Math.hypot(s.sx - screenX, s.sy - screenY);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestHit = { type: 'scan-site', id: site.id };
+      // Scan sites — match renderer threshold (fadeIn=0.3, fullIn=0.8)
+      if (smoothStep(zoom, 0.3, 0.8) > 0.01) {
+        for (const site of snap.scan_sites) {
+          check('scan-site', site.id, entityAbsolute(site.position, ba));
         }
       }
 
@@ -377,6 +373,56 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
     [hitTest],
   );
 
+  // --- Double-click: zoom to entity (bodies + stations only) ---
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const { width, height } = sizeRef.current;
+      const cam = cameraRef.current;
+      const ba = bodyAbsolutesRef.current;
+      const cfg = configRef.current;
+
+      // Check bodies first
+      if (cfg) {
+        for (const body of cfg.bodies) {
+          if (body.body_type === 'Zone' || body.body_type === 'Belt') { continue; }
+          const abs = ba[body.id];
+          if (!abs) { continue; }
+          const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
+          const s = worldToScreen(w.x, w.y, cam, width, height);
+          if (Math.hypot(s.sx - mouseX, s.sy - mouseY) < HIT_RADIUS * 2) {
+            const target = targetCameraRef.current;
+            target.x = w.x;
+            target.y = w.y;
+            target.zoom = Math.min(MAX_ZOOM, cam.zoom * 2);
+            return;
+          }
+        }
+      }
+
+      // Check stations
+      const snap = snapshotRef.current;
+      if (snap) {
+        for (const station of Object.values(snap.stations)) {
+          const abs = entityAbsolute(station.position, ba);
+          const w = { x: auUmToWorld(abs.x_au_um), y: auUmToWorld(abs.y_au_um) };
+          const s = worldToScreen(w.x, w.y, cam, width, height);
+          if (Math.hypot(s.sx - mouseX, s.sy - mouseY) < HIT_RADIUS * 2) {
+            const target = targetCameraRef.current;
+            target.x = w.x;
+            target.y = w.y;
+            target.zoom = Math.min(MAX_ZOOM, cam.zoom * 2);
+            return;
+          }
+        }
+      }
+    },
+    [],
+  );
+
   // --- Tooltip content ---
   const tooltipContent = (() => {
     if (!hovered || !snapshot) { return null; }
@@ -412,6 +458,7 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
     >
       {/* Starfield CSS background with parallax */}
       <div
