@@ -6,11 +6,11 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde::Deserialize;
 use sim_core::{
-    AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, GameContent, GameState,
-    InputFilter, InventoryItem, MetaState, MetricsFileWriter, ModuleBehaviorDef, ModuleDef,
-    ModuleItemId, OutputSpec, PowerState, PricingTable, PrincipalId, QualityFormula, ResearchState,
-    ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechId,
-    YieldFormula,
+    AlertRuleDef, AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, GameContent,
+    GameState, InputFilter, InventoryItem, MetaState, MetricsFileWriter, ModuleBehaviorDef,
+    ModuleDef, ModuleItemId, OutputSpec, PowerState, PricingTable, PrincipalId, QualityFormula,
+    ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState,
+    TechDef, TechId, YieldFormula,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -333,6 +333,10 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         &std::fs::read_to_string(dir.join("pricing.json")).context("reading pricing.json")?,
     )
     .context("parsing pricing.json")?;
+    let alert_rules: Vec<AlertRuleDef> = match std::fs::read_to_string(dir.join("alerts.json")) {
+        Ok(text) => serde_json::from_str(&text).context("parsing alerts.json")?,
+        Err(_) => Vec::new(),
+    };
     let mut content = GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
@@ -343,6 +347,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         component_defs,
         pricing,
         constants,
+        alert_rules,
         density_map: std::collections::HashMap::new(),
     };
     content.constants.derive_tick_values();

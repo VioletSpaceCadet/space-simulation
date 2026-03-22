@@ -104,7 +104,10 @@ async fn main() -> Result<()> {
             let alert_engine = if no_metrics {
                 None
             } else {
-                Some(alerts::AlertEngine::new(setup.content.techs.len()))
+                Some(alerts::AlertEngine::new(
+                    &setup.content.alert_rules,
+                    setup.content.techs.len(),
+                ))
             };
 
             let (event_tx, _) = broadcast::channel::<Vec<EventEnvelope>>(256);
@@ -164,7 +167,12 @@ mod tests {
     use tower::ServiceExt;
 
     fn make_test_state() -> AppState {
-        let content = base_content();
+        let mut content = base_content();
+        // Load alert rules from content JSON so alert tests work
+        let alert_rules: Vec<sim_core::AlertRuleDef> =
+            serde_json::from_str(&std::fs::read_to_string("../../content/alerts.json").unwrap())
+                .unwrap();
+        content.alert_rules = alert_rules;
         let mut rng = ChaCha8Rng::seed_from_u64(0);
         let game_state = build_initial_state(&content, 0, &mut rng);
         let (event_tx, _) = tokio::sync::broadcast::channel(64);
@@ -493,7 +501,8 @@ mod tests {
         let state = make_test_state();
         {
             let mut sim = state.sim.lock();
-            let mut engine = alerts::AlertEngine::new(sim.content.techs.len());
+            let mut engine =
+                alerts::AlertEngine::new(&sim.content.alert_rules, sim.content.techs.len());
             let snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
             // ORE_STARVATION fires when 3+ consecutive snapshots have refinery_starved_count > 0.
             // The test state has no refineries, so starved_count is 0. Instead use STORAGE_SATURATION
@@ -582,7 +591,8 @@ mod tests {
         let state = make_test_state();
         {
             let mut sim = state.sim.lock();
-            let mut engine = alerts::AlertEngine::new(sim.content.techs.len());
+            let mut engine =
+                alerts::AlertEngine::new(&sim.content.alert_rules, sim.content.techs.len());
 
             // Create a snapshot with high storage to trigger STORAGE_SATURATION
             let mut snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);

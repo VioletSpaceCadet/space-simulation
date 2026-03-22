@@ -1,4 +1,4 @@
-use sim_core::MetricsSnapshot;
+use sim_core::{AlertRuleDef, AlertRuleType, MetricsSnapshot};
 use std::collections::{HashSet, VecDeque};
 
 /// Alert detail returned by the advisor digest endpoint.
@@ -10,155 +10,66 @@ pub struct AlertDetail {
     pub suggested_action: String,
 }
 
-type RuleFn = fn(&VecDeque<MetricsSnapshot>, &AlertEngine) -> bool;
+// --- Metric field accessors ---
 
-struct AlertRule {
-    id: &'static str,
-    severity: sim_core::AlertSeverity,
-    check: RuleFn,
-    message: &'static str,
-    suggested_action: &'static str,
+/// Extract an f64-compatible value from a `MetricsSnapshot` by field name.
+fn get_metric_f64(snapshot: &MetricsSnapshot, name: &str) -> Option<f64> {
+    match name {
+        "total_ore_kg" => Some(f64::from(snapshot.total_ore_kg)),
+        "total_material_kg" => Some(f64::from(snapshot.total_material_kg)),
+        "total_slag_kg" => Some(f64::from(snapshot.total_slag_kg)),
+        "station_storage_used_pct" => Some(f64::from(snapshot.station_storage_used_pct)),
+        "ship_cargo_used_pct" => Some(f64::from(snapshot.ship_cargo_used_pct)),
+        "avg_material_quality" => Some(f64::from(snapshot.avg_material_quality)),
+        "avg_module_wear" => Some(f64::from(snapshot.avg_module_wear)),
+        "max_module_wear" => Some(f64::from(snapshot.max_module_wear)),
+        "max_tech_evidence" => Some(f64::from(snapshot.max_tech_evidence)),
+        "total_scan_data" => Some(f64::from(snapshot.total_scan_data)),
+        "balance" => Some(snapshot.balance),
+        "export_revenue_total" => Some(snapshot.export_revenue_total),
+        "power_generated_kw" => Some(f64::from(snapshot.power_generated_kw)),
+        "power_consumed_kw" => Some(f64::from(snapshot.power_consumed_kw)),
+        "power_deficit_kw" => Some(f64::from(snapshot.power_deficit_kw)),
+        "battery_charge_pct" => Some(f64::from(snapshot.battery_charge_pct)),
+        "heat_wear_multiplier_avg" => Some(f64::from(snapshot.heat_wear_multiplier_avg)),
+        // u32 fields
+        "refinery_active_count" => Some(f64::from(snapshot.refinery_active_count)),
+        "refinery_starved_count" => Some(f64::from(snapshot.refinery_starved_count)),
+        "refinery_stalled_count" => Some(f64::from(snapshot.refinery_stalled_count)),
+        "assembler_active_count" => Some(f64::from(snapshot.assembler_active_count)),
+        "assembler_stalled_count" => Some(f64::from(snapshot.assembler_stalled_count)),
+        "fleet_total" => Some(f64::from(snapshot.fleet_total)),
+        "fleet_idle" => Some(f64::from(snapshot.fleet_idle)),
+        "fleet_mining" => Some(f64::from(snapshot.fleet_mining)),
+        "fleet_transiting" => Some(f64::from(snapshot.fleet_transiting)),
+        "fleet_surveying" => Some(f64::from(snapshot.fleet_surveying)),
+        "fleet_depositing" => Some(f64::from(snapshot.fleet_depositing)),
+        "scan_sites_remaining" => Some(f64::from(snapshot.scan_sites_remaining)),
+        "asteroids_discovered" => Some(f64::from(snapshot.asteroids_discovered)),
+        "asteroids_depleted" => Some(f64::from(snapshot.asteroids_depleted)),
+        "techs_unlocked" => Some(f64::from(snapshot.techs_unlocked)),
+        "ore_lot_count" => Some(f64::from(snapshot.ore_lot_count)),
+        "repair_kits_remaining" => Some(f64::from(snapshot.repair_kits_remaining)),
+        "thruster_count" => Some(f64::from(snapshot.thruster_count)),
+        "export_count" => Some(f64::from(snapshot.export_count)),
+        "station_max_temp_mk" => Some(f64::from(snapshot.station_max_temp_mk)),
+        "station_avg_temp_mk" => Some(f64::from(snapshot.station_avg_temp_mk)),
+        "overheat_warning_count" => Some(f64::from(snapshot.overheat_warning_count)),
+        "overheat_critical_count" => Some(f64::from(snapshot.overheat_critical_count)),
+        _ => None,
+    }
 }
 
-const RULES: &[AlertRule] = &[
-    AlertRule {
-        id: "ORE_STARVATION",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| tail(h, 3).iter().all(|s| s.refinery_starved_count > 0) && h.len() >= 3,
-        message: "Refineries starved — insufficient ore for 3+ samples",
-        suggested_action: "Assign more ships to mining or lower refinery threshold",
-    },
-    AlertRule {
-        id: "STORAGE_SATURATION",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| latest(h).is_some_and(|s| s.station_storage_used_pct > 0.95),
-        message: "Station storage above 95% capacity",
-        suggested_action: "Jettison slag, expand storage, or slow mining",
-    },
-    AlertRule {
-        id: "SLAG_BACKPRESSURE",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| {
-            let recent = tail(h, 5);
-            if recent.len() < 2 {
-                return false;
-            }
-            let slag_delta =
-                max_f(&recent, |s| s.total_slag_kg) - min_f(&recent, |s| s.total_slag_kg);
-            let mat_delta =
-                max_f(&recent, |s| s.total_material_kg) - min_f(&recent, |s| s.total_material_kg);
-            slag_delta > 10.0 && mat_delta < 1.0
-        },
-        message: "Slag accumulating while material production is flat",
-        suggested_action: "Manage slag output — jettison or reduce refinery throughput",
-    },
-    AlertRule {
-        id: "SHIP_IDLE_WITH_WORK",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| latest(h).is_some_and(|s| s.fleet_idle > 0),
-        message: "Ships sitting idle while other alerts are active",
-        suggested_action: "Assign idle ships to address active bottlenecks",
-    },
-    AlertRule {
-        id: "THROUGHPUT_DROP",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| {
-            let recent = tail(h, 10);
-            let longer = tail(h, 50);
-            if recent.len() < 2 || longer.len() < 2 {
-                return false;
-            }
-            let recent_delta =
-                max_f(&recent, |s| s.total_material_kg) - min_f(&recent, |s| s.total_material_kg);
-            let longer_delta =
-                max_f(&longer, |s| s.total_material_kg) - min_f(&longer, |s| s.total_material_kg);
-            longer_delta > 0.0 && recent_delta < longer_delta * 0.5
-        },
-        message: "Material throughput dropped significantly",
-        suggested_action: "Check for starvation, stalled ships, or depleted asteroids",
-    },
-    AlertRule {
-        id: "EXPLORATION_STALL",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| {
-            let recent = tail(h, 10);
-            if recent.len() < 2 {
-                return false;
-            }
-            let discovered_unchanged = max_u(&recent, |s| s.asteroids_discovered)
-                == min_u(&recent, |s| s.asteroids_discovered);
-            let has_sites = max_u(&recent, |s| s.scan_sites_remaining) > 0;
-            let has_idle = max_u(&recent, |s| s.fleet_idle) > 0;
-            discovered_unchanged && has_sites && has_idle
-        },
-        message: "No new asteroids despite available scan sites and idle ships",
-        suggested_action: "Assign idle ships to survey scan sites",
-    },
-    AlertRule {
-        id: "MODULE_WEAR_HIGH",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| latest(h).is_some_and(|s| s.max_module_wear > 0.8),
-        message: "Module wear exceeding 80% — approaching auto-disable threshold",
-        suggested_action: "Run maintenance with repair kits or replace worn modules",
-    },
-    AlertRule {
-        id: "REFINERY_STALLED",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| tail(h, 2).iter().all(|s| s.refinery_stalled_count > 0) && h.len() >= 2,
-        message: "Refineries stalled — insufficient storage capacity for 2+ samples",
-        suggested_action: "Free station storage (jettison slag) or expand cargo capacity",
-    },
-    AlertRule {
-        id: "RESEARCH_STALLED",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, engine| {
-            let recent = tail(h, 20);
-            if recent.len() < 2 {
-                return false;
-            }
-            let evidence_unchanged = (max_f(&recent, |s| s.max_tech_evidence)
-                - min_f(&recent, |s| s.max_tech_evidence))
-            .abs()
-                < f32::EPSILON;
-            #[allow(clippy::cast_possible_truncation)]
-            let all_unlocked = max_u(&recent, |s| s.techs_unlocked) >= engine.total_techs as u32;
-            evidence_unchanged && !all_unlocked
-        },
-        message: "Research evidence not accumulating — no scan data flowing",
-        suggested_action: "Need more survey and deep scan activity",
-    },
-    AlertRule {
-        id: "OVERHEAT_WARNING",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| {
-            tail(h, 5)
-                .iter()
-                .all(|s| s.overheat_warning_count > 0 || s.overheat_critical_count > 0)
-                && h.len() >= 5
-        },
-        message: "Modules in overheat warning zone for 5+ consecutive samples",
-        suggested_action: "Add radiators, reduce processing rate, or shut down overheating modules",
-    },
-    AlertRule {
-        id: "OVERHEAT_CRITICAL",
-        severity: sim_core::AlertSeverity::Critical,
-        check: |h, _| tail(h, 3).iter().all(|s| s.overheat_critical_count > 0) && h.len() >= 3,
-        message: "Modules in critical overheat zone — auto-disabled and wearing rapidly",
-        suggested_action: "Immediately reduce thermal load or add cooling capacity",
-    },
-    AlertRule {
-        id: "PROPELLANT_LOW",
-        severity: sim_core::AlertSeverity::Warning,
-        check: |h, _| {
-            latest(h).is_some_and(|s| {
-                let lh2 = s.per_element_material_kg.get("LH2").copied().unwrap_or(0.0);
-                lh2 > 0.0 && lh2 < 500.0
-            })
-        },
-        message: "LH2 propellant reserves critically low",
-        suggested_action: "Increase electrolysis output or import LH2",
-    },
-];
+fn check_condition(value: f64, condition: &str, threshold: f64) -> bool {
+    match condition {
+        "gt" => value > threshold,
+        "lt" => value < threshold,
+        "gte" => value >= threshold,
+        "lte" => value <= threshold,
+        "eq" => (value - threshold).abs() < f64::EPSILON,
+        _ => false,
+    }
+}
 
 // --- Helpers for querying recent snapshots ---
 
@@ -189,16 +100,80 @@ fn min_u(snapshots: &[&MetricsSnapshot], f: fn(&MetricsSnapshot) -> u32) -> u32 
     snapshots.iter().map(|s| f(s)).min().unwrap_or(0)
 }
 
+// --- Builtin rule evaluators ---
+
+fn builtin_slag_backpressure(h: &VecDeque<MetricsSnapshot>) -> bool {
+    let recent = tail(h, 5);
+    if recent.len() < 2 {
+        return false;
+    }
+    let slag_delta = max_f(&recent, |s| s.total_slag_kg) - min_f(&recent, |s| s.total_slag_kg);
+    let mat_delta =
+        max_f(&recent, |s| s.total_material_kg) - min_f(&recent, |s| s.total_material_kg);
+    slag_delta > 10.0 && mat_delta < 1.0
+}
+
+fn builtin_ship_idle_with_work(h: &VecDeque<MetricsSnapshot>) -> bool {
+    latest(h).is_some_and(|s| s.fleet_idle > 0)
+}
+
+fn builtin_throughput_drop(h: &VecDeque<MetricsSnapshot>) -> bool {
+    let recent = tail(h, 10);
+    let longer = tail(h, 50);
+    if recent.len() < 2 || longer.len() < 2 {
+        return false;
+    }
+    let recent_delta =
+        max_f(&recent, |s| s.total_material_kg) - min_f(&recent, |s| s.total_material_kg);
+    let longer_delta =
+        max_f(&longer, |s| s.total_material_kg) - min_f(&longer, |s| s.total_material_kg);
+    longer_delta > 0.0 && recent_delta < longer_delta * 0.5
+}
+
+fn builtin_exploration_stall(h: &VecDeque<MetricsSnapshot>) -> bool {
+    let recent = tail(h, 10);
+    if recent.len() < 2 {
+        return false;
+    }
+    let discovered_unchanged =
+        max_u(&recent, |s| s.asteroids_discovered) == min_u(&recent, |s| s.asteroids_discovered);
+    let has_sites = max_u(&recent, |s| s.scan_sites_remaining) > 0;
+    let has_idle = max_u(&recent, |s| s.fleet_idle) > 0;
+    discovered_unchanged && has_sites && has_idle
+}
+
+fn builtin_research_stalled(h: &VecDeque<MetricsSnapshot>, total_techs: usize) -> bool {
+    let recent = tail(h, 20);
+    if recent.len() < 2 {
+        return false;
+    }
+    let evidence_unchanged =
+        (max_f(&recent, |s| s.max_tech_evidence) - min_f(&recent, |s| s.max_tech_evidence)).abs()
+            < f32::EPSILON;
+    #[allow(clippy::cast_possible_truncation)]
+    let all_unlocked = max_u(&recent, |s| s.techs_unlocked) >= total_techs as u32;
+    evidence_unchanged && !all_unlocked
+}
+
+fn builtin_overheat_warning(h: &VecDeque<MetricsSnapshot>) -> bool {
+    tail(h, 5)
+        .iter()
+        .all(|s| s.overheat_warning_count > 0 || s.overheat_critical_count > 0)
+        && h.len() >= 5
+}
+
 // --- AlertEngine ---
 
 pub struct AlertEngine {
+    rules: Vec<AlertRuleDef>,
     active: HashSet<String>,
     total_techs: usize,
 }
 
 impl AlertEngine {
-    pub fn new(total_techs: usize) -> Self {
+    pub fn new(rules: &[AlertRuleDef], total_techs: usize) -> Self {
         Self {
+            rules: rules.to_vec(),
             active: HashSet::new(),
             total_techs,
         }
@@ -211,16 +186,74 @@ impl AlertEngine {
 
     /// Returns full details for all currently active alerts.
     pub fn active_alert_details(&self) -> Vec<AlertDetail> {
-        RULES
+        self.rules
             .iter()
-            .filter(|rule| self.active.contains(rule.id))
+            .filter(|rule| self.active.contains(&rule.id))
             .map(|rule| AlertDetail {
-                id: rule.id.to_string(),
+                id: rule.id.clone(),
                 severity: format!("{:?}", rule.severity),
-                message: rule.message.to_string(),
-                suggested_action: rule.suggested_action.to_string(),
+                message: rule.message.clone(),
+                suggested_action: rule.suggested_action.clone(),
             })
             .collect()
+    }
+
+    /// Evaluate a single rule against the metrics history.
+    fn evaluate_rule(&self, rule: &AlertRuleDef, history: &VecDeque<MetricsSnapshot>) -> bool {
+        match &rule.rule {
+            AlertRuleType::ThresholdLatest {
+                metric,
+                condition,
+                threshold,
+            } => latest(history).is_some_and(|snapshot| {
+                get_metric_f64(snapshot, metric)
+                    .is_some_and(|value| check_condition(value, condition, *threshold))
+            }),
+
+            AlertRuleType::ThresholdLatestElement {
+                element,
+                condition,
+                threshold,
+                min_value,
+            } => latest(history).is_some_and(|snapshot| {
+                let value = f64::from(
+                    snapshot
+                        .per_element_material_kg
+                        .get(element.as_str())
+                        .copied()
+                        .unwrap_or(0.0),
+                );
+                // If min_value is set, the value must exceed it (for "between" checks)
+                if let Some(min_val) = min_value {
+                    if value <= *min_val {
+                        return false;
+                    }
+                }
+                check_condition(value, condition, *threshold)
+            }),
+
+            AlertRuleType::Consecutive {
+                metric,
+                min_samples,
+            } => {
+                let n = *min_samples as usize;
+                let recent = tail(history, n);
+                recent.len() >= n
+                    && recent
+                        .iter()
+                        .all(|snapshot| get_metric_f64(snapshot, metric).is_some_and(|v| v > 0.0))
+            }
+
+            AlertRuleType::Builtin { name } => match name.as_str() {
+                "slag_backpressure" => builtin_slag_backpressure(history),
+                "ship_idle_with_work" => builtin_ship_idle_with_work(history),
+                "throughput_drop" => builtin_throughput_drop(history),
+                "exploration_stall" => builtin_exploration_stall(history),
+                "research_stalled" => builtin_research_stalled(history, self.total_techs),
+                "overheat_warning" => builtin_overheat_warning(history),
+                _ => false,
+            },
+        }
     }
 
     /// Evaluate all rules against recent metrics history. Returns events for state changes.
@@ -232,33 +265,35 @@ impl AlertEngine {
     ) -> Vec<sim_core::EventEnvelope> {
         let mut events = Vec::new();
 
-        for rule in RULES {
-            let fired = (rule.check)(history, self);
-            let was_active = self.active.contains(rule.id);
+        // Clone rules to avoid borrow conflict with &mut self
+        let rules = self.rules.clone();
+        for rule in &rules {
+            let fired = self.evaluate_rule(rule, history);
+            let was_active = self.active.contains(&rule.id);
 
             if fired && !was_active {
                 // SHIP_IDLE_WITH_WORK only fires if another alert is already active
                 if rule.id == "SHIP_IDLE_WITH_WORK" && self.active.is_empty() {
                     continue;
                 }
-                self.active.insert(rule.id.to_string());
+                self.active.insert(rule.id.clone());
                 events.push(make_envelope(
                     counters,
                     tick,
                     sim_core::Event::AlertRaised {
-                        alert_id: rule.id.to_string(),
+                        alert_id: rule.id.clone(),
                         severity: rule.severity.clone(),
-                        message: rule.message.to_string(),
-                        suggested_action: rule.suggested_action.to_string(),
+                        message: rule.message.clone(),
+                        suggested_action: rule.suggested_action.clone(),
                     },
                 ));
             } else if !fired && was_active {
-                self.active.remove(rule.id);
+                self.active.remove(&rule.id);
                 events.push(make_envelope(
                     counters,
                     tick,
                     sim_core::Event::AlertCleared {
-                        alert_id: rule.id.to_string(),
+                        alert_id: rule.id.clone(),
                     },
                 ));
             }
@@ -341,9 +376,16 @@ mod tests {
         }
     }
 
+    /// Load alert rules from content/alerts.json for tests.
+    fn test_rules() -> Vec<AlertRuleDef> {
+        let text = std::fs::read_to_string("../../content/alerts.json")
+            .expect("content/alerts.json should exist");
+        serde_json::from_str(&text).expect("alerts.json should parse")
+    }
+
     #[test]
     fn new_engine_has_no_active_alerts() {
-        let engine = AlertEngine::new(5);
+        let engine = AlertEngine::new(&test_rules(), 5);
         assert!(engine.active_alert_ids().is_empty());
     }
 
@@ -351,7 +393,7 @@ mod tests {
     fn evaluate_with_empty_history_fires_nothing() {
         let history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
         let events = engine.evaluate(&history, 1, &mut counters);
         assert!(events.is_empty());
     }
@@ -360,7 +402,7 @@ mod tests {
     fn evaluate_raises_and_clears_storage_saturation() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         // Insert a snapshot with storage > 95%
         let mut snap = empty_snapshot(1);
@@ -410,7 +452,7 @@ mod tests {
     fn ship_idle_requires_other_active_alert() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         let mut snap = empty_snapshot(1);
         snap.fleet_idle = 2;
@@ -430,7 +472,7 @@ mod tests {
     fn module_wear_high_fires_above_threshold() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         let mut snap = empty_snapshot(1);
         snap.max_module_wear = 0.85;
@@ -447,7 +489,7 @@ mod tests {
     fn refinery_stalled_needs_consecutive_samples() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         // Only one stalled sample — should not fire
         let mut snap = empty_snapshot(1);
@@ -479,7 +521,7 @@ mod tests {
     fn active_alert_details_returns_full_info() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         // Trigger STORAGE_SATURATION
         let mut snap = empty_snapshot(1);
@@ -499,7 +541,7 @@ mod tests {
     fn overheat_warning_fires_after_5_consecutive_samples() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         // 4 samples with warning — should not fire
         for tick in 1..=4 {
@@ -528,7 +570,7 @@ mod tests {
     fn overheat_warning_clears_when_resolved() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         // Trigger alert with 5 warning samples
         for tick in 1..=5 {
@@ -554,7 +596,7 @@ mod tests {
     fn overheat_critical_fires_after_3_consecutive_samples() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         // 2 critical samples — should not fire
         for tick in 1..=2 {
@@ -586,7 +628,7 @@ mod tests {
     fn overheat_critical_clears_when_resolved() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         // Trigger critical alert
         for tick in 1..=3 {
@@ -612,7 +654,7 @@ mod tests {
     fn overheat_warning_also_fires_for_critical_modules() {
         let mut history = VecDeque::new();
         let mut counters = test_counters();
-        let mut engine = AlertEngine::new(5);
+        let mut engine = AlertEngine::new(&test_rules(), 5);
 
         // 5 samples with only critical (no warning count) — should still fire OVERHEAT_WARNING
         for tick in 1..=5 {
@@ -628,5 +670,76 @@ mod tests {
             warning_raised,
             "OVERHEAT_WARNING should fire for critical modules too"
         );
+    }
+
+    #[test]
+    fn propellant_low_fires_when_lh2_below_threshold() {
+        let mut history = VecDeque::new();
+        let mut counters = test_counters();
+        let mut engine = AlertEngine::new(&test_rules(), 5);
+
+        let mut snap = empty_snapshot(1);
+        snap.per_element_material_kg
+            .insert("LH2".to_string(), 100.0);
+        history.push_back(snap);
+
+        let events = engine.evaluate(&history, 1, &mut counters);
+        let raised = events.iter().any(|e| {
+            matches!(&e.event, sim_core::Event::AlertRaised { alert_id, .. } if alert_id == "PROPELLANT_LOW")
+        });
+        assert!(raised, "expected PROPELLANT_LOW to fire for LH2=100");
+    }
+
+    #[test]
+    fn propellant_low_does_not_fire_at_zero() {
+        let mut history = VecDeque::new();
+        let mut counters = test_counters();
+        let mut engine = AlertEngine::new(&test_rules(), 5);
+
+        // LH2 = 0.0 — should NOT fire (min_value check)
+        let snap = empty_snapshot(1);
+        history.push_back(snap);
+
+        let events = engine.evaluate(&history, 1, &mut counters);
+        let raised = events.iter().any(|e| {
+            matches!(&e.event, sim_core::Event::AlertRaised { alert_id, .. } if alert_id == "PROPELLANT_LOW")
+        });
+        assert!(
+            !raised,
+            "PROPELLANT_LOW should not fire when LH2 is absent/zero"
+        );
+    }
+
+    #[test]
+    fn alerts_json_parses_all_rules() {
+        let rules = test_rules();
+        // We expect exactly 12 rules matching the original hardcoded set
+        // (minus one that was removed or consolidated, if applicable)
+        assert!(
+            rules.len() >= 12,
+            "expected at least 12 alert rules, got {}",
+            rules.len()
+        );
+        // Verify all expected rule IDs are present
+        let ids: Vec<&str> = rules.iter().map(|r| r.id.as_str()).collect();
+        for expected_id in &[
+            "ORE_STARVATION",
+            "STORAGE_SATURATION",
+            "SLAG_BACKPRESSURE",
+            "SHIP_IDLE_WITH_WORK",
+            "THROUGHPUT_DROP",
+            "EXPLORATION_STALL",
+            "MODULE_WEAR_HIGH",
+            "REFINERY_STALLED",
+            "RESEARCH_STALLED",
+            "OVERHEAT_WARNING",
+            "OVERHEAT_CRITICAL",
+            "PROPELLANT_LOW",
+        ] {
+            assert!(
+                ids.contains(expected_id),
+                "missing expected rule ID: {expected_id}"
+            );
+        }
     }
 }
