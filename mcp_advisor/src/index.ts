@@ -413,15 +413,15 @@ const ObservationSchema = z.object({
 const BottleneckSchema = z.object({
   type: z.string().describe("Bottleneck category (e.g. ore_starvation)"),
   severity: z.enum(["low", "medium", "high", "critical"]).describe("Impact severity"),
-  tick_range: z.tuple([z.number(), z.number()]).describe("[start_tick, end_tick]"),
+  tick_range: z.tuple([z.number().int(), z.number().int()]).describe("[start_tick, end_tick]"),
   description: z.string().describe("Human-readable description"),
 });
 
 const JournalAlertSchema = z.object({
   alert_id: z.string().describe("Alert rule ID (e.g. ORE_STARVATION)"),
   severity: z.string().describe("Alert severity level"),
-  first_seen_tick: z.number().describe("Tick when alert first fired"),
-  resolved_tick: z.number().nullable().default(null).describe("Tick when alert cleared, or null"),
+  first_seen_tick: z.number().int().describe("Tick when alert first fired"),
+  resolved_tick: z.number().int().nullable().default(null).describe("Tick when alert cleared, or null"),
 });
 
 const ParameterChangeSchema = z.object({
@@ -432,7 +432,7 @@ const ParameterChangeSchema = z.object({
 });
 
 const BottleneckEventSchema = z.object({
-  tick: z.number().describe("Tick when bottleneck state changed"),
+  tick: z.number().int().describe("Tick when bottleneck state changed"),
   type: z.string().describe("Bottleneck category"),
   severity: z.enum(["low", "medium", "high", "critical"]).describe("Severity at this tick"),
 });
@@ -442,17 +442,17 @@ server.tool(
   "Save a run journal entry after a simulation analysis session. Generates UUID and timestamp automatically.",
   {
     seed: z.number().int().describe("Simulation RNG seed used"),
-    tick_range: z.tuple([z.number(), z.number()]).describe("[start_tick, end_tick] observed"),
+    tick_range: z.tuple([z.number().int(), z.number().int()]).describe("[start_tick, end_tick] observed"),
     ticks_per_sec: z.number().optional().describe("Simulation speed used"),
     observations: z.array(ObservationSchema).describe("Structured observations"),
     bottlenecks: z.array(BottleneckSchema).describe("Bottlenecks detected"),
     alerts_seen: z.array(JournalAlertSchema).describe("Alerts that fired"),
-    parameter_changes: z.array(ParameterChangeSchema).optional().default([])
+    parameter_changes: z.array(ParameterChangeSchema)
       .describe("Parameter changes proposed or applied"),
     strategy_notes: z.array(z.string()).describe("Free-form learnings"),
     tags: z.array(z.string()).describe("Categorization tags"),
     final_score: z.number().optional().describe("Composite metric at run end"),
-    collapse_tick: z.number().nullable().optional().describe("Tick of collapse, or null"),
+    collapse_tick: z.number().int().nullable().optional().describe("Tick of collapse, or null"),
     bottleneck_timeline: z.array(BottleneckEventSchema).optional()
       .describe("Time-series bottleneck state changes"),
     autopilot_config_hash: z.string().optional().describe("Hash of autopilot config"),
@@ -466,7 +466,8 @@ server.tool(
       const id = crypto.randomUUID();
       const timestamp = new Date().toISOString();
       const fileTimestamp = timestamp.replace(/:/g, "-").replace(/\.\d+Z$/, "Z");
-      const filename = `${fileTimestamp}_${params.seed}.json`;
+      const idFragment = id.split("-")[0];
+      const filename = `${fileTimestamp}_${params.seed}_${idFragment}.json`;
       const filePath = path.join(journalsDir, filename);
 
       const journal: RunJournal = {
