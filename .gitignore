@@ -39,8 +39,11 @@ saves/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+# Node/Vite
+node_modules/
+.vite/
+
 # MCP advisor
-mcp_advisor/node_modules/
 mcp_advisor/dist/
 content/advisor_proposals/
 
@@ -49,7 +52,6 @@ lcov.info
 ui_web/coverage/
 
 # E2E tests
-e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/
 
