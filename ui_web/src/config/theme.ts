@@ -23,6 +23,23 @@ export function hashColor(value: string): string {
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
+// --- Element / material colors ---
+export const ELEMENT_COLORS: Record<string, string> = {
+  Fe: '#c47038',
+  Si: '#8a9aaf',
+  He: '#c4a038',
+  H2O: '#4a90d9',
+  LH2: '#5cc8e8',
+  LOX: '#e08a6a',
+};
+
+export function elementColor(element: string): string {
+  return ELEMENT_COLORS[element] ?? hashColor(element);
+}
+
+/** Elements that experience boiloff — show loss indicator in inventory */
+export const CRYO_ELEMENTS = new Set(['LH2', 'LOX']);
+
 // --- Asteroid anomaly tags ---
 export const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   IronRich: { bg: 'rgba(196, 112, 56, 0.15)', text: '#c47038' },
