@@ -30,6 +30,12 @@ Any work touching `ui_web/` — React components, hooks, styling, SSE subscripti
 - **Design iteration:** design-iterator agent (requires `--chrome` flag) — iteratively refines layout, spacing, typography
 - **E2E:** only for critical flows — prefer vitest over Playwright for new tests
 
+## Responsive Layout Rules
+- [ ] **Flex items need min-width floors:** any `flex-1` or `flex-shrink` element must have a `min-w-[Nrem]` to prevent collapsing to 0px at narrow widths — `min-w-0` alone allows full collapse
+- [ ] **Grid cells need overflow handling:** `grid-cols-N` cells must have `min-w-0 overflow-hidden` on their content div, and text labels should use `truncate` — otherwise content overflows into adjacent columns
+- [ ] **Wide containers need max-width caps:** flex/grid containers inside resizable panels must have `max-w-sm`/`max-w-lg` to prevent content from spreading across 1000px+ when the panel is expanded to full width
+- [ ] **Test at both extremes:** verify layout at ~200px (all panels open) AND full width (single panel) — bugs often only appear at one extreme
+
 ## Pitfalls
 - `react-resizable-panels` v1 API (deprecated) vs v2 — always use v2
 - ESLint blocks underscore-prefixed destructured vars

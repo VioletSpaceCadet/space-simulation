@@ -18,6 +18,9 @@ Any work in `sim_core`, `sim_world`, or `sim_control` — game state, tick logic
 - [ ] **Data-driven types:** game content types (asteroid tags, data kinds, research domains) are Strings loaded from content — never add new enum variants for content-defined categories
 - [ ] **Module extensibility:** new module types use common fields/trait — never add match arms to station/mod.rs dispatcher functions
 
+- [ ] **Function size:** new functions over 80 lines should use the accumulator pattern (like `MetricsAccumulator`) or extract sub-functions. Never add `#[allow(clippy::too_many_lines)]` to suppress growth — decompose instead.
+- [ ] **Progression tests:** at least one test per major system should use `load_content("../../content")` with real content values (real wear rates, real timescales) — not just zero-wear fixtures
+
 ## Testing
 - **Unit:** `cargo test -p sim_core` (runs automatically via PostToolUse hook on `.rs` edits)
 - **Scenario:** `cargo run -p sim_bench -- run --scenario scenarios/baseline.json`
