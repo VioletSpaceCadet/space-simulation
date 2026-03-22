@@ -84,6 +84,8 @@ pub fn base_content() -> GameContent {
                 melting_point_mk: None,
                 latent_heat_j_per_kg: None,
                 specific_heat_j_per_kg_k: None,
+                boiloff_rate_per_day_at_293k: None,
+                boiling_point_mk: None,
             },
             ElementDef {
                 id: "Fe".to_string(),
@@ -94,6 +96,8 @@ pub fn base_content() -> GameContent {
                 melting_point_mk: Some(1_811_000),
                 latent_heat_j_per_kg: Some(247_000),
                 specific_heat_j_per_kg_k: Some(449),
+                boiloff_rate_per_day_at_293k: None,
+                boiling_point_mk: None,
             },
             ElementDef {
                 id: "Si".to_string(),
@@ -104,6 +108,8 @@ pub fn base_content() -> GameContent {
                 melting_point_mk: Some(1_687_000),
                 latent_heat_j_per_kg: Some(1_787_000),
                 specific_heat_j_per_kg_k: Some(710),
+                boiloff_rate_per_day_at_293k: None,
+                boiling_point_mk: None,
             },
             ElementDef {
                 id: "slag".to_string(),
@@ -114,6 +120,8 @@ pub fn base_content() -> GameContent {
                 melting_point_mk: None,
                 latent_heat_j_per_kg: None,
                 specific_heat_j_per_kg_k: None,
+                boiloff_rate_per_day_at_293k: None,
+                boiling_point_mk: None,
             },
         ],
         module_defs: HashMap::new(),
@@ -202,6 +210,8 @@ pub fn minimal_content() -> GameContent {
                 melting_point_mk: None,
                 latent_heat_j_per_kg: None,
                 specific_heat_j_per_kg_k: None,
+                boiloff_rate_per_day_at_293k: None,
+                boiling_point_mk: None,
             },
             ElementDef {
                 id: "Fe".to_string(),
@@ -212,6 +222,8 @@ pub fn minimal_content() -> GameContent {
                 melting_point_mk: Some(1_811_000),
                 latent_heat_j_per_kg: Some(247_000),
                 specific_heat_j_per_kg_k: Some(449),
+                boiloff_rate_per_day_at_293k: None,
+                boiling_point_mk: None,
             },
             ElementDef {
                 id: "slag".to_string(),
@@ -222,6 +234,8 @@ pub fn minimal_content() -> GameContent {
                 melting_point_mk: None,
                 latent_heat_j_per_kg: None,
                 specific_heat_j_per_kg_k: None,
+                boiloff_rate_per_day_at_293k: None,
+                boiling_point_mk: None,
             },
         ],
         module_defs: HashMap::new(),

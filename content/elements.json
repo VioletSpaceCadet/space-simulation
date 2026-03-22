@@ -8,7 +8,9 @@
       "melting_point_mk": 1687000, "latent_heat_j_per_kg": 1787000, "specific_heat_j_per_kg_k": 710 },
     { "id": "He",   "density_kg_per_m3": 125.0,  "display_name": "Helium-3",   "refined_name": "Liquid Helium-3", "category": "material" },
     { "id": "H2O",  "density_kg_per_m3": 1000.0, "display_name": "Water Ice",   "refined_name": "Water", "category": "material" },
-    { "id": "LH2",  "density_kg_per_m3": 71.0,   "display_name": "Liquid Hydrogen", "refined_name": "LH2", "category": "material" },
-    { "id": "LOX",  "density_kg_per_m3": 1141.0,  "display_name": "Liquid Oxygen",  "refined_name": "LOX", "category": "material" }
+    { "id": "LH2",  "density_kg_per_m3": 71.0,   "display_name": "Liquid Hydrogen", "refined_name": "LH2", "category": "material",
+      "boiloff_rate_per_day_at_293k": 0.014, "boiling_point_mk": 20300 },
+    { "id": "LOX",  "density_kg_per_m3": 1141.0,  "display_name": "Liquid Oxygen",  "refined_name": "LOX", "category": "material",
+      "boiloff_rate_per_day_at_293k": 0.003, "boiling_point_mk": 90200 }
   ]
 }
