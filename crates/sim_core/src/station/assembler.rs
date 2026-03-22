@@ -57,7 +57,7 @@ fn execute(
         };
         match &station.modules[ctx.module_idx].kind_state {
             crate::ModuleKindState::Assembler(asmb) => asmb.selected_recipe_idx,
-            _ => 0,
+            _ => return super::RunOutcome::Skipped { reset_timer: true },
         }
     };
 
