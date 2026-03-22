@@ -51,17 +51,17 @@ fn execute(
     rng: &mut impl rand::Rng,
     events: &mut Vec<EventEnvelope>,
 ) -> super::RunOutcome {
-    let recipe_idx = {
+    let selected = {
         let Some(station) = state.stations.get(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: true };
         };
         match &station.modules[ctx.module_idx].kind_state {
-            crate::ModuleKindState::Assembler(asmb) => asmb.selected_recipe_idx,
+            crate::ModuleKindState::Assembler(asmb) => asmb.selected_recipe.clone(),
             _ => return super::RunOutcome::Skipped { reset_timer: true },
         }
     };
-
-    let Some(recipe) = assembler_def.recipes.get(recipe_idx) else {
+    let recipe_id = selected.as_ref().or_else(|| assembler_def.recipes.first());
+    let Some(recipe) = recipe_id.and_then(|id| content.recipes.get(id)) else {
         return super::RunOutcome::Skipped { reset_timer: true };
     };
 
@@ -434,6 +434,28 @@ mod assembler_component_tests {
             volume_m3: 5.0,
         });
         // Assembler recipe: 100kg Fe + 4 thrusters => 1 hull_plate
+        let hull_plate_recipe = RecipeDef {
+            id: RecipeId("recipe_hull_plate".to_string()),
+            inputs: vec![
+                RecipeInput {
+                    filter: InputFilter::Element("Fe".to_string()),
+                    amount: InputAmount::Kg(100.0),
+                },
+                RecipeInput {
+                    filter: InputFilter::Component(ComponentId("thruster".to_string())),
+                    amount: InputAmount::Count(4),
+                },
+            ],
+            outputs: vec![OutputSpec::Component {
+                component_id: ComponentId("hull_plate".to_string()),
+                quality_formula: QualityFormula::Fixed(0.9),
+            }],
+            efficiency: 1.0,
+            thermal_req: None,
+            required_tech: None,
+            tags: vec![],
+        };
+        let recipe_id = crate::test_fixtures::insert_recipe(&mut content, hull_plate_recipe);
         content.module_defs.insert(
             "module_shipyard".to_string(),
             ModuleDef {
@@ -446,25 +468,7 @@ mod assembler_component_tests {
                 behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
                     assembly_interval_minutes: 1,
                     assembly_interval_ticks: 1,
-                    recipes: vec![RecipeDef {
-                        id: "recipe_hull_plate".to_string(),
-                        inputs: vec![
-                            RecipeInput {
-                                filter: InputFilter::Element("Fe".to_string()),
-                                amount: InputAmount::Kg(100.0),
-                            },
-                            RecipeInput {
-                                filter: InputFilter::Component(ComponentId("thruster".to_string())),
-                                amount: InputAmount::Count(4),
-                            },
-                        ],
-                        outputs: vec![OutputSpec::Component {
-                            component_id: ComponentId("hull_plate".to_string()),
-                            quality_formula: QualityFormula::Fixed(0.9),
-                        }],
-                        efficiency: 1.0,
-                        thermal_req: None,
-                    }],
+                    recipes: vec![recipe_id],
                     max_stock: HashMap::new(),
                 }),
                 thermal: None,
@@ -514,7 +518,7 @@ mod assembler_component_tests {
                             stalled: false,
                             capped: false,
                             cap_override: HashMap::new(),
-                            selected_recipe_idx: 0,
+                            selected_recipe: None,
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
@@ -737,6 +741,27 @@ mod assembler_component_tests {
             volume_m3: 2.0,
         });
         // Shipyard recipe: 100kg Fe + 2 thrusters => Ship with 50 m3 cargo
+        let ship_recipe = RecipeDef {
+            id: RecipeId("recipe_build_ship".to_string()),
+            inputs: vec![
+                RecipeInput {
+                    filter: InputFilter::Element("Fe".to_string()),
+                    amount: InputAmount::Kg(100.0),
+                },
+                RecipeInput {
+                    filter: InputFilter::Component(ComponentId("thruster".to_string())),
+                    amount: InputAmount::Count(2),
+                },
+            ],
+            outputs: vec![OutputSpec::Ship {
+                cargo_capacity_m3: 50.0,
+            }],
+            efficiency: 1.0,
+            thermal_req: None,
+            required_tech: None,
+            tags: vec![],
+        };
+        let recipe_id = crate::test_fixtures::insert_recipe(&mut content, ship_recipe);
         content.module_defs.insert(
             "module_shipyard".to_string(),
             ModuleDef {
@@ -749,24 +774,7 @@ mod assembler_component_tests {
                 behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
                     assembly_interval_minutes: 1,
                     assembly_interval_ticks: 1,
-                    recipes: vec![RecipeDef {
-                        id: "recipe_build_ship".to_string(),
-                        inputs: vec![
-                            RecipeInput {
-                                filter: InputFilter::Element("Fe".to_string()),
-                                amount: InputAmount::Kg(100.0),
-                            },
-                            RecipeInput {
-                                filter: InputFilter::Component(ComponentId("thruster".to_string())),
-                                amount: InputAmount::Count(2),
-                            },
-                        ],
-                        outputs: vec![OutputSpec::Ship {
-                            cargo_capacity_m3: 50.0,
-                        }],
-                        efficiency: 1.0,
-                        thermal_req: None,
-                    }],
+                    recipes: vec![recipe_id],
                     max_stock: HashMap::new(),
                 }),
                 thermal: None,
@@ -816,7 +824,7 @@ mod assembler_component_tests {
                             stalled: false,
                             capped: false,
                             cap_override: HashMap::new(),
-                            selected_recipe_idx: 0,
+                            selected_recipe: None,
                         }),
                         wear: WearState::default(),
                         power_stalled: false,

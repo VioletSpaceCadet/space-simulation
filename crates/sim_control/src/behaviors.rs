@@ -480,10 +480,13 @@ impl AutopilotBehavior for ThrusterImport {
             .module_defs
             .get("module_shipyard")
             .and_then(|def| match &def.behavior {
-                ModuleBehaviorDef::Assembler(asm) => asm.recipes.first(),
+                ModuleBehaviorDef::Assembler(asm) => asm
+                    .recipes
+                    .first()
+                    .and_then(|recipe_id| content.recipes.get(recipe_id)),
                 _ => None,
             })
-            .map_or(4, |recipe| {
+            .map_or(4u32, |recipe| {
                 recipe
                     .inputs
                     .iter()

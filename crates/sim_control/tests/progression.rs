@@ -158,6 +158,35 @@ fn production_like_content() -> GameContent {
         },
     );
 
+    // Processor recipe: Ore → Fe + Slag
+    let iron_recipe = RecipeDef {
+        id: RecipeId("recipe_basic_iron".to_string()),
+        inputs: vec![RecipeInput {
+            filter: InputFilter::ItemKind(ItemKind::Ore),
+            amount: InputAmount::Kg(1000.0),
+        }],
+        outputs: vec![
+            OutputSpec::Material {
+                element: "Fe".to_string(),
+                yield_formula: YieldFormula::ElementFraction {
+                    element: "Fe".to_string(),
+                },
+                quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                    element: "Fe".to_string(),
+                    multiplier: 1.0,
+                },
+            },
+            OutputSpec::Slag {
+                yield_formula: YieldFormula::FixedFraction(1.0),
+            },
+        ],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    };
+    content.recipes.insert(iron_recipe.id.clone(), iron_recipe);
+
     // Processor (refinery): every 1 hour
     content.module_defs.insert(
         "module_basic_iron_refinery".to_string(),
@@ -171,34 +200,31 @@ fn production_like_content() -> GameContent {
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 60,
                 processing_interval_ticks: 1,
-                recipes: vec![RecipeDef {
-                    id: "recipe_basic_iron".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::ItemKind(ItemKind::Ore),
-                        amount: InputAmount::Kg(1000.0),
-                    }],
-                    outputs: vec![
-                        OutputSpec::Material {
-                            element: "Fe".to_string(),
-                            yield_formula: YieldFormula::ElementFraction {
-                                element: "Fe".to_string(),
-                            },
-                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
-                                element: "Fe".to_string(),
-                                multiplier: 1.0,
-                            },
-                        },
-                        OutputSpec::Slag {
-                            yield_formula: YieldFormula::FixedFraction(1.0),
-                        },
-                    ],
-                    efficiency: 1.0,
-                    thermal_req: None,
-                }],
+                recipes: vec![RecipeId("recipe_basic_iron".to_string())],
             }),
             thermal: None,
         },
     );
+
+    // Assembler recipe: Fe → Repair Kit
+    let repair_kit_recipe = RecipeDef {
+        id: RecipeId("recipe_basic_repair_kit".to_string()),
+        inputs: vec![RecipeInput {
+            filter: InputFilter::Element("Fe".to_string()),
+            amount: InputAmount::Kg(200.0),
+        }],
+        outputs: vec![OutputSpec::Component {
+            component_id: ComponentId("repair_kit".to_string()),
+            quality_formula: QualityFormula::Fixed(1.0),
+        }],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    };
+    content
+        .recipes
+        .insert(repair_kit_recipe.id.clone(), repair_kit_recipe);
 
     // Assembler (repair kits): every 6 hours — generates EngineeringData
     content.module_defs.insert(
@@ -213,19 +239,7 @@ fn production_like_content() -> GameContent {
             behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
                 assembly_interval_minutes: 360,
                 assembly_interval_ticks: 6,
-                recipes: vec![RecipeDef {
-                    id: "recipe_basic_repair_kit".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::Element("Fe".to_string()),
-                        amount: InputAmount::Kg(200.0),
-                    }],
-                    outputs: vec![OutputSpec::Component {
-                        component_id: ComponentId("repair_kit".to_string()),
-                        quality_formula: QualityFormula::Fixed(1.0),
-                    }],
-                    efficiency: 1.0,
-                    thermal_req: None,
-                }],
+                recipes: vec![RecipeId("recipe_basic_repair_kit".to_string())],
                 max_stock: HashMap::from([(ComponentId("repair_kit".to_string()), 50)]),
             }),
             thermal: None,
@@ -491,6 +505,31 @@ fn sensor_data_generation_rate_at_mpt_60() {
 fn ships_built_after_tech_unlock_and_trade_available() {
     let mut content = production_like_content();
 
+    // Add shipyard recipe to catalog
+    let shuttle_recipe = RecipeDef {
+        id: RecipeId("recipe_basic_mining_shuttle".to_string()),
+        inputs: vec![
+            RecipeInput {
+                filter: InputFilter::Element("Fe".to_string()),
+                amount: InputAmount::Kg(10000.0),
+            },
+            RecipeInput {
+                filter: InputFilter::Component(ComponentId("thruster".to_string())),
+                amount: InputAmount::Count(8),
+            },
+        ],
+        outputs: vec![OutputSpec::Ship {
+            cargo_capacity_m3: 50.0,
+        }],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    };
+    content
+        .recipes
+        .insert(shuttle_recipe.id.clone(), shuttle_recipe);
+
     // Add shipyard assembler: 20160 min = 336 ticks, needs 10000kg Fe + 8 thrusters
     content.module_defs.insert(
         "module_shipyard".to_string(),
@@ -504,24 +543,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
             behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
                 assembly_interval_minutes: 20160,
                 assembly_interval_ticks: 336, // 20160 / 60
-                recipes: vec![RecipeDef {
-                    id: "recipe_basic_mining_shuttle".to_string(),
-                    inputs: vec![
-                        RecipeInput {
-                            filter: InputFilter::Element("Fe".to_string()),
-                            amount: InputAmount::Kg(10000.0),
-                        },
-                        RecipeInput {
-                            filter: InputFilter::Component(ComponentId("thruster".to_string())),
-                            amount: InputAmount::Count(8),
-                        },
-                    ],
-                    outputs: vec![OutputSpec::Ship {
-                        cargo_capacity_m3: 50.0,
-                    }],
-                    efficiency: 1.0,
-                    thermal_req: None,
-                }],
+                recipes: vec![RecipeId("recipe_basic_mining_shuttle".to_string())],
                 max_stock: HashMap::new(),
             }),
             thermal: None,

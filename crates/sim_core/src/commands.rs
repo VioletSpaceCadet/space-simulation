@@ -57,7 +57,7 @@ fn default_module_state(
                 threshold_kg: 0.0,
                 ticks_since_last_run: 0,
                 stalled: false,
-                selected_recipe_idx: 0,
+                selected_recipe: None,
             }),
             crate::BehaviorType::Processor,
         ),
@@ -77,7 +77,7 @@ fn default_module_state(
                 stalled: false,
                 capped: false,
                 cap_override: std::collections::HashMap::new(),
-                selected_recipe_idx: 0,
+                selected_recipe: None,
             }),
             crate::BehaviorType::Assembler,
         ),
@@ -295,8 +295,12 @@ pub(crate) fn handle_select_recipe(
     content: &GameContent,
     station_id: &crate::StationId,
     module_id: &crate::ModuleInstanceId,
-    recipe_idx: usize,
+    recipe_id: &crate::RecipeId,
 ) -> bool {
+    // Recipe must exist in the catalog
+    if !content.recipes.contains_key(recipe_id) {
+        return false;
+    }
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
@@ -308,16 +312,16 @@ pub(crate) fn handle_select_recipe(
     };
     match (&mut module.kind_state, &def.behavior) {
         (crate::ModuleKindState::Processor(ps), crate::ModuleBehaviorDef::Processor(proc_def)) => {
-            if recipe_idx >= proc_def.recipes.len() {
+            if !proc_def.recipes.contains(recipe_id) {
                 return false;
             }
-            ps.selected_recipe_idx = recipe_idx;
+            ps.selected_recipe = Some(recipe_id.clone());
         }
         (crate::ModuleKindState::Assembler(asmb), crate::ModuleBehaviorDef::Assembler(asm_def)) => {
-            if recipe_idx >= asm_def.recipes.len() {
+            if !asm_def.recipes.contains(recipe_id) {
                 return false;
             }
-            asmb.selected_recipe_idx = recipe_idx;
+            asmb.selected_recipe = Some(recipe_id.clone());
         }
         _ => return false,
     }

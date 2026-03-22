@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_fixtures::insert_recipe;
 
 fn heating_content() -> GameContent {
     let mut content = test_content();
@@ -15,6 +16,33 @@ fn heating_content() -> GameContent {
         boiloff_rate_per_day_at_293k: None,
         boiling_point_mk: None,
     });
+    let water_recipe = RecipeDef {
+        id: RecipeId("recipe_extract_water".to_string()),
+        inputs: vec![RecipeInput {
+            filter: InputFilter::ItemKind(ItemKind::Ore),
+            amount: InputAmount::Kg(500.0),
+        }],
+        outputs: vec![
+            OutputSpec::Material {
+                element: "H2O".to_string(),
+                yield_formula: YieldFormula::ElementFraction {
+                    element: "H2O".to_string(),
+                },
+                quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                    element: "H2O".to_string(),
+                    multiplier: 1.0,
+                },
+            },
+            OutputSpec::Slag {
+                yield_formula: YieldFormula::FixedFraction(1.0),
+            },
+        ],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    };
+    let recipe_id = insert_recipe(&mut content, water_recipe);
     content.module_defs = HashMap::from([(
         "module_heating_unit".to_string(),
         ModuleDef {
@@ -27,30 +55,7 @@ fn heating_content() -> GameContent {
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
-                recipes: vec![RecipeDef {
-                    id: "recipe_extract_water".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::ItemKind(ItemKind::Ore),
-                        amount: InputAmount::Kg(500.0),
-                    }],
-                    outputs: vec![
-                        OutputSpec::Material {
-                            element: "H2O".to_string(),
-                            yield_formula: YieldFormula::ElementFraction {
-                                element: "H2O".to_string(),
-                            },
-                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
-                                element: "H2O".to_string(),
-                                multiplier: 1.0,
-                            },
-                        },
-                        OutputSpec::Slag {
-                            yield_formula: YieldFormula::FixedFraction(1.0),
-                        },
-                    ],
-                    efficiency: 1.0,
-                    thermal_req: None,
-                }],
+                recipes: vec![recipe_id],
             }),
             thermal: None,
         },
@@ -71,7 +76,7 @@ fn state_with_heating(content: &GameContent) -> GameState {
             threshold_kg: 100.0,
             ticks_since_last_run: 0,
             stalled: false,
-            selected_recipe_idx: 0,
+            selected_recipe: None,
         }),
         wear: WearState::default(),
         power_stalled: false,
@@ -189,7 +194,7 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
             threshold_kg: 100.0,
             ticks_since_last_run: 0,
             stalled: false,
-            selected_recipe_idx: 0,
+            selected_recipe: None,
         }),
         wear: WearState::default(),
         power_stalled: false,

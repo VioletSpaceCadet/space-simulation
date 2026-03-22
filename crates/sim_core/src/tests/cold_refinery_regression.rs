@@ -9,6 +9,7 @@
 //! - The thermal tick step is a no-op for modules without `ThermalDef`
 
 use super::*;
+use crate::test_fixtures::insert_recipe;
 
 // ── Cold refinery has no thermal state ──────────────────────────────────
 
@@ -402,6 +403,7 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
     let mut content = refinery_content();
 
     // Add the thermal smelter def
+    let smelt_recipe_id = insert_recipe(&mut content, crate::test_fixtures::test_smelt_recipe());
     content.module_defs.insert(
         "module_basic_smelter".to_string(),
         ModuleDef {
@@ -414,36 +416,7 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
-                recipes: vec![RecipeDef {
-                    id: "recipe_smelt_iron".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::ItemKind(ItemKind::Ore),
-                        amount: InputAmount::Kg(500.0),
-                    }],
-                    outputs: vec![
-                        OutputSpec::Material {
-                            element: "Fe".to_string(),
-                            yield_formula: YieldFormula::ElementFraction {
-                                element: "Fe".to_string(),
-                            },
-                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
-                                element: "Fe".to_string(),
-                                multiplier: 1.0,
-                            },
-                        },
-                        OutputSpec::Slag {
-                            yield_formula: YieldFormula::FixedFraction(1.0),
-                        },
-                    ],
-                    efficiency: 1.0,
-                    thermal_req: Some(RecipeThermalReq {
-                        min_temp_mk: 1_800_000,
-                        optimal_min_mk: 1_850_000,
-                        optimal_max_mk: 1_950_000,
-                        max_temp_mk: 2_100_000,
-                        heat_per_run_j: 50_000_000,
-                    }),
-                }],
+                recipes: vec![smelt_recipe_id],
             }),
             thermal: Some(ThermalDef {
                 heat_capacity_j_per_k: 50_000.0,
@@ -470,7 +443,7 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
             threshold_kg: 500.0,
             ticks_since_last_run: 100,
             stalled: false,
-            selected_recipe_idx: 0,
+            selected_recipe: None,
         }),
         wear: WearState::default(),
         thermal: Some(ThermalState {

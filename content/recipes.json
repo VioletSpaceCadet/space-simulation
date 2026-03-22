@@ -1,0 +1,152 @@
+[
+  {
+    "id": "recipe_basic_iron",
+    "inputs": [
+      {
+        "filter": { "ItemKind": "Ore" },
+        "amount": { "Kg": 1000.0 }
+      }
+    ],
+    "outputs": [
+      {
+        "Material": {
+          "element": "Fe",
+          "yield_formula": { "ElementFraction": { "element": "Fe" } },
+          "quality_formula": {
+            "ElementFractionTimesMultiplier": { "element": "Fe", "multiplier": 1.0 }
+          }
+        }
+      },
+      {
+        "Slag": {
+          "yield_formula": { "FixedFraction": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0
+  },
+  {
+    "id": "recipe_electrolysis",
+    "inputs": [
+      {
+        "filter": { "Element": "H2O" },
+        "amount": { "Kg": 1000.0 }
+      }
+    ],
+    "outputs": [
+      {
+        "Material": {
+          "element": "LH2",
+          "yield_formula": { "FixedFraction": 0.111 },
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      },
+      {
+        "Material": {
+          "element": "LOX",
+          "yield_formula": { "FixedFraction": 0.889 },
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0
+  },
+  {
+    "id": "recipe_extract_water",
+    "inputs": [
+      {
+        "filter": { "ItemKind": "Ore" },
+        "amount": { "Kg": 1000.0 }
+      }
+    ],
+    "outputs": [
+      {
+        "Material": {
+          "element": "H2O",
+          "yield_formula": { "ElementFraction": { "element": "H2O" } },
+          "quality_formula": {
+            "ElementFractionTimesMultiplier": { "element": "H2O", "multiplier": 1.0 }
+          }
+        }
+      },
+      {
+        "Slag": {
+          "yield_formula": { "FixedFraction": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0
+  },
+  {
+    "id": "recipe_basic_repair_kit",
+    "inputs": [
+      {
+        "filter": { "Element": "Fe" },
+        "amount": { "Kg": 200.0 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "repair_kit",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0
+  },
+  {
+    "id": "recipe_basic_mining_shuttle",
+    "inputs": [
+      {
+        "filter": { "Element": "Fe" },
+        "amount": { "Kg": 10000.0 }
+      },
+      {
+        "filter": { "Component": "thruster" },
+        "amount": { "Count": 8 }
+      }
+    ],
+    "outputs": [
+      {
+        "Ship": {
+          "cargo_capacity_m3": 50.0
+        }
+      }
+    ],
+    "efficiency": 1.0
+  },
+  {
+    "id": "recipe_smelt_iron",
+    "inputs": [
+      {
+        "filter": { "ItemKind": "Ore" },
+        "amount": { "Kg": 500.0 }
+      }
+    ],
+    "outputs": [
+      {
+        "Material": {
+          "element": "Fe",
+          "yield_formula": { "ElementFraction": { "element": "Fe" } },
+          "quality_formula": {
+            "ElementFractionTimesMultiplier": { "element": "Fe", "multiplier": 1.0 }
+          }
+        }
+      },
+      {
+        "Slag": {
+          "yield_formula": { "FixedFraction": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0,
+    "thermal_req": {
+      "min_temp_mk": 1800000,
+      "optimal_min_mk": 1850000,
+      "optimal_max_mk": 1950000,
+      "max_temp_mk": 2100000,
+      "heat_per_run_j": 50000000
+    }
+  }
+]

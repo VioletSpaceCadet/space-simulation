@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_fixtures::insert_recipe;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
@@ -63,6 +64,27 @@ fn economy_content() -> GameContent {
 
     // Shipyard assembler: consumes 100kg Fe + 2 thrusters => Ship (50 m3 cargo)
     // Use assembly_interval_ticks=2 so the test doesn't need thousands of ticks.
+    let ship_recipe = RecipeDef {
+        id: RecipeId("recipe_build_ship".to_string()),
+        inputs: vec![
+            RecipeInput {
+                filter: InputFilter::Element("Fe".to_string()),
+                amount: InputAmount::Kg(100.0),
+            },
+            RecipeInput {
+                filter: InputFilter::Component(ComponentId("thruster".to_string())),
+                amount: InputAmount::Count(2),
+            },
+        ],
+        outputs: vec![OutputSpec::Ship {
+            cargo_capacity_m3: 50.0,
+        }],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    };
+    let recipe_id = insert_recipe(&mut content, ship_recipe);
     content.module_defs = HashMap::from([(
         "module_shipyard".to_string(),
         ModuleDef {
@@ -75,24 +97,7 @@ fn economy_content() -> GameContent {
             behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
                 assembly_interval_minutes: 2,
                 assembly_interval_ticks: 2,
-                recipes: vec![RecipeDef {
-                    id: "recipe_build_ship".to_string(),
-                    inputs: vec![
-                        RecipeInput {
-                            filter: InputFilter::Element("Fe".to_string()),
-                            amount: InputAmount::Kg(100.0),
-                        },
-                        RecipeInput {
-                            filter: InputFilter::Component(ComponentId("thruster".to_string())),
-                            amount: InputAmount::Count(2),
-                        },
-                    ],
-                    outputs: vec![OutputSpec::Ship {
-                        cargo_capacity_m3: 50.0,
-                    }],
-                    efficiency: 1.0,
-                    thermal_req: None,
-                }],
+                recipes: vec![recipe_id],
                 max_stock: HashMap::new(),
             }),
             thermal: None,

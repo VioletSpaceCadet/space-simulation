@@ -1,5 +1,5 @@
 use super::*;
-use crate::test_fixtures::{base_content, base_state, make_rng, test_position};
+use crate::test_fixtures::{base_content, base_state, insert_recipe, make_rng, test_position};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
@@ -109,6 +109,33 @@ fn mine_command(
 
 fn refinery_content() -> GameContent {
     let mut content = test_content();
+    let iron_recipe = RecipeDef {
+        id: RecipeId("recipe_basic_iron".to_string()),
+        inputs: vec![RecipeInput {
+            filter: InputFilter::ItemKind(ItemKind::Ore),
+            amount: InputAmount::Kg(500.0),
+        }],
+        outputs: vec![
+            OutputSpec::Material {
+                element: "Fe".to_string(),
+                yield_formula: YieldFormula::ElementFraction {
+                    element: "Fe".to_string(),
+                },
+                quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                    element: "Fe".to_string(),
+                    multiplier: 1.0,
+                },
+            },
+            OutputSpec::Slag {
+                yield_formula: YieldFormula::FixedFraction(1.0),
+            },
+        ],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    };
+    let recipe_id = insert_recipe(&mut content, iron_recipe);
     content.module_defs = HashMap::from([(
         "module_basic_iron_refinery".to_string(),
         ModuleDef {
@@ -121,30 +148,7 @@ fn refinery_content() -> GameContent {
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 2,
                 processing_interval_ticks: 2,
-                recipes: vec![RecipeDef {
-                    id: "recipe_basic_iron".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::ItemKind(ItemKind::Ore),
-                        amount: InputAmount::Kg(500.0),
-                    }],
-                    outputs: vec![
-                        OutputSpec::Material {
-                            element: "Fe".to_string(),
-                            yield_formula: YieldFormula::ElementFraction {
-                                element: "Fe".to_string(),
-                            },
-                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
-                                element: "Fe".to_string(),
-                                multiplier: 1.0,
-                            },
-                        },
-                        OutputSpec::Slag {
-                            yield_formula: YieldFormula::FixedFraction(1.0),
-                        },
-                    ],
-                    efficiency: 1.0,
-                    thermal_req: None,
-                }],
+                recipes: vec![recipe_id],
             }),
             thermal: None,
         },
@@ -165,7 +169,7 @@ fn state_with_refinery(content: &GameContent) -> GameState {
             threshold_kg: 100.0,
             ticks_since_last_run: 0,
             stalled: false,
-            selected_recipe_idx: 0,
+            selected_recipe: None,
         }),
         wear: WearState::default(),
         power_stalled: false,
@@ -187,6 +191,22 @@ fn state_with_refinery(content: &GameContent) -> GameState {
 
 fn assembler_content() -> GameContent {
     let mut content = test_content();
+    let repair_kit_recipe = RecipeDef {
+        id: RecipeId("recipe_basic_repair_kit".to_string()),
+        inputs: vec![RecipeInput {
+            filter: InputFilter::Element("Fe".to_string()),
+            amount: InputAmount::Kg(100.0),
+        }],
+        outputs: vec![OutputSpec::Component {
+            component_id: ComponentId("repair_kit".to_string()),
+            quality_formula: QualityFormula::Fixed(1.0),
+        }],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    };
+    let recipe_id = insert_recipe(&mut content, repair_kit_recipe);
     content.module_defs = HashMap::from([(
         "module_basic_assembler".to_string(),
         ModuleDef {
@@ -200,19 +220,7 @@ fn assembler_content() -> GameContent {
                 assembly_interval_minutes: 2,
                 assembly_interval_ticks: 2,
                 max_stock: HashMap::new(),
-                recipes: vec![RecipeDef {
-                    id: "recipe_basic_repair_kit".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::Element("Fe".to_string()),
-                        amount: InputAmount::Kg(100.0),
-                    }],
-                    outputs: vec![OutputSpec::Component {
-                        component_id: ComponentId("repair_kit".to_string()),
-                        quality_formula: QualityFormula::Fixed(1.0),
-                    }],
-                    efficiency: 1.0,
-                    thermal_req: None,
-                }],
+                recipes: vec![recipe_id],
             }),
             thermal: None,
         },
@@ -240,7 +248,7 @@ fn state_with_assembler(content: &GameContent) -> GameState {
             stalled: false,
             capped: false,
             cap_override: HashMap::new(),
-            selected_recipe_idx: 0,
+            selected_recipe: None,
         }),
         wear: WearState::default(),
         power_stalled: false,

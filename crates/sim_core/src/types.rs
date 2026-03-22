@@ -2,7 +2,7 @@
 //!
 //! All public types, structs, enums, and ID newtypes used by the simulation.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -44,7 +44,7 @@ pub const CURRENT_SCHEMA_VERSION: u32 = 1;
 
 macro_rules! string_id {
     ($name:ident) => {
-        #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
         pub struct $name(pub String);
 
         impl std::fmt::Display for $name {
@@ -69,6 +69,7 @@ string_id!(LotId);
 string_id!(ModuleItemId);
 string_id!(ModuleInstanceId);
 string_id!(ComponentId);
+string_id!(RecipeId);
 
 // ---------------------------------------------------------------------------
 // Core enums
@@ -322,7 +323,7 @@ pub struct ProcessorState {
     #[serde(default)]
     pub stalled: bool,
     #[serde(default)]
-    pub selected_recipe_idx: usize,
+    pub selected_recipe: Option<RecipeId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -340,7 +341,7 @@ pub struct AssemblerState {
     #[serde(default)]
     pub cap_override: HashMap<ComponentId, u32>,
     #[serde(default)]
-    pub selected_recipe_idx: usize,
+    pub selected_recipe: Option<RecipeId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -632,7 +633,7 @@ pub enum Command {
     SelectRecipe {
         station_id: StationId,
         module_id: ModuleInstanceId,
-        recipe_idx: usize,
+        recipe_id: RecipeId,
     },
 }
 
@@ -775,7 +776,7 @@ pub enum Event {
     AssemblerRan {
         station_id: StationId,
         module_id: ModuleInstanceId,
-        recipe_id: String,
+        recipe_id: RecipeId,
         material_consumed_kg: f32,
         material_element: ElementId,
         component_produced_id: ComponentId,
@@ -918,6 +919,9 @@ pub struct GameContent {
     pub elements: Vec<ElementDef>,
     pub module_defs: HashMap<String, ModuleDef>,
     pub component_defs: Vec<ComponentDef>,
+    /// Recipe catalog loaded from `content/recipes.json`.
+    #[serde(default)]
+    pub recipes: BTreeMap<RecipeId, RecipeDef>,
     pub pricing: PricingTable,
     pub constants: Constants,
     /// Alert rules loaded from `content/alerts.json`. Empty if file is missing.
@@ -1173,7 +1177,7 @@ pub struct AssemblerDef {
     pub assembly_interval_minutes: u64,
     #[serde(skip_deserializing, default)]
     pub assembly_interval_ticks: u64,
-    pub recipes: Vec<RecipeDef>,
+    pub recipes: Vec<RecipeId>,
     #[serde(default)]
     pub max_stock: HashMap<ComponentId, u32>,
 }
@@ -1243,7 +1247,7 @@ pub struct ProcessorDef {
     pub processing_interval_minutes: u64,
     #[serde(skip_deserializing, default)]
     pub processing_interval_ticks: u64,
-    pub recipes: Vec<RecipeDef>,
+    pub recipes: Vec<RecipeId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1262,12 +1266,16 @@ pub struct RecipeThermalReq {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecipeDef {
-    pub id: String,
+    pub id: RecipeId,
     pub inputs: Vec<RecipeInput>,
     pub outputs: Vec<OutputSpec>,
     pub efficiency: f32,
     #[serde(default)]
     pub thermal_req: Option<RecipeThermalReq>,
+    #[serde(default)]
+    pub required_tech: Option<TechId>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

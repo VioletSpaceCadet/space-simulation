@@ -10,13 +10,13 @@ use crate::{
     ElementDef, GameContent, GameState, InputAmount, InputFilter, ItemKind, LotId, MetaState,
     ModuleDef, ModuleInstanceId, ModuleKindState, ModuleState, NodeDef, NodeId, OrbitalBodyDef,
     OutputSpec, PricingTable, PrincipalId, ProcessorDef, ProcessorState, QualityFormula,
-    RadiatorDef, RadiatorState, RecipeDef, RecipeThermalReq, ResearchState, ScanSite, ShipId,
-    ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechEffect, TechId,
-    ThermalDef, ThermalState, WearState, YieldFormula,
+    RadiatorDef, RadiatorState, RecipeDef, RecipeId, RecipeThermalReq, ResearchState, ScanSite,
+    ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechEffect,
+    TechId, ThermalDef, ThermalState, WearState, YieldFormula,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// Standard test position used across fixtures.
 pub fn test_position() -> Position {
@@ -126,6 +126,7 @@ pub fn base_content() -> GameContent {
         ],
         module_defs: HashMap::new(),
         component_defs: vec![],
+        recipes: BTreeMap::new(),
         pricing: PricingTable {
             import_surcharge_per_kg: 100.0,
             export_surcharge_per_kg: 50.0,
@@ -192,6 +193,79 @@ pub fn base_content() -> GameContent {
     content
 }
 
+/// Standard test recipe: Ore → Fe + Slag (basic iron refinery recipe).
+pub fn test_iron_recipe() -> RecipeDef {
+    RecipeDef {
+        id: RecipeId("recipe_basic_iron".to_string()),
+        inputs: vec![crate::RecipeInput {
+            filter: InputFilter::ItemKind(ItemKind::Ore),
+            amount: InputAmount::Kg(1000.0),
+        }],
+        outputs: vec![
+            OutputSpec::Material {
+                element: "Fe".to_string(),
+                yield_formula: YieldFormula::ElementFraction {
+                    element: "Fe".to_string(),
+                },
+                quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                    element: "Fe".to_string(),
+                    multiplier: 1.0,
+                },
+            },
+            OutputSpec::Slag {
+                yield_formula: YieldFormula::FixedFraction(1.0),
+            },
+        ],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    }
+}
+
+/// Smelter recipe: Ore → Fe + Slag with thermal requirements.
+pub fn test_smelt_recipe() -> RecipeDef {
+    RecipeDef {
+        id: RecipeId("recipe_smelt_iron".to_string()),
+        inputs: vec![crate::RecipeInput {
+            filter: InputFilter::ItemKind(ItemKind::Ore),
+            amount: InputAmount::Kg(500.0),
+        }],
+        outputs: vec![
+            OutputSpec::Material {
+                element: "Fe".to_string(),
+                yield_formula: YieldFormula::ElementFraction {
+                    element: "Fe".to_string(),
+                },
+                quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                    element: "Fe".to_string(),
+                    multiplier: 1.0,
+                },
+            },
+            OutputSpec::Slag {
+                yield_formula: YieldFormula::FixedFraction(1.0),
+            },
+        ],
+        efficiency: 1.0,
+        thermal_req: Some(RecipeThermalReq {
+            min_temp_mk: 1_800_000,
+            optimal_min_mk: 1_850_000,
+            optimal_max_mk: 1_950_000,
+            max_temp_mk: 2_100_000,
+            heat_per_run_j: 50_000_000,
+        }),
+        required_tech: None,
+        tags: vec![],
+    }
+}
+
+/// Insert a recipe into the content's recipe catalog, using its own id as the key.
+pub fn insert_recipe(content: &mut GameContent, recipe: RecipeDef) -> RecipeId {
+    let id = recipe.id.clone();
+    content.recipes.insert(id.clone(), recipe);
+    id
+}
+
 /// Bare-minimum content for validation tests: no techs, no templates, just Fe element.
 pub fn minimal_content() -> GameContent {
     let mut content = GameContent {
@@ -243,6 +317,7 @@ pub fn minimal_content() -> GameContent {
         ],
         module_defs: HashMap::new(),
         component_defs: vec![],
+        recipes: BTreeMap::new(),
         pricing: PricingTable {
             import_surcharge_per_kg: 100.0,
             export_surcharge_per_kg: 50.0,
@@ -389,6 +464,7 @@ pub fn make_rng() -> ChaCha8Rng {
 pub fn thermal_content() -> GameContent {
     let mut content = base_content();
 
+    let smelt_recipe_id = insert_recipe(&mut content, test_smelt_recipe());
     content.module_defs.insert(
         "module_basic_smelter".to_string(),
         ModuleDef {
@@ -401,36 +477,7 @@ pub fn thermal_content() -> GameContent {
             behavior: crate::ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
-                recipes: vec![RecipeDef {
-                    id: "recipe_smelt_iron".to_string(),
-                    inputs: vec![crate::RecipeInput {
-                        filter: InputFilter::ItemKind(ItemKind::Ore),
-                        amount: InputAmount::Kg(500.0),
-                    }],
-                    outputs: vec![
-                        OutputSpec::Material {
-                            element: "Fe".to_string(),
-                            yield_formula: YieldFormula::ElementFraction {
-                                element: "Fe".to_string(),
-                            },
-                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
-                                element: "Fe".to_string(),
-                                multiplier: 1.0,
-                            },
-                        },
-                        OutputSpec::Slag {
-                            yield_formula: YieldFormula::FixedFraction(1.0),
-                        },
-                    ],
-                    efficiency: 1.0,
-                    thermal_req: Some(RecipeThermalReq {
-                        min_temp_mk: 1_800_000,
-                        optimal_min_mk: 1_850_000,
-                        optimal_max_mk: 1_950_000,
-                        max_temp_mk: 2_100_000,
-                        heat_per_run_j: 50_000_000,
-                    }),
-                }],
+                recipes: vec![smelt_recipe_id],
             }),
             thermal: Some(ThermalDef {
                 heat_capacity_j_per_k: 50_000.0,
@@ -480,7 +527,7 @@ fn smelter_module(temp_mk: u32) -> ModuleState {
             threshold_kg: 500.0,
             ticks_since_last_run: 100,
             stalled: false,
-            selected_recipe_idx: 0,
+            selected_recipe: None,
         }),
         wear: WearState::default(),
         thermal: Some(ThermalState {
