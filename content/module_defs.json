@@ -224,6 +224,23 @@
     }
   },
   {
+    "id": "module_propulsion_lab",
+    "name": "Propulsion Lab",
+    "mass_kg": 3500.0,
+    "volume_m3": 7.0,
+    "power_consumption_per_run": 10.0,
+    "wear_per_run": 0.005,
+    "behavior": {
+      "Lab": {
+        "domain": "Propulsion",
+        "data_consumption_per_run": 8.0,
+        "research_points_per_run": 4.0,
+        "accepted_data": ["TransitData"],
+        "research_interval_minutes": 60
+      }
+    }
+  },
+  {
     "id": "module_sensor_array",
     "name": "Sensor Array",
     "mass_kg": 2500.0,

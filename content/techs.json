@@ -32,6 +32,15 @@
       "effects": [
         { "type": "EnableShipConstruction" }
       ]
+    },
+    {
+      "id": "tech_efficient_transit",
+      "name": "Efficient Transit",
+      "prereqs": ["tech_ship_construction"],
+      "domain_requirements": { "Propulsion": 150.0 },
+      "accepted_data": ["TransitData"],
+      "difficulty": 300.0,
+      "effects": []
     }
   ]
 }
