@@ -1,15 +1,12 @@
 import type { SimEvent } from '../types';
+import { getEventKey } from '../utils';
 
 interface Props {
   events: SimEvent[]
 }
 
-function eventType(event: Record<string, unknown>): string {
-  return Object.keys(event)[0] ?? 'Unknown';
-}
-
 function eventDetail(event: Record<string, unknown>): string {
-  const key = Object.keys(event)[0];
+  const key = getEventKey(event);
   if (!key) {return '';}
   const value = event[key] as Record<string, unknown>;
   if (!value || typeof value !== 'object') {return '';}
@@ -33,7 +30,7 @@ export function EventsFeed({ events }: Props) {
         <div key={evt.id} className="flex gap-1.5 py-0.5 border-b border-surface text-[11px] overflow-hidden">
           <span className="text-faint min-w-[90px] shrink-0">{evt.id}</span>
           <span className="text-faint min-w-[44px] shrink-0">t={evt.tick}</span>
-          <span className="text-accent min-w-[120px] shrink-0">{eventType(evt.event)}</span>
+          <span className="text-accent min-w-[120px] shrink-0">{getEventKey(evt.event)}</span>
           <span className="text-muted overflow-hidden text-ellipsis whitespace-nowrap">{eventDetail(evt.event)}</span>
         </div>
       ))}

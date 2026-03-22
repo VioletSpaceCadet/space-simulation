@@ -1,5 +1,6 @@
 import { tagColor } from '../../config/theme';
 import type { AsteroidState, InventoryItem, OreItem, ScanSite, ShipState, StationState } from '../../types';
+import { getTaskKind } from '../../utils';
 
 type EntityInfo =
   | { type: 'station'; data: StationState }
@@ -61,7 +62,7 @@ function StationDetail({ station }: { station: StationState }) {
 }
 
 function ShipDetail({ ship }: { ship: ShipState }) {
-  const taskKey = ship.task ? Object.keys(ship.task.kind)[0] : 'idle';
+  const taskKey = getTaskKind(ship.task) ?? 'idle';
   const totalKg = inventoryKg(ship.inventory);
   return (
     <>

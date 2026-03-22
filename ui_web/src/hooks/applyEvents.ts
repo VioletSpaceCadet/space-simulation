@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 
 import type { AsteroidState, ComponentItem, MaterialItem, ModuleKindState, OverheatZone, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
+import { getEventKey } from '../utils';
 
 import { eventSchemas } from './eventSchemas';
 import type { EventType } from './eventSchemas';
@@ -830,7 +831,7 @@ export function applyEvents(
 
   for (const evt of events) {
     const e = evt.event;
-    const eventKey = Object.keys(e)[0];
+    const eventKey = getEventKey(e);
 
     const handler = EVENT_HANDLERS[eventKey];
     if (!handler) {
