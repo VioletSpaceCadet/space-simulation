@@ -17,6 +17,11 @@ A run journal captures observations, bottlenecks, parameter changes, and learnin
 | `parameter_changes` | `ParameterChange[]` | yes | Parameter changes proposed or applied (may be empty) |
 | `strategy_notes` | `string[]` | yes | Free-form learnings and insights (may be empty) |
 | `tags` | `string[]` | yes | Categorization tags (e.g. `"ore-supply"`, `"fleet-sizing"`, `"slag-management"`) |
+| `final_score` | `number` | no | Composite economy/research/fleet metric at run end |
+| `collapse_tick` | `integer \| null` | no | Tick when collapse was detected, or `null` if no collapse |
+| `bottleneck_timeline` | `BottleneckEvent[]` | no | Time-series of bottleneck state changes (may be empty) |
+| `autopilot_config_hash` | `string` | no | Hash of autopilot parameters used (for cross-run comparison) |
+| `parquet_path` | `string` | no | Relative path to associated Parquet metrics file |
 
 ### Observation
 
@@ -53,6 +58,14 @@ A run journal captures observations, bottlenecks, parameter changes, and learnin
 | `current_value` | `string` | yes | Value before change |
 | `proposed_value` | `string` | yes | Value after change |
 | `rationale` | `string` | yes | Why the change was made |
+
+### BottleneckEvent
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `tick` | `integer` | yes | Tick when the bottleneck state changed |
+| `type` | `string` | yes | Bottleneck category (e.g. `"ore_starvation"`, `"storage_saturation"`) |
+| `severity` | `"low" \| "medium" \| "high" \| "critical"` | yes | Severity at this tick |
 
 ## File Naming
 

@@ -46,6 +46,16 @@ export interface ParameterChange {
   rationale: string;
 }
 
+/** A bottleneck state change at a specific tick (for ML timeline data). */
+export interface BottleneckEvent {
+  /** Tick when the bottleneck state changed. */
+  tick: number;
+  /** Bottleneck category (e.g. "ore_starvation", "storage_saturation"). */
+  type: string;
+  /** Severity at this tick. */
+  severity: "low" | "medium" | "high" | "critical";
+}
+
 /**
  * Run journal entry capturing observations, bottlenecks, parameter changes,
  * and learnings from a single simulation analysis session.
@@ -76,4 +86,17 @@ export interface RunJournal {
   strategy_notes: string[];
   /** Categorization tags (e.g. "ore-supply", "fleet-sizing"). */
   tags: string[];
+
+  // --- ML metadata (optional, for training pipeline) ---
+
+  /** Composite economy/research/fleet metric at run end. */
+  final_score?: number;
+  /** Tick when collapse was detected, or null if no collapse. */
+  collapse_tick?: number | null;
+  /** Time-series of bottleneck state changes. */
+  bottleneck_timeline?: BottleneckEvent[];
+  /** Hash of autopilot parameters used (for cross-run comparison). */
+  autopilot_config_hash?: string;
+  /** Relative path to associated Parquet metrics file. */
+  parquet_path?: string;
 }
