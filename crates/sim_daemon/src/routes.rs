@@ -368,14 +368,12 @@ pub async fn content_handler(State(app_state): State<AppState>) -> Json<ContentR
         }
     }
 
-    let recipes: Vec<sim_core::RecipeDef> = sim.content.recipes.values().cloned().collect();
-
     Json(ContentResponse {
         techs: sim.content.techs.clone(),
         lab_rates,
         data_rates,
         minutes_per_tick: mpt,
-        recipes,
+        recipes: sim.content.recipes.clone(),
     })
 }
 
@@ -385,7 +383,7 @@ pub struct ContentResponse {
     pub lab_rates: Vec<LabRateInfo>,
     pub data_rates: std::collections::HashMap<DataKind, f64>,
     pub minutes_per_tick: u32,
-    pub recipes: Vec<sim_core::RecipeDef>,
+    pub recipes: std::collections::BTreeMap<sim_core::RecipeId, sim_core::RecipeDef>,
 }
 
 #[derive(serde::Serialize)]
