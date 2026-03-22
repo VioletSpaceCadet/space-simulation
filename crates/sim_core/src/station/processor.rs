@@ -578,6 +578,7 @@ mod tests {
                     operating_min_mk: None,
                     operating_max_mk: None,
                     thermal_group: Some("smelting".to_string()),
+                    idle_heat_generation_w: None,
                 }),
             },
         );

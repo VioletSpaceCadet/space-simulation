@@ -153,12 +153,11 @@ fn test_install_module_initializes_thermal_state_for_thermal_modules() {
         "installed thermal module must have ThermalState initialized"
     );
     let thermal = smelter.thermal.as_ref().unwrap();
-    // After one tick of cooling, temp will be slightly below operating_min_mk.
-    // Verify it's near operating range, not at ambient (293K).
-    assert!(
-        thermal.temp_mk > 1_700_000,
-        "temp should be near operating_min_mk (1800K), not ambient; got {}",
-        thermal.temp_mk
+    // Modules now initialize at ambient temp (293K). Idle heat generation
+    // warms them up over time; no more operating_min_mk workaround.
+    assert_eq!(
+        thermal.temp_mk, content.constants.thermal_sink_temp_mk,
+        "newly installed module should start at ambient temp"
     );
     assert_eq!(
         thermal.overheat_zone,

@@ -32,7 +32,7 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `DataKind` | Enum: `SurveyData`, `AssayData`, `ManufacturingData`, `TransitData` — type of raw data a lab consumes |
 | `LabDef` | Lab module behavior definition: `data_kind`, `domain`, `throughput_per_tick` |
 | `LabState` | Lab runtime state (embedded in `ModuleState::kind_state`): `assigned_tech: Option<TechId>` |
-| `ThermalDef` | Module thermal properties: `heat_capacity_j_per_k`, `passive_cooling_coefficient`, `max_temp_mk`, `operating_min_mk`, `operating_max_mk`, `thermal_group` |
+| `ThermalDef` | Module thermal properties: `heat_capacity_j_per_k`, `passive_cooling_coefficient`, `max_temp_mk`, `operating_min_mk`, `operating_max_mk`, `thermal_group`, `idle_heat_generation_w` |
 | `ThermalState` | Per-module thermal runtime: `temp_mk: u32`, `thermal_group`, `overheat_zone: OverheatZone`, `overheat_disabled: bool` |
 | `OverheatZone` | Enum: `Nominal`, `Warning`, `Critical` — drives wear multiplier and auto-disable |
 | `RecipeThermalReq` | Recipe thermal requirements: `min_temp_mk`, `optimal_min_mk`, `optimal_max_mk`, `max_temp_mk`, `heat_per_run_j` |
@@ -193,17 +193,18 @@ All in `content/`. Loaded at runtime; never compiled in.
 | Type | Purpose |
 |---|---|
 | `ThermalState` | Per-module runtime thermal state: `temp_mk: u32` (milli-Kelvin), `thermal_group: Option<ThermalGroupId>`, `overheat_zone: OverheatZone`, `overheat_disabled: bool` |
-| `ThermalDef` | Content-driven module thermal properties: `heat_capacity_j_per_k: f32`, `passive_cooling_coefficient: f32`, `max_temp_mk: u32`, `operating_min_mk: Option<u32>`, `operating_max_mk: Option<u32>`, `thermal_group: Option<ThermalGroupId>` |
+| `ThermalDef` | Content-driven module thermal properties: `heat_capacity_j_per_k: f32`, `passive_cooling_coefficient: f32`, `max_temp_mk: u32`, `operating_min_mk: Option<u32>`, `operating_max_mk: Option<u32>`, `thermal_group: Option<ThermalGroupId>`, `idle_heat_generation_w: Option<f32>` |
 | `MaterialThermalProps` | Thermal properties on a `Material` inventory item: `temp_mk: u32`, `phase: Phase`, `latent_heat_buffer_j: i64` |
 | `Phase` | Enum: `Solid`, `Liquid` |
 | `OverheatZone` | Enum: `Nominal` (default), `Warning`, `Critical` |
 | `RecipeThermalReq` | Per-recipe thermal requirements: `min_temp_mk`, `optimal_min_mk`, `optimal_max_mk`, `max_temp_mk`, `heat_per_run_j` |
 | `RadiatorDef` | Radiator module behavior: `cooling_capacity_w: f32` |
 
-**Thermal tick step (3.6):** Runs after maintenance, before research. For each station, groups modules by `thermal_group` (BTreeMap for deterministic order, modules sorted by ID within each group). Two passes:
+**Thermal tick step (3.6):** Runs after maintenance, before research. For each station, groups modules by `thermal_group` (BTreeMap for deterministic order, modules sorted by ID within each group). Three passes:
 
-1. **Passive cooling:** For each thermal module, applies Newton's cooling law toward the sink temperature: `Q_loss = passive_cooling_coefficient * dt_s * (T - T_sink) / 1000`. Converts energy to temperature delta via `heat_capacity_j_per_k`. Temperature clamped to `[sink_temp, 10_000_000 mK]`.
-2. **Radiator cooling:** Per group, sums total radiator `cooling_capacity_w` (adjusted for wear efficiency), distributes cooling energy evenly across all thermal modules in the group. Same energy-to-delta conversion and clamping.
+1. **Idle heat generation:** For each enabled thermal module with `idle_heat_generation_w`, applies `Q = idle_heat_generation_w * dt_s` as heat. This lets thermal modules (e.g. smelters) preheat from ambient temperature without needing recipe inputs. Modules start at ambient (293K) and warm up over time.
+2. **Passive cooling:** For each thermal module, applies Newton's cooling law toward the sink temperature: `Q_loss = passive_cooling_coefficient * dt_s * (T - T_sink) / 1000`. Converts energy to temperature delta via `heat_capacity_j_per_k`. Temperature clamped to `[sink_temp, 10_000_000 mK]`.
+3. **Radiator cooling:** Per group, sums total radiator `cooling_capacity_w` (adjusted for wear efficiency), distributes cooling energy evenly across all thermal modules in the group. Same energy-to-delta conversion and clamping.
 
 After temperature updates, checks all thermal modules for overheat zone transitions and emits events.
 

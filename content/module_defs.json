@@ -355,7 +355,8 @@
       "max_temp_mk": 2500000,
       "operating_min_mk": 1800000,
       "operating_max_mk": 2100000,
-      "thermal_group": "default"
+      "thermal_group": "default",
+      "idle_heat_generation_w": 10000.0
     }
   },
   {

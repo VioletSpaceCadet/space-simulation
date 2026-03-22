@@ -1322,6 +1322,7 @@ mod tests {
                     operating_min_mk: None,
                     operating_max_mk: None,
                     thermal_group: None,
+                    idle_heat_generation_w: None,
                 }),
             },
         );

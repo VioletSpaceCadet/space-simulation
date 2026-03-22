@@ -452,6 +452,7 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
                 operating_min_mk: None,
                 operating_max_mk: None,
                 thermal_group: Some("default".to_string()),
+                idle_heat_generation_w: None,
             }),
         },
     );
