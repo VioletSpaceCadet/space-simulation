@@ -97,6 +97,9 @@ pub struct Modifier {
     pub op: ModifierOp,
     pub value: f64,
     pub source: ModifierSource,
+    /// Reserved for future conditional modifiers (e.g. only applies to a
+    /// specific station or resource type). Not evaluated by `resolve()` yet —
+    /// callers are responsible for placing modifiers in the correct entity's set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub condition: Option<Condition>,
 }
@@ -169,7 +172,7 @@ fn resolve_pipeline<'a>(
     let mut flat_sum: f64 = 0.0;
     let mut pct_add_sum: f64 = 0.0;
     let mut pct_mults: Vec<(ModifierSource, f64)> = Vec::new();
-    let mut override_val: Option<f64> = None;
+    let mut overrides: Vec<(ModifierSource, f64)> = Vec::new();
 
     for modifier in modifiers {
         if modifier.stat != stat {
@@ -181,12 +184,15 @@ fn resolve_pipeline<'a>(
             ModifierOp::PctMultiplicative => {
                 pct_mults.push((modifier.source.clone(), modifier.value));
             }
-            ModifierOp::Override => override_val = Some(modifier.value),
+            ModifierOp::Override => {
+                overrides.push((modifier.source.clone(), modifier.value));
+            }
         }
     }
 
-    // Sort multiplicative modifiers by source for deterministic ordering.
+    // Sort by source for deterministic ordering.
     pct_mults.sort_by(|a, b| a.0.cmp(&b.0));
+    overrides.sort_by(|a, b| a.0.cmp(&b.0));
 
     // Phase 1: flat
     let mut result = base + flat_sum;
@@ -196,9 +202,9 @@ fn resolve_pipeline<'a>(
     for (_source, value) in &pct_mults {
         result *= value;
     }
-    // Phase 4: override
-    if let Some(v) = override_val {
-        result = v;
+    // Phase 4: override (last by source order wins)
+    if let Some((_source, value)) = overrides.last() {
+        result = *value;
     }
 
     result
@@ -470,5 +476,49 @@ mod tests {
         assert_eq!(set.len(), 0);
         // Resolving with empty set returns base
         assert!((set.resolve(StatId::PowerOutput, 42.0) - 42.0).abs() < TOL);
+    }
+
+    #[test]
+    fn override_deterministic_with_multiple_sources() {
+        // Multiple overrides from different sources — last by source order wins.
+        let overrides = vec![
+            make_modifier(
+                StatId::PowerOutput,
+                ModifierOp::Override,
+                50.0,
+                ModifierSource::Wear,
+            ),
+            make_modifier(
+                StatId::PowerOutput,
+                ModifierOp::Override,
+                30.0,
+                ModifierSource::Environment,
+            ),
+            make_modifier(
+                StatId::PowerOutput,
+                ModifierOp::Override,
+                10.0,
+                ModifierSource::Thermal,
+            ),
+        ];
+
+        let mut set_a = ModifierSet::new();
+        for m in overrides.iter() {
+            set_a.add(m.clone());
+        }
+
+        let mut set_b = ModifierSet::new();
+        for m in overrides.iter().rev() {
+            set_b.add(m.clone());
+        }
+
+        let result_a = set_a.resolve(StatId::PowerOutput, 100.0);
+        let result_b = set_b.resolve(StatId::PowerOutput, 100.0);
+        assert!(
+            (result_a - result_b).abs() < TOL,
+            "Different insertion order gave different override results: {result_a} vs {result_b}"
+        );
+        // Wear sorts last (alphabetically after Thermal and Environment)
+        assert!((result_a - 50.0).abs() < TOL);
     }
 }
