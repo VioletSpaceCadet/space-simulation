@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solar System Map — Design Mockup v2</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --void: #0b0d14;
+    --surface: #10131a;
+    --edge: #1e2228;
+    --fg: #c8ccd4;
+    --bright: #e0e2e8;
+    --dim: #8a8e98;
+    --muted: #5c6070;
+    --faint: #3a3e48;
+    --accent: #5ca0c8;
+    --cargo: #c89a4a;
+    --online: #4caf7d;
+    --offline: #c85450;
+    --label: #6b7080;
+  }
+
+  body {
+    background: var(--void);
+    color: var(--fg);
+    font-family: 'IBM Plex Mono', monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+  }
+
+  #map-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+  #map-container:active { cursor: grabbing; }
+
+  canvas#starfield { position: absolute; inset: 0; z-index: 0; display: none; }
+  #star-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background-repeat: repeat;
+    image-rendering: pixelated;
+  }
+  canvas#map { position: absolute; inset: 0; z-index: 1; }
+
+  /* ---- HUD Overlay ---- */
+  .hud-corner { position: absolute; z-index: 10; pointer-events: none; }
+  .hud-corner > * { pointer-events: auto; }
+  .hud-top-left { top: 16px; left: 16px; }
+  .hud-top-right { top: 16px; right: 16px; }
+  .hud-bottom-left { bottom: 16px; left: 16px; }
+  .hud-bottom-right { bottom: 16px; right: 16px; }
+
+  .hud-panel {
+    background: rgba(11,13,20,0.88);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    padding: 6px 10px;
+    backdrop-filter: blur(8px);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+  .hud-panel + .hud-panel { margin-top: 6px; }
+
+  .zoom-value { color: var(--accent); font-weight: 500; }
+
+  .scale-bar { display: flex; align-items: center; gap: 8px; }
+  .scale-bar .bar {
+    width: 60px; height: 1px; background: var(--muted);
+    position: relative;
+  }
+  .scale-bar .bar::before, .scale-bar .bar::after {
+    content: ''; position: absolute; width: 1px; height: 5px;
+    background: var(--muted); top: -2px;
+  }
+  .scale-bar .bar::before { left: 0; }
+  .scale-bar .bar::after { right: 0; }
+
+  /* Quick nav */
+  .quick-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .quick-nav-title {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .nav-btn {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+    color: var(--dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nav-btn:hover {
+    background: rgba(92,160,200,0.08);
+    border-color: rgba(92,160,200,0.25);
+    color: var(--accent);
+  }
+  .nav-btn .nav-key {
+    width: 16px; height: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+    font-size: 9px; color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    flex-shrink: 0;
+  }
+  .nav-btn .nav-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  /* Legend */
+  .legend { display: flex; flex-direction: column; gap: 5px; }
+  .legend-title {
+    font-size: 9px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 2px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--dim); }
+  .legend-swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .legend-swatch.diamond { border-radius: 1px; transform: rotate(45deg); width: 7px; height: 7px; }
+  .legend-swatch.tri {
+    width: 0; height: 0; border-left: 4px solid transparent;
+    border-right: 4px solid transparent; border-bottom: 7px solid;
+    border-radius: 0; background: none !important;
+  }
+  .legend-swatch.ring { border: 1.5px solid; background: transparent !important; }
+
+  /* Minimap */
+  .minimap {
+    width: 140px; height: 140px; background: rgba(11,13,20,0.9);
+    border: 1px solid var(--edge); border-radius: 4px;
+    overflow: hidden; position: relative; backdrop-filter: blur(8px);
+  }
+  .minimap canvas { width: 100%; height: 100%; }
+  .viewport-rect {
+    position: absolute; border: 1px solid var(--accent);
+    opacity: 0.5; pointer-events: none;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed; z-index: 100;
+    background: rgba(16,19,26,0.95); border: 1px solid var(--edge);
+    border-radius: 6px; padding: 10px 14px; max-width: 240px;
+    pointer-events: none; backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    transform: translate(-50%, -100%) translateY(-12px);
+    transition: opacity 0.1s;
+  }
+  .tooltip::after {
+    content: ''; position: absolute; bottom: -5px; left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px; height: 8px; background: rgba(16,19,26,0.95);
+    border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge);
+  }
+  .tt-name { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 500; color: var(--bright); margin-bottom: 2px; }
+  .tt-type { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+  .tt-row { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); padding: 2px 0; gap: 16px; }
+  .tt-label { color: var(--muted); white-space: nowrap; }
+  .tt-val { color: var(--fg); text-align: right; white-space: nowrap; }
+  .tt-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .tt-tag { font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: 500; }
+
+  /* LOD indicator */
+  .lod-indicator {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--faint); margin-top: 4px;
+  }
+
+  /* Breadcrumb / focus path */
+  .focus-breadcrumb {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 10px; color: var(--dim);
+  }
+  .focus-breadcrumb .crumb { cursor: pointer; }
+  .focus-breadcrumb .crumb:hover { color: var(--accent); }
+  .focus-breadcrumb .sep { color: var(--faint); }
+
+  @keyframes pulse-ring {
+    0% { opacity: 0.5; } 50% { opacity: 0.15; } 100% { opacity: 0.5; }
+  }
+</style>
+</head>
+<body>
+
+<div id="map-container">
+  <div id="star-bg"></div>
+  <canvas id="starfield"></canvas>
+  <canvas id="map"></canvas>
+
+  <!-- HUD: Top-left -->
+  <div class="hud-corner hud-top-left">
+    <div class="hud-panel">
+      ZOOM <span class="zoom-value" id="zoom-val">1.0x</span>
+      <span class="lod-indicator" id="lod-label">· SYSTEM</span>
+    </div>
+    <div class="hud-panel scale-bar">
+      <div class="bar"></div>
+      <span id="scale-label">0.5 AU</span>
+    </div>
+    <div class="hud-panel" id="focus-bar" style="display:none;">
+      <div class="focus-breadcrumb">
+        <span class="crumb" onclick="flyTo('system')">System</span>
+        <span class="sep">›</span>
+        <span class="crumb" id="focus-name" style="color:var(--accent);">Earth</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD: Top-right — Quick Nav -->
+  <div class="hud-corner hud-top-right">
+    <div class="hud-panel quick-nav">
+      <div class="quick-nav-title">Navigate</div>
+      <div id="nav-buttons">
+      <button class="nav-btn" onclick="flyTo('galaxy')">
+        <div class="nav-dot" style="background:#888;"></div>
+        Stellar Overview
+      </button>
+      <button class="nav-btn" onclick="flyTo('system')">
+        <div class="nav-dot" style="background:#f5c842;"></div>
+        Sol System
+      </button>
+      <button class="nav-btn" onclick="flyTo('earth')">
+        <div class="nav-dot" style="background:#6b9dba;"></div>
+        Earth
+      </button>
+      <button class="nav-btn" onclick="flyTo('belt')">
+        <div class="nav-dot" style="background:#c89a4a;"></div>
+        Main Belt
+      </button>
+      <button class="nav-btn" onclick="flyTo('alpha')">
+        <div class="nav-dot" style="background:#e8a040;"></div>
+        Alpha Centauri
+      </button>
+      <button class="nav-btn" onclick="flyTo('proxima')">
+        <div class="nav-dot" style="background:#d04030;"></div>
+        Proxima Centauri
+      </button>
+      </div>
+      <div style="font-size:9px;color:var(--faint);margin-top:4px;line-height:1.4;">
+        Hold <span style="color:var(--muted)">Shift</span> stations · <span style="color:var(--muted)">Control</span> ships
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD: Bottom-left — legend -->
+  <div class="hud-corner hud-bottom-left">
+    <div class="hud-panel legend">
+      <div class="legend-title">Entities</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#f5c842;"></div>Star</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#6b9dba;"></div>Planet</div>
+      <div class="legend-item"><div class="legend-swatch diamond" style="background:#5ca0c8;"></div>Station</div>
+      <div class="legend-item"><div class="legend-swatch tri" style="border-bottom-color:#5b9bd5;"></div>Ship</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#c47038;"></div>Asteroid</div>
+      <div class="legend-item"><div class="legend-swatch ring" style="border-color:var(--muted);"></div>Scan Site</div>
+    </div>
+  </div>
+
+  <!-- HUD: Bottom-right — minimap -->
+  <div class="hud-corner hud-bottom-right">
+    <div class="minimap">
+      <canvas id="minimap-canvas"></canvas>
+      <div class="viewport-rect" id="viewport-rect"></div>
+    </div>
+  </div>
+
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip" style="display:none;">
+    <div class="tt-name" id="tt-name"></div>
+    <div class="tt-type" id="tt-type"></div>
+    <div id="tt-details"></div>
+  </div>
+</div>
+
+<script>
+// ========== Data ==========
+const AU = 200; // 1 AU = 200 world units (for inner solar system)
+
+// Proxima Centauri is ~268,550 AU from Sol
+// We place it far away — world coords are in "AU-pixels" (AU * 200)
+const PROXIMA_DIST_AU = 268550;
+// Place Proxima to the upper-right (arbitrary direction)
+const PROXIMA_ANGLE = -0.4; // radians
+const PROXIMA_X = PROXIMA_DIST_AU * AU * Math.cos(PROXIMA_ANGLE);
+const PROXIMA_Y = PROXIMA_DIST_AU * AU * Math.sin(PROXIMA_ANGLE);
+
+const bodies = [
+  // --- Sol system ---
+  { id: 'sol', name: 'Sol', type: 'Star', x: 0, y: 0, radius: 10, color: '#f5c842',
+    focusZoom: 0.4, lodMin: 0, system: 'sol' },
+  { id: 'earth', name: 'Earth', type: 'Planet', x: AU, y: 0, radius: 5, color: '#6b9dba',
+    focusZoom: 6, lodMin: 0.12, system: 'sol' },
+  { id: 'luna', name: 'Luna', type: 'Moon', x: AU + 4, y: -3, radius: 2, color: '#999',
+    focusZoom: 20, lodMin: 0.8, system: 'sol' },
+  { id: 'mars', name: 'Mars', type: 'Planet', x: -1.08 * AU, y: 1.08 * AU, radius: 4, color: '#c0614a',
+    focusZoom: 5, lodMin: 0.12, system: 'sol' },
+  { id: 'jupiter', name: 'Jupiter', type: 'Planet', x: 0, y: -5.2 * AU, radius: 7, color: '#c4a060',
+    focusZoom: 1.5, lodMin: 0.06, system: 'sol' },
+
+  // --- Alpha Centauri system ---
+  // Rigil Kentaurus (Alpha Centauri A) — at Proxima's general location
+  { id: 'rigil', name: 'Rigil Kentaurus', type: 'Star', x: PROXIMA_X - 23 * AU, y: PROXIMA_Y + 10 * AU,
+    radius: 9, color: '#f5d050', focusZoom: 0.4, lodMin: 0, system: 'alpha' },
+  // Toliman (Alpha Centauri B) — orbits A at ~23 AU
+  { id: 'toliman', name: 'Toliman', type: 'Star', x: PROXIMA_X - 5 * AU, y: PROXIMA_Y + 15 * AU,
+    radius: 7, color: '#e8a040', focusZoom: 0.4, lodMin: 0, system: 'alpha' },
+  // Proxima Centauri (Alpha Centauri C) — ~13,000 AU from A/B
+  { id: 'proxima', name: 'Proxima Centauri', type: 'Star', x: PROXIMA_X, y: PROXIMA_Y,
+    radius: 5, color: '#d04030', focusZoom: 0.4, lodMin: 0, system: 'proxima' },
+  // Proxima b — habitable zone, 0.049 AU
+  { id: 'proxima_b', name: 'Proxima b', type: 'Planet', x: PROXIMA_X + 0.049 * AU, y: PROXIMA_Y,
+    radius: 3, color: '#5a8a6a', focusZoom: 20, lodMin: 0.8, system: 'proxima' },
+  // Proxima d — 0.029 AU
+  { id: 'proxima_d', name: 'Proxima d', type: 'Planet', x: PROXIMA_X, y: PROXIMA_Y - 0.029 * AU,
+    radius: 2, color: '#7a7a8a', focusZoom: 30, lodMin: 1.0, system: 'proxima' },
+];
+
+const zones = [
+  { name: 'Earth NEOs', cx: 0, cy: 0, rMin: 0.8 * AU, rMax: 1.2 * AU, startAngle: 0, span: 360,
+    fill: 'rgba(160,160,180,0.04)', stroke: 'rgba(160,160,180,0.10)', lodMin: 0.15 },
+  { name: 'Inner Belt', cx: 0, cy: 0, rMin: 2.1 * AU, rMax: 2.8 * AU, startAngle: 0, span: 360,
+    fill: 'rgba(217,158,60,0.06)', stroke: 'rgba(217,158,60,0.14)', lodMin: 0.08 },
+  { name: 'Outer Belt', cx: 0, cy: 0, rMin: 2.8 * AU, rMax: 3.3 * AU, startAngle: 0, span: 360,
+    fill: 'rgba(80,140,220,0.06)', stroke: 'rgba(80,140,220,0.14)', lodMin: 0.08 },
+  { name: 'Jupiter Trojans', cx: 0, cy: 0, rMin: 4.8 * AU, rMax: 5.6 * AU, startAngle: 310, span: 40,
+    fill: 'rgba(80,140,220,0.05)', stroke: 'rgba(80,140,220,0.12)', lodMin: 0.05 },
+];
+
+const orbits = [
+  // Sol system
+  { cx: 0, cy: 0, r: AU, label: 'Earth orbit', lodMin: 0.12 },
+  { cx: 0, cy: 0, r: 1.524 * AU, label: 'Mars orbit', lodMin: 0.10 },
+  { cx: 0, cy: 0, r: 5.2 * AU, label: 'Jupiter orbit', lodMin: 0.05 },
+  // Alpha Centauri — Toliman orbits Rigil Kentaurus at ~23 AU
+  { cx: PROXIMA_X - 23 * AU, cy: PROXIMA_Y + 10 * AU, r: 23 * AU,
+    label: 'Toliman orbit (A-B)', lodMin: 0.01 },
+  // Proxima orbits A/B barycenter at ~13,000 AU
+  { cx: PROXIMA_X - 14 * AU, cy: PROXIMA_Y + 12 * AU, r: 13000 * AU,
+    label: 'Proxima orbit', lodMin: 0.0005 },
+  // Proxima b orbit (0.049 AU)
+  { cx: PROXIMA_X, cy: PROXIMA_Y, r: 0.049 * AU,
+    label: 'Proxima b orbit', lodMin: 2.0 },
+];
+
+const TASK_COLORS = {
+  Survey: '#5b9bd5', Mine: '#d4a44c', Deposit: '#4caf7d',
+  Transit: '#5ca0c8', DeepScan: '#7b68ee', idle: '#5c6070',
+};
+const TAG_COLORS = {
+  IronRich: '#c47038', VolatileRich: '#38a0c4', Carbonaceous: '#b48c3c',
+};
+
+const stations = [
+  { id: 'station_alpha', name: 'Station Alpha', x: AU + 8, y: 6, parentBody: 'Earth',
+    power: { generated_kw: 58, consumed_kw: 16, deficit_kw: 0 },
+    inventory_kg: 2847, cargo_capacity_m3: 10000, modules_active: 6, modules_total: 8,
+    ores: [
+      { element: 'Fe', kg: 1200, pct: 68 },
+      { element: 'Si', kg: 847, pct: 24 },
+    ] },
+];
+
+const ships = [
+  { id: 'ship_001', name: 'Surveyor I', task: 'Survey', x: AU * 2.3, y: AU * 0.4,
+    parentBody: 'Inner Belt', target: 'site_003', cargo_kg: 0, capacity_m3: 20,
+    started_tick: 820, eta_tick: 910 },
+  { id: 'ship_002', name: 'Miner Bravo', task: 'Mine', x: AU * 2.5, y: -AU * 0.3,
+    parentBody: 'Inner Belt', target: 'ast_002', cargo_kg: 4200, capacity_m3: 20,
+    started_tick: 780, eta_tick: 960, duration: '12h' },
+  { id: 'ship_003', name: 'Hauler Delta', task: 'Transit', x: AU * 1.6, y: AU * 0.2,
+    parentBody: null, cargo_kg: 8400, capacity_m3: 20,
+    transitTo: { x: AU + 8, y: 6, name: 'Station Alpha' },
+    progress: 0.45, started_tick: 750, eta_tick: 950, totalTicks: 200 },
+  { id: 'ship_004', name: 'Scout Echo', task: 'Survey', x: AU * 3.0, y: AU * 0.6,
+    parentBody: 'Outer Belt', target: 'site_001', cargo_kg: 0, capacity_m3: 20,
+    started_tick: 860, eta_tick: 920 },
+  { id: 'ship_005', name: 'Refiner Fox', task: 'Deposit', x: AU + 12, y: -4,
+    parentBody: 'Earth', target: 'station_alpha', cargo_kg: 1200, capacity_m3: 20,
+    started_tick: 880, eta_tick: 885 },
+];
+
+const asteroids = [
+  { id: 'ast_001', tags: ['IronRich'], mass: 12400, x: AU * 2.2, y: AU * 0.6,
+    parentBody: 'Inner Belt', composition: { Fe: 0.72, Si: 0.18, Ni: 0.10 },
+    beliefs: [['IronRich', 0.92]] },
+  { id: 'ast_002', tags: ['IronRich'], mass: 8200, x: AU * 2.6, y: -AU * 0.1,
+    parentBody: 'Inner Belt', composition: { Fe: 0.65, Si: 0.25, C: 0.10 },
+    beliefs: [['IronRich', 0.85]] },
+  { id: 'ast_003', tags: ['VolatileRich'], mass: 5100, x: AU * 2.9, y: AU * 0.8,
+    parentBody: 'Outer Belt', composition: null,
+    beliefs: [['VolatileRich', 0.78]] },
+  { id: 'ast_004', tags: ['Carbonaceous'], mass: 3400, x: AU * 3.1, y: -AU * 0.5,
+    parentBody: 'Outer Belt', composition: { C: 0.55, H2O: 0.30, Si: 0.15 },
+    beliefs: [['Carbonaceous', 0.90]] },
+  { id: 'ast_005', tags: ['IronRich'], mass: 18000, x: AU * 2.4, y: -AU * 0.7,
+    parentBody: 'Inner Belt', composition: { Fe: 0.80, Ni: 0.12, Si: 0.08 },
+    beliefs: [['IronRich', 0.95]] },
+  { id: 'ast_006', tags: ['VolatileRich'], mass: 7700, x: AU * 3.0, y: AU * 0.2,
+    parentBody: 'Outer Belt', composition: null,
+    beliefs: [['VolatileRich', 0.65]] },
+];
+
+const scanSites = [
+  { id: 'site_001', x: AU * 2.35, y: AU * 0.9, parentBody: 'Inner Belt', template: 'belt_survey_a' },
+  { id: 'site_002', x: AU * 2.7, y: -AU * 0.6, parentBody: 'Inner Belt', template: 'belt_survey_b' },
+  { id: 'site_003', x: AU * 3.15, y: AU * 0.1, parentBody: 'Outer Belt', template: 'outer_survey_a' },
+];
+
+const CURRENT_TICK = 890;
+
+// All hoverable entities for hit detection
+function getAllEntities() {
+  return [
+    ...stations.map(s => ({ ...s, entityType: 'Station' })),
+    ...ships.map(s => ({ ...s, entityType: 'Ship', name: s.name })),
+    ...asteroids.map(a => ({ ...a, entityType: 'Asteroid', name: a.id })),
+    ...scanSites.map(s => ({ ...s, entityType: 'Scan Site', name: s.id })),
+    ...bodies.map(b => ({ ...b, entityType: b.type, name: b.name })),
+  ];
+}
+
+// ========== Canvas Setup ==========
+const mapCanvas = document.getElementById('map');
+const starCanvas = document.getElementById('starfield');
+const minimapCanvas = document.getElementById('minimap-canvas');
+const ctx = mapCanvas.getContext('2d');
+const starCtx = starCanvas.getContext('2d');
+const miniCtx = minimapCanvas.getContext('2d');
+let W, H;
+const dpr = window.devicePixelRatio || 1;
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  for (const [c, w, h] of [[mapCanvas, W, H], [starCanvas, W, H], [minimapCanvas, 140, 140]]) {
+    c.width = w * dpr; c.height = h * dpr;
+    c.style.width = w + 'px'; c.style.height = h + 'px';
+  }
+  starTileReady = false; // regenerate tile on resize (dpr may change)
+}
+
+// ========== Camera ==========
+let camera = { x: 0, y: 0, zoom: 0.5 };
+let targetCamera = { x: 0, y: 0, zoom: 0.5 };
+const LERP = 0.12;
+const MIN_ZOOM = 0.00001; // can zoom way out to interstellar
+const MAX_ZOOM = 50;
+let currentFocus = null;
+
+// Logarithmic projection: at very low zoom levels, compress distances logarithmically
+// so interstellar objects are reachable without infinite panning.
+// Above LOG_THRESHOLD zoom, projection is linear (normal).
+// Below it, distances from camera center are log-compressed.
+const LOG_THRESHOLD = 0.01; // zoom level where log kicks in
+
+function logProject(delta) {
+  // Signed log: preserves direction, compresses magnitude
+  if (delta === 0) return 0;
+  const sign = delta > 0 ? 1 : -1;
+  const abs = Math.abs(delta);
+  // log1p(x) = ln(1+x), smooth at 0
+  return sign * Math.log1p(abs * 0.001) * 1000;
+}
+
+function worldToScreen(wx, wy) {
+  let dx = wx - camera.x;
+  let dy = wy - camera.y;
+
+  if (camera.zoom < LOG_THRESHOLD) {
+    // Blend between linear and log based on how far below threshold
+    const logStrength = 1 - camera.zoom / LOG_THRESHOLD; // 0..1
+    const linDx = dx, linDy = dy;
+    const logDx = logProject(dx), logDy = logProject(dy);
+    dx = linDx * (1 - logStrength) + logDx * logStrength;
+    dy = linDy * (1 - logStrength) + logDy * logStrength;
+  }
+
+  return {
+    sx: dx * camera.zoom + W / 2,
+    sy: dy * camera.zoom + H / 2,
+  };
+}
+
+function screenToWorld(sx, sy) {
+  // Inverse — for log mode this is approximate but fine for panning/clicking
+  return {
+    wx: (sx - W / 2) / camera.zoom + camera.x,
+    wy: (sy - H / 2) / camera.zoom + camera.y,
+  };
+}
+
+// LOD tier based on zoom
+function getLOD() {
+  if (camera.zoom < 0.001) return 'interstellar';
+  if (camera.zoom < 0.15) return 'system';
+  if (camera.zoom < 0.8) return 'region';
+  return 'local';
+}
+
+// Smooth value: returns 0..1 for smooth fade between zoom thresholds
+function smoothStep(zoom, fadeIn, fullIn) {
+  if (zoom <= fadeIn) return 0;
+  if (zoom >= fullIn) return 1;
+  const t = (zoom - fadeIn) / (fullIn - fadeIn);
+  return t * t * (3 - 2 * t);
+}
+
+// ========== Fly-To Navigation ==========
+const FLY_TARGETS = {
+  galaxy: { x: PROXIMA_X / 2, y: PROXIMA_Y / 2, zoom: 0.0001, name: null },
+  system: { x: 0, y: 0, zoom: 0.12, name: 'Sol' },
+  earth: { x: AU, y: 0, zoom: 6, name: 'Earth' },
+  mars: { x: -1.08 * AU, y: 1.08 * AU, zoom: 5, name: 'Mars' },
+  belt: { x: AU * 2.5, y: 0, zoom: 0.35, name: 'Main Belt' },
+  jupiter: { x: 0, y: -5.2 * AU, zoom: 1.5, name: 'Jupiter' },
+  proxima: { x: PROXIMA_X, y: PROXIMA_Y, zoom: 0.12, name: 'Proxima Centauri' },
+  alpha: { x: PROXIMA_X - 14 * AU, y: PROXIMA_Y + 12 * AU, zoom: 0.02, name: 'Alpha Centauri' },
+};
+
+function flyTo(targetId) {
+  const t = FLY_TARGETS[targetId];
+  if (!t) return;
+  targetCamera.x = t.x;
+  targetCamera.y = t.y;
+  targetCamera.zoom = t.zoom;
+  currentFocus = targetId;
+
+  const bar = document.getElementById('focus-bar');
+  const nameEl = document.getElementById('focus-name');
+  if (targetId === 'system') {
+    bar.style.display = 'none';
+  } else {
+    bar.style.display = 'block';
+    nameEl.textContent = t.name;
+  }
+}
+
+// Keyboard shortcuts — nav panel swaps content when holding Shift/Ctrl
+let modifierHeld = null; // 'shift' | 'ctrl' | null
+const navButtonsEl = document.getElementById('nav-buttons');
+
+// Detect which system the camera is closest to
+function getCurrentSystem() {
+  const dSol = Math.hypot(camera.x, camera.y);
+  const dProxima = Math.hypot(camera.x - PROXIMA_X, camera.y - PROXIMA_Y);
+  if (dProxima < dSol) return 'proxima';
+  return 'sol';
+}
+
+// Nav waypoints per system
+const NAV_WAYPOINTS = {
+  sol: [
+    { id: 'system', label: 'Sol System', color: '#f5c842' },
+    { id: 'earth', label: 'Earth', color: '#6b9dba' },
+    { id: 'mars', label: 'Mars', color: '#c0614a' },
+    { id: 'belt', label: 'Main Belt', color: '#c89a4a' },
+    { id: 'jupiter', label: 'Jupiter', color: '#c4a060' },
+  ],
+  proxima: [
+    { id: 'proxima', label: 'Proxima System', color: '#d04030' },
+    { id: 'alpha', label: 'Alpha Centauri', color: '#e8a040' },
+  ],
+  interstellar: [
+    { id: 'system', label: 'Sol System', color: '#f5c842' },
+    { id: 'alpha', label: 'Alpha Centauri', color: '#e8a040' },
+    { id: 'proxima', label: 'Proxima Centauri', color: '#d04030' },
+  ],
+};
+
+let lastNavRendered = '';
+
+function renderNav() {
+  const titleEl = document.querySelector('.quick-nav-title');
+  const isInterstellar = camera.zoom < 0.005;
+  const sys = isInterstellar ? 'interstellar' : getCurrentSystem();
+  const key = `${modifierHeld || 'loc'}-${sys}`;
+  if (key === lastNavRendered) return;
+  lastNavRendered = key;
+
+  if (modifierHeld && !isInterstellar) {
+    // Show stations or ships for current system
+    const items = modifierHeld === 'shift' ? stations : ships;
+    // In real impl, filter by system — for demo just show all
+    titleEl.textContent = modifierHeld === 'shift' ? 'Stations' : 'Ships';
+    let html = '';
+    items.forEach((item, i) => {
+      const color = modifierHeld === 'shift' ? '#5ca0c8' : (TASK_COLORS[item.task] || '#5c6070');
+      const detail = modifierHeld === 'shift' ? item.parentBody : item.task;
+      html += `<button class="nav-btn" onclick="flyToEntity('${modifierHeld}', ${i})">
+        <span class="nav-key">${i + 1}</span>
+        <div class="nav-dot" style="background:${color};"></div>
+        ${item.name}
+        <span style="color:var(--faint);font-size:9px;margin-left:auto;">${detail}</span>
+      </button>`;
+    });
+    navButtonsEl.innerHTML = html;
+    return;
+  }
+
+  // Location waypoints
+  const waypoints = NAV_WAYPOINTS[sys] || NAV_WAYPOINTS.sol;
+  titleEl.textContent = isInterstellar ? 'Star Systems' : 'Navigate';
+  let html = '';
+  waypoints.forEach((wp, i) => {
+    html += `<button class="nav-btn" onclick="flyTo('${wp.id}')">
+      <span class="nav-key">${i + 1}</span>
+      <div class="nav-dot" style="background:${wp.color};"></div>
+      ${wp.label}
+    </button>`;
+  });
+  navButtonsEl.innerHTML = html;
+}
+
+function flyToEntity(type, idx) {
+  const items = type === 'shift' ? stations : ships;
+  if (idx < 0 || idx >= items.length) return;
+  const item = items[idx];
+  targetCamera.x = item.x;
+  targetCamera.y = item.y;
+  targetCamera.zoom = type === 'shift' ? 8 : 5;
+  document.getElementById('focus-bar').style.display = 'block';
+  document.getElementById('focus-name').textContent = item.name;
+}
+
+document.addEventListener('keydown', (e) => {
+  const isInterstellar = camera.zoom < 0.005;
+  if (e.key === 'Shift' && !e.ctrlKey && !e.metaKey && !isInterstellar) {
+    if (modifierHeld !== 'shift') { modifierHeld = 'shift'; lastNavRendered = ''; renderNav(); }
+    return;
+  }
+  if ((e.key === 'Control' || e.key === 'Meta') && !e.shiftKey && !isInterstellar) {
+    if (modifierHeld !== 'ctrl') { modifierHeld = 'ctrl'; lastNavRendered = ''; renderNav(); }
+    return;
+  }
+
+  const num = parseInt(e.key);
+
+  if (modifierHeld && num >= 1 && num <= 9) {
+    e.preventDefault();
+    flyToEntity(modifierHeld, num - 1);
+    return;
+  }
+
+  if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    const num = parseInt(e.key);
+    if (num >= 1 && num <= 9) {
+      const isInterstellar = camera.zoom < 0.005;
+      const sys = isInterstellar ? 'interstellar' : getCurrentSystem();
+      const waypoints = NAV_WAYPOINTS[sys] || NAV_WAYPOINTS.sol;
+      const idx = num - 1;
+      if (idx < waypoints.length) {
+        flyTo(waypoints[idx].id);
+      }
+    }
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Meta') {
+    modifierHeld = null;
+    lastNavRendered = ''; // force re-render back to locations
+    renderNav();
+  }
+});
+
+// ========== Starfield (parallax tiling) ==========
+const STAR_TILE_SIZE = 1024; // px — tile repeats seamlessly
+const PARALLAX_FACTOR = 0.05; // stars move at 5% of camera speed
+const starBgEl = document.getElementById('star-bg');
+let starTileReady = false;
+
+function generateStarTile() {
+  if (starTileReady) return;
+  starTileReady = true;
+
+  const tileCanvas = document.createElement('canvas');
+  tileCanvas.width = STAR_TILE_SIZE * dpr;
+  tileCanvas.height = STAR_TILE_SIZE * dpr;
+  const tCtx = tileCanvas.getContext('2d');
+  tCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Deterministic seeded random for consistent stars
+  let seed = 48271;
+  function sr() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+
+  // Layer 1: dim background stars (many, tiny)
+  for (let i = 0; i < 300; i++) {
+    tCtx.beginPath();
+    tCtx.arc(sr() * STAR_TILE_SIZE, sr() * STAR_TILE_SIZE, sr() * 0.6 + 0.2, 0, Math.PI * 2);
+    tCtx.fillStyle = `rgba(180,190,210,${sr() * 0.12 + 0.03})`;
+    tCtx.fill();
+  }
+
+  // Layer 2: medium stars
+  for (let i = 0; i < 60; i++) {
+    tCtx.beginPath();
+    tCtx.arc(sr() * STAR_TILE_SIZE, sr() * STAR_TILE_SIZE, sr() * 0.8 + 0.4, 0, Math.PI * 2);
+    tCtx.fillStyle = `rgba(200,210,230,${sr() * 0.18 + 0.08})`;
+    tCtx.fill();
+  }
+
+  // Layer 3: bright accent stars (few, larger)
+  for (let i = 0; i < 12; i++) {
+    const x = sr() * STAR_TILE_SIZE;
+    const y = sr() * STAR_TILE_SIZE;
+    const r = sr() * 0.6 + 0.8;
+    const brightness = sr() * 0.15 + 0.2;
+    // Warm or cool tint
+    const warm = sr() > 0.5;
+    tCtx.beginPath();
+    tCtx.arc(x, y, r, 0, Math.PI * 2);
+    tCtx.fillStyle = warm
+      ? `rgba(230,215,190,${brightness})`
+      : `rgba(190,210,240,${brightness})`;
+    tCtx.fill();
+  }
+
+  // Set as CSS background
+  starBgEl.style.backgroundImage = `url(${tileCanvas.toDataURL()})`;
+  starBgEl.style.backgroundSize = `${STAR_TILE_SIZE}px ${STAR_TILE_SIZE}px`;
+}
+
+function drawStarfield() {
+  generateStarTile();
+  // Shift background position at parallax rate
+  const ox = -(camera.x * PARALLAX_FACTOR) % STAR_TILE_SIZE;
+  const oy = -(camera.y * PARALLAX_FACTOR) % STAR_TILE_SIZE;
+  starBgEl.style.backgroundPosition = `${ox}px ${oy}px`;
+}
+
+// ========== Main Draw ==========
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const lod = getLOD();
+  const time = performance.now();
+
+  // --- Star system markers (interstellar zoom) ---
+  if (lod === 'interstellar' || lod === 'system') {
+    const systems = [
+      { name: 'Sol', x: 0, y: 0, color: '#f5c842', stars: 1 },
+      { name: 'Alpha Centauri', x: PROXIMA_X, y: PROXIMA_Y, color: '#e8a040', stars: 3,
+        desc: 'Triple star · 4.25 ly' },
+    ];
+    // Only show system markers when individual stars would overlap
+    const showSystemMarkers = camera.zoom < 0.005;
+    if (showSystemMarkers) {
+      for (const sys of systems) {
+        const { sx, sy } = worldToScreen(sys.x, sys.y);
+        if (sx < -100 || sx > W + 100 || sy < -100 || sy > H + 100) continue;
+        // Glow
+        const glowR = 20;
+        const grd = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
+        grd.addColorStop(0, sys.color + '30');
+        grd.addColorStop(1, sys.color + '00');
+        ctx.beginPath();
+        ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
+        ctx.fillStyle = grd;
+        ctx.fill();
+        // Dot
+        ctx.beginPath();
+        ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = sys.color;
+        ctx.fill();
+        // Label
+        ctx.font = '12px "Outfit", sans-serif';
+        ctx.fillStyle = sys.color;
+        ctx.textAlign = 'center';
+        ctx.fillText(sys.name, sx, sy - 12);
+        if (sys.desc) {
+          ctx.font = '10px "IBM Plex Mono", monospace';
+          ctx.fillStyle = '#5c6070';
+          ctx.fillText(sys.desc, sx, sy + 18);
+        }
+      }
+    }
+  }
+
+  // --- Interstellar distance indicator ---
+  if (lod === 'interstellar') {
+    const solS = worldToScreen(0, 0);
+    const proxS = worldToScreen(PROXIMA_X, PROXIMA_Y);
+    // Dashed line between stars
+    ctx.globalAlpha = 0.2;
+    ctx.beginPath();
+    ctx.moveTo(solS.sx, solS.sy);
+    ctx.lineTo(proxS.sx, proxS.sy);
+    ctx.strokeStyle = '#3a3e48';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Distance label at midpoint
+    const mx = (solS.sx + proxS.sx) / 2;
+    const my = (solS.sy + proxS.sy) / 2;
+    ctx.globalAlpha = 0.4;
+    ctx.font = '11px "IBM Plex Mono", monospace';
+    ctx.fillStyle = '#5c6070';
+    ctx.textAlign = 'center';
+    ctx.fillText('4.25 ly · 268,550 AU', mx, my - 8);
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Orbit rings ---
+  for (const orbit of orbits) {
+    const alpha = smoothStep(camera.zoom, orbit.lodMin * 0.5, orbit.lodMin * 1.5);
+    if (alpha < 0.01) continue;
+    const c = worldToScreen(orbit.cx || 0, orbit.cy || 0);
+    const r = orbit.r * camera.zoom;
+    if (r < 3) continue;
+
+    ctx.globalAlpha = alpha * 0.4;
+    ctx.beginPath();
+    ctx.arc(c.sx, c.sy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = '#2a2e38';
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([4, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (r > 50) {
+      ctx.font = '11px "IBM Plex Mono", monospace';
+      ctx.fillStyle = '#2a2e38';
+      ctx.textAlign = 'center';
+      ctx.fillText(orbit.label, c.sx, c.sy - r - 4);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Zones ---
+  for (const zone of zones) {
+    const alpha = smoothStep(camera.zoom, zone.lodMin * 0.5, zone.lodMin * 2);
+    if (alpha < 0.01) continue;
+    const c = worldToScreen(zone.cx, zone.cy);
+    const rMin = zone.rMin * camera.zoom;
+    const rMax = zone.rMax * camera.zoom;
+    if (rMax < 3) continue;
+
+    const startRad = (zone.startAngle - 90) * Math.PI / 180;
+    const endRad = startRad + zone.span * Math.PI / 180;
+
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    if (zone.span >= 360) {
+      ctx.arc(c.sx, c.sy, rMax, 0, Math.PI * 2);
+      ctx.arc(c.sx, c.sy, rMin, 0, Math.PI * 2, true);
+    } else {
+      ctx.arc(c.sx, c.sy, rMax, startRad, endRad);
+      ctx.arc(c.sx, c.sy, rMin, endRad, startRad, true);
+      ctx.closePath();
+    }
+    ctx.fillStyle = zone.fill;
+    ctx.fill();
+    ctx.strokeStyle = zone.stroke;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Zone label — only at region+ zoom
+    const labelAlpha = smoothStep(camera.zoom, 0.2, 0.5);
+    if (labelAlpha > 0.01 && rMax > 50) {
+      const midR = (rMin + rMax) / 2;
+      const midAngle = zone.span >= 360 ? -Math.PI / 4 : (startRad + endRad) / 2;
+      ctx.globalAlpha = alpha * labelAlpha * 0.7;
+      ctx.font = '11px "IBM Plex Mono", monospace';
+      ctx.fillStyle = '#4a4e58';
+      ctx.textAlign = 'center';
+      ctx.fillText(zone.name, c.sx + midR * Math.cos(midAngle), c.sy + midR * Math.sin(midAngle));
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Sun glow ---
+  const sunS = worldToScreen(0, 0);
+  const glowR = Math.max(25, 70 * camera.zoom);
+  const grad = ctx.createRadialGradient(sunS.sx, sunS.sy, 0, sunS.sx, sunS.sy, glowR);
+  grad.addColorStop(0, 'rgba(245,200,66,0.12)');
+  grad.addColorStop(0.4, 'rgba(245,200,66,0.04)');
+  grad.addColorStop(1, 'rgba(245,200,66,0)');
+  ctx.beginPath();
+  ctx.arc(sunS.sx, sunS.sy, glowR, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // --- Bodies ---
+  const hideIndividualStars = camera.zoom < 0.005;
+  for (const body of bodies) {
+    // At interstellar zoom, hide individual stars — system markers are shown instead
+    if (hideIndividualStars && (body.system === 'alpha' || body.system === 'proxima')) continue;
+    // Also hide Sol's label at interstellar — system marker handles it
+    const alpha = smoothStep(camera.zoom, body.lodMin * 0.5, body.lodMin * 1.5);
+    if (alpha < 0.01 && body.type !== 'Star') continue;
+    const { sx, sy } = worldToScreen(body.x, body.y);
+    const screenR = Math.max(body.type === 'Star' ? 5 : 2, Math.min(body.radius * camera.zoom * 0.5, body.type === 'Star' ? 14 : body.type === 'Moon' ? 4 : 8));
+
+    ctx.globalAlpha = body.type === 'Star' ? 1 : alpha;
+    ctx.beginPath();
+    ctx.arc(sx, sy, screenR, 0, Math.PI * 2);
+    ctx.fillStyle = body.color;
+    ctx.fill();
+
+    if (body.type === 'Star') {
+      ctx.beginPath();
+      ctx.arc(sx, sy, screenR * 1.6, 0, Math.PI * 2);
+      ctx.strokeStyle = body.color + '30';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Body label — hide if too zoomed out, smart positioning to avoid overlap
+    const labelAlpha = body.type === 'Star' ? 1 : smoothStep(camera.zoom, body.lodMin, body.lodMin * 2);
+    if (labelAlpha > 0.01) {
+      // Hide planet label if a station is very nearby (avoid overlap)
+      let hideForStation = false;
+      if (body.type === 'Planet' || body.type === 'Moon') {
+        for (const st of stations) {
+          const stScreen = worldToScreen(st.x, st.y);
+          if (Math.hypot(sx - stScreen.sx, sy - stScreen.sy) < 40) {
+            hideForStation = camera.zoom > 0.5; // only hide at close zoom
+            break;
+          }
+        }
+      }
+      if (!hideForStation) {
+        ctx.globalAlpha = labelAlpha * (body.type === 'Star' ? 0.8 : 0.5);
+        ctx.font = `${body.type === 'Star' ? 12 : 11}px "IBM Plex Mono", monospace`;
+        ctx.fillStyle = body.type === 'Star' ? '#c8ccd4' : '#6b7080';
+        // Moon labels offset to the right to avoid parent planet
+        if (body.type === 'Moon') {
+          ctx.textAlign = 'left';
+          ctx.fillText(body.name, sx + screenR + 4, sy + 3);
+        } else {
+          ctx.textAlign = 'center';
+          ctx.fillText(body.name, sx, sy - screenR - 6);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Transit lines (region+) ---
+  const transitAlpha = smoothStep(camera.zoom, 0.15, 0.4);
+  if (transitAlpha > 0.01) {
+    for (const ship of ships) {
+      if (!ship.transitTo) continue;
+      const from = worldToScreen(ship.x, ship.y);
+      const to = worldToScreen(ship.transitTo.x, ship.transitTo.y);
+      const progress = ship.progress || 0;
+
+      // Full path — dim dashed line
+      ctx.globalAlpha = transitAlpha * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(from.sx, from.sy);
+      ctx.lineTo(to.sx, to.sy);
+      ctx.strokeStyle = TASK_COLORS.Transit;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([8, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Completed portion — solid brighter line
+      const progX = from.sx + (to.sx - from.sx) * progress;
+      const progY = from.sy + (to.sy - from.sy) * progress;
+      ctx.globalAlpha = transitAlpha * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(from.sx, from.sy);
+      ctx.lineTo(progX, progY);
+      ctx.strokeStyle = TASK_COLORS.Transit;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Progress pip — small dot at current position
+      ctx.globalAlpha = transitAlpha;
+      ctx.beginPath();
+      ctx.arc(progX, progY, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = TASK_COLORS.Transit;
+      ctx.fill();
+      // Subtle outer glow
+      ctx.beginPath();
+      ctx.arc(progX, progY, 5, 0, Math.PI * 2);
+      ctx.strokeStyle = TASK_COLORS.Transit + '33';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      // Destination marker — small hollow circle
+      ctx.globalAlpha = transitAlpha * 0.4;
+      ctx.beginPath();
+      ctx.arc(to.sx, to.sy, 3, 0, Math.PI * 2);
+      ctx.strokeStyle = TASK_COLORS.Transit;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // ETA label along the line (local zoom)
+      const etaFade = smoothStep(camera.zoom, 0.5, 1.0);
+      if (etaFade > 0.01) {
+        const etaLeft = ship.eta_tick - CURRENT_TICK;
+        const angle = Math.atan2(to.sy - from.sy, to.sx - from.sx);
+        const labelX = progX + 12 * Math.cos(angle + Math.PI/2);
+        const labelY = progY + 12 * Math.sin(angle + Math.PI/2);
+        ctx.globalAlpha = transitAlpha * etaFade * 0.7;
+        ctx.font = '11px "IBM Plex Mono", monospace';
+        ctx.fillStyle = TASK_COLORS.Transit;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${Math.round(progress*100)}% · ${ticksToTime(Math.max(0,etaLeft))}`, labelX, labelY);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Scan sites (region+) ---
+  const siteAlpha = smoothStep(camera.zoom, 0.3, 0.8);
+  if (siteAlpha > 0.01) {
+    for (const site of scanSites) {
+      const { sx, sy } = worldToScreen(site.x, site.y);
+      const r = Math.max(3, Math.min(5, 3.5 * camera.zoom * 0.4));
+      ctx.globalAlpha = siteAlpha * 0.8;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#1a1d26';
+      ctx.fill();
+      ctx.strokeStyle = '#5c6070';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.font = 'bold 10px "IBM Plex Mono", monospace';
+      ctx.fillStyle = '#8a8e98';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('?', sx, sy + 0.5);
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Asteroids (region+) ---
+  const astAlpha = smoothStep(camera.zoom, 0.25, 0.7);
+  if (astAlpha > 0.01) {
+    for (const ast of asteroids) {
+      const { sx, sy } = worldToScreen(ast.x, ast.y);
+      const size = Math.max(2, Math.min(5, Math.log10(ast.mass) * camera.zoom * 0.35));
+      const color = TAG_COLORS[ast.tags[0]] || '#8a8e98';
+
+      ctx.globalAlpha = astAlpha * 0.85;
+      ctx.beginPath();
+      const sides = 6;
+      for (let i = 0; i < sides; i++) {
+        const angle = (i / sides) * Math.PI * 2;
+        const wobble = 0.7 + 0.3 * Math.sin(i * 2.5 + ast.mass * 0.001);
+        const px = sx + size * wobble * Math.cos(angle);
+        const py = sy + size * wobble * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Stations (always visible at region+, dot at system) ---
+  for (const station of stations) {
+    const { sx, sy } = worldToScreen(station.x, station.y);
+    const stationAlpha = smoothStep(camera.zoom, 0.1, 0.3);
+
+    if (camera.zoom < 0.1) {
+      // Tiny dot at system level
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#5ca0c8';
+      ctx.globalAlpha = 0.5;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else {
+      const size = Math.max(3, Math.min(7, 4 * camera.zoom * 0.6));
+      ctx.save();
+      ctx.globalAlpha = stationAlpha;
+      ctx.translate(sx, sy);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#5ca0c8';
+      ctx.fillRect(-size / 2, -size / 2, size, size);
+      ctx.restore();
+
+      // Subtle selection ring
+      const pulse = 0.2 + 0.15 * Math.sin(time * 0.003);
+      ctx.beginPath();
+      ctx.arc(sx, sy, size + 3, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(92,160,200,${pulse * stationAlpha})`;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      // Label — offset right to avoid body label collision
+      const labelAlpha2 = smoothStep(camera.zoom, 0.3, 0.8);
+      if (labelAlpha2 > 0.01) {
+        ctx.globalAlpha = labelAlpha2;
+        ctx.font = '11px "Outfit", sans-serif';
+        ctx.fillStyle = '#5ca0c8';
+        ctx.textAlign = 'left';
+        ctx.fillText(station.name, sx + size + 6, sy + 3);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // --- Ships (region+, dots at system) ---
+  for (const ship of ships) {
+    const { sx, sy } = worldToScreen(ship.x, ship.y);
+    const color = TASK_COLORS[ship.task] || TASK_COLORS.idle;
+    const shipAlpha = smoothStep(camera.zoom, 0.15, 0.4);
+
+    if (camera.zoom < 0.15) {
+      // Tiny dot at system level
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.4;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+
+    const size = Math.max(3, Math.min(6, 3.5 * camera.zoom * 0.5));
+    ctx.globalAlpha = shipAlpha;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - size);
+    ctx.lineTo(sx - size * 0.6, sy + size * 0.5);
+    ctx.lineTo(sx + size * 0.6, sy + size * 0.5);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // Ship label (local zoom only) — smaller, dimmer
+    const nameFade = smoothStep(camera.zoom, 0.6, 1.5);
+    if (nameFade > 0.01) {
+      ctx.globalAlpha = shipAlpha * nameFade * 0.6;
+      ctx.font = '11px "IBM Plex Mono", monospace';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.fillText(ship.name, sx, sy + size + 10);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- HUD updates ---
+  document.getElementById('zoom-val').textContent = camera.zoom.toFixed(1) + 'x';
+  document.getElementById('lod-label').textContent = '· ' + lod.toUpperCase();
+  // Update nav panel based on zoom level and current system
+  renderNav();
+  const auPerBar = 60 / (camera.zoom * AU);
+  let scaleText;
+  if (auPerBar > 50000) {
+    scaleText = `${(auPerBar / 63241).toFixed(1)} ly`;
+  } else if (auPerBar > 100) {
+    scaleText = `${Math.round(auPerBar).toLocaleString()} AU`;
+  } else if (auPerBar < 0.01) {
+    scaleText = `${(auPerBar * 1000).toFixed(0)} mAU`;
+  } else if (auPerBar < 0.1) {
+    scaleText = `${(auPerBar * 1000).toFixed(0)} mAU`;
+  } else {
+    scaleText = `${auPerBar.toFixed(1)} AU`;
+  }
+  document.getElementById('scale-label').textContent = scaleText;
+}
+
+// ========== Minimap ==========
+function drawMinimap() {
+  miniCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  miniCtx.clearRect(0, 0, 140, 140);
+  const scale = 140 / (12 * AU);
+  const ox = 70, oy = 70;
+
+  for (const zone of zones) {
+    if (zone.span < 360) continue;
+    miniCtx.beginPath();
+    miniCtx.arc(ox, oy, zone.rMax * scale, 0, Math.PI * 2);
+    miniCtx.arc(ox, oy, zone.rMin * scale, 0, Math.PI * 2, true);
+    miniCtx.fillStyle = zone.fill;
+    miniCtx.fill();
+  }
+  for (const body of bodies) {
+    miniCtx.beginPath();
+    miniCtx.arc(ox + body.x * scale, oy + body.y * scale, body.type === 'Star' ? 3 : 1.5, 0, Math.PI * 2);
+    miniCtx.fillStyle = body.color;
+    miniCtx.fill();
+  }
+
+  // Viewport rect
+  const tl = screenToWorld(0, 0);
+  const br = screenToWorld(W, H);
+  const rx = ox + tl.wx * scale;
+  const ry = oy + tl.wy * scale;
+  const rw = (br.wx - tl.wx) * scale;
+  const rh = (br.wy - tl.wy) * scale;
+  const vr = document.getElementById('viewport-rect');
+  vr.style.left = Math.max(0, Math.min(132, rx)) + 'px';
+  vr.style.top = Math.max(0, Math.min(132, ry)) + 'px';
+  vr.style.width = Math.max(6, Math.min(140, rw)) + 'px';
+  vr.style.height = Math.max(6, Math.min(140, rh)) + 'px';
+}
+
+// ========== Tooltip ==========
+function progressBar(pct, color) {
+  return `<div style="height:3px;background:#1a1d26;border-radius:2px;margin:3px 0;overflow:hidden;">
+    <div style="width:${Math.round(pct*100)}%;height:100%;background:${color};border-radius:2px;"></div></div>`;
+}
+
+function ticksToTime(ticks) {
+  const hours = ticks;
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h`;
+}
+
+function handleHover(mx, my) {
+  const world = screenToWorld(mx, my);
+  const tooltip = document.getElementById('tooltip');
+  const hitR = Math.max(8, 18 / camera.zoom);
+  let found = null;
+
+  for (const e of getAllEntities()) {
+    const dx = world.wx - e.x, dy = world.wy - e.y;
+    if (Math.sqrt(dx * dx + dy * dy) < hitR) {
+      if (e.entityType === 'Scan Site' && camera.zoom < 0.3) continue;
+      if (e.entityType === 'Asteroid' && camera.zoom < 0.25) continue;
+      if (e.entityType === 'Ship' && camera.zoom < 0.15) continue;
+      if (e.entityType === 'Moon' && camera.zoom < 0.8) continue;
+      found = e;
+      break;
+    }
+  }
+
+  if (found) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = mx + 'px';
+    tooltip.style.top = my + 'px';
+    document.getElementById('tt-name').textContent = found.name;
+    document.getElementById('tt-type').textContent = found.entityType;
+
+    let details = '';
+
+    if (found.entityType === 'Station') {
+      const pw = found.power;
+      const pwColor = pw.deficit_kw > 0 ? 'var(--offline)' : 'var(--online)';
+      const pwText = pw.deficit_kw > 0 ? `-${pw.deficit_kw} kW deficit` : `+${pw.generated_kw - pw.consumed_kw} kW surplus`;
+      details += `<div class="tt-row"><span class="tt-label">Orbit</span><span class="tt-val">${found.parentBody}</span></div>`;
+      details += `<div class="tt-row"><span class="tt-label">Power</span><span class="tt-val" style="color:${pwColor}">${pwText}</span></div>`;
+      details += `<div class="tt-row"><span class="tt-label">Cargo</span><span class="tt-val">${found.inventory_kg.toLocaleString()} / ${found.cargo_capacity_m3.toLocaleString()} m³</span></div>`;
+      details += `<div class="tt-row"><span class="tt-label">Modules</span><span class="tt-val">${found.modules_active}/${found.modules_total} active</span></div>`;
+      if (found.ores && found.ores.length > 0) {
+        details += `<div style="margin-top:6px;padding-top:5px;border-top:1px solid var(--edge);">`;
+        for (const ore of found.ores) {
+          const c = ore.element === 'Fe' ? '#c47038' : ore.element === 'Si' ? '#8a9aaf' : '#888';
+          details += `<div class="tt-row"><span class="tt-label">${ore.element} ore</span><span class="tt-val">${ore.kg.toLocaleString()} kg</span></div>`;
+        }
+        details += `</div>`;
+      }
+
+    } else if (found.entityType === 'Ship') {
+      const c = TASK_COLORS[found.task] || '#888';
+      details += `<div class="tt-row"><span class="tt-label">Task</span><span class="tt-val" style="color:${c}">${found.task}</span></div>`;
+      if (found.parentBody) {
+        details += `<div class="tt-row"><span class="tt-label">Location</span><span class="tt-val">${found.parentBody}</span></div>`;
+      }
+      if (found.task === 'Transit' && found.transitTo) {
+        const pct = found.progress || 0;
+        const etaLeft = found.eta_tick - CURRENT_TICK;
+        details += `<div class="tt-row"><span class="tt-label">Destination</span><span class="tt-val">${found.transitTo.name}</span></div>`;
+        details += `<div class="tt-row"><span class="tt-label">Progress</span><span class="tt-val">${Math.round(pct*100)}%</span></div>`;
+        details += progressBar(pct, c);
+        details += `<div class="tt-row"><span class="tt-label">ETA</span><span class="tt-val">${ticksToTime(Math.max(0,etaLeft))}</span></div>`;
+      } else if (found.task === 'Mine' && found.target) {
+        const pct = (CURRENT_TICK - found.started_tick) / (found.eta_tick - found.started_tick);
+        details += `<div class="tt-row"><span class="tt-label">Target</span><span class="tt-val">${found.target}</span></div>`;
+        details += `<div class="tt-row"><span class="tt-label">Progress</span><span class="tt-val">${Math.round(pct*100)}%</span></div>`;
+        details += progressBar(pct, c);
+      } else if (found.task === 'Survey' && found.target) {
+        const pct = (CURRENT_TICK - found.started_tick) / (found.eta_tick - found.started_tick);
+        details += `<div class="tt-row"><span class="tt-label">Site</span><span class="tt-val">${found.target}</span></div>`;
+        details += progressBar(Math.min(1, pct), c);
+      } else if (found.task === 'Deposit' && found.target) {
+        details += `<div class="tt-row"><span class="tt-label">Station</span><span class="tt-val">${found.target}</span></div>`;
+      }
+      details += `<div class="tt-row"><span class="tt-label">Cargo</span><span class="tt-val">${found.cargo_kg.toLocaleString()} kg / ${found.capacity_m3} m³</span></div>`;
+
+    } else if (found.entityType === 'Asteroid') {
+      details += `<div class="tt-row"><span class="tt-label">Location</span><span class="tt-val">${found.parentBody}</span></div>`;
+      details += `<div class="tt-row"><span class="tt-label">Mass</span><span class="tt-val">${found.mass?.toLocaleString()} kg</span></div>`;
+      details += `<div class="tt-tags">${(found.tags||[]).map(t => {
+        const c = TAG_COLORS[t] || '#888';
+        return `<span class="tt-tag" style="background:${c}22;color:${c}">${t}</span>`;
+      }).join('')}</div>`;
+      if (found.beliefs && found.beliefs.length > 0) {
+        details += `<div style="margin-top:4px;">`;
+        for (const [tag, conf] of found.beliefs) {
+          details += `<div class="tt-row"><span class="tt-label">${tag}</span><span class="tt-val">${Math.round(conf*100)}% confidence</span></div>`;
+        }
+        details += `</div>`;
+      }
+      if (found.composition) {
+        details += `<div style="margin-top:4px;padding-top:4px;border-top:1px solid var(--edge);font-size:10px;color:var(--dim);">`;
+        details += Object.entries(found.composition)
+          .sort(([,a],[,b]) => b - a)
+          .map(([el, frac]) => `${el} ${Math.round(frac*100)}%`)
+          .join(' · ');
+        details += `</div>`;
+      }
+
+    } else if (found.entityType === 'Scan Site') {
+      details += `<div class="tt-row"><span class="tt-label">Location</span><span class="tt-val">${found.parentBody}</span></div>`;
+      details += `<div class="tt-row"><span class="tt-label">Template</span><span class="tt-val">${found.template}</span></div>`;
+
+    } else if (found.entityType === 'Planet' || found.entityType === 'Star' || found.entityType === 'Moon') {
+      // Body tooltip — type is already shown in the subtitle, no extra rows needed
+    }
+
+    document.getElementById('tt-details').innerHTML = details;
+    mapCanvas.style.cursor = 'pointer';
+  } else {
+    tooltip.style.display = 'none';
+    mapCanvas.style.cursor = isDragging ? 'grabbing' : 'grab';
+  }
+}
+
+// ========== Interaction ==========
+let isDragging = false;
+let lastMouse = { x: 0, y: 0 };
+
+mapCanvas.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  lastMouse = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('mousemove', (e) => {
+  if (isDragging) {
+    // At normal zoom: 1/zoom works fine
+    // At interstellar zoom (< 0.01): boost proportional to how zoomed out we are
+    // so dragging 100px at zoom 0.0001 moves ~same screen distance as at zoom 0.1
+    let panSpeed = 1 / camera.zoom;
+    if (camera.zoom < LOG_THRESHOLD) {
+      // Extra boost: scale up by (threshold/zoom)^0.5 so movement feels consistent
+      panSpeed *= Math.pow(LOG_THRESHOLD / camera.zoom, 0.4);
+    }
+    panSpeed = Math.min(panSpeed, 1e10); // safety cap
+    targetCamera.x -= (e.clientX - lastMouse.x) * panSpeed;
+    targetCamera.y -= (e.clientY - lastMouse.y) * panSpeed;
+    lastMouse = { x: e.clientX, y: e.clientY };
+  }
+  handleHover(e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', () => { isDragging = false; });
+
+mapCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  // Constant zoom ratio per scroll tick — the log-interpolated camera lerp
+  // handles the smoothing, so we don't need to dampen the target.
+  // 0.82/1.22 gives ~5 ticks per order of magnitude (10x zoom change)
+  const factor = e.deltaY > 0 ? 0.82 : 1.22;
+  const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetCamera.zoom * factor));
+  const mouse = screenToWorld(e.clientX, e.clientY);
+  const ratio = newZoom / targetCamera.zoom;
+  targetCamera.x = mouse.wx - (mouse.wx - targetCamera.x) / ratio;
+  targetCamera.y = mouse.wy - (mouse.wy - targetCamera.y) / ratio;
+  targetCamera.zoom = newZoom;
+}, { passive: false });
+
+// Double-click to fly to nearest body/station — only if close enough
+mapCanvas.addEventListener('dblclick', (e) => {
+  const world = screenToWorld(e.clientX, e.clientY);
+  const maxHitR = Math.max(20, 40 / camera.zoom); // must be near something
+  let bestDist = Infinity, bestTarget = null;
+
+  // Only flyable targets: bodies and stations
+  const flyable = [
+    ...bodies.map(b => ({ ...b, focusZoom: b.focusZoom || 4 })),
+    ...stations.map(s => ({ ...s, focusZoom: 8, type: 'Station' })),
+  ];
+
+  for (const target of flyable) {
+    const d = Math.hypot(world.wx - target.x, world.wy - target.y);
+    if (d < maxHitR && d < bestDist) {
+      bestDist = d;
+      bestTarget = target;
+    }
+  }
+
+  if (!bestTarget) return; // clicked empty space — do nothing
+
+  targetCamera.x = bestTarget.x;
+  targetCamera.y = bestTarget.y;
+  targetCamera.zoom = Math.max(camera.zoom * 2, bestTarget.focusZoom);
+  targetCamera.zoom = Math.min(targetCamera.zoom, MAX_ZOOM);
+
+  const bar = document.getElementById('focus-bar');
+  const nameEl = document.getElementById('focus-name');
+  bar.style.display = 'block';
+  nameEl.textContent = bestTarget.name;
+  currentFocus = bestTarget.id;
+});
+
+// ========== Animation Loop ==========
+function animate() {
+  // Logarithmic zoom interpolation
+  const logCurrent = Math.log(camera.zoom);
+  const logTarget = Math.log(targetCamera.zoom);
+  const zoomLerp = 0.18; // faster than position lerp for responsive feel
+  const logNew = logCurrent + (logTarget - logCurrent) * zoomLerp;
+  camera.zoom = Math.exp(logNew);
+
+  // Position lerp — adaptive speed based on distance
+  const posDelta = Math.hypot(targetCamera.x - camera.x, targetCamera.y - camera.y);
+  const posLerp = posDelta > 1e8 ? 0.06 : LERP;
+  camera.x += (targetCamera.x - camera.x) * posLerp;
+  camera.y += (targetCamera.y - camera.y) * posLerp;
+  drawStarfield();
+  draw();
+  drawMinimap();
+  requestAnimationFrame(animate);
+}
+
+// Minimap click-to-pan + drag-to-pan
+const minimapEl = document.querySelector('.minimap');
+let miniDragging = false;
+
+function minimapToWorld(mx, my) {
+  const rect = minimapEl.getBoundingClientRect();
+  const px = (mx - rect.left) / rect.width;  // 0..1
+  const py = (my - rect.top) / rect.height;  // 0..1
+  const scale = 12 * AU; // total world range shown in minimap
+  return {
+    wx: (px - 0.5) * scale,
+    wy: (py - 0.5) * scale,
+  };
+}
+
+minimapEl.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  miniDragging = true;
+  const w = minimapToWorld(e.clientX, e.clientY);
+  targetCamera.x = w.wx;
+  targetCamera.y = w.wy;
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (miniDragging) {
+    const w = minimapToWorld(e.clientX, e.clientY);
+    targetCamera.x = w.wx;
+    targetCamera.y = w.wy;
+  }
+}, true);
+
+window.addEventListener('mouseup', () => { miniDragging = false; }, true);
+
+// No-op — hints are in the HTML now
+
+window.addEventListener('resize', resize);
+resize();
+animate();
+flyTo('system');
+</script>
+</body>
+</html>
