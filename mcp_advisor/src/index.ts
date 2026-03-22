@@ -529,29 +529,55 @@ function findSection(
   lines: string[],
   sectionPath: string,
 ): { startLine: number; endLine: number; level: number } | null {
-  const parts = sectionPath.split(">").map((s) => s.trim());
-  const target = parts[parts.length - 1].toLowerCase();
+  const parts = sectionPath.split(">").map((s) => s.trim().toLowerCase());
+  const target = parts[parts.length - 1];
 
+  // Build a heading index for parent validation
+  const headings: { level: number; text: string; line: number }[] = [];
   for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    const match = line.match(/^(#{1,6})\s+(.+)$/);
-    if (!match) continue;
-
-    const level = match[1].length;
-    const heading = match[2].trim().toLowerCase();
-
-    if (heading === target) {
-      // Find the end of this section (next header at same or higher level)
-      let endLine = lines.length;
-      for (let j = index + 1; j < lines.length; j++) {
-        const nextMatch = lines[j].match(/^(#{1,6})\s+/);
-        if (nextMatch && nextMatch[1].length <= level) {
-          endLine = j;
-          break;
-        }
-      }
-      return { startLine: index, endLine, level };
+    const match = lines[index].match(/^(#{1,6})\s+(.+)$/);
+    if (match) {
+      headings.push({ level: match[1].length, text: match[2].trim().toLowerCase(), line: index });
     }
+  }
+
+  for (let hi = 0; hi < headings.length; hi++) {
+    const heading = headings[hi];
+    if (heading.text !== target) continue;
+
+    // Validate parent path: walk up the heading hierarchy
+    if (parts.length > 1) {
+      let valid = true;
+      let checkIdx = hi;
+      for (let pi = parts.length - 2; pi >= 0; pi--) {
+        // Find the nearest ancestor heading with a lower level
+        let found = false;
+        for (let ai = checkIdx - 1; ai >= 0; ai--) {
+          if (headings[ai].level < headings[checkIdx].level) {
+            if (headings[ai].text !== parts[pi]) {
+              valid = false;
+            }
+            checkIdx = ai;
+            found = true;
+            break;
+          }
+        }
+        if (!found) { valid = false; }
+        if (!valid) break;
+      }
+      if (!valid) continue;
+    }
+
+    // Found a match — compute section end
+    const index = heading.line;
+    let endLine = lines.length;
+    for (let j = hi + 1; j < headings.length; j++) {
+      if (headings[j].level <= heading.level) {
+        endLine = headings[j].line;
+        break;
+      }
+    }
+    return { startLine: index, endLine, level: heading.level };
   }
   return null;
 }
@@ -611,13 +637,16 @@ server.tool(
           ...lines.slice(found.endLine),
         ];
       } else {
-        // Append before the next section boundary
-        const insertAt = found.endLine;
+        // Append before the next section boundary, trimming trailing blanks to avoid accumulation
+        let insertAt = found.endLine;
+        while (insertAt > found.startLine + 1 && lines[insertAt - 1].trim() === "") {
+          insertAt--;
+        }
         updatedLines = [
           ...lines.slice(0, insertAt),
           ...contentLines,
           "",
-          ...lines.slice(insertAt),
+          ...lines.slice(found.endLine),
         ];
       }
 
