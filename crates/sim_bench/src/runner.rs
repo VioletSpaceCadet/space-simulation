@@ -58,7 +58,8 @@ pub fn run_seed(
         }),
     )?;
 
-    let mut metrics_writer = sim_core::MetricsFileWriter::new(seed_dir.to_path_buf())
+    let element_ids = sim_core::content_element_ids(content);
+    let mut metrics_writer = sim_core::MetricsFileWriter::new(seed_dir.to_path_buf(), element_ids)
         .with_context(|| format!("opening metrics CSV in {}", seed_dir.display()))?;
 
     for _ in 0..ticks {

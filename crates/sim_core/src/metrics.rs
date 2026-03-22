@@ -10,10 +10,20 @@ use crate::{
     ModuleKindState, TaskKind,
 };
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-const METRICS_VERSION: u32 = 8;
+/// v9: Replace element-specific fields with per_element_material_kg and per_element_ore_stats.
+const METRICS_VERSION: u32 = 9;
+
+/// Per-element ore composition statistics (avg/min/max fraction across all ore lots).
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+pub struct OreElementStats {
+    pub avg_fraction: f32,
+    pub min_fraction: f32,
+    pub max_fraction: f32,
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
@@ -24,17 +34,18 @@ pub struct MetricsSnapshot {
     pub total_ore_kg: f32,
     pub total_material_kg: f32,
     pub total_slag_kg: f32,
-    pub total_iron_material_kg: f32,
+
+    /// Per-element refined material kg (e.g. "Fe" → 500.0, "H2O" → 100.0).
+    pub per_element_material_kg: BTreeMap<String, f32>,
 
     // Storage pressure
     pub station_storage_used_pct: f32,
     pub ship_cargo_used_pct: f32,
 
-    // Ore quality
-    pub avg_ore_fe_fraction: f32,
+    // Ore quality (per-element)
+    /// Per-element ore composition stats (avg/min/max fraction across ore lots).
+    pub per_element_ore_stats: BTreeMap<String, OreElementStats>,
     pub ore_lot_count: u32,
-    pub min_ore_fe_fraction: f32,
-    pub max_ore_fe_fraction: f32,
 
     // Material quality
     pub avg_material_quality: f32,
@@ -83,10 +94,7 @@ pub struct MetricsSnapshot {
     pub power_deficit_kw: f32,
     pub battery_charge_pct: f32,
 
-    // Propellant
-    pub total_h2o_kg: f32,
-    pub total_lh2_kg: f32,
-    pub total_lox_kg: f32,
+    // (Propellant totals are in per_element_material_kg: H2O, LH2, LOX)
 
     // Thermal
     pub station_max_temp_mk: u32,
@@ -101,28 +109,18 @@ struct InventoryAccumulator {
     total_ore_kg: f32,
     total_material_kg: f32,
     total_slag_kg: f32,
-    total_iron_material_kg: f32,
+    per_element_material_kg: BTreeMap<String, f32>,
     ore_lot_count: u32,
-    ore_fe_weighted_sum: f32,
     ore_total_weight: f32,
-    min_ore_fe: f32,
-    max_ore_fe: f32,
+    /// Per-element weighted sum of ore fractions (for computing avg).
+    ore_element_weighted_sums: BTreeMap<String, f32>,
+    ore_element_min: BTreeMap<String, f32>,
+    ore_element_max: BTreeMap<String, f32>,
     material_quality_weighted_sum: f32,
     material_total_weight: f32,
-    total_h2o_kg: f32,
-    total_lh2_kg: f32,
-    total_lox_kg: f32,
 }
 
 impl InventoryAccumulator {
-    fn new() -> Self {
-        Self {
-            min_ore_fe: f32::MAX,
-            max_ore_fe: f32::MIN,
-            ..Default::default()
-        }
-    }
-
     fn accumulate(&mut self, inventory: &[InventoryItem]) {
         for item in inventory {
             match item {
@@ -131,14 +129,26 @@ impl InventoryAccumulator {
                 } => {
                     self.total_ore_kg += kg;
                     self.ore_lot_count += 1;
-                    let fe_frac = composition.get(crate::ELEMENT_FE).copied().unwrap_or(0.0);
-                    self.ore_fe_weighted_sum += fe_frac * kg;
                     self.ore_total_weight += kg;
-                    if fe_frac < self.min_ore_fe {
-                        self.min_ore_fe = fe_frac;
-                    }
-                    if fe_frac > self.max_ore_fe {
-                        self.max_ore_fe = fe_frac;
+                    for (element, &fraction) in composition {
+                        *self
+                            .ore_element_weighted_sums
+                            .entry(element.clone())
+                            .or_default() += fraction * kg;
+                        let min = self
+                            .ore_element_min
+                            .entry(element.clone())
+                            .or_insert(f32::MAX);
+                        if fraction < *min {
+                            *min = fraction;
+                        }
+                        let max = self
+                            .ore_element_max
+                            .entry(element.clone())
+                            .or_insert(f32::MIN);
+                        if fraction > *max {
+                            *max = fraction;
+                        }
                     }
                 }
                 InventoryItem::Material {
@@ -148,15 +158,10 @@ impl InventoryAccumulator {
                     ..
                 } => {
                     self.total_material_kg += kg;
-                    if element == crate::ELEMENT_FE {
-                        self.total_iron_material_kg += kg;
-                    }
-                    match element.as_str() {
-                        "H2O" => self.total_h2o_kg += kg,
-                        "LH2" => self.total_lh2_kg += kg,
-                        "LOX" => self.total_lox_kg += kg,
-                        _ => {}
-                    }
+                    *self
+                        .per_element_material_kg
+                        .entry(element.clone())
+                        .or_default() += kg;
                     self.material_quality_weighted_sum += quality * kg;
                     self.material_total_weight += kg;
                 }
@@ -167,6 +172,12 @@ impl InventoryAccumulator {
             }
         }
     }
+}
+
+/// Extract sorted element IDs from content for dynamic CSV columns.
+/// Returns all element IDs in definition order.
+pub fn content_element_ids(content: &GameContent) -> Vec<String> {
+    content.elements.iter().map(|e| e.id.clone()).collect()
 }
 
 pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnapshot {
@@ -230,7 +241,7 @@ struct MetricsAccumulator {
 impl MetricsAccumulator {
     fn new() -> Self {
         Self {
-            inv: InventoryAccumulator::new(),
+            inv: InventoryAccumulator::default(),
             ..Default::default()
         }
     }
@@ -380,8 +391,46 @@ impl MetricsAccumulator {
 
     #[allow(clippy::cast_possible_truncation)]
     fn compute_averages(&self) -> Averages {
+        let per_element_ore_stats: BTreeMap<String, OreElementStats> = self
+            .inv
+            .ore_element_weighted_sums
+            .keys()
+            .map(|element| {
+                let avg = safe_div(
+                    self.inv.ore_element_weighted_sums[element],
+                    self.inv.ore_total_weight,
+                );
+                let min = if self.inv.ore_lot_count > 0 {
+                    self.inv
+                        .ore_element_min
+                        .get(element)
+                        .copied()
+                        .unwrap_or(0.0)
+                } else {
+                    0.0
+                };
+                let max = if self.inv.ore_lot_count > 0 {
+                    self.inv
+                        .ore_element_max
+                        .get(element)
+                        .copied()
+                        .unwrap_or(0.0)
+                } else {
+                    0.0
+                };
+                (
+                    element.clone(),
+                    OreElementStats {
+                        avg_fraction: avg,
+                        min_fraction: min,
+                        max_fraction: max,
+                    },
+                )
+            })
+            .collect();
+
         Averages {
-            avg_ore_fe_fraction: safe_div(self.inv.ore_fe_weighted_sum, self.inv.ore_total_weight),
+            per_element_ore_stats,
             avg_material_quality: safe_div(
                 self.inv.material_quality_weighted_sum,
                 self.inv.material_total_weight,
@@ -389,16 +438,6 @@ impl MetricsAccumulator {
             station_storage_used_pct: safe_div(self.station_storage_sum, self.station_count as f32),
             ship_cargo_used_pct: safe_div(self.ship_cargo_sum, self.ship_count as f32),
             avg_module_wear: safe_div(self.wear_sum, self.wear_count as f32),
-            min_ore_fe_fraction: if self.inv.ore_lot_count > 0 {
-                self.inv.min_ore_fe
-            } else {
-                0.0
-            },
-            max_ore_fe_fraction: if self.inv.ore_lot_count > 0 {
-                self.inv.max_ore_fe
-            } else {
-                0.0
-            },
             battery_charge_pct: safe_div(self.battery_stored_kwh, self.battery_capacity_kwh),
             station_avg_temp_mk: if self.thermal_module_count > 0 {
                 (self.thermal_temp_sum / u64::from(self.thermal_module_count)) as u32
@@ -441,13 +480,11 @@ impl MetricsAccumulator {
             total_ore_kg: self.inv.total_ore_kg,
             total_material_kg: self.inv.total_material_kg,
             total_slag_kg: self.inv.total_slag_kg,
-            total_iron_material_kg: self.inv.total_iron_material_kg,
+            per_element_material_kg: self.inv.per_element_material_kg,
             station_storage_used_pct: avgs.station_storage_used_pct,
             ship_cargo_used_pct: avgs.ship_cargo_used_pct,
-            avg_ore_fe_fraction: avgs.avg_ore_fe_fraction,
+            per_element_ore_stats: avgs.per_element_ore_stats,
             ore_lot_count: self.inv.ore_lot_count,
-            min_ore_fe_fraction: avgs.min_ore_fe_fraction,
-            max_ore_fe_fraction: avgs.max_ore_fe_fraction,
             avg_material_quality: avgs.avg_material_quality,
             refinery_active_count: self.refinery_active_count,
             refinery_starved_count: self.refinery_starved_count,
@@ -477,9 +514,6 @@ impl MetricsAccumulator {
             power_consumed_kw: self.power_consumed_kw,
             power_deficit_kw: self.power_deficit_kw,
             battery_charge_pct: avgs.battery_charge_pct,
-            total_h2o_kg: self.inv.total_h2o_kg,
-            total_lh2_kg: self.inv.total_lh2_kg,
-            total_lox_kg: self.inv.total_lox_kg,
             station_max_temp_mk: self.thermal_max_temp_mk,
             station_avg_temp_mk: avgs.station_avg_temp_mk,
             overheat_warning_count: self.overheat_warning_count,
@@ -499,26 +533,37 @@ fn safe_div(numerator: f32, denominator: f32) -> f32 {
 }
 
 struct Averages {
-    avg_ore_fe_fraction: f32,
+    per_element_ore_stats: BTreeMap<String, OreElementStats>,
     avg_material_quality: f32,
     station_storage_used_pct: f32,
     ship_cargo_used_pct: f32,
     avg_module_wear: f32,
-    min_ore_fe_fraction: f32,
-    max_ore_fe_fraction: f32,
     battery_charge_pct: f32,
     station_avg_temp_mk: u32,
     heat_wear_multiplier_avg: f32,
 }
 
-/// Write the CSV header row for metrics.
-pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result<()> {
-    writeln!(
+/// Write the CSV header row for metrics. `element_ids` defines the dynamic
+/// per-element columns (material_kg_X, ore_avg_X, ore_min_X, ore_max_X).
+pub fn write_metrics_header(
+    writer: &mut impl std::io::Write,
+    element_ids: &[String],
+) -> std::io::Result<()> {
+    write!(
         writer,
         "tick,metrics_version,\
-         total_ore_kg,total_material_kg,total_slag_kg,total_iron_material_kg,\
-         station_storage_used_pct,ship_cargo_used_pct,\
-         avg_ore_fe_fraction,ore_lot_count,min_ore_fe_fraction,max_ore_fe_fraction,\
+         total_ore_kg,total_material_kg,total_slag_kg"
+    )?;
+    for eid in element_ids {
+        write!(writer, ",material_kg_{eid}")?;
+    }
+    write!(writer, ",station_storage_used_pct,ship_cargo_used_pct")?;
+    for eid in element_ids {
+        write!(writer, ",ore_avg_{eid},ore_min_{eid},ore_max_{eid}")?;
+    }
+    writeln!(
+        writer,
+        ",ore_lot_count,\
          avg_material_quality,\
          refinery_active_count,refinery_starved_count,refinery_stalled_count,\
          assembler_active_count,assembler_stalled_count,\
@@ -528,7 +573,6 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
          avg_module_wear,max_module_wear,repair_kits_remaining,\
          balance,thruster_count,export_revenue_total,export_count,\
          power_generated_kw,power_consumed_kw,power_deficit_kw,battery_charge_pct,\
-         total_h2o_kg,total_lh2_kg,total_lox_kg,\
          station_max_temp_mk,station_avg_temp_mk,overheat_warning_count,overheat_critical_count,\
          heat_wear_multiplier_avg"
     )
@@ -538,22 +582,46 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
 pub fn append_metrics_row(
     writer: &mut impl std::io::Write,
     snapshot: &MetricsSnapshot,
+    element_ids: &[String],
 ) -> std::io::Result<()> {
-    writeln!(
+    write!(
         writer,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{}",
         snapshot.tick,
         snapshot.metrics_version,
         snapshot.total_ore_kg,
         snapshot.total_material_kg,
         snapshot.total_slag_kg,
-        snapshot.total_iron_material_kg,
-        snapshot.station_storage_used_pct,
-        snapshot.ship_cargo_used_pct,
-        snapshot.avg_ore_fe_fraction,
+    )?;
+    for eid in element_ids {
+        let val = snapshot
+            .per_element_material_kg
+            .get(eid)
+            .copied()
+            .unwrap_or(0.0);
+        write!(writer, ",{val}")?;
+    }
+    write!(
+        writer,
+        ",{},{}",
+        snapshot.station_storage_used_pct, snapshot.ship_cargo_used_pct,
+    )?;
+    for eid in element_ids {
+        let stats = snapshot
+            .per_element_ore_stats
+            .get(eid)
+            .cloned()
+            .unwrap_or_default();
+        write!(
+            writer,
+            ",{},{},{}",
+            stats.avg_fraction, stats.min_fraction, stats.max_fraction
+        )?;
+    }
+    writeln!(
+        writer,
+        ",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         snapshot.ore_lot_count,
-        snapshot.min_ore_fe_fraction,
-        snapshot.max_ore_fe_fraction,
         snapshot.avg_material_quality,
         snapshot.refinery_active_count,
         snapshot.refinery_starved_count,
@@ -583,23 +651,25 @@ pub fn append_metrics_row(
         snapshot.power_consumed_kw,
         snapshot.power_deficit_kw,
         snapshot.battery_charge_pct,
-        snapshot.total_h2o_kg,
-        snapshot.total_lh2_kg,
-        snapshot.total_lox_kg,
         snapshot.station_max_temp_mk,
         snapshot.station_avg_temp_mk,
         snapshot.overheat_warning_count,
         snapshot.overheat_critical_count,
         snapshot.heat_wear_multiplier_avg,
-    )
+    )?;
+    Ok(())
 }
 
 /// Write a collection of snapshots to a CSV file.
-pub fn write_metrics_csv(path: &str, snapshots: &[MetricsSnapshot]) -> std::io::Result<()> {
+pub fn write_metrics_csv(
+    path: &str,
+    snapshots: &[MetricsSnapshot],
+    element_ids: &[String],
+) -> std::io::Result<()> {
     let mut file = std::fs::File::create(path)?;
-    write_metrics_header(&mut file)?;
+    write_metrics_header(&mut file, element_ids)?;
     for snapshot in snapshots {
-        append_metrics_row(&mut file, snapshot)?;
+        append_metrics_row(&mut file, snapshot, element_ids)?;
     }
     Ok(())
 }
@@ -614,17 +684,20 @@ pub struct MetricsFileWriter {
     file_index: u32,
     rows_in_current_file: usize,
     writer: std::io::BufWriter<std::fs::File>,
+    element_ids: Vec<String>,
 }
 
 impl MetricsFileWriter {
     /// Create a new writer, opening the first CSV file with a header row.
-    pub fn new(run_dir: std::path::PathBuf) -> std::io::Result<Self> {
-        let (writer, _) = open_csv_file(&run_dir, 0)?;
+    /// `element_ids` defines the dynamic per-element columns.
+    pub fn new(run_dir: std::path::PathBuf, element_ids: Vec<String>) -> std::io::Result<Self> {
+        let (writer, _) = open_csv_file(&run_dir, 0, &element_ids)?;
         Ok(Self {
             run_dir,
             file_index: 0,
             rows_in_current_file: 0,
             writer,
+            element_ids,
         })
     }
 
@@ -633,11 +706,11 @@ impl MetricsFileWriter {
         if self.rows_in_current_file >= MAX_ROWS_PER_FILE {
             self.writer.flush()?;
             self.file_index += 1;
-            let (new_writer, _) = open_csv_file(&self.run_dir, self.file_index)?;
+            let (new_writer, _) = open_csv_file(&self.run_dir, self.file_index, &self.element_ids)?;
             self.writer = new_writer;
             self.rows_in_current_file = 0;
         }
-        append_metrics_row(&mut self.writer, snapshot)?;
+        append_metrics_row(&mut self.writer, snapshot, &self.element_ids)?;
         self.writer.flush()?;
         self.rows_in_current_file += 1;
         Ok(())
@@ -651,12 +724,13 @@ impl MetricsFileWriter {
 fn open_csv_file(
     run_dir: &std::path::Path,
     index: u32,
+    element_ids: &[String],
 ) -> std::io::Result<(std::io::BufWriter<std::fs::File>, std::path::PathBuf)> {
     let name = format!("metrics_{index:03}.csv");
     let path = run_dir.join(&name);
     let file = std::fs::File::create(&path)?;
     let mut writer = std::io::BufWriter::new(file);
-    write_metrics_header(&mut writer)?;
+    write_metrics_header(&mut writer, element_ids)?;
     Ok((writer, path))
 }
 
@@ -753,13 +827,18 @@ mod tests {
         assert_eq!(snapshot.total_ore_kg, 0.0);
         assert_eq!(snapshot.total_material_kg, 0.0);
         assert_eq!(snapshot.total_slag_kg, 0.0);
-        assert_eq!(snapshot.total_iron_material_kg, 0.0);
+        assert_eq!(
+            snapshot
+                .per_element_material_kg
+                .get("Fe")
+                .copied()
+                .unwrap_or(0.0),
+            0.0
+        );
         assert_eq!(snapshot.station_storage_used_pct, 0.0);
         assert_eq!(snapshot.ship_cargo_used_pct, 0.0);
-        assert_eq!(snapshot.avg_ore_fe_fraction, 0.0);
+        assert!(snapshot.per_element_ore_stats.is_empty());
         assert_eq!(snapshot.ore_lot_count, 0);
-        assert_eq!(snapshot.min_ore_fe_fraction, 0.0);
-        assert_eq!(snapshot.max_ore_fe_fraction, 0.0);
         assert_eq!(snapshot.avg_material_quality, 0.0);
         assert_eq!(snapshot.refinery_active_count, 0);
         assert_eq!(snapshot.refinery_starved_count, 0);
@@ -810,9 +889,10 @@ mod tests {
 
         assert!((snapshot.total_ore_kg - 1000.0).abs() < 1e-3);
         assert_eq!(snapshot.ore_lot_count, 1);
-        assert!((snapshot.avg_ore_fe_fraction - 0.7).abs() < 1e-5);
-        assert!((snapshot.min_ore_fe_fraction - 0.7).abs() < 1e-5);
-        assert!((snapshot.max_ore_fe_fraction - 0.7).abs() < 1e-5);
+        let fe_stats = &snapshot.per_element_ore_stats["Fe"];
+        assert!((fe_stats.avg_fraction - 0.7).abs() < 1e-5);
+        assert!((fe_stats.min_fraction - 0.7).abs() < 1e-5);
+        assert!((fe_stats.max_fraction - 0.7).abs() < 1e-5);
     }
 
     #[test]
@@ -840,7 +920,7 @@ mod tests {
         let snapshot = compute_metrics(&state, &content);
 
         assert!((snapshot.total_material_kg - 500.0).abs() < 1e-3);
-        assert!((snapshot.total_iron_material_kg - 500.0).abs() < 1e-3);
+        assert!((snapshot.per_element_material_kg["Fe"] - 500.0).abs() < 1e-3);
         assert!((snapshot.total_slag_kg - 200.0).abs() < 1e-3);
         assert!((snapshot.avg_material_quality - 0.8).abs() < 1e-5);
     }
@@ -1051,8 +1131,8 @@ mod tests {
         assert_eq!(snapshot_a.total_ore_kg, snapshot_b.total_ore_kg);
         assert_eq!(snapshot_a.total_material_kg, snapshot_b.total_material_kg);
         assert_eq!(
-            snapshot_a.avg_ore_fe_fraction,
-            snapshot_b.avg_ore_fe_fraction
+            snapshot_a.per_element_ore_stats,
+            snapshot_b.per_element_ore_stats
         );
         assert_eq!(
             snapshot_a.avg_material_quality,

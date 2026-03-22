@@ -700,7 +700,8 @@ impl RunSetupBuilder {
                 self.metrics_every,
                 self.runner_args,
             )?;
-            let writer = MetricsFileWriter::new(dir.clone())
+            let element_ids = sim_core::content_element_ids(&self.content);
+            let writer = MetricsFileWriter::new(dir.clone(), element_ids)
                 .with_context(|| format!("opening metrics CSV in {}", dir.display()))?;
             (Some(dir), Some(writer))
         } else {

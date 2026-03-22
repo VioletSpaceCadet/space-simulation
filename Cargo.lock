@@ -1025,6 +1025,7 @@ dependencies = [
  "rand",
  "rand_chacha",
  "sim_core",
+ "sim_world",
 ]
 
 [[package]]
