@@ -53,7 +53,7 @@ For each ticket in execution order, run this autonomous cycle:
 2. **Watch CI**: `gh pr checks <PR_NUMBER> --watch`. Fix failures, push, watch again.
 3. **Dispatch review agents (in parallel):**
    - **All PRs:** Dispatch `pr-reviewer` agent (subagent_type: "pr-reviewer") for correctness, tests, error handling (checklist items 1-10).
-   - **Non-trivial PRs** (200+ lines, multi-file, new systems): Also dispatch `pattern-recognition-specialist` agent (subagent_type: `compound-engineering:review:pattern-recognition-specialist`) for scalability, duplication, hardcoded content (checklist items 11-14).
+   - **Non-trivial PRs** (200+ lines or 3+ files changed): Also dispatch `ce:review` agent (subagent_type: `compound-engineering:ce-review`) for exhaustive multi-agent analysis using ultra-thinking and worktrees, plus `pattern-recognition-specialist` agent (subagent_type: `compound-engineering:review:pattern-recognition-specialist`) for scalability, duplication, hardcoded content (checklist items 11-14).
    - **UI tickets:** Also dispatch `design-implementation-reviewer`.
 4. **Fix review findings** — fix should-fix items from all reviewers. Commit, push, re-run CI. Do not ask for confirmation.
 5. **Re-review if needed** — if reviewers found Important or Critical issues, dispatch them again after fixes. Repeat until clean.
