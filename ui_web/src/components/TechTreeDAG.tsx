@@ -251,7 +251,7 @@ function NodeCard({ layoutNode }: NodeCardProps) {
               key={domain}
               domain={domain}
               required={required}
-              evidence={node.evidence[domain] ?? 0}
+              evidence={node.state === 'unlocked' ? required : (node.evidence[domain] ?? 0)}
             />
           ))}
         </>
