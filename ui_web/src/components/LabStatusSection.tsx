@@ -47,7 +47,7 @@ export function LabStatusSection({ labs, techNames }: LabStatusSectionProps) {
   }
 
   return (
-    <div className="flex flex-col gap-0.5 px-2 py-1.5">
+    <div className="flex flex-col gap-0.5 px-2 py-1.5 max-w-lg">
       {labs.map((lab) => {
         const status = getLabStatus(lab);
         const techName = lab.assigned_tech ? (techNames[lab.assigned_tech] ?? lab.assigned_tech) : null;
