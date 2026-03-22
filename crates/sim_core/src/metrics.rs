@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-const METRICS_VERSION: u32 = 7;
+const METRICS_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
@@ -81,6 +81,11 @@ pub struct MetricsSnapshot {
     pub power_deficit_kw: f32,
     pub battery_charge_pct: f32,
 
+    // Propellant
+    pub total_h2o_kg: f32,
+    pub total_lh2_kg: f32,
+    pub total_lox_kg: f32,
+
     // Thermal
     pub station_max_temp_mk: u32,
     pub station_avg_temp_mk: u32,
@@ -102,6 +107,9 @@ struct InventoryAccumulator {
     max_ore_fe: f32,
     material_quality_weighted_sum: f32,
     material_total_weight: f32,
+    total_h2o_kg: f32,
+    total_lh2_kg: f32,
+    total_lox_kg: f32,
 }
 
 impl InventoryAccumulator {
@@ -140,6 +148,12 @@ impl InventoryAccumulator {
                     self.total_material_kg += kg;
                     if element == crate::ELEMENT_FE {
                         self.total_iron_material_kg += kg;
+                    }
+                    match element.as_str() {
+                        "H2O" => self.total_h2o_kg += kg,
+                        "LH2" => self.total_lh2_kg += kg,
+                        "LOX" => self.total_lox_kg += kg,
+                        _ => {}
                     }
                     self.material_quality_weighted_sum += quality * kg;
                     self.material_total_weight += kg;
@@ -464,6 +478,9 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
         power_consumed_kw,
         power_deficit_kw,
         battery_charge_pct,
+        total_h2o_kg: acc.total_h2o_kg,
+        total_lh2_kg: acc.total_lh2_kg,
+        total_lox_kg: acc.total_lox_kg,
         station_max_temp_mk: thermal_max_temp_mk,
         station_avg_temp_mk,
         overheat_warning_count,
@@ -489,6 +506,7 @@ pub fn write_metrics_header(writer: &mut impl std::io::Write) -> std::io::Result
          avg_module_wear,max_module_wear,repair_kits_remaining,\
          balance,thruster_count,export_revenue_total,export_count,\
          power_generated_kw,power_consumed_kw,power_deficit_kw,battery_charge_pct,\
+         total_h2o_kg,total_lh2_kg,total_lox_kg,\
          station_max_temp_mk,station_avg_temp_mk,overheat_warning_count,overheat_critical_count,\
          heat_wear_multiplier_avg"
     )
@@ -501,7 +519,7 @@ pub fn append_metrics_row(
 ) -> std::io::Result<()> {
     writeln!(
         writer,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
         snapshot.tick,
         snapshot.metrics_version,
         snapshot.total_ore_kg,
@@ -543,6 +561,9 @@ pub fn append_metrics_row(
         snapshot.power_consumed_kw,
         snapshot.power_deficit_kw,
         snapshot.battery_charge_pct,
+        snapshot.total_h2o_kg,
+        snapshot.total_lh2_kg,
+        snapshot.total_lox_kg,
         snapshot.station_max_temp_mk,
         snapshot.station_avg_temp_mk,
         snapshot.overheat_warning_count,
