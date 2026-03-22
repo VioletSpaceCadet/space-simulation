@@ -70,5 +70,12 @@
     "fleet-sizing",
     "slag-management",
     "transit-time"
-  ]
+  ],
+  "final_score": 0.42,
+  "collapse_tick": null,
+  "bottleneck_timeline": [
+    { "tick": 2880, "type": "ore_starvation", "severity": "high" },
+    { "tick": 3500, "type": "storage_saturation", "severity": "medium" }
+  ],
+  "autopilot_config_hash": "a3f8c1d2e4b5"
 }
