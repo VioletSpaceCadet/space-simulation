@@ -6,6 +6,8 @@ import * as fsPromises from "node:fs/promises";
 import * as path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import * as os from "node:os";
+import * as crypto from "node:crypto";
+import type { RunJournal } from "./types.js";
 
 const DAEMON_URL = process.env["DAEMON_URL"] ?? "http://localhost:3001";
 const CONTENT_DIR = process.env["CONTENT_DIR"] ?? path.resolve(
@@ -396,6 +398,121 @@ server.tool(
     }
     const body = await response.text();
     return { content: [{ type: "text" as const, text: body }] };
+  },
+);
+
+// ---------- Tool 10: save_run_journal ----------
+
+const ObservationSchema = z.object({
+  metric: z.string().describe("Metric name matching MetricsSnapshot fields"),
+  value: z.number().describe("Observed value"),
+  trend: z.enum(["rising", "falling", "stable", "volatile"]).describe("Direction of change"),
+  interpretation: z.string().describe("What this observation means"),
+});
+
+const BottleneckSchema = z.object({
+  type: z.string().describe("Bottleneck category (e.g. ore_starvation)"),
+  severity: z.enum(["low", "medium", "high", "critical"]).describe("Impact severity"),
+  tick_range: z.tuple([z.number().int(), z.number().int()]).describe("[start_tick, end_tick]"),
+  description: z.string().describe("Human-readable description"),
+});
+
+const JournalAlertSchema = z.object({
+  alert_id: z.string().describe("Alert rule ID (e.g. ORE_STARVATION)"),
+  severity: z.string().describe("Alert severity level"),
+  first_seen_tick: z.number().int().describe("Tick when alert first fired"),
+  resolved_tick: z.number().int().nullable().default(null).describe("Tick when alert cleared, or null"),
+});
+
+const ParameterChangeSchema = z.object({
+  parameter_path: z.string().describe("Dotted path (e.g. constants.ticks_per_au)"),
+  current_value: z.string().describe("Value before change"),
+  proposed_value: z.string().describe("Value after change"),
+  rationale: z.string().describe("Why the change was made"),
+});
+
+const BottleneckEventSchema = z.object({
+  tick: z.number().int().describe("Tick when bottleneck state changed"),
+  type: z.string().describe("Bottleneck category"),
+  severity: z.enum(["low", "medium", "high", "critical"]).describe("Severity at this tick"),
+});
+
+server.tool(
+  "save_run_journal",
+  "Save a run journal entry after a simulation analysis session. Generates UUID and timestamp automatically.",
+  {
+    seed: z.number().int().describe("Simulation RNG seed used"),
+    tick_range: z.tuple([z.number().int(), z.number().int()]).describe("[start_tick, end_tick] observed"),
+    ticks_per_sec: z.number().optional().describe("Simulation speed used"),
+    observations: z.array(ObservationSchema).describe("Structured observations"),
+    bottlenecks: z.array(BottleneckSchema).describe("Bottlenecks detected"),
+    alerts_seen: z.array(JournalAlertSchema).describe("Alerts that fired"),
+    parameter_changes: z.array(ParameterChangeSchema)
+      .describe("Parameter changes proposed or applied"),
+    strategy_notes: z.array(z.string()).describe("Free-form learnings"),
+    tags: z.array(z.string()).describe("Categorization tags"),
+    final_score: z.number().optional().describe("Composite metric at run end"),
+    collapse_tick: z.number().int().nullable().optional().describe("Tick of collapse, or null"),
+    bottleneck_timeline: z.array(BottleneckEventSchema).optional()
+      .describe("Time-series bottleneck state changes"),
+    autopilot_config_hash: z.string().optional().describe("Hash of autopilot config"),
+    parquet_path: z.string().optional().describe("Path to associated Parquet file"),
+  },
+  async (params) => {
+    try {
+      const journalsDir = path.join(CONTENT_DIR, "knowledge", "journals");
+      await fsPromises.mkdir(journalsDir, { recursive: true });
+
+      const id = crypto.randomUUID();
+      const timestamp = new Date().toISOString();
+      const fileTimestamp = timestamp.replace(/:/g, "-").replace(/\.\d+Z$/, "Z");
+      const idFragment = id.split("-")[0];
+      const filename = `${fileTimestamp}_${params.seed}_${idFragment}.json`;
+      const filePath = path.join(journalsDir, filename);
+
+      const journal: RunJournal = {
+        id,
+        timestamp,
+        seed: params.seed,
+        tick_range: params.tick_range,
+        ...(params.ticks_per_sec !== undefined && { ticks_per_sec: params.ticks_per_sec }),
+        observations: params.observations,
+        bottlenecks: params.bottlenecks,
+        alerts_seen: params.alerts_seen,
+        parameter_changes: params.parameter_changes,
+        strategy_notes: params.strategy_notes,
+        tags: params.tags,
+        ...(params.final_score !== undefined && { final_score: params.final_score }),
+        ...(params.collapse_tick !== undefined && { collapse_tick: params.collapse_tick }),
+        ...(params.bottleneck_timeline !== undefined && { bottleneck_timeline: params.bottleneck_timeline }),
+        ...(params.autopilot_config_hash !== undefined && { autopilot_config_hash: params.autopilot_config_hash }),
+        ...(params.parquet_path !== undefined && { parquet_path: params.parquet_path }),
+      };
+
+      await fsPromises.writeFile(filePath, JSON.stringify(journal, null, 2) + "\n");
+
+      const relativePath = path.relative(
+        path.resolve(CONTENT_DIR, ".."),
+        filePath,
+      );
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "saved",
+          id,
+          path: relativePath,
+          timestamp,
+        }) }],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to save journal: ${message}`,
+        }) }],
+      };
+    }
   },
 );
 
