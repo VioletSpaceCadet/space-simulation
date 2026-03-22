@@ -16,7 +16,7 @@ import { EventsFeed } from './components/EventsFeed';
 import { FleetPanel } from './components/FleetPanel';
 import { LayoutRenderer } from './components/LayoutRenderer';
 import { ResearchPanel } from './components/ResearchPanel';
-import { SolarSystemMap } from './components/SolarSystemMap';
+import { SolarSystemMapCanvas } from './components/SolarSystemMapCanvas';
 import { StatusBar } from './components/StatusBar';
 import { useAnimatedTick } from './hooks/useAnimatedTick';
 import { useLayoutState } from './hooks/useLayoutState';
@@ -113,7 +113,7 @@ export default function App() {
       const content = (() => {
         switch (id) {
           case 'map':
-            return <SolarSystemMap snapshot={snapshot} currentTick={displayTick} />;
+            return <SolarSystemMapCanvas snapshot={snapshot} currentTick={displayTick} />;
           case 'events':
             return <EventsFeed events={events} />;
           case 'asteroids':
