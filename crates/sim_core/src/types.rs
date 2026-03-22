@@ -125,6 +125,48 @@ pub enum AlertSeverity {
 }
 
 // ---------------------------------------------------------------------------
+// Content-driven alert rules
+// ---------------------------------------------------------------------------
+
+/// A single alert rule definition loaded from `content/alerts.json`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlertRuleDef {
+    pub id: String,
+    pub severity: AlertSeverity,
+    pub message: String,
+    pub suggested_action: String,
+    pub rule: AlertRuleType,
+}
+
+/// Parameterized rule evaluator type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum AlertRuleType {
+    /// Fires when a metric field on the latest snapshot exceeds a threshold.
+    #[serde(rename = "threshold_latest")]
+    ThresholdLatest {
+        metric: String,
+        condition: String,
+        threshold: f64,
+    },
+    /// Fires when a per-element material value exceeds a threshold.
+    #[serde(rename = "threshold_latest_element")]
+    ThresholdLatestElement {
+        element: String,
+        condition: String,
+        threshold: f64,
+        #[serde(default)]
+        min_value: Option<f64>,
+    },
+    /// Fires when a metric field is nonzero for N consecutive samples.
+    #[serde(rename = "consecutive")]
+    Consecutive { metric: String, min_samples: u32 },
+    /// Complex rules kept as named Rust implementations.
+    #[serde(rename = "builtin")]
+    Builtin { name: String },
+}
+
+// ---------------------------------------------------------------------------
 // State types
 // ---------------------------------------------------------------------------
 
@@ -878,6 +920,9 @@ pub struct GameContent {
     pub component_defs: Vec<ComponentDef>,
     pub pricing: PricingTable,
     pub constants: Constants,
+    /// Alert rules loaded from `content/alerts.json`. Empty if file is missing.
+    #[serde(default)]
+    pub alert_rules: Vec<AlertRuleDef>,
     /// Pre-computed element id → density (kg/m³) lookup. Populated by `init_caches()`.
     #[serde(skip)]
     pub density_map: HashMap<String, f32>,

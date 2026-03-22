@@ -184,6 +184,7 @@ pub fn base_content() -> GameContent {
             station_power_available_per_tick: 0.0,
             research_roll_interval_ticks: 0,
         },
+        alert_rules: Vec::new(),
         density_map: HashMap::new(),
     };
     content.constants.derive_tick_values();
@@ -299,6 +300,7 @@ pub fn minimal_content() -> GameContent {
             station_power_available_per_tick: 0.0,
             research_roll_interval_ticks: 0,
         },
+        alert_rules: Vec::new(),
         density_map: HashMap::new(),
     };
     content.constants.derive_tick_values();

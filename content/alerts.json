@@ -1,0 +1,86 @@
+[
+  {
+    "id": "ORE_STARVATION",
+    "severity": "Warning",
+    "message": "Refineries starved — insufficient ore for 3+ samples",
+    "suggested_action": "Assign more ships to mining or lower refinery threshold",
+    "rule": { "type": "consecutive", "metric": "refinery_starved_count", "min_samples": 3 }
+  },
+  {
+    "id": "STORAGE_SATURATION",
+    "severity": "Warning",
+    "message": "Station storage above 95% capacity",
+    "suggested_action": "Jettison slag, expand storage, or slow mining",
+    "rule": { "type": "threshold_latest", "metric": "station_storage_used_pct", "condition": "gt", "threshold": 0.95 }
+  },
+  {
+    "id": "SLAG_BACKPRESSURE",
+    "severity": "Warning",
+    "message": "Slag accumulating while material production is flat",
+    "suggested_action": "Manage slag output — jettison or reduce refinery throughput",
+    "rule": { "type": "builtin", "name": "slag_backpressure" }
+  },
+  {
+    "id": "SHIP_IDLE_WITH_WORK",
+    "severity": "Warning",
+    "message": "Ships sitting idle while other alerts are active",
+    "suggested_action": "Assign idle ships to address active bottlenecks",
+    "rule": { "type": "builtin", "name": "ship_idle_with_work" }
+  },
+  {
+    "id": "THROUGHPUT_DROP",
+    "severity": "Warning",
+    "message": "Material throughput dropped significantly",
+    "suggested_action": "Check for starvation, stalled ships, or depleted asteroids",
+    "rule": { "type": "builtin", "name": "throughput_drop" }
+  },
+  {
+    "id": "EXPLORATION_STALL",
+    "severity": "Warning",
+    "message": "No new asteroids despite available scan sites and idle ships",
+    "suggested_action": "Assign idle ships to survey scan sites",
+    "rule": { "type": "builtin", "name": "exploration_stall" }
+  },
+  {
+    "id": "MODULE_WEAR_HIGH",
+    "severity": "Warning",
+    "message": "Module wear exceeding 80% — approaching auto-disable threshold",
+    "suggested_action": "Run maintenance with repair kits or replace worn modules",
+    "rule": { "type": "threshold_latest", "metric": "max_module_wear", "condition": "gt", "threshold": 0.8 }
+  },
+  {
+    "id": "REFINERY_STALLED",
+    "severity": "Warning",
+    "message": "Refineries stalled — insufficient storage capacity for 2+ samples",
+    "suggested_action": "Free station storage (jettison slag) or expand cargo capacity",
+    "rule": { "type": "consecutive", "metric": "refinery_stalled_count", "min_samples": 2 }
+  },
+  {
+    "id": "RESEARCH_STALLED",
+    "severity": "Warning",
+    "message": "Research evidence not accumulating — no scan data flowing",
+    "suggested_action": "Need more survey and deep scan activity",
+    "rule": { "type": "builtin", "name": "research_stalled" }
+  },
+  {
+    "id": "OVERHEAT_WARNING",
+    "severity": "Warning",
+    "message": "Modules in overheat warning zone for 5+ consecutive samples",
+    "suggested_action": "Add radiators, reduce processing rate, or shut down overheating modules",
+    "rule": { "type": "builtin", "name": "overheat_warning" }
+  },
+  {
+    "id": "OVERHEAT_CRITICAL",
+    "severity": "Critical",
+    "message": "Modules in critical overheat zone — auto-disabled and wearing rapidly",
+    "suggested_action": "Immediately reduce thermal load or add cooling capacity",
+    "rule": { "type": "consecutive", "metric": "overheat_critical_count", "min_samples": 3 }
+  },
+  {
+    "id": "PROPELLANT_LOW",
+    "severity": "Warning",
+    "message": "LH2 propellant reserves critically low",
+    "suggested_action": "Increase electrolysis output or import LH2",
+    "rule": { "type": "threshold_latest_element", "element": "LH2", "condition": "lt", "threshold": 500.0, "min_value": 0.0 }
+  }
+]
