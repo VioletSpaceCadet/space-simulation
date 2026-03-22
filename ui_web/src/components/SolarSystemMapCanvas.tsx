@@ -280,15 +280,15 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
         }
       }
 
-      // Asteroids — visible at region+ zoom (0.25+)
-      if (smoothStep(zoom, 0.2, 0.3) > 0.01) {
+      // Asteroids — match renderer threshold (fadeIn=0.25, fullIn=0.7)
+      if (smoothStep(zoom, 0.25, 0.7) > 0.01) {
         for (const asteroid of Object.values(snap.asteroids)) {
           check('asteroid', asteroid.id, entityAbsolute(asteroid.position, ba));
         }
       }
 
-      // Scan sites — visible at region+ zoom (0.3+)
-      if (smoothStep(zoom, 0.25, 0.35) > 0.01) {
+      // Scan sites — match renderer threshold (fadeIn=0.3, fullIn=0.8)
+      if (smoothStep(zoom, 0.3, 0.8) > 0.01) {
         for (const site of snap.scan_sites) {
           check('scan-site', site.id, entityAbsolute(site.position, ba));
         }

@@ -47,24 +47,6 @@ export const INITIAL_CAMERA: Camera = { x: 0, y: 0, zoom: 0.5 };
 
 // --- LOD system ---
 
-/** LOD tier names ordered from most zoomed-out to most zoomed-in. */
-export type LodTier = 'system' | 'region' | 'local';
-
-/** LOD tier zoom thresholds. */
-export const LOD_THRESHOLDS = {
-  /** Below this: SYSTEM tier. */
-  region: 0.15,
-  /** Above this: LOCAL tier. Between region and local: REGION tier. */
-  local: 0.8,
-} as const;
-
-/** Compute the current LOD tier from camera zoom level. */
-export function getLodTier(zoom: number): LodTier {
-  if (zoom < LOD_THRESHOLDS.region) { return 'system'; }
-  if (zoom < LOD_THRESHOLDS.local) { return 'region'; }
-  return 'local';
-}
-
 /**
  * Hermite smoothstep: returns 0 when zoom <= fadeIn, 1 when zoom >= fullIn,
  * smooth S-curve between. Used for LOD opacity transitions.

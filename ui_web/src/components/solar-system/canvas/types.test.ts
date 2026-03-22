@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { auUmToWorld, getLodTier, smoothStep } from './types';
+import { auUmToWorld, smoothStep } from './types';
 
 describe('auUmToWorld', () => {
   it('converts 1 AU (1_000_000 uAU) to 200 world units', () => {
@@ -9,24 +9,6 @@ describe('auUmToWorld', () => {
 
   it('converts 0 to 0', () => {
     expect(auUmToWorld(0)).toBe(0);
-  });
-});
-
-describe('getLodTier', () => {
-  it('returns system for low zoom', () => {
-    expect(getLodTier(0.05)).toBe('system');
-    expect(getLodTier(0.14)).toBe('system');
-  });
-
-  it('returns region for medium zoom', () => {
-    expect(getLodTier(0.15)).toBe('region');
-    expect(getLodTier(0.5)).toBe('region');
-    expect(getLodTier(0.79)).toBe('region');
-  });
-
-  it('returns local for high zoom', () => {
-    expect(getLodTier(0.8)).toBe('local');
-    expect(getLodTier(5.0)).toBe('local');
   });
 });
 
