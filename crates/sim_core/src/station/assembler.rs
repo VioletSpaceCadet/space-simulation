@@ -51,7 +51,17 @@ fn execute(
     rng: &mut impl rand::Rng,
     events: &mut Vec<EventEnvelope>,
 ) -> super::RunOutcome {
-    let Some(recipe) = assembler_def.recipes.first() else {
+    let recipe_idx = {
+        let Some(station) = state.stations.get(&ctx.station_id) else {
+            return super::RunOutcome::Skipped { reset_timer: true };
+        };
+        match &station.modules[ctx.module_idx].kind_state {
+            crate::ModuleKindState::Assembler(asmb) => asmb.selected_recipe_idx,
+            _ => return super::RunOutcome::Skipped { reset_timer: true },
+        }
+    };
+
+    let Some(recipe) = assembler_def.recipes.get(recipe_idx) else {
         return super::RunOutcome::Skipped { reset_timer: true };
     };
 
@@ -503,6 +513,7 @@ mod assembler_component_tests {
                             stalled: false,
                             capped: false,
                             cap_override: HashMap::new(),
+                            selected_recipe_idx: 0,
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
@@ -804,6 +815,7 @@ mod assembler_component_tests {
                             stalled: false,
                             capped: false,
                             cap_override: HashMap::new(),
+                            selected_recipe_idx: 0,
                         }),
                         wear: WearState::default(),
                         power_stalled: false,

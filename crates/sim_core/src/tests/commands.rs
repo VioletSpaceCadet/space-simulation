@@ -223,3 +223,115 @@ fn test_install_module_no_thermal_state_for_non_thermal_modules() {
         "non-thermal module should have thermal: None"
     );
 }
+
+#[test]
+fn test_select_recipe_updates_processor_state() {
+    let content = test_content();
+    let mut state = test_state(&content);
+    let mut rng = make_rng();
+    let station_id = StationId("station_earth_orbit".to_string());
+    let module_id = ModuleInstanceId("module_inst_test".to_string());
+
+    // Add a processor module directly to the station.
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: module_id.clone(),
+        def_id: "module_basic_iron_refinery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+            selected_recipe_idx: 0,
+        }),
+        wear: WearState::default(),
+        thermal: None,
+        power_stalled: false,
+    });
+
+    // SelectRecipe with idx 0 (valid).
+    let select_cmd = CommandEnvelope {
+        id: CommandId("cmd_select".to_string()),
+        issued_by: PrincipalId("principal_autopilot".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::SelectRecipe {
+            station_id: station_id.clone(),
+            module_id: module_id.clone(),
+            recipe_idx: 0,
+        },
+    };
+    tick(
+        &mut state,
+        &[select_cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+    );
+
+    let station = state.stations.get(&station_id).unwrap();
+    let module = station.modules.iter().find(|m| m.id == module_id).unwrap();
+    if let ModuleKindState::Processor(ps) = &module.kind_state {
+        assert_eq!(ps.selected_recipe_idx, 0);
+    } else {
+        panic!("expected Processor state");
+    }
+}
+
+#[test]
+fn test_select_recipe_out_of_bounds_rejected() {
+    let content = test_content();
+    let mut state = test_state(&content);
+    let mut rng = make_rng();
+    let station_id = StationId("station_earth_orbit".to_string());
+    let module_id = ModuleInstanceId("module_inst_test".to_string());
+
+    // Add a processor module directly.
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: module_id.clone(),
+        def_id: "module_basic_iron_refinery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+            selected_recipe_idx: 0,
+        }),
+        wear: WearState::default(),
+        thermal: None,
+        power_stalled: false,
+    });
+
+    // SelectRecipe with out-of-bounds idx (module has 1 recipe, idx 99 is invalid).
+    let select_cmd = CommandEnvelope {
+        id: CommandId("cmd_select".to_string()),
+        issued_by: PrincipalId("principal_autopilot".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::SelectRecipe {
+            station_id: station_id.clone(),
+            module_id: module_id.clone(),
+            recipe_idx: 99,
+        },
+    };
+    tick(
+        &mut state,
+        &[select_cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+    );
+
+    // idx should still be 0 (unchanged — command was rejected).
+    let station = state.stations.get(&station_id).unwrap();
+    let module = station.modules.iter().find(|m| m.id == module_id).unwrap();
+    if let ModuleKindState::Processor(ps) = &module.kind_state {
+        assert_eq!(
+            ps.selected_recipe_idx, 0,
+            "out-of-bounds recipe_idx should be rejected"
+        );
+    } else {
+        panic!("expected Processor state");
+    }
+}

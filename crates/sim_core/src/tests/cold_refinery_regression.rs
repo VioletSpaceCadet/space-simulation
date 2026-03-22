@@ -470,6 +470,7 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
             threshold_kg: 500.0,
             ticks_since_last_run: 100,
             stalled: false,
+            selected_recipe_idx: 0,
         }),
         wear: WearState::default(),
         thermal: Some(ThermalState {

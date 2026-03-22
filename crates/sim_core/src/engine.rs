@@ -180,6 +180,13 @@ fn apply_commands(
             Command::JettisonSlag { station_id } => {
                 commands::handle_jettison_slag(state, station_id, current_tick, events);
             }
+            Command::SelectRecipe {
+                station_id,
+                module_id,
+                recipe_idx,
+            } => {
+                commands::handle_select_recipe(state, content, station_id, module_id, *recipe_idx);
+            }
         }
     }
 

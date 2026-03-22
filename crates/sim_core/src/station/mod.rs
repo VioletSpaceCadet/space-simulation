@@ -808,6 +808,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 3,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -830,6 +831,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 0,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -846,6 +848,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 0,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -886,6 +889,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 2, // interval is 5, after increment = 3
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -902,6 +906,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 4, // after increment = 5 = interval
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -918,6 +923,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 4,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -941,6 +947,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 5,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -973,6 +980,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 5,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -1003,6 +1011,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 5,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -1035,6 +1044,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 5,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -1067,6 +1077,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 5,
                 stalled: true,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -1095,6 +1106,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 5,
                 stalled: true,
+                selected_recipe_idx: 0,
             }),
         );
         let station_id = StationId("station_test".to_string());
@@ -1127,6 +1139,7 @@ mod framework_tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 5,
                 stalled: false,
+                selected_recipe_idx: 0,
             }),
         );
         // Give the module a thermal state in the Warning zone.
