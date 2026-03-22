@@ -48,17 +48,18 @@ fn execute(
     };
 
     // Read processor state for threshold and selected recipe
-    let (threshold_kg, recipe_idx) = {
+    let threshold_kg = {
         let Some(station) = state.stations.get(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: false };
         };
         match &station.modules[ctx.module_idx].kind_state {
-            ModuleKindState::Processor(ps) => (ps.threshold_kg, ps.selected_recipe_idx),
+            ModuleKindState::Processor(ps) => ps.threshold_kg,
             _ => return super::RunOutcome::Skipped { reset_timer: false },
         }
     };
 
-    let Some(recipe) = processor_def.recipes.get(recipe_idx) else {
+    let recipe = resolve_recipe(state, ctx, processor_def, content);
+    let Some(recipe) = recipe else {
         return super::RunOutcome::Skipped { reset_timer: false };
     };
 
@@ -168,16 +169,7 @@ fn resolve_processor_run(
         return;
     };
 
-    let recipe_idx = state
-        .stations
-        .get(&ctx.station_id)
-        .and_then(|s| match &s.modules[ctx.module_idx].kind_state {
-            ModuleKindState::Processor(ps) => Some(ps.selected_recipe_idx),
-            _ => None,
-        })
-        .unwrap_or(0);
-
-    let Some(recipe) = processor_def.recipes.get(recipe_idx) else {
+    let Some(recipe) = resolve_recipe(state, ctx, processor_def, content) else {
         return;
     };
 
@@ -369,6 +361,25 @@ fn resolve_processor_run(
             }
         }
     }
+}
+
+/// Resolve the active recipe for a processor module.
+/// Uses `selected_recipe` from state if set, otherwise falls back to the first recipe in the
+/// module's recipe list. Returns `None` if no valid recipe can be resolved.
+fn resolve_recipe<'a>(
+    state: &GameState,
+    ctx: &super::ModuleTickContext,
+    processor_def: &crate::ProcessorDef,
+    content: &'a GameContent,
+) -> Option<&'a crate::RecipeDef> {
+    let selected = state.stations.get(&ctx.station_id).and_then(|s| {
+        match &s.modules[ctx.module_idx].kind_state {
+            crate::ModuleKindState::Processor(ps) => ps.selected_recipe.as_ref(),
+            _ => None,
+        }
+    });
+    let recipe_id = selected.or_else(|| processor_def.recipes.first());
+    recipe_id.and_then(|id| content.recipes.get(id))
 }
 
 /// FIFO-consume up to `rate_kg` from matching inventory items (Ore or Material).
@@ -563,14 +574,39 @@ mod tests {
 
     use crate::{
         Counters, InputFilter, MetaState, ModuleDef, ModuleInstanceId, ModuleState, PowerState,
-        ProcessorDef, ProcessorState, RecipeInput, RecipeThermalReq, StationState, ThermalDef,
-        ThermalState, WearState,
+        ProcessorDef, ProcessorState, RecipeId, RecipeInput, RecipeThermalReq, StationState,
+        ThermalDef, ThermalState, WearState,
     };
     use std::collections::HashSet;
 
     /// Build content with a processor that has a thermal recipe.
     fn thermal_processor_content() -> GameContent {
         let mut content = crate::test_fixtures::base_content();
+        let smelt_recipe = crate::RecipeDef {
+            id: RecipeId("smelt_fe".to_string()),
+            inputs: vec![RecipeInput {
+                filter: InputFilter::ItemKind(crate::ItemKind::Ore),
+                amount: InputAmount::Kg(100.0),
+            }],
+            outputs: vec![OutputSpec::Material {
+                element: "Fe".to_string(),
+                yield_formula: YieldFormula::ElementFraction {
+                    element: "Fe".to_string(),
+                },
+                quality_formula: QualityFormula::Fixed(0.9),
+            }],
+            efficiency: 1.0,
+            thermal_req: Some(RecipeThermalReq {
+                min_temp_mk: 1_000_000,    // 1000K
+                optimal_min_mk: 1_500_000, // 1500K
+                optimal_max_mk: 2_000_000, // 2000K
+                max_temp_mk: 2_500_000,    // 2500K
+                heat_per_run_j: 50_000,
+            }),
+            required_tech: None,
+            tags: vec![],
+        };
+        let recipe_id = crate::test_fixtures::insert_recipe(&mut content, smelt_recipe);
         content.module_defs.insert(
             "module_smelter".to_string(),
             ModuleDef {
@@ -583,28 +619,7 @@ mod tests {
                 behavior: ModuleBehaviorDef::Processor(ProcessorDef {
                     processing_interval_minutes: 1,
                     processing_interval_ticks: 1,
-                    recipes: vec![crate::RecipeDef {
-                        id: "smelt_fe".to_string(),
-                        inputs: vec![RecipeInput {
-                            filter: InputFilter::ItemKind(crate::ItemKind::Ore),
-                            amount: InputAmount::Kg(100.0),
-                        }],
-                        outputs: vec![OutputSpec::Material {
-                            element: "Fe".to_string(),
-                            yield_formula: YieldFormula::ElementFraction {
-                                element: "Fe".to_string(),
-                            },
-                            quality_formula: QualityFormula::Fixed(0.9),
-                        }],
-                        efficiency: 1.0,
-                        thermal_req: Some(RecipeThermalReq {
-                            min_temp_mk: 1_000_000,    // 1000K
-                            optimal_min_mk: 1_500_000, // 1500K
-                            optimal_max_mk: 2_000_000, // 2000K
-                            max_temp_mk: 2_500_000,    // 2500K
-                            heat_per_run_j: 50_000,
-                        }),
-                    }],
+                    recipes: vec![recipe_id],
                 }),
                 thermal: Some(ThermalDef {
                     heat_capacity_j_per_k: 500.0,
@@ -657,7 +672,7 @@ mod tests {
                             threshold_kg: 0.0,
                             ticks_since_last_run: 0,
                             stalled: false,
-                            selected_recipe_idx: 0,
+                            selected_recipe: None,
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
@@ -855,14 +870,10 @@ mod tests {
     #[test]
     fn recipe_without_thermal_req_runs_normally() {
         let mut content = thermal_processor_content();
-        // Remove thermal_req from the recipe
-        if let ModuleBehaviorDef::Processor(ref mut p) = content
-            .module_defs
-            .get_mut("module_smelter")
-            .unwrap()
-            .behavior
-        {
-            p.recipes[0].thermal_req = None;
+        // Remove thermal_req from the recipe in the catalog
+        let recipe_id = RecipeId("smelt_fe".to_string());
+        if let Some(recipe) = content.recipes.get_mut(&recipe_id) {
+            recipe.thermal_req = None;
         }
         // Module at room temp — should still run fine
         let mut state = thermal_processor_state(&content, 293_000);

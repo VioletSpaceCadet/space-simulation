@@ -17,11 +17,11 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `WearState` | `wear: f32` (0.0–1.0). Embedded on any wearable entity. |
 | `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
 | `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold`, `AssignLabTech`, `SetAssemblerCap`, `Import`, `Export`, `JettisonSlag` |
-| `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, component_defs, constants |
+| `GameContent` | Static config: techs, solar system, asteroid templates, elements, module_defs, component_defs, recipes (`BTreeMap<RecipeId, RecipeDef>`), constants |
 | `ModuleDef` | Module definition with `ModuleBehaviorDef` (Processor, Storage, Maintenance, Assembler, Lab, SensorArray, SolarArray, Battery, Radiator), `wear_per_run`, optional `thermal: ThermalDef` |
 | `ComponentDef` | Component definition: `id`, `name`, `mass_kg`, `volume_m3` |
 | `MaintenanceDef` | Maintenance module behavior: `repair_interval_ticks`, `wear_reduction_per_run`, `repair_kit_cost` |
-| `AssemblerDef` | Assembler module behavior: `assembly_interval_ticks`, `recipes` (list of input filters + output component), `max_stock: HashMap<ComponentId, u32>` (optional stock cap per output component) |
+| `AssemblerDef` | Assembler module behavior: `assembly_interval_ticks`, `recipes: Vec<RecipeId>` (references into `GameContent.recipes`), `max_stock: HashMap<ComponentId, u32>` (optional stock cap per output component) |
 | `PricingTable` | `import_surcharge_per_kg`, `export_surcharge_per_kg`, `items: HashMap<String, PricingEntry>` |
 | `PricingEntry` | `base_price_per_unit`, `importable`, `exportable` |
 | `TradeItemSpec` | Enum: `Material { element, kg }`, `Component { component_id, count }`, `Module { module_def_id }` |

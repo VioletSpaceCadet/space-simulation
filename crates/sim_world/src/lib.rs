@@ -188,18 +188,30 @@ fn validate_asteroid_templates(content: &GameContent, element_ids: &HashSet<&str
 fn validate_module_recipes(content: &GameContent, element_ids: &HashSet<&str>) {
     for module_def in content.module_defs.values() {
         if let ModuleBehaviorDef::Processor(processor) = &module_def.behavior {
-            for recipe in &processor.recipes {
+            for recipe_id in &processor.recipes {
+                let recipe = content.recipes.get(recipe_id).unwrap_or_else(|| {
+                    panic!(
+                        "module '{}' references unknown recipe '{}'",
+                        module_def.id, recipe_id
+                    );
+                });
                 validate_recipe_elements(element_ids, &module_def.id, recipe);
             }
         }
         if let ModuleBehaviorDef::Assembler(assembler) = &module_def.behavior {
-            for recipe in &assembler.recipes {
+            for recipe_id in &assembler.recipes {
+                let recipe = content.recipes.get(recipe_id).unwrap_or_else(|| {
+                    panic!(
+                        "module '{}' references unknown recipe '{}'",
+                        module_def.id, recipe_id
+                    );
+                });
                 for input in &recipe.inputs {
                     if let InputFilter::Element(element_id) = &input.filter {
                         assert!(
                             element_ids.contains(element_id.as_str()),
                             "module '{}' assembler recipe '{}' input element '{}' is not a known element",
-                            module_def.id, recipe.id, element_id,
+                            module_def.id, recipe_id, element_id,
                         );
                     }
                 }
@@ -337,6 +349,21 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         Ok(text) => serde_json::from_str(&text).context("parsing alerts.json")?,
         Err(_) => Vec::new(),
     };
+    let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
+    )
+    .context("parsing recipes.json")?;
+    // Check for duplicate recipe IDs before converting to map
+    let mut recipe_ids_seen = std::collections::HashSet::new();
+    for recipe in &recipes {
+        assert!(
+            recipe_ids_seen.insert(&recipe.id),
+            "duplicate recipe id '{}'",
+            recipe.id
+        );
+    }
+    let recipe_map: std::collections::BTreeMap<sim_core::RecipeId, sim_core::RecipeDef> =
+        recipes.into_iter().map(|r| (r.id.clone(), r)).collect();
     let mut content = GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
@@ -345,6 +372,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         elements: elements_file.elements,
         module_defs,
         component_defs,
+        recipes: recipe_map,
         pricing,
         constants,
         alert_rules,
@@ -790,6 +818,23 @@ mod tests {
     #[should_panic(expected = "not a known element")]
     fn test_recipe_output_unknown_element_panics() {
         let mut content = minimal_content();
+        let recipe = RecipeDef {
+            id: sim_core::RecipeId("recipe_test".to_string()),
+            inputs: vec![RecipeInput {
+                filter: InputFilter::ItemKind(ItemKind::Ore),
+                amount: InputAmount::Kg(100.0),
+            }],
+            outputs: vec![OutputSpec::Material {
+                element: "Ghost".to_string(), // does not exist
+                yield_formula: YieldFormula::FixedFraction(1.0),
+                quality_formula: QualityFormula::Fixed(1.0),
+            }],
+            efficiency: 1.0,
+            thermal_req: None,
+            required_tech: None,
+            tags: vec![],
+        };
+        content.recipes.insert(recipe.id.clone(), recipe);
         content.module_defs.insert(
             "mod_test".to_string(),
             ModuleDef {
@@ -802,20 +847,7 @@ mod tests {
                 behavior: ModuleBehaviorDef::Processor(ProcessorDef {
                     processing_interval_minutes: 10,
                     processing_interval_ticks: 10,
-                    recipes: vec![RecipeDef {
-                        id: "recipe_test".to_string(),
-                        inputs: vec![RecipeInput {
-                            filter: InputFilter::ItemKind(ItemKind::Ore),
-                            amount: InputAmount::Kg(100.0),
-                        }],
-                        outputs: vec![OutputSpec::Material {
-                            element: "Ghost".to_string(), // does not exist
-                            yield_formula: YieldFormula::FixedFraction(1.0),
-                            quality_formula: QualityFormula::Fixed(1.0),
-                        }],
-                        efficiency: 1.0,
-                        thermal_req: None,
-                    }],
+                    recipes: vec![sim_core::RecipeId("recipe_test".to_string())],
                 }),
                 thermal: None,
             },
@@ -877,6 +909,19 @@ mod tests {
     #[should_panic(expected = "not a known element")]
     fn test_assembler_recipe_unknown_element_panics() {
         let mut content = minimal_content();
+        let recipe = RecipeDef {
+            id: sim_core::RecipeId("recipe_asm_test".to_string()),
+            inputs: vec![RecipeInput {
+                filter: InputFilter::Element("Unobtanium".to_string()),
+                amount: InputAmount::Kg(50.0),
+            }],
+            outputs: vec![],
+            efficiency: 1.0,
+            thermal_req: None,
+            required_tech: None,
+            tags: vec![],
+        };
+        content.recipes.insert(recipe.id.clone(), recipe);
         content.module_defs.insert(
             "mod_assembler_test".to_string(),
             ModuleDef {
@@ -890,16 +935,7 @@ mod tests {
                     assembly_interval_minutes: 10,
                     assembly_interval_ticks: 10,
                     max_stock: std::collections::HashMap::new(),
-                    recipes: vec![RecipeDef {
-                        id: "recipe_asm_test".to_string(),
-                        inputs: vec![RecipeInput {
-                            filter: InputFilter::Element("Unobtanium".to_string()),
-                            amount: InputAmount::Kg(50.0),
-                        }],
-                        outputs: vec![],
-                        efficiency: 1.0,
-                        thermal_req: None,
-                    }],
+                    recipes: vec![sim_core::RecipeId("recipe_asm_test".to_string())],
                 }),
                 thermal: None,
             },

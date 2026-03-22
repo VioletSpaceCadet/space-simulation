@@ -198,7 +198,7 @@ mod tests {
                     threshold_kg: 0.0,
                     ticks_since_last_run: 0,
                     stalled: false,
-                    selected_recipe_idx: 0,
+                    selected_recipe: None,
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
@@ -421,7 +421,7 @@ mod tests {
                     threshold_kg: 500.0,
                     ticks_since_last_run: 0,
                     stalled: false,
-                    selected_recipe_idx: 0,
+                    selected_recipe: None,
                 }),
                 wear: sim_core::WearState { wear: 1.0 },
                 power_stalled: false,
@@ -790,6 +790,29 @@ mod tests {
         content.techs.clear();
         content.constants.station_power_available_per_tick = 0.0;
 
+        // Add shipyard recipe to catalog
+        let ship_recipe = sim_core::RecipeDef {
+            id: sim_core::RecipeId("recipe_test_ship".to_string()),
+            inputs: vec![
+                sim_core::RecipeInput {
+                    filter: sim_core::InputFilter::Element("Fe".to_string()),
+                    amount: sim_core::InputAmount::Kg(5000.0),
+                },
+                sim_core::RecipeInput {
+                    filter: sim_core::InputFilter::Component(ComponentId("thruster".to_string())),
+                    amount: sim_core::InputAmount::Count(4),
+                },
+            ],
+            outputs: vec![sim_core::OutputSpec::Ship {
+                cargo_capacity_m3: 50.0,
+            }],
+            efficiency: 1.0,
+            thermal_req: None,
+            required_tech: None,
+            tags: vec![],
+        };
+        content.recipes.insert(ship_recipe.id.clone(), ship_recipe);
+
         // Add shipyard module def with a recipe requiring 4 thrusters
         content.module_defs.insert(
             "module_shipyard".to_string(),
@@ -803,26 +826,7 @@ mod tests {
                 behavior: sim_core::ModuleBehaviorDef::Assembler(sim_core::AssemblerDef {
                     assembly_interval_minutes: 1440,
                     assembly_interval_ticks: 1440,
-                    recipes: vec![sim_core::RecipeDef {
-                        id: "recipe_test_ship".to_string(),
-                        inputs: vec![
-                            sim_core::RecipeInput {
-                                filter: sim_core::InputFilter::Element("Fe".to_string()),
-                                amount: sim_core::InputAmount::Kg(5000.0),
-                            },
-                            sim_core::RecipeInput {
-                                filter: sim_core::InputFilter::Component(ComponentId(
-                                    "thruster".to_string(),
-                                )),
-                                amount: sim_core::InputAmount::Count(4),
-                            },
-                        ],
-                        outputs: vec![sim_core::OutputSpec::Ship {
-                            cargo_capacity_m3: 50.0,
-                        }],
-                        efficiency: 1.0,
-                        thermal_req: None,
-                    }],
+                    recipes: vec![sim_core::RecipeId("recipe_test_ship".to_string())],
                     max_stock: HashMap::new(),
                 }),
                 thermal: None,
@@ -869,7 +873,7 @@ mod tests {
                 stalled: false,
                 capped: false,
                 cap_override: HashMap::new(),
-                selected_recipe_idx: 0,
+                selected_recipe: None,
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
@@ -1314,7 +1318,7 @@ mod tests {
                 threshold_kg: 0.0,
                 ticks_since_last_run: 0,
                 stalled: false,
-                selected_recipe_idx: 0,
+                selected_recipe: None,
             }),
             thermal: None,
             power_stalled: false,
@@ -1520,7 +1524,7 @@ mod tests {
                 threshold_kg: 0.0,
                 ticks_since_last_run: 0,
                 stalled: false,
-                selected_recipe_idx: 0,
+                selected_recipe: None,
             }),
             thermal: None,
             power_stalled: false,
@@ -1612,7 +1616,7 @@ mod tests {
                 threshold_kg: 200.0,
                 ticks_since_last_run: 0,
                 stalled: false,
-                selected_recipe_idx: 0,
+                selected_recipe: None,
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
@@ -1631,7 +1635,7 @@ mod tests {
                 threshold_kg: 100.0,
                 ticks_since_last_run: 0,
                 stalled: false,
-                selected_recipe_idx: 0,
+                selected_recipe: None,
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
@@ -1779,7 +1783,7 @@ mod tests {
                 threshold_kg: 200.0,
                 ticks_since_last_run: 0,
                 stalled: false,
-                selected_recipe_idx: 0,
+                selected_recipe: None,
             }),
             wear: sim_core::WearState { wear: 1.0 },
             power_stalled: false,

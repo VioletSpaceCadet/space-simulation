@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_fixtures::insert_recipe;
 
 fn electrolysis_content() -> GameContent {
     let mut content = test_content();
@@ -40,6 +41,30 @@ fn electrolysis_content() -> GameContent {
         boiling_point_mk: None,
     });
 
+    let electrolysis_recipe = RecipeDef {
+        id: RecipeId("recipe_electrolysis".to_string()),
+        inputs: vec![RecipeInput {
+            filter: InputFilter::Element("H2O".to_string()),
+            amount: InputAmount::Kg(1000.0),
+        }],
+        outputs: vec![
+            OutputSpec::Material {
+                element: "LH2".to_string(),
+                yield_formula: YieldFormula::FixedFraction(0.111),
+                quality_formula: QualityFormula::Fixed(1.0),
+            },
+            OutputSpec::Material {
+                element: "LOX".to_string(),
+                yield_formula: YieldFormula::FixedFraction(0.889),
+                quality_formula: QualityFormula::Fixed(1.0),
+            },
+        ],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    };
+    let recipe_id = insert_recipe(&mut content, electrolysis_recipe);
     content.module_defs.insert(
         "module_electrolysis_unit".to_string(),
         ModuleDef {
@@ -52,27 +77,7 @@ fn electrolysis_content() -> GameContent {
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
-                recipes: vec![RecipeDef {
-                    id: "recipe_electrolysis".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::Element("H2O".to_string()),
-                        amount: InputAmount::Kg(1000.0),
-                    }],
-                    outputs: vec![
-                        OutputSpec::Material {
-                            element: "LH2".to_string(),
-                            yield_formula: YieldFormula::FixedFraction(0.111),
-                            quality_formula: QualityFormula::Fixed(1.0),
-                        },
-                        OutputSpec::Material {
-                            element: "LOX".to_string(),
-                            yield_formula: YieldFormula::FixedFraction(0.889),
-                            quality_formula: QualityFormula::Fixed(1.0),
-                        },
-                    ],
-                    efficiency: 1.0,
-                    thermal_req: None,
-                }],
+                recipes: vec![recipe_id],
             }),
             thermal: None,
         },
@@ -123,7 +128,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
             threshold_kg: 200.0,
             ticks_since_last_run: 0,
             stalled: false,
-            selected_recipe_idx: 0,
+            selected_recipe: None,
         }),
         wear: WearState::default(),
         power_stalled: false,
@@ -425,6 +430,33 @@ fn test_full_chain_ore_to_propellant() {
     let mut content = electrolysis_content();
 
     // Add heating unit for ore → H2O
+    let water_recipe = RecipeDef {
+        id: RecipeId("recipe_extract_water".to_string()),
+        inputs: vec![RecipeInput {
+            filter: InputFilter::ItemKind(ItemKind::Ore),
+            amount: InputAmount::Kg(500.0),
+        }],
+        outputs: vec![
+            OutputSpec::Material {
+                element: "H2O".to_string(),
+                yield_formula: YieldFormula::ElementFraction {
+                    element: "H2O".to_string(),
+                },
+                quality_formula: QualityFormula::ElementFractionTimesMultiplier {
+                    element: "H2O".to_string(),
+                    multiplier: 1.0,
+                },
+            },
+            OutputSpec::Slag {
+                yield_formula: YieldFormula::FixedFraction(1.0),
+            },
+        ],
+        efficiency: 1.0,
+        thermal_req: None,
+        required_tech: None,
+        tags: vec![],
+    };
+    let water_recipe_id = insert_recipe(&mut content, water_recipe);
     content.module_defs.insert(
         "module_heating_unit".to_string(),
         ModuleDef {
@@ -437,30 +469,7 @@ fn test_full_chain_ore_to_propellant() {
             behavior: ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
-                recipes: vec![RecipeDef {
-                    id: "recipe_extract_water".to_string(),
-                    inputs: vec![RecipeInput {
-                        filter: InputFilter::ItemKind(ItemKind::Ore),
-                        amount: InputAmount::Kg(500.0),
-                    }],
-                    outputs: vec![
-                        OutputSpec::Material {
-                            element: "H2O".to_string(),
-                            yield_formula: YieldFormula::ElementFraction {
-                                element: "H2O".to_string(),
-                            },
-                            quality_formula: QualityFormula::ElementFractionTimesMultiplier {
-                                element: "H2O".to_string(),
-                                multiplier: 1.0,
-                            },
-                        },
-                        OutputSpec::Slag {
-                            yield_formula: YieldFormula::FixedFraction(1.0),
-                        },
-                    ],
-                    efficiency: 1.0,
-                    thermal_req: None,
-                }],
+                recipes: vec![water_recipe_id],
             }),
             thermal: None,
         },
@@ -490,7 +499,7 @@ fn test_full_chain_ore_to_propellant() {
             threshold_kg: 100.0,
             ticks_since_last_run: 0,
             stalled: false,
-            selected_recipe_idx: 0,
+            selected_recipe: None,
         }),
         wear: WearState::default(),
         power_stalled: false,
@@ -506,7 +515,7 @@ fn test_full_chain_ore_to_propellant() {
             threshold_kg: 200.0,
             ticks_since_last_run: 0,
             stalled: false,
-            selected_recipe_idx: 0,
+            selected_recipe: None,
         }),
         wear: WearState::default(),
         power_stalled: false,

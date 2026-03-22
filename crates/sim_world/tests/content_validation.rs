@@ -404,14 +404,20 @@ fn assembler_component_inputs_reference_known_components() {
 
     for module_def in content.module_defs.values() {
         if let ModuleBehaviorDef::Assembler(assembler) = &module_def.behavior {
-            for recipe in &assembler.recipes {
+            for recipe_id in &assembler.recipes {
+                let recipe = content.recipes.get(recipe_id).unwrap_or_else(|| {
+                    panic!(
+                        "module '{}' references unknown recipe '{}'",
+                        module_def.id, recipe_id
+                    );
+                });
                 for input in &recipe.inputs {
                     if let InputFilter::Component(ComponentId(component_id)) = &input.filter {
                         assert!(
                             component_ids.contains(component_id.as_str()),
                             "module '{}' recipe '{}' input component '{}' is not a known component",
                             module_def.id,
-                            recipe.id,
+                            recipe_id,
                             component_id
                         );
                     }
@@ -432,14 +438,20 @@ fn assembler_component_outputs_reference_known_components() {
 
     for module_def in content.module_defs.values() {
         if let ModuleBehaviorDef::Assembler(assembler) = &module_def.behavior {
-            for recipe in &assembler.recipes {
+            for recipe_id in &assembler.recipes {
+                let recipe = content.recipes.get(recipe_id).unwrap_or_else(|| {
+                    panic!(
+                        "module '{}' references unknown recipe '{}'",
+                        module_def.id, recipe_id
+                    );
+                });
                 for output in &recipe.outputs {
                     if let OutputSpec::Component { component_id, .. } = output {
                         assert!(
                             component_ids.contains(component_id.0.as_str()),
                             "module '{}' recipe '{}' output component '{}' is not a known component",
                             module_def.id,
-                            recipe.id,
+                            recipe_id,
                             component_id.0
                         );
                     }
@@ -479,7 +491,13 @@ fn processor_recipe_element_inputs_reference_known_elements() {
 
     for module_def in content.module_defs.values() {
         if let ModuleBehaviorDef::Processor(processor) = &module_def.behavior {
-            for recipe in &processor.recipes {
+            for recipe_id in &processor.recipes {
+                let recipe = content.recipes.get(recipe_id).unwrap_or_else(|| {
+                    panic!(
+                        "module '{}' references unknown recipe '{}'",
+                        module_def.id, recipe_id
+                    );
+                });
                 for input in &recipe.inputs {
                     match &input.filter {
                         InputFilter::Element(element_id) => {
@@ -487,7 +505,7 @@ fn processor_recipe_element_inputs_reference_known_elements() {
                                 element_ids.contains(element_id.as_str()),
                                 "module '{}' recipe '{}' input element '{}' is not a known element",
                                 module_def.id,
-                                recipe.id,
+                                recipe_id,
                                 element_id
                             );
                         }
@@ -496,7 +514,7 @@ fn processor_recipe_element_inputs_reference_known_elements() {
                                 element_ids.contains(element.as_str()),
                                 "module '{}' recipe '{}' input element '{}' is not a known element",
                                 module_def.id,
-                                recipe.id,
+                                recipe_id,
                                 element
                             );
                         }
@@ -510,7 +528,7 @@ fn processor_recipe_element_inputs_reference_known_elements() {
                                 component_ids.contains(component_id.as_str()),
                                 "module '{}' recipe '{}' input component '{}' is not a known component",
                                 module_def.id,
-                                recipe.id,
+                                recipe_id,
                                 component_id
                             );
                         }
@@ -802,12 +820,18 @@ fn processor_recipe_efficiencies_are_valid() {
     let content = load_test_content();
     for module_def in content.module_defs.values() {
         if let ModuleBehaviorDef::Processor(processor) = &module_def.behavior {
-            for recipe in &processor.recipes {
+            for recipe_id in &processor.recipes {
+                let recipe = content.recipes.get(recipe_id).unwrap_or_else(|| {
+                    panic!(
+                        "module '{}' references unknown recipe '{}'",
+                        module_def.id, recipe_id
+                    );
+                });
                 assert!(
                     recipe.efficiency > 0.0 && recipe.efficiency <= 1.0,
                     "module '{}' recipe '{}' has invalid efficiency: {} (expected 0 < e <= 1)",
                     module_def.id,
-                    recipe.id,
+                    recipe_id,
                     recipe.efficiency
                 );
             }
@@ -820,12 +844,18 @@ fn assembler_recipe_efficiencies_are_valid() {
     let content = load_test_content();
     for module_def in content.module_defs.values() {
         if let ModuleBehaviorDef::Assembler(assembler) = &module_def.behavior {
-            for recipe in &assembler.recipes {
+            for recipe_id in &assembler.recipes {
+                let recipe = content.recipes.get(recipe_id).unwrap_or_else(|| {
+                    panic!(
+                        "module '{}' references unknown recipe '{}'",
+                        module_def.id, recipe_id
+                    );
+                });
                 assert!(
                     recipe.efficiency > 0.0 && recipe.efficiency <= 1.0,
                     "module '{}' recipe '{}' has invalid efficiency: {} (expected 0 < e <= 1)",
                     module_def.id,
-                    recipe.id,
+                    recipe_id,
                     recipe.efficiency
                 );
             }
@@ -1144,7 +1174,10 @@ fn smelter_recipe_has_thermal_requirement() {
     };
 
     assert!(!processor.recipes.is_empty(), "smelter must have recipes");
-    let recipe = &processor.recipes[0];
+    let recipe = content
+        .recipes
+        .get(&processor.recipes[0])
+        .expect("smelter recipe must exist in catalog");
 
     let thermal_req = recipe
         .thermal_req
@@ -1174,18 +1207,30 @@ fn smelter_processes_less_ore_than_cold_refinery() {
         .expect("module_basic_iron_refinery must exist");
 
     let smelter_input_kg = match &smelter.behavior {
-        ModuleBehaviorDef::Processor(p) => match &p.recipes[0].inputs[0].amount {
-            sim_core::InputAmount::Kg(kg) => *kg,
-            sim_core::InputAmount::Count(_) => panic!("expected Kg input"),
-        },
+        ModuleBehaviorDef::Processor(p) => {
+            let recipe = content
+                .recipes
+                .get(&p.recipes[0])
+                .expect("smelter recipe must exist");
+            match &recipe.inputs[0].amount {
+                sim_core::InputAmount::Kg(kg) => *kg,
+                sim_core::InputAmount::Count(_) => panic!("expected Kg input"),
+            }
+        }
         _ => panic!("expected Processor"),
     };
 
     let refinery_input_kg = match &refinery.behavior {
-        ModuleBehaviorDef::Processor(p) => match &p.recipes[0].inputs[0].amount {
-            sim_core::InputAmount::Kg(kg) => *kg,
-            sim_core::InputAmount::Count(_) => panic!("expected Kg input"),
-        },
+        ModuleBehaviorDef::Processor(p) => {
+            let recipe = content
+                .recipes
+                .get(&p.recipes[0])
+                .expect("refinery recipe must exist");
+            match &recipe.inputs[0].amount {
+                sim_core::InputAmount::Kg(kg) => *kg,
+                sim_core::InputAmount::Count(_) => panic!("expected Kg input"),
+            }
+        }
         _ => panic!("expected Processor"),
     };
 
@@ -1288,13 +1333,19 @@ fn thermal_recipe_requirements_are_consistent() {
     let content = load_test_content();
     for module_def in content.module_defs.values() {
         if let ModuleBehaviorDef::Processor(processor) = &module_def.behavior {
-            for recipe in &processor.recipes {
+            for recipe_id in &processor.recipes {
+                let recipe = content.recipes.get(recipe_id).unwrap_or_else(|| {
+                    panic!(
+                        "module '{}' references unknown recipe '{}'",
+                        module_def.id, recipe_id
+                    );
+                });
                 if let Some(req) = &recipe.thermal_req {
                     assert!(
                         req.min_temp_mk <= req.optimal_min_mk,
                         "module '{}' recipe '{}': min_temp_mk ({}) > optimal_min_mk ({})",
                         module_def.id,
-                        recipe.id,
+                        recipe_id,
                         req.min_temp_mk,
                         req.optimal_min_mk
                     );
@@ -1302,7 +1353,7 @@ fn thermal_recipe_requirements_are_consistent() {
                         req.optimal_min_mk <= req.optimal_max_mk,
                         "module '{}' recipe '{}': optimal_min_mk ({}) > optimal_max_mk ({})",
                         module_def.id,
-                        recipe.id,
+                        recipe_id,
                         req.optimal_min_mk,
                         req.optimal_max_mk
                     );
@@ -1310,7 +1361,7 @@ fn thermal_recipe_requirements_are_consistent() {
                         req.optimal_max_mk <= req.max_temp_mk,
                         "module '{}' recipe '{}': optimal_max_mk ({}) > max_temp_mk ({})",
                         module_def.id,
-                        recipe.id,
+                        recipe_id,
                         req.optimal_max_mk,
                         req.max_temp_mk
                     );
@@ -1320,7 +1371,7 @@ fn thermal_recipe_requirements_are_consistent() {
                         assert!(
                             req.max_temp_mk <= thermal.max_temp_mk,
                             "module '{}' recipe '{}': recipe max_temp_mk ({}) exceeds module max_temp_mk ({})",
-                            module_def.id, recipe.id, req.max_temp_mk, thermal.max_temp_mk
+                            module_def.id, recipe_id, req.max_temp_mk, thermal.max_temp_mk
                         );
                     }
                 }

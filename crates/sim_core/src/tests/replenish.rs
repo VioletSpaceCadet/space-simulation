@@ -56,6 +56,7 @@ fn replenish_test_content() -> GameContent {
         }],
         module_defs: HashMap::new(),
         component_defs: vec![],
+        recipes: std::collections::BTreeMap::new(),
         pricing: PricingTable {
             import_surcharge_per_kg: 100.0,
             export_surcharge_per_kg: 50.0,

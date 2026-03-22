@@ -183,9 +183,9 @@ fn apply_commands(
             Command::SelectRecipe {
                 station_id,
                 module_id,
-                recipe_idx,
+                recipe_id,
             } => {
-                commands::handle_select_recipe(state, content, station_id, module_id, *recipe_idx);
+                commands::handle_select_recipe(state, content, station_id, module_id, recipe_id);
             }
         }
     }

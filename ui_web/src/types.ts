@@ -74,7 +74,7 @@ export interface ProcessorState {
   threshold_kg: number
   ticks_since_last_run: number
   stalled: boolean
-  selected_recipe_idx?: number
+  selected_recipe?: string | null
 }
 
 export interface MaintenanceState {
@@ -86,7 +86,7 @@ export interface AssemblerState {
   stalled: boolean
   capped: boolean
   cap_override: Record<string, number>
-  selected_recipe_idx?: number
+  selected_recipe?: string | null
 }
 
 export interface LabState {
