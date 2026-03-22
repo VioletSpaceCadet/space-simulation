@@ -17,7 +17,7 @@ export function DataPoolSection({ dataPool, dataRates }: DataPoolSectionProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-2 py-1.5 text-[11px]">
+    <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-2 py-1.5 text-[11px] max-w-sm">
       {entries.map(([kind, amount]) => {
         const label = DATA_KIND_LABELS[kind] ?? kind;
         const color = DATA_KIND_COLORS[kind] ?? '#888888';
