@@ -89,6 +89,13 @@ pub(crate) fn tick_thermal(
             radiator_def.cooling_capacity_w * efficiency;
     }
 
+    // Apply idle heat generation to enabled modules with idle_heat_generation_w.
+    for modules in groups.values() {
+        for &(_, module_index) in modules {
+            apply_idle_heat(state, station_id, module_index, content, dt_s);
+        }
+    }
+
     // Apply passive cooling to each module.
     for modules in groups.values() {
         for &(_, module_index) in modules {
@@ -123,6 +130,59 @@ pub(crate) fn tick_thermal(
 
     // Check overheat zones for all thermal modules after temperature updates.
     check_overheat_zones(state, station_id, content, events);
+}
+
+/// Apply idle heat generation to a single module.
+///
+/// Enabled modules with `idle_heat_generation_w` set generate heat every tick,
+/// regardless of whether a recipe ran. This allows thermal modules (e.g. smelters)
+/// to preheat from ambient temperature.
+fn apply_idle_heat(
+    state: &mut GameState,
+    station_id: &StationId,
+    module_index: usize,
+    content: &GameContent,
+    dt_s: f64,
+) {
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+    let module = &station.modules[module_index];
+
+    // Only enabled modules generate idle heat.
+    if !module.enabled {
+        return;
+    }
+
+    let Some(def) = content.module_defs.get(&module.def_id) else {
+        return;
+    };
+    let Some(ref thermal_def) = def.thermal else {
+        return;
+    };
+    let Some(idle_w) = thermal_def.idle_heat_generation_w else {
+        return;
+    };
+    if idle_w <= 0.0 {
+        return;
+    }
+
+    let heat_j = thermal::power_to_heat_j(idle_w, dt_s);
+    let delta_mk = thermal::heat_to_temp_delta_mk(heat_j, thermal_def.heat_capacity_j_per_k);
+
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return;
+    };
+    if let Some(ref mut thermal) = station.modules[module_index].thermal {
+        // idle_w > 0 guaranteed by early return, so delta_mk is always non-negative.
+        debug_assert!(
+            delta_mk >= 0,
+            "idle heat delta must be >= 0, got {delta_mk}"
+        );
+        #[allow(clippy::cast_sign_loss)]
+        let new_temp = thermal.temp_mk.saturating_add(delta_mk as u32);
+        thermal.temp_mk = new_temp.min(T_MAX_ABSOLUTE_MK);
+    }
 }
 
 /// Apply passive cooling to a single module.
@@ -426,6 +486,7 @@ mod tests {
                     operating_min_mk: None,
                     operating_max_mk: None,
                     thermal_group: Some("smelting".to_string()),
+                    idle_heat_generation_w: None,
                 }),
             },
         );
@@ -629,6 +690,7 @@ mod tests {
                     operating_min_mk: None,
                     operating_max_mk: None,
                     thermal_group: Some("reactor".to_string()),
+                    idle_heat_generation_w: None,
                 }),
             },
         );
@@ -695,6 +757,7 @@ mod tests {
                     operating_min_mk: None,
                     operating_max_mk: None,
                     thermal_group: Some("smelting".to_string()),
+                    idle_heat_generation_w: None,
                 }),
             },
         );
@@ -1183,6 +1246,138 @@ mod tests {
         assert!(
             !state.stations.get(&station_id).unwrap().modules[0].enabled,
             "wear-disabled module should stay disabled even after overheat clears"
+        );
+    }
+
+    /// Helper: create content with a smelter that has idle heat generation.
+    fn idle_heat_test_content(idle_w: f32) -> GameContent {
+        let mut content = crate::test_fixtures::base_content();
+        content.module_defs.insert(
+            "module_smelter".to_string(),
+            ModuleDef {
+                id: "module_smelter".to_string(),
+                name: "Test Smelter".to_string(),
+                mass_kg: 5000.0,
+                volume_m3: 10.0,
+                power_consumption_per_run: 100.0,
+                wear_per_run: 0.02,
+                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_minutes: 5,
+                    processing_interval_ticks: 5,
+                    recipes: vec![],
+                }),
+                thermal: Some(ThermalDef {
+                    heat_capacity_j_per_k: 500.0,
+                    passive_cooling_coefficient: 0.05,
+                    max_temp_mk: 2_500_000,
+                    operating_min_mk: None,
+                    operating_max_mk: None,
+                    thermal_group: Some("smelting".to_string()),
+                    idle_heat_generation_w: Some(idle_w),
+                }),
+            },
+        );
+        content
+    }
+
+    #[test]
+    fn idle_heat_warms_module_from_ambient() {
+        let content = idle_heat_test_content(100.0); // 100W idle heat
+        let mut state = thermal_test_state(&content, content.constants.thermal_sink_temp_mk);
+        let station_id = StationId("station_test".to_string());
+
+        let initial_temp = content.constants.thermal_sink_temp_mk;
+        tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
+
+        let temp = state.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+        assert!(
+            temp > initial_temp,
+            "idle heat should warm module above ambient; got {temp}, was {initial_temp}"
+        );
+    }
+
+    #[test]
+    fn idle_heat_not_applied_when_disabled() {
+        let content = idle_heat_test_content(100.0);
+        let mut state = thermal_test_state(&content, content.constants.thermal_sink_temp_mk);
+        let station_id = StationId("station_test".to_string());
+
+        // Disable the module.
+        state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
+
+        tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
+
+        let temp = state.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+        assert_eq!(
+            temp, content.constants.thermal_sink_temp_mk,
+            "disabled module should not receive idle heat"
+        );
+    }
+
+    #[test]
+    fn idle_heat_reaches_equilibrium() {
+        let content = idle_heat_test_content(100.0);
+        let mut state = thermal_test_state(&content, content.constants.thermal_sink_temp_mk);
+        let station_id = StationId("station_test".to_string());
+
+        // Run many ticks to reach equilibrium (time constant ~167 ticks).
+        for _ in 0..2000 {
+            tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
+        }
+
+        let temp_a = state.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+
+        // One more tick should produce negligible change.
+        tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
+        let temp_b = state.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+
+        let delta = temp_a.abs_diff(temp_b);
+        assert!(
+            delta < 100,
+            "after many ticks, temperature should stabilize; delta was {delta} mK"
+        );
+
+        // Equilibrium should be above ambient.
+        assert!(
+            temp_a > content.constants.thermal_sink_temp_mk + 10_000,
+            "equilibrium should be well above ambient; got {temp_a}"
+        );
+    }
+
+    #[test]
+    fn no_idle_heat_without_field() {
+        // Use the standard thermal_test_content which has idle_heat_generation_w: None.
+        let content = thermal_test_content();
+        let sink = content.constants.thermal_sink_temp_mk;
+        let mut state = thermal_test_state(&content, sink);
+        let station_id = StationId("station_test".to_string());
+
+        tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
+
+        let temp = state.stations.get(&station_id).unwrap().modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .temp_mk;
+        assert_eq!(
+            temp, sink,
+            "module without idle_heat_generation_w at sink should stay at sink"
         );
     }
 }

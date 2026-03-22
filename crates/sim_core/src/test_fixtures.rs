@@ -431,6 +431,7 @@ pub fn thermal_content() -> GameContent {
                 operating_min_mk: Some(1_800_000),
                 operating_max_mk: Some(2_100_000),
                 thermal_group: Some("default".to_string()),
+                idle_heat_generation_w: None,
             }),
         },
     );
@@ -454,6 +455,7 @@ pub fn thermal_content() -> GameContent {
                 operating_min_mk: None,
                 operating_max_mk: None,
                 thermal_group: Some("default".to_string()),
+                idle_heat_generation_w: None,
             }),
         },
     );

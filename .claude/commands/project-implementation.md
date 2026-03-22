@@ -1,6 +1,6 @@
 # Project Implementation
 
-Implement a Linear project end-to-end: read tickets, then for each one — branch from main, implement, review, fix, compound, merge into main, compact, repeat.
+Implement a Linear project end-to-end: read tickets, then for each one — branch from main, implement, review, fix, compound, merge into main, repeat.
 
 ## Input
 
@@ -73,8 +73,7 @@ If the implementation involved debugging, new patterns, or tricky solutions: run
    git branch -d <branch-name>
    ```
 
-### 2f. Compact & Continue
-- **Run `/compact`** to clear stale context (diffs, CI logs, review comments from the completed ticket). This is critical for multi-ticket runs — without it, the context window fills up and quality degrades.
+### 2f. Continue
 - **Check next ticket** — if it was previously blocked, verify its blockers are now Done.
 - **Continue** to the next ticket.
 
@@ -93,7 +92,6 @@ After all tickets are complete:
 - **Always squash merge.**
 - **Always run tests** before creating a PR.
 - **Update Linear** at every state change.
-- **Compact after every ticket.** Do not wait until context is full.
 - **If stuck on a ticket**, ask the user rather than guessing.
 - **One ticket at a time.** Finish, PR, merge, compact, then next.
 - **Compound selectively.** Only non-trivial learnings.

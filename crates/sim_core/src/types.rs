@@ -969,6 +969,11 @@ pub struct ThermalDef {
     /// Thermal group for shared radiator cooling. Modules in the same group share radiators.
     #[serde(default)]
     pub thermal_group: Option<ThermalGroupId>,
+    /// Idle heat generation in Watts. Applied every tick when the module is enabled,
+    /// regardless of whether a recipe ran. Allows thermal modules to preheat from
+    /// ambient temperature without needing recipe inputs.
+    #[serde(default)]
+    pub idle_heat_generation_w: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

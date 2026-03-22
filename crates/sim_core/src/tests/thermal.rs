@@ -236,6 +236,7 @@ fn thermal_def_round_trip() {
         operating_min_mk: Some(1_000_000),
         operating_max_mk: Some(2_000_000),
         thermal_group: Some("smelting".to_string()),
+        idle_heat_generation_w: None,
     };
 
     let json = serde_json::to_string(&thermal_def).unwrap();
