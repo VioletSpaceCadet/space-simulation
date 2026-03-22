@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+import { CRYO_ELEMENTS, elementColor } from '../config/theme';
 import { useSortableData } from '../hooks/useSortableData';
 import type {
   ComponentItem, InventoryItem, MaterialItem, ModuleItem, ModuleState,
@@ -91,9 +92,16 @@ function InventoryDisplay({ inventory }: { inventory: InventoryItem[] }) {
         </div>
       )}
       {materials.map((item, idx) => (
-        <div key={`mat-${idx}`} className="text-cargo">
-          {item.element} {formatKg(item.kg)} kg
-          <span className="text-faint ml-1">({qualityTier(item.quality)})</span>
+        <div key={`mat-${idx}`} className="flex items-center gap-1">
+          <span style={{ color: elementColor(item.element) }}>
+            {item.element} {formatKg(item.kg)} kg
+          </span>
+          <span className="text-faint">({qualityTier(item.quality)})</span>
+          {CRYO_ELEMENTS.has(item.element) && (
+            <span className="text-[9px] px-1 rounded text-amber-400/80 bg-amber-400/10">
+              CRYO
+            </span>
+          )}
         </div>
       ))}
       {slags.length > 0 && (
