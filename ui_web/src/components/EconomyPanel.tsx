@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { API_PATHS } from '../api';
 import type { PricingTable, SimEvent, SimSnapshot, TradeItemSpec } from '../types';
 import { formatCurrency, getEventKey } from '../utils';
 
@@ -81,7 +82,7 @@ export function EconomyPanel({ snapshot, events }: Props) {
   const [exportStatus, setExportStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   useEffect(() => {
-    fetch('/api/v1/pricing')
+    fetch(API_PATHS.pricing)
       .then((response) => {
         if (!response.ok) {throw new Error('Failed to fetch pricing');}
         return response.json();
@@ -153,7 +154,7 @@ export function EconomyPanel({ snapshot, events }: Props) {
         },
       };
 
-      const response = await fetch('/api/v1/command', {
+      const response = await fetch(API_PATHS.command, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command }),
