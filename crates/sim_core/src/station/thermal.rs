@@ -84,9 +84,20 @@ pub(crate) fn tick_thermal(
             .and_then(|t| t.thermal_group.clone())
             .unwrap_or_default();
 
-        let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
-        *radiator_cooling_by_group.entry(group_key).or_default() +=
-            radiator_def.cooling_capacity_w * efficiency;
+        let mut cooling_mods = crate::modifiers::ModifierSet::new();
+        cooling_mods.add(crate::modifiers::Modifier::pct_mult(
+            crate::modifiers::StatId::CoolingRate,
+            f64::from(crate::wear::wear_efficiency(
+                module.wear.wear,
+                &content.constants,
+            )),
+            crate::modifiers::ModifierSource::Wear,
+        ));
+        let effective_cooling = cooling_mods.resolve_f32(
+            crate::modifiers::StatId::CoolingRate,
+            radiator_def.cooling_capacity_w,
+        );
+        *radiator_cooling_by_group.entry(group_key).or_default() += effective_cooling;
     }
 
     // Apply idle heat generation to enabled modules with idle_heat_generation_w.

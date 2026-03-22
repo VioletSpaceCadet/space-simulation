@@ -95,8 +95,17 @@ fn execute(
         }
     }
 
-    // Use ctx.efficiency instead of recomputing wear efficiency
-    let points = lab_def.research_points_per_run * ratio * ctx.efficiency;
+    // Route wear through modifier system for research output.
+    let mut lab_mods = crate::modifiers::ModifierSet::new();
+    lab_mods.add(crate::modifiers::Modifier::pct_mult(
+        crate::modifiers::StatId::ResearchSpeed,
+        f64::from(ctx.efficiency),
+        crate::modifiers::ModifierSource::Wear,
+    ));
+    let points = lab_mods.resolve_f32(
+        crate::modifiers::StatId::ResearchSpeed,
+        lab_def.research_points_per_run * ratio,
+    );
 
     // Add points to evidence
     let progress = state
