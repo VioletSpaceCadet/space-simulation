@@ -25,6 +25,11 @@ import {
 } from './solar-system/canvas/types';
 import type { EntityInfo } from './solar-system/DetailCard';
 import { DetailCard } from './solar-system/DetailCard';
+import { Breadcrumb } from './solar-system/hud/Breadcrumb';
+import { Minimap } from './solar-system/hud/Minimap';
+import type { FlyTarget } from './solar-system/hud/QuickNav';
+import { QuickNav } from './solar-system/hud/QuickNav';
+import { ZoomInfo } from './solar-system/hud/ZoomInfo';
 import { Tooltip } from './solar-system/Tooltip';
 
 interface Props {
@@ -54,6 +59,12 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
   const dragStartRef = useRef({ x: 0, y: 0 });
   const didDragRef = useRef(false);
   const [dragging, setDragging] = useState(false);
+
+  // HUD state — camera snapshot updated in the rAF loop for HUD components
+  const [hudCamera, setHudCamera] = useState<Camera>({ ...INITIAL_CAMERA });
+  const [hudSize, setHudSize] = useState({ width: 0, height: 0 });
+  const [focusName, setFocusName] = useState<string | null>(null);
+  const hudUpdateTimer = useRef(0);
 
   const [config, setConfig] = useState<SolarSystemConfig | null>(null);
   const [hovered, setHovered] = useState<{
@@ -173,7 +184,15 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
       const { width, height } = sizeRef.current;
       if (width === 0 || height === 0) { return; }
 
-      lerpCamera(cameraRef.current, targetCameraRef.current);
+      const moved = lerpCamera(cameraRef.current, targetCameraRef.current);
+
+      // Throttle HUD camera state updates (~10Hz)
+      const now = performance.now();
+      if (moved && now - hudUpdateTimer.current > 100) {
+        hudUpdateTimer.current = now;
+        setHudCamera({ ...cameraRef.current });
+        setHudSize({ ...sizeRef.current });
+      }
 
       const dpr = window.devicePixelRatio || 1;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -423,6 +442,29 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
     [],
   );
 
+  // --- Fly-to navigation ---
+  const handleFlyTo = useCallback((target: FlyTarget) => {
+    const cam = targetCameraRef.current;
+    cam.x = target.x;
+    cam.y = target.y;
+    cam.zoom = target.zoom;
+    setFocusName(target.label);
+  }, []);
+
+  const handleFlyToSystem = useCallback(() => {
+    const cam = targetCameraRef.current;
+    cam.x = 0;
+    cam.y = 0;
+    cam.zoom = 0.12;
+    setFocusName(null);
+  }, []);
+
+  const handleMinimapNavigate = useCallback((worldX: number, worldY: number) => {
+    const cam = targetCameraRef.current;
+    cam.x = worldX;
+    cam.y = worldY;
+  }, []);
+
   // --- Tooltip content ---
   const tooltipContent = (() => {
     if (!hovered || !snapshot) { return null; }
@@ -475,7 +517,33 @@ export function SolarSystemMapCanvas({ snapshot, currentTick }: Props) {
       {/* Main map canvas */}
       <canvas ref={canvasRef} className="absolute inset-0" />
 
-      {/* DOM overlays */}
+      {/* HUD overlays */}
+      <ZoomInfo camera={hudCamera} />
+      <div className="absolute top-4 left-4 z-10 pointer-events-none" style={{ top: 60 }}>
+        <Breadcrumb focusName={focusName} onReset={handleFlyToSystem} />
+      </div>
+      {config && (
+        <QuickNav
+          bodies={config.bodies}
+          stations={snapshot ? Object.values(snapshot.stations) : []}
+          ships={snapshot ? Object.values(snapshot.ships) : []}
+          onFlyTo={handleFlyTo}
+          auUmToWorld={auUmToWorld}
+          bodyAbsolutes={bodyAbsolutes}
+        />
+      )}
+      {config && (
+        <Minimap
+          bodies={config.bodies}
+          bodyAbsolutes={bodyAbsolutes}
+          camera={hudCamera}
+          viewWidth={hudSize.width}
+          viewHeight={hudSize.height}
+          onNavigate={handleMinimapNavigate}
+        />
+      )}
+
+      {/* Entity overlays */}
       {tooltipContent}
       {detailCard}
     </div>
