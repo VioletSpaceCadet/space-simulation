@@ -595,6 +595,33 @@ fn ships_built_after_tech_unlock_and_trade_available() {
     );
 }
 
+/// Run with production content (real wear rates) and verify deep_scan unlocks.
+/// This catches the scenario where wear_per_run: 0.0 in fixture content masks
+/// production failures like power cliff or module degradation.
+#[test]
+fn deep_scan_unlocks_with_production_content() {
+    let content = sim_world::load_content("../../content").unwrap();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut state = sim_world::build_initial_state(&content, 42, &mut rng);
+
+    run_with_autopilot(&content, &mut state, &mut rng, 1500);
+
+    assert!(
+        state
+            .research
+            .unlocked
+            .contains(&TechId("tech_deep_scan_v1".to_string())),
+        "tech_deep_scan_v1 should unlock within 1500 ticks with production content \
+         (real wear rates). Unlocked: {:?}, SurveyData: {:?}, Evidence: {:?}",
+        state.research.unlocked,
+        state.research.data_pool.get(&DataKind::SurveyData),
+        state
+            .research
+            .evidence
+            .get(&TechId("tech_deep_scan_v1".to_string())),
+    );
+}
+
 /// Lab per-run amounts should NOT be scaled by `minutes_per_tick`.
 /// `data_consumption_per_run` and `research_points_per_run` are per-execution
 /// constants, not rates. This catches the VIO-187 double-scaling bug.
