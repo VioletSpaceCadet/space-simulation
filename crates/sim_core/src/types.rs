@@ -1251,6 +1251,10 @@ pub struct Constants {
     /// Skip exports that would yield less than this revenue. Avoids micro-transactions.
     #[serde(default = "default_autopilot_export_min_revenue")]
     pub autopilot_export_min_revenue: f64,
+    /// LH2 inventory threshold for propellant pipeline management.
+    /// Below this: ensure electrolysis enabled. Above 2x this: disable to save power.
+    #[serde(default = "default_autopilot_lh2_threshold_kg")]
+    pub autopilot_lh2_threshold_kg: f32,
     // Spatial system
     /// Max distance (micro-AU) for docking/deposit operations. Ships must be within this range.
     #[serde(default = "default_docking_range_au_um")]
@@ -1413,6 +1417,10 @@ fn default_autopilot_export_batch_size_kg() -> f32 {
 
 fn default_autopilot_export_min_revenue() -> f64 {
     1_000.0
+}
+
+fn default_autopilot_lh2_threshold_kg() -> f32 {
+    5000.0
 }
 
 /// 20 °C in milli-Kelvin — shared default for ambient/sink temperature.
