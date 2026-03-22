@@ -1,4 +1,5 @@
-use super::{MIN_MEANINGFUL_KG, TECH_SHIP_CONSTRUCTION};
+use super::MIN_MEANINGFUL_KG;
+use crate::tasks::{ship_construction_enabled, ship_construction_tech_id};
 use crate::{
     Event, EventEnvelope, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
     ModuleBehaviorDef, OutputSpec, PrincipalId, QualityFormula, RecipeDef, ShipId, ShipState,
@@ -144,17 +145,12 @@ fn execute(
         return super::RunOutcome::Stalled(super::StallReason::StockCap);
     }
 
-    // Tech gate: if recipe has ship output, require tech_ship_construction
+    // Tech gate: if recipe has ship output, require EnableShipConstruction effect
     let has_ship_output = recipe
         .outputs
         .iter()
         .any(|o| matches!(o, OutputSpec::Ship { .. }));
-    if has_ship_output
-        && !state
-            .research
-            .unlocked
-            .contains(&TechId(TECH_SHIP_CONSTRUCTION.to_string()))
-    {
+    if has_ship_output && !ship_construction_enabled(&state.research, content) {
         // Only emit ModuleAwaitingTech once — when timer first reaches the interval.
         // should_run() incremented the timer; if it equals exactly the interval,
         // this is the first time we've reached it.
@@ -170,16 +166,18 @@ fn execute(
             }
         };
         if first_trigger {
-            let current_tick = state.meta.tick;
-            events.push(crate::emit(
-                &mut state.counters,
-                current_tick,
-                Event::ModuleAwaitingTech {
-                    station_id: ctx.station_id.clone(),
-                    module_id: ctx.module_id.clone(),
-                    tech_id: TechId(TECH_SHIP_CONSTRUCTION.to_string()),
-                },
-            ));
+            if let Some(tech_id) = ship_construction_tech_id(content) {
+                let current_tick = state.meta.tick;
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::ModuleAwaitingTech {
+                        station_id: ctx.station_id.clone(),
+                        module_id: ctx.module_id.clone(),
+                        tech_id: tech_id.clone(),
+                    },
+                ));
+            }
         }
         // Don't reset timer — let it stay above interval so we only emit once
         return super::RunOutcome::Skipped { reset_timer: false };
@@ -708,6 +706,15 @@ mod assembler_component_tests {
 
     fn shipyard_content() -> GameContent {
         let mut content = crate::test_fixtures::base_content();
+        content.techs.push(TechDef {
+            id: TechId("tech_ship_construction".to_string()),
+            name: "Ship Construction".to_string(),
+            prereqs: vec![],
+            domain_requirements: HashMap::new(),
+            accepted_data: vec![],
+            difficulty: 10.0,
+            effects: vec![TechEffect::EnableShipConstruction],
+        });
         content.component_defs.push(ComponentDef {
             id: "thruster".to_string(),
             name: "Thruster".to_string(),

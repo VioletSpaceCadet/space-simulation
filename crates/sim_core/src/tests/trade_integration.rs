@@ -7,6 +7,17 @@ use std::collections::HashMap;
 fn economy_content() -> GameContent {
     let mut content = test_fixtures::base_content();
 
+    // Tech that gates ship construction via effect system
+    content.techs.push(TechDef {
+        id: TechId("tech_ship_construction".to_string()),
+        name: "Ship Construction".to_string(),
+        prereqs: vec![],
+        domain_requirements: HashMap::new(),
+        accepted_data: vec![],
+        difficulty: 10.0,
+        effects: vec![TechEffect::EnableShipConstruction],
+    });
+
     // Pricing table for materials, components, and modules
     content.pricing = PricingTable {
         import_surcharge_per_kg: 100.0,
