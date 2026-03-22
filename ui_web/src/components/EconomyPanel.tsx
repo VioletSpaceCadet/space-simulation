@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { PricingTable, SimEvent, SimSnapshot, TradeItemSpec } from '../types';
-import { formatCurrency } from '../utils';
+import { formatCurrency, getEventKey } from '../utils';
 
 type ItemCategory = 'Material' | 'Component' | 'Module'
 
@@ -194,7 +194,7 @@ export function EconomyPanel({ snapshot, events }: Props) {
   const tradeEvents = useMemo(() => {
     return events
       .filter((event) => {
-        const key = Object.keys(event.event)[0];
+        const key = getEventKey(event.event);
         return key === 'ItemImported' || key === 'ItemExported';
       })
       .slice(-20)
@@ -364,7 +364,7 @@ export function EconomyPanel({ snapshot, events }: Props) {
         ) : (
           <div className="flex flex-col gap-0.5">
             {tradeEvents.map((event) => {
-              const eventKey = Object.keys(event.event)[0];
+              const eventKey = getEventKey(event.event);
               const data = event.event[eventKey] as Record<string, unknown>;
               const isImport = eventKey === 'ItemImported';
               const amount = isImport ? (data.cost as number) : (data.revenue as number);

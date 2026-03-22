@@ -6,7 +6,7 @@ import type {
   ComponentItem, InventoryItem, MaterialItem, ModuleItem, ModuleState,
   OreItem, PowerState, ShipState, SlagItem, StationState,
 } from '../types';
-import { formatTempMk, thermalColorClass } from '../utils';
+import { formatTempMk, getTaskKind, thermalColorClass } from '../utils';
 
 import { SortIndicator } from './SortIndicator';
 
@@ -31,7 +31,7 @@ function formatKg(kg: number): string {
 
 function taskLabel(task: ShipState['task']): string {
   if (!task) {return 'idle';}
-  const key = Object.keys(task.kind)[0] ?? 'idle';
+  const key = getTaskKind(task) ?? 'idle';
   return key.toLowerCase();
 }
 
@@ -159,7 +159,7 @@ function TaskProgress({ task, displayTick }: { task: ShipState['task']; displayT
 
 function ShipDetail({ ship, displayTick }: { ship: ShipState; displayTick: number }) {
   const task = ship.task;
-  const taskType = task ? Object.keys(task.kind)[0] : null;
+  const taskType = getTaskKind(task);
 
   return (
     <div className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2 text-[11px] w-fit">

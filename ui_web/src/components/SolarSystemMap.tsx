@@ -21,6 +21,7 @@ import type {
   SolarSystemConfig,
   StationState,
 } from '../types';
+import { getTaskKind } from '../utils';
 import {
   auUmToAu,
   distanceAuUm,
@@ -51,7 +52,7 @@ function toSvgPos(abs: AbsolutePos): { x: number; y: number } {
 
 function shipColor(task: ShipState['task']): string {
   if (!task) {return 'var(--color-dim)';}
-  const kind = Object.keys(task.kind)[0];
+  const kind = getTaskKind(task) ?? 'idle';
   return shipTaskColor(kind);
 }
 
@@ -178,7 +179,7 @@ export function SolarSystemMap({ snapshot, currentTick }: Props) {
 
   // Compute ship SVG position, handling transit interpolation
   function shipSvgPos(ship: ShipState): { x: number; y: number } {
-    const taskKind = ship.task ? Object.keys(ship.task.kind)[0] : null;
+    const taskKind = getTaskKind(ship.task);
 
     if (taskKind === 'Transit' && ship.task && 'Transit' in ship.task.kind) {
       const transit = (ship.task.kind as { Transit: { destination: Position } }).Transit;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer } from 'react';
 
 import { createEventSource, fetchSnapshot } from '../api';
 import type { ActiveAlert, AlertSeverity, SimEvent, SimSnapshot } from '../types';
+import { getEventKey } from '../utils';
 
 import { applyEvents } from './applyEvents';
 
@@ -49,7 +50,7 @@ function reducer(state: State, action: Action): State {
       const newAlerts = new Map(state.activeAlerts);
       let newDismissed = state.dismissedAlerts;
       for (const e of action.events) {
-        const eventKey = Object.keys(e.event)[0];
+        const eventKey = getEventKey(e.event);
         const data = e.event[eventKey] as Record<string, unknown>;
         if (eventKey === 'AlertRaised') {
           newAlerts.set(data.alert_id as string, {

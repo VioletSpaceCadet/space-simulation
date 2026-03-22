@@ -1,4 +1,21 @@
-import type { OverheatZone, ThermalState } from './types';
+import type { OverheatZone, ShipState, ThermalState } from './types';
+
+/**
+ * Extract the discriminant key from a tagged-union event object.
+ * E.g. `{ "ShipTaskCompleted": { ship_id: "s1" } }` → `"ShipTaskCompleted"`.
+ */
+export function getEventKey(event: Record<string, unknown>): string {
+  return Object.keys(event)[0] ?? 'Unknown';
+}
+
+/**
+ * Extract the task kind string from a ship's task.
+ * Returns the discriminant key (e.g. "Transit", "Mine") or null if no task.
+ */
+export function getTaskKind(task: ShipState['task']): string | null {
+  if (!task) { return null; }
+  return Object.keys(task.kind)[0] ?? null;
+}
 
 export function formatCurrency(value: number): string {
   if (value >= 1_000_000_000) {
