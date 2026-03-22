@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manufacturing DAG — Design Mockup</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --void: #0b0d14;
+    --surface: #10131a;
+    --surface-raised: #161a24;
+    --edge: #1e2228;
+    --edge-light: #282d36;
+    --fg: #c8ccd4;
+    --bright: #e0e2e8;
+    --dim: #8a8e98;
+    --muted: #5c6070;
+    --faint: #3a3e48;
+    --accent: #5ca0c8;
+    --amber: #c89a4a;
+    --green: #4caf7d;
+    --red: #c85450;
+    --purple: #7b68ee;
+    /* Material tier colors */
+    --raw: #c47038;
+    --refined: #c89a4a;
+    --component: #5ca0c8;
+    --final: #4caf7d;
+    --locked: #3a3e48;
+  }
+
+  body {
+    background: var(--void);
+    color: var(--fg);
+    font-family: 'DM Mono', monospace;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Panel frame — simulates the draggable panel container */
+  .panel-frame {
+    width: 900px;
+    height: 620px;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  /* Panel header */
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--edge);
+    background: var(--surface-raised);
+    cursor: grab;
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--dim);
+  }
+  .panel-controls {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .panel-btn {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .panel-btn:hover { background: rgba(255,255,255,0.06); color: var(--fg); }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--edge);
+    flex-shrink: 0;
+  }
+  .toolbar-group {
+    display: flex;
+    gap: 2px;
+  }
+  .toolbar-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    background: transparent;
+    border: 1px solid var(--edge);
+    color: var(--dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .toolbar-btn:first-child { border-radius: 3px 0 0 3px; }
+  .toolbar-btn:last-child { border-radius: 0 3px 3px 0; }
+  .toolbar-btn.active {
+    background: rgba(92,160,200,0.1);
+    border-color: rgba(92,160,200,0.3);
+    color: var(--accent);
+  }
+  .toolbar-btn:hover:not(.active) {
+    background: rgba(255,255,255,0.03);
+    color: var(--fg);
+  }
+  .toolbar-sep {
+    width: 1px; height: 16px; background: var(--edge); margin: 0 4px;
+  }
+  .station-selector {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 4px 8px;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+    color: var(--accent);
+    cursor: pointer;
+    appearance: none;
+    outline: none;
+  }
+  .station-selector option { background: var(--surface); }
+
+  /* DAG canvas area */
+  .dag-viewport {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  canvas#dag {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Legend overlay */
+  .dag-legend {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(16,19,26,0.92);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    padding: 8px 10px;
+    backdrop-filter: blur(8px);
+    display: flex;
+    gap: 14px;
+    font-size: 9px;
+    color: var(--dim);
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 5px;
+  }
+  .legend-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .legend-rect {
+    width: 10px; height: 6px; border-radius: 1px;
+  }
+
+  /* Tooltip */
+  .dag-tooltip {
+    position: fixed;
+    z-index: 100;
+    background: rgba(16,19,26,0.95);
+    border: 1px solid var(--edge);
+    border-radius: 6px;
+    padding: 10px 14px;
+    max-width: 260px;
+    pointer-events: none;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    transform: translate(-50%, -100%) translateY(-10px);
+    font-size: 10px;
+    display: none;
+  }
+  .dag-tooltip .tt-name {
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--bright);
+    margin-bottom: 2px;
+  }
+  .dag-tooltip .tt-type {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .dag-tooltip .tt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 2px 0;
+    color: var(--dim);
+  }
+  .dag-tooltip .tt-label { color: var(--muted); }
+  .dag-tooltip .tt-val { color: var(--fg); text-align: right; }
+  .dag-tooltip .tt-bar {
+    height: 3px; background: var(--edge); border-radius: 2px;
+    margin: 3px 0; overflow: hidden;
+  }
+  .dag-tooltip .tt-bar-fill {
+    height: 100%; border-radius: 2px;
+  }
+
+  /* Status badge */
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 9px; padding: 1px 6px; border-radius: 3px;
+    margin-top: 4px;
+  }
+  .status-active { background: rgba(76,175,125,0.15); color: var(--green); }
+  .status-available { background: rgba(92,160,200,0.1); color: var(--accent); }
+  .status-locked { background: rgba(58,62,72,0.3); color: var(--muted); }
+  .status-starved { background: rgba(200,84,80,0.15); color: var(--red); }
+
+  /* Pulse animation for active recipes */
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1.0; }
+  }
+
+  /* Bottleneck flash */
+  @keyframes bottleneck-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+  }
+</style>
+</head>
+<body>
+
+<div class="panel-frame">
+  <div class="panel-header">
+    <span class="panel-title">Production Chain</span>
+    <div class="panel-controls">
+      <div class="panel-btn" title="Fit to view">⊡</div>
+      <div class="panel-btn" title="Close">✕</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button class="toolbar-btn active" id="view-chain">Chain</button>
+      <button class="toolbar-btn" id="view-station">Station</button>
+    </div>
+    <div class="toolbar-sep"></div>
+    <select class="station-selector">
+      <option>Station Alpha</option>
+      <option>Refinery Bravo</option>
+    </select>
+    <div class="toolbar-sep"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn active">All</button>
+      <button class="toolbar-btn">Active</button>
+    </div>
+  </div>
+
+  <div class="dag-viewport">
+    <canvas id="dag"></canvas>
+
+    <div class="dag-legend">
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--raw);"></div>
+        Raw
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--refined);"></div>
+        Refined
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--component);"></div>
+        Component
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--final);"></div>
+        Final
+      </div>
+      <div class="legend-item">
+        <div class="legend-rect" style="background:var(--green);"></div>
+        Active
+      </div>
+      <div class="legend-item">
+        <div class="legend-rect" style="background:var(--accent); opacity:0.5;"></div>
+        Available
+      </div>
+    </div>
+  </div>
+
+  <div class="dag-tooltip" id="tooltip"></div>
+</div>
+
+<script>
+// ========== DAG Data ==========
+// Item nodes — what flows through the chain
+const items = [
+  // Raw materials
+  { id: 'ore', name: 'Iron Ore', type: 'raw', unit: 'kg',
+    inventory: 4200, capacity: 10000 },
+  { id: 'si_ore', name: 'Silicate Ore', type: 'raw', unit: 'kg',
+    inventory: 1800, capacity: 10000 },
+
+  // Refined materials
+  { id: 'Fe', name: 'Iron', type: 'refined', unit: 'kg',
+    inventory: 1200, capacity: null },
+  { id: 'Si', name: 'Silicon', type: 'refined', unit: 'kg',
+    inventory: 640, capacity: null },
+  { id: 'slag', name: 'Slag', type: 'byproduct', unit: 'kg',
+    inventory: 340, capacity: null },
+
+  // Components
+  { id: 'fe_plate', name: 'Fe Plate', type: 'component', unit: 'ct',
+    inventory: 8, capacity: null },
+  { id: 'si_wafer', name: 'Si Wafer', type: 'component', unit: 'ct',
+    inventory: 5, capacity: null },
+  { id: 'repair_kit', name: 'Repair Kit', type: 'component', unit: 'ct',
+    inventory: 12, capacity: 50 },
+
+  // Assembled
+  { id: 'structural_beam', name: 'Structural Beam', type: 'component', unit: 'ct',
+    inventory: 3, capacity: null },
+  { id: 'circuit_board', name: 'Circuit Board', type: 'component', unit: 'ct',
+    inventory: 4, capacity: null },
+
+  // Final products
+  { id: 'hull_frame', name: 'Hull Frame', type: 'final', unit: 'ct',
+    inventory: 1, capacity: null },
+];
+
+// Recipe nodes — transformations between items
+const recipes = [
+  { id: 'recipe_iron_smelt', name: 'Iron Smelting',
+    inputs: [{ item: 'ore', amount: '1000 kg' }],
+    outputs: [{ item: 'Fe', amount: '~680 kg' }, { item: 'slag', amount: '~320 kg' }],
+    status: 'active',
+    module: { name: 'Basic Iron Refinery', type: 'Processor', assigned: 1, available: 1 },
+    rate: { actual: '680 kg/hr', max: '680 kg/hr', utilization: 1.0 },
+    thermal: { current: 1420, optimal: '1200–1600 K' } },
+
+  { id: 'recipe_si_refine', name: 'Silicon Refining',
+    inputs: [{ item: 'si_ore', amount: '800 kg' }],
+    outputs: [{ item: 'Si', amount: '~520 kg' }, { item: 'slag', amount: '~280 kg' }],
+    status: 'active',
+    module: { name: 'Silicon Refinery', type: 'Processor', assigned: 1, available: 1 },
+    rate: { actual: '520 kg/hr', max: '520 kg/hr', utilization: 1.0 } },
+
+  { id: 'recipe_fe_plate', name: 'Plate Pressing',
+    inputs: [{ item: 'Fe', amount: '500 kg' }],
+    outputs: [{ item: 'fe_plate', amount: '1 plate' }],
+    status: 'active',
+    module: { name: 'Plate Press', type: 'Processor', assigned: 1, available: 2 },
+    rate: { actual: '1.0/hr', max: '1.0/hr', utilization: 1.0 } },
+
+  { id: 'recipe_si_wafer', name: 'Wafer Cutting',
+    inputs: [{ item: 'Si', amount: '200 kg' }],
+    outputs: [{ item: 'si_wafer', amount: '1 wafer' }],
+    status: 'active',
+    module: { name: 'Wafer Fabricator', type: 'Processor', assigned: 1, available: 1 },
+    rate: { actual: '2.0/hr', max: '2.6/hr', utilization: 0.77, stallReason: 'Si supply intermittent' } },
+
+  { id: 'recipe_repair_kit', name: 'Repair Kit',
+    inputs: [{ item: 'Fe', amount: '200 kg' }],
+    outputs: [{ item: 'repair_kit', amount: '1 kit' }],
+    status: 'active',
+    module: { name: 'Basic Assembler', type: 'Assembler', assigned: 1, available: 1 },
+    rate: { actual: '0.17/hr', max: '0.17/hr', utilization: 1.0 },
+    stockCap: '12 / 50' },
+
+  { id: 'recipe_beam', name: 'Beam Fabrication',
+    inputs: [{ item: 'fe_plate', amount: '3 plates' }],
+    outputs: [{ item: 'structural_beam', amount: '1 beam' }],
+    status: 'active',
+    module: { name: 'Structural Assembler', type: 'Assembler', assigned: 1, available: 1 },
+    rate: { actual: '0.3/hr', max: '0.33/hr', utilization: 0.91, stallReason: 'Fe plates intermittent' } },
+
+  { id: 'recipe_circuit', name: 'Circuit Assembly',
+    inputs: [{ item: 'si_wafer', amount: '2 wafers' }, { item: 'Fe', amount: '50 kg' }],
+    outputs: [{ item: 'circuit_board', amount: '1 board' }],
+    status: 'available',
+    module: { name: 'Electronics Bay', type: 'Assembler', assigned: 0, available: 1 },
+    rate: { actual: '—', max: '0.5/hr', utilization: 0 } },
+
+  { id: 'recipe_hull', name: 'Hull Frame Assembly',
+    inputs: [{ item: 'structural_beam', amount: '2 beams' }, { item: 'fe_plate', amount: '4 plates' }, { item: 'circuit_board', amount: '1 board' }],
+    outputs: [{ item: 'hull_frame', amount: '1 frame' }],
+    status: 'available',
+    module: { name: 'Heavy Assembler', type: 'Assembler', assigned: 0, available: 1 },
+    rate: { actual: '—', max: '0.1/hr', utilization: 0 } },
+];
+
+// ========== Layout ==========
+// Position items and recipes on a grid.
+// Flow: left → right. Items as circles, recipes as rounded rectangles.
+const TIER_X = [60, 200, 380, 540, 740]; // x position per tier
+const NODE_R = 22; // item node radius
+const RECIPE_W = 130;
+const RECIPE_H = 28;
+
+// Manually position for this mockup (real impl would use dagre/auto-layout)
+const nodePositions = {
+  // Items — positioned by graph depth, spaced vertically
+  ore:              { x: 50,  y: 130, type: 'item' },
+  si_ore:           { x: 50,  y: 280, type: 'item' },
+  Fe:               { x: 200, y: 110, type: 'item' },
+  Si:               { x: 200, y: 280, type: 'item' },
+  slag:             { x: 200, y: 380, type: 'item' },
+  fe_plate:         { x: 370, y: 80,  type: 'item' },
+  si_wafer:         { x: 370, y: 260, type: 'item' },
+  repair_kit:       { x: 370, y: 380, type: 'item' },
+  structural_beam:  { x: 530, y: 60,  type: 'item' },
+  circuit_board:    { x: 530, y: 220, type: 'item' },
+  hull_frame:       { x: 720, y: 140, type: 'item' },
+
+  // Recipes — between their inputs and outputs
+  recipe_iron_smelt:  { x: 125, y: 130, type: 'recipe' },
+  recipe_si_refine:   { x: 125, y: 280, type: 'recipe' },
+  recipe_fe_plate:    { x: 285, y: 90,  type: 'recipe' },
+  recipe_si_wafer:    { x: 285, y: 260, type: 'recipe' },
+  recipe_repair_kit:  { x: 285, y: 380, type: 'recipe' },
+  recipe_beam:        { x: 450, y: 60,  type: 'recipe' },
+  recipe_circuit:     { x: 450, y: 220, type: 'recipe' },
+  recipe_hull:        { x: 630, y: 140, type: 'recipe' },
+};
+
+// Edge connections (from → to)
+const edges = [
+  // Iron chain: ore → smelt → Fe + slag
+  { from: 'ore', to: 'recipe_iron_smelt' },
+  { from: 'recipe_iron_smelt', to: 'Fe' },
+  { from: 'recipe_iron_smelt', to: 'slag' },
+
+  // Silicon chain: si_ore → refine → Si + slag
+  { from: 'si_ore', to: 'recipe_si_refine' },
+  { from: 'recipe_si_refine', to: 'Si' },
+  { from: 'recipe_si_refine', to: 'slag' },
+
+  // Fe → plate press → fe_plate
+  { from: 'Fe', to: 'recipe_fe_plate' },
+  { from: 'recipe_fe_plate', to: 'fe_plate' },
+
+  // Si → wafer cutter → si_wafer
+  { from: 'Si', to: 'recipe_si_wafer' },
+  { from: 'recipe_si_wafer', to: 'si_wafer' },
+
+  // Fe → repair kit
+  { from: 'Fe', to: 'recipe_repair_kit' },
+  { from: 'recipe_repair_kit', to: 'repair_kit' },
+
+  // fe_plate → structural beam
+  { from: 'fe_plate', to: 'recipe_beam' },
+  { from: 'recipe_beam', to: 'structural_beam' },
+
+  // si_wafer + Fe → circuit board (component + refined = component)
+  { from: 'si_wafer', to: 'recipe_circuit' },
+  { from: 'Fe', to: 'recipe_circuit' },
+  { from: 'recipe_circuit', to: 'circuit_board' },
+
+  // structural_beam + fe_plate + circuit_board → hull frame (components mixing)
+  { from: 'structural_beam', to: 'recipe_hull' },
+  { from: 'fe_plate', to: 'recipe_hull' },
+  { from: 'circuit_board', to: 'recipe_hull' },
+  { from: 'recipe_hull', to: 'hull_frame' },
+];
+
+// ========== Canvas ==========
+const canvas = document.getElementById('dag');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+let W, H;
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+}
+
+// Scale positions to fit the viewport (mock data is in 0-800 x 0-400 space)
+function scaleX(x) { return x * (W / 820) + 30; }
+function scaleY(y) { return y * (H / 460) + 20; }
+
+// ========== Colors ==========
+const TIER_COLORS = {
+  raw: '#c47038',
+  refined: '#c89a4a',
+  byproduct: '#6b6050',
+  component: '#5ca0c8',
+  final: '#4caf7d',
+};
+
+const STATUS_COLORS = {
+  active: '#4caf7d',
+  available: '#5ca0c8',
+  locked: '#3a3e48',
+  starved: '#c85450',
+};
+
+// ========== Drawing ==========
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const time = performance.now();
+
+  // No tier labels or grid — layout is topology-driven, not category-driven
+
+  // --- Edges ---
+  for (const edge of edges) {
+    const fromPos = nodePositions[edge.from];
+    const toPos = nodePositions[edge.to];
+    if (!fromPos || !toPos) continue;
+
+    const x1 = scaleX(fromPos.x);
+    const y1 = scaleY(fromPos.y);
+    const x2 = scaleX(toPos.x);
+    const y2 = scaleY(toPos.y);
+
+    // Determine edge color from source recipe status — skip locked
+    const recipe = recipes.find(r => r.id === edge.from || r.id === edge.to);
+    const status = recipe?.status || 'available';
+    if (status === 'locked') continue; // locked recipes not shown
+    let edgeColor = '#2a2e38';
+    let edgeAlpha = 0.5;
+    if (status === 'active') { edgeColor = '#4caf7d'; edgeAlpha = 0.4; }
+    else if (status === 'available') { edgeColor = '#5ca0c8'; edgeAlpha = 0.25; }
+
+    // Offset start/end to node edges
+    const dx = x2 - x1, dy = y2 - y1;
+    const dist = Math.hypot(dx, dy);
+    const ux = dx / dist, uy = dy / dist;
+    const startOffset = fromPos.type === 'item' ? NODE_R * 0.7 : RECIPE_W * 0.35;
+    const endOffset = toPos.type === 'item' ? NODE_R * 0.7 : RECIPE_W * 0.35;
+    const sx = x1 + ux * startOffset;
+    const sy = y1 + uy * startOffset;
+    const ex = x2 - ux * endOffset;
+    const ey = y2 - uy * endOffset;
+
+    ctx.globalAlpha = edgeAlpha;
+
+    // Bezier curve for smoother edges
+    const cpx = (sx + ex) / 2;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.bezierCurveTo(cpx, sy, cpx, ey, ex, ey);
+    ctx.strokeStyle = edgeColor;
+    ctx.lineWidth = status === 'active' ? 2 : 1.2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrowhead
+    const arrowSize = 4;
+    const angle = Math.atan2(ey - sy, ex - sx);
+    // Approximate end tangent
+    const tangentAngle = Math.atan2(ey - (sy + ey) / 2, ex - cpx);
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - arrowSize * Math.cos(tangentAngle - 0.4), ey - arrowSize * Math.sin(tangentAngle - 0.4));
+    ctx.lineTo(ex - arrowSize * Math.cos(tangentAngle + 0.4), ey - arrowSize * Math.sin(tangentAngle + 0.4));
+    ctx.closePath();
+    ctx.fillStyle = edgeColor;
+    ctx.fill();
+
+    // No edge labels — recipe tooltips show input/output details
+
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Item nodes (circles) ---
+  for (const item of items) {
+    if (item.locked) continue; // locked items rendered as part of locked recipe badges
+    const pos = nodePositions[item.id];
+    if (!pos) continue;
+    const x = scaleX(pos.x);
+    const y = scaleY(pos.y);
+    const r = NODE_R * 0.65;
+    const color = TIER_COLORS[item.type] || TIER_COLORS.component;
+
+    // Background circle
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = var_to_hex('--surface-raised');
+    ctx.fill();
+    ctx.strokeStyle = color + '55';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Inventory level ring (partial arc)
+    if (item.capacity) {
+      const pct = Math.min(1, item.inventory / item.capacity);
+      ctx.beginPath();
+      ctx.arc(x, y, r + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
+
+    // Item icon (just the first 2 chars as text for now)
+    ctx.font = 'bold 10px "DM Mono", monospace';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const label = item.id === 'ore' ? '⛏' : item.id === 'slag' ? '▪' : item.id.substring(0, 2).toUpperCase();
+    ctx.fillText(label, x, y);
+    ctx.textBaseline = 'alphabetic';
+
+    // Item name below
+    ctx.font = '9px "Instrument Sans", sans-serif';
+    ctx.fillStyle = '#6b7080';
+    ctx.fillText(item.name, x, y + r + 14);
+
+    // Inventory count
+    const countStr = item.unit === 'kg'
+      ? `${(item.inventory / 1000).toFixed(1)}t`
+      : `×${item.inventory}`;
+    ctx.font = '9px "DM Mono", monospace';
+    ctx.fillStyle = item.inventory === 0 ? '#c85450' : '#8a8e98';
+    ctx.fillText(countStr, x, y + r + 25);
+  }
+
+  // --- Recipe nodes ---
+  for (const recipe of recipes) {
+    if (recipe.status === 'locked') continue; // locked recipes drawn separately below
+    const pos = nodePositions[recipe.id];
+    if (!pos) continue;
+    const x = scaleX(pos.x);
+    const y = scaleY(pos.y);
+    const w = RECIPE_W * 0.75;
+    const h = RECIPE_H * 0.75;
+    const statusColor = STATUS_COLORS[recipe.status] || STATUS_COLORS.available;
+
+    // Background
+    ctx.beginPath();
+    roundRect(ctx, x - w/2, y - h/2, w, h, 4);
+    ctx.fillStyle = '#161a24';
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = recipe.status === 'active'
+      ? statusColor + (Math.sin(time * 0.004) > 0 ? 'aa' : '55')
+      : statusColor + '44';
+    ctx.lineWidth = recipe.status === 'active' ? 1.5 : 1;
+    ctx.stroke();
+
+    // Active glow
+    if (recipe.status === 'active') {
+      const glowAlpha = 0.08 + 0.04 * Math.sin(time * 0.003);
+      ctx.shadowColor = statusColor;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      roundRect(ctx, x - w/2, y - h/2, w, h, 4);
+      ctx.strokeStyle = `rgba(76,175,125,${glowAlpha})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // Status dot
+    const dotR = 3;
+    ctx.beginPath();
+    ctx.arc(x - w/2 + 8, y, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = statusColor;
+    if (recipe.status === 'active') {
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(time * 0.005);
+    }
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Recipe name
+    ctx.font = '9px "DM Mono", monospace';
+    ctx.fillStyle = '#c8ccd4';
+    ctx.textAlign = 'left';
+    const maxTextW = w - 20;
+    let displayName = recipe.name;
+    while (ctx.measureText(displayName).width > maxTextW && displayName.length > 3) {
+      displayName = displayName.slice(0, -1);
+    }
+    if (displayName !== recipe.name) displayName += '…';
+    ctx.fillText(displayName, x - w/2 + 16, y + 3);
+
+    // Utilization bar along bottom edge
+    if (recipe.rate && recipe.rate.utilization > 0) {
+      const barW = (w - 4) * recipe.rate.utilization;
+      const barColor = recipe.rate.utilization >= 0.9 ? '#4caf7d' : recipe.rate.utilization >= 0.5 ? '#c89a4a' : '#c85450';
+      ctx.fillStyle = barColor + '44';
+      ctx.fillRect(x - w/2 + 2, y + h/2 - 3, barW, 2);
+    }
+  }
+
+  // Locked recipes are NOT rendered — they appear when unlocked via research
+}
+
+// Utility: roundRect
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+}
+
+// Utility: CSS variable to hex
+function var_to_hex(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// ========== Tooltip ==========
+const tooltip = document.getElementById('tooltip');
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  let found = null;
+
+  // Check recipe nodes
+  for (const recipe of recipes) {
+    const pos = nodePositions[recipe.id];
+    if (!pos) continue;
+    const x = scaleX(pos.x), y = scaleY(pos.y);
+    const w = RECIPE_W * 0.75, h = RECIPE_H * 0.75;
+    if (mx > x - w/2 && mx < x + w/2 && my > y - h/2 && my < y + h/2) {
+      found = { type: 'recipe', data: recipe };
+      break;
+    }
+  }
+
+  // Check item nodes
+  if (!found) {
+    for (const item of items) {
+      const pos = nodePositions[item.id];
+      if (!pos) continue;
+      const x = scaleX(pos.x), y = scaleY(pos.y);
+      if (Math.hypot(mx - x, my - y) < NODE_R * 0.8) {
+        found = { type: 'item', data: item };
+        break;
+      }
+    }
+  }
+
+  if (found) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = e.clientX + 'px';
+    tooltip.style.top = e.clientY + 'px';
+
+    if (found.type === 'recipe') {
+      const r = found.data;
+      const statusClass = `status-${r.status}`;
+      let html = `<div class="tt-name">${r.name}</div>`;
+      html += `<div class="tt-type">Recipe · <span class="status-badge ${statusClass}" style="display:inline">${r.status}</span></div>`;
+
+      // Inputs section
+      html += `<div style="margin-top:6px;padding-top:5px;border-top:1px solid var(--edge);">`;
+      html += `<div class="tt-label" style="margin-bottom:3px;">Inputs (per cycle)</div>`;
+      for (const inp of r.inputs) {
+        const inputItem = items.find(i => i.id === inp.item);
+        const itemName = inputItem ? inputItem.name : inp.item;
+        const color = TIER_COLORS[inputItem?.type] || '#888';
+        const stock = inputItem ? (inputItem.unit === 'kg' ? `${(inputItem.inventory/1000).toFixed(1)}t in stock` : `×${inputItem.inventory} in stock`) : '';
+        html += `<div class="tt-row"><span style="color:${color}">${itemName}</span><span class="tt-val">${inp.amount}</span></div>`;
+        html += `<div class="tt-row" style="font-size:9px;"><span></span><span style="color:var(--muted)">${stock}</span></div>`;
+      }
+      html += `</div>`;
+
+      // Outputs section
+      html += `<div style="margin-top:4px;padding-top:4px;border-top:1px solid var(--edge);">`;
+      html += `<div class="tt-label" style="margin-bottom:3px;">Outputs (per cycle)</div>`;
+      for (const out of r.outputs) {
+        const outputItem = items.find(i => i.id === out.item);
+        const itemName = outputItem ? outputItem.name : out.item;
+        const color = TIER_COLORS[outputItem?.type] || '#888';
+        html += `<div class="tt-row"><span style="color:${color}">${itemName}</span><span class="tt-val">${out.amount}</span></div>`;
+      }
+      html += `</div>`;
+
+      // Module + rate section
+      html += `<div style="margin-top:4px;padding-top:4px;border-top:1px solid var(--edge);">`;
+      if (r.module) {
+        const m = r.module;
+        const assignColor = m.assigned > 0 ? 'var(--green)' : 'var(--muted)';
+        html += `<div class="tt-row"><span class="tt-label">Module</span><span class="tt-val">${m.name}</span></div>`;
+        html += `<div class="tt-row"><span class="tt-label">Type</span><span class="tt-val">${m.type}</span></div>`;
+        html += `<div class="tt-row"><span class="tt-label">Assigned</span><span class="tt-val" style="color:${assignColor}">${m.assigned} / ${m.available} available</span></div>`;
+      }
+      if (r.rate) {
+        html += `<div class="tt-row"><span class="tt-label">Actual rate</span><span class="tt-val">${r.rate.actual}</span></div>`;
+        html += `<div class="tt-row"><span class="tt-label">Max rate</span><span class="tt-val">${r.rate.max}</span></div>`;
+        const pct = Math.round(r.rate.utilization * 100);
+        const barColor = pct >= 90 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
+        html += `<div class="tt-row"><span class="tt-label">Utilization</span><span class="tt-val" style="color:${barColor}">${pct}%</span></div>`;
+        html += `<div class="tt-bar"><div class="tt-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>`;
+        if (r.rate.stallReason) {
+          html += `<div class="tt-row"><span class="tt-label">Stall</span><span class="tt-val" style="color:var(--amber)">${r.rate.stallReason}</span></div>`;
+        }
+      }
+      html += `</div>`;
+
+      // Thermal + stock cap
+      if (r.thermal) {
+        html += `<div class="tt-row"><span class="tt-label">Temp</span><span class="tt-val">${r.thermal.current} K (opt: ${r.thermal.optimal})</span></div>`;
+      }
+      if (r.stockCap) {
+        html += `<div class="tt-row"><span class="tt-label">Stock cap</span><span class="tt-val">${r.stockCap}</span></div>`;
+      }
+
+      tooltip.innerHTML = html;
+    } else {
+      const item = found.data;
+      const color = TIER_COLORS[item.type] || '#888';
+      let html = `<div class="tt-name">${item.name}</div>`;
+      html += `<div class="tt-type" style="color:${color}">${item.type}</div>`;
+      html += `<div class="tt-row"><span class="tt-label">In Stock</span><span class="tt-val">${item.inventory.toLocaleString()} ${item.unit}</span></div>`;
+      if (item.capacity) {
+        const pct = item.inventory / item.capacity;
+        html += `<div class="tt-row"><span class="tt-label">Capacity</span><span class="tt-val">${item.capacity.toLocaleString()} ${item.unit}</span></div>`;
+        html += `<div class="tt-bar"><div class="tt-bar-fill" style="width:${pct*100}%;background:${color}"></div></div>`;
+      }
+      // Show consumers
+      const consumers = recipes.filter(r => r.inputs.some(i => i.item === item.id));
+      if (consumers.length > 0) {
+        html += `<div style="margin-top:6px;padding-top:5px;border-top:1px solid var(--edge);">`;
+        html += `<div class="tt-label" style="margin-bottom:3px;">Consumed by</div>`;
+        for (const c of consumers) {
+          const sc = STATUS_COLORS[c.status];
+          html += `<div class="tt-row"><span class="tt-val" style="color:${sc}">${c.name}</span></div>`;
+        }
+        html += `</div>`;
+      }
+      // Show producers
+      const producers = recipes.filter(r => r.outputs.some(o => o.item === item.id));
+      if (producers.length > 0) {
+        html += `<div style="margin-top:4px;">`;
+        html += `<div class="tt-label" style="margin-bottom:3px;">Produced by</div>`;
+        for (const p of producers) {
+          const sc = STATUS_COLORS[p.status];
+          html += `<div class="tt-row"><span class="tt-val" style="color:${sc}">${p.name}</span></div>`;
+        }
+        html += `</div>`;
+      }
+      tooltip.innerHTML = html;
+    }
+
+    canvas.style.cursor = 'pointer';
+  } else {
+    tooltip.style.display = 'none';
+    canvas.style.cursor = 'default';
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  tooltip.style.display = 'none';
+});
+
+// ========== Animation loop ==========
+function animate() {
+  draw();
+  requestAnimationFrame(animate);
+}
+
+window.addEventListener('resize', () => { resize(); });
+resize();
+animate();
+</script>
+</body>
+</html>
