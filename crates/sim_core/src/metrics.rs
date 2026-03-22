@@ -1,7 +1,9 @@
 //! Snapshot metrics computed from `GameState`.
 //!
-//! A single `compute_metrics(&GameState, &GameContent) -> MetricsSnapshot` function
-//! samples the current state for time-series analysis. No state mutation, no IO.
+//! `compute_metrics(&GameState, &GameContent) -> MetricsSnapshot` samples the
+//! current state for time-series analysis. Uses `MetricsAccumulator` internally
+//! to accumulate per-station and per-ship metrics before finalizing averages.
+//! No state mutation, no IO.
 
 use crate::{
     tasks::inventory_volume_m3, GameContent, GameState, InventoryItem, ModuleBehaviorDef,
@@ -167,54 +169,82 @@ impl InventoryAccumulator {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::too_many_lines,
-    clippy::cognitive_complexity
-)]
 pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnapshot {
-    let mut acc = InventoryAccumulator::new();
-
-    let mut station_storage_sum = 0.0_f32;
-    let mut station_count = 0_u32;
-
-    let mut refinery_active_count = 0_u32;
-    let mut refinery_starved_count = 0_u32;
-    let mut refinery_stalled_count = 0_u32;
-
-    let mut assembler_active_count = 0_u32;
-    let mut assembler_stalled_count = 0_u32;
-
-    let mut wear_sum = 0.0_f32;
-    let mut wear_count = 0_u32;
-    let mut max_wear = 0.0_f32;
-    let mut total_repair_kits = 0_u32;
-    let mut total_thruster_count = 0_u32;
-
-    let mut power_generated_kw = 0.0_f32;
-    let mut power_consumed_kw = 0.0_f32;
-    let mut power_deficit_kw = 0.0_f32;
-    let mut battery_stored_kwh = 0.0_f32;
-    let mut battery_capacity_kwh = 0.0_f32;
-
-    let mut thermal_max_temp_mk = 0_u32;
-    let mut thermal_temp_sum = 0_u64;
-    let mut thermal_module_count = 0_u32;
-    let mut overheat_warning_count = 0_u32;
-    let mut overheat_critical_count = 0_u32;
-    let mut heat_wear_multiplier_sum = 0.0_f32;
-
-    // --- Stations ---
+    let mut acc = MetricsAccumulator::new();
     for station in state.stations.values() {
-        acc.accumulate(&station.inventory);
+        acc.accumulate_station(station, content);
+    }
+    for ship in state.ships.values() {
+        acc.accumulate_ship(ship, content);
+    }
+    acc.finalize(state)
+}
+
+// ---------------------------------------------------------------------------
+// Accumulator
+// ---------------------------------------------------------------------------
+
+#[derive(Default)]
+struct MetricsAccumulator {
+    inv: InventoryAccumulator,
+
+    station_storage_sum: f32,
+    station_count: u32,
+
+    refinery_active_count: u32,
+    refinery_starved_count: u32,
+    refinery_stalled_count: u32,
+
+    assembler_active_count: u32,
+    assembler_stalled_count: u32,
+
+    wear_sum: f32,
+    wear_count: u32,
+    max_wear: f32,
+    total_repair_kits: u32,
+    total_thruster_count: u32,
+
+    power_generated_kw: f32,
+    power_consumed_kw: f32,
+    power_deficit_kw: f32,
+    battery_stored_kwh: f32,
+    battery_capacity_kwh: f32,
+
+    thermal_max_temp_mk: u32,
+    thermal_temp_sum: u64,
+    thermal_module_count: u32,
+    overheat_warning_count: u32,
+    overheat_critical_count: u32,
+    heat_wear_multiplier_sum: f32,
+
+    fleet_total: u32,
+    fleet_idle: u32,
+    fleet_mining: u32,
+    fleet_transiting: u32,
+    fleet_surveying: u32,
+    fleet_depositing: u32,
+    ship_cargo_sum: f32,
+    ship_count: u32,
+}
+
+impl MetricsAccumulator {
+    fn new() -> Self {
+        Self {
+            inv: InventoryAccumulator::new(),
+            ..Default::default()
+        }
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn accumulate_station(&mut self, station: &crate::StationState, content: &GameContent) {
+        self.inv.accumulate(&station.inventory);
 
         let volume_used = inventory_volume_m3(&station.inventory, content);
         if station.cargo_capacity_m3 > 0.0 {
-            station_storage_sum += volume_used / station.cargo_capacity_m3;
+            self.station_storage_sum += volume_used / station.cargo_capacity_m3;
         }
-        station_count += 1;
+        self.station_count += 1;
 
-        // Check refinery modules
         let total_ore_at_station: f32 = station
             .inventory
             .iter()
@@ -228,83 +258,22 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
             .sum();
 
         for module in &station.modules {
-            // Track wear for all processor modules (enabled or not)
-            let Some(def) = content.module_defs.get(&module.def_id) else {
-                continue;
-            };
-            if matches!(
-                def.behavior,
-                ModuleBehaviorDef::Processor(_) | ModuleBehaviorDef::Assembler(_)
-            ) {
-                wear_sum += module.wear.wear;
-                wear_count += 1;
-                if module.wear.wear > max_wear {
-                    max_wear = module.wear.wear;
-                }
-            }
-
-            // Accumulate thermal metrics for any module with thermal state.
-            if let Some(thermal) = &module.thermal {
-                thermal_module_count += 1;
-                thermal_temp_sum += u64::from(thermal.temp_mk);
-                if thermal.temp_mk > thermal_max_temp_mk {
-                    thermal_max_temp_mk = thermal.temp_mk;
-                }
-                match thermal.overheat_zone {
-                    crate::OverheatZone::Warning => overheat_warning_count += 1,
-                    crate::OverheatZone::Critical | crate::OverheatZone::Damage => {
-                        overheat_critical_count += 1;
-                    }
-                    crate::OverheatZone::Nominal => {}
-                }
-                heat_wear_multiplier_sum +=
-                    crate::thermal::heat_wear_multiplier(thermal.overheat_zone, &content.constants);
-            }
-
-            if !module.enabled {
-                continue;
-            }
-
-            match &def.behavior {
-                ModuleBehaviorDef::Processor(_) => {
-                    refinery_active_count += 1;
-                    if let ModuleKindState::Processor(ps) = &module.kind_state {
-                        if ps.stalled {
-                            refinery_stalled_count += 1;
-                        }
-                        if total_ore_at_station < ps.threshold_kg {
-                            refinery_starved_count += 1;
-                        }
-                    }
-                }
-                ModuleBehaviorDef::Assembler(_) => {
-                    assembler_active_count += 1;
-                    if let ModuleKindState::Assembler(asmb) = &module.kind_state {
-                        if asmb.stalled {
-                            assembler_stalled_count += 1;
-                        }
-                    }
-                }
-                _ => {}
-            }
+            self.accumulate_module(module, content, total_ore_at_station);
         }
 
-        // Accumulate power metrics from station power state
-        power_generated_kw += station.power.generated_kw;
-        power_consumed_kw += station.power.consumed_kw;
-        power_deficit_kw += station.power.deficit_kw;
-        battery_stored_kwh += station.power.battery_stored_kwh;
+        self.power_generated_kw += station.power.generated_kw;
+        self.power_consumed_kw += station.power.consumed_kw;
+        self.power_deficit_kw += station.power.deficit_kw;
+        self.battery_stored_kwh += station.power.battery_stored_kwh;
 
-        // Sum total battery capacity from module defs
         for module in &station.modules {
             if let Some(def) = content.module_defs.get(&module.def_id) {
                 if let ModuleBehaviorDef::Battery(battery_def) = &def.behavior {
-                    battery_capacity_kwh += battery_def.capacity_kwh;
+                    self.battery_capacity_kwh += battery_def.capacity_kwh;
                 }
             }
         }
 
-        // Count repair kits and thrusters
         for item in &station.inventory {
             if let InventoryItem::Component {
                 component_id,
@@ -313,182 +282,233 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
             } = item
             {
                 if component_id.0 == crate::COMPONENT_REPAIR_KIT {
-                    total_repair_kits += *count;
+                    self.total_repair_kits += *count;
                 }
                 if component_id.0 == crate::COMPONENT_THRUSTER {
-                    total_thruster_count += *count;
+                    self.total_thruster_count += *count;
                 }
             }
         }
     }
 
-    // --- Ships ---
-    let mut fleet_total = 0_u32;
-    let mut fleet_idle = 0_u32;
-    let mut fleet_mining = 0_u32;
-    let mut fleet_transiting = 0_u32;
-    let mut fleet_surveying = 0_u32;
-    let mut fleet_depositing = 0_u32;
-    let mut ship_cargo_sum = 0.0_f32;
-    let mut ship_count = 0_u32;
+    fn accumulate_module(
+        &mut self,
+        module: &crate::ModuleState,
+        content: &GameContent,
+        total_ore_at_station: f32,
+    ) {
+        let Some(def) = content.module_defs.get(&module.def_id) else {
+            return;
+        };
 
-    for ship in state.ships.values() {
-        fleet_total += 1;
+        if matches!(
+            def.behavior,
+            ModuleBehaviorDef::Processor(_) | ModuleBehaviorDef::Assembler(_)
+        ) {
+            self.wear_sum += module.wear.wear;
+            self.wear_count += 1;
+            if module.wear.wear > self.max_wear {
+                self.max_wear = module.wear.wear;
+            }
+        }
 
-        acc.accumulate(&ship.inventory);
+        if let Some(thermal) = &module.thermal {
+            self.thermal_module_count += 1;
+            self.thermal_temp_sum += u64::from(thermal.temp_mk);
+            if thermal.temp_mk > self.thermal_max_temp_mk {
+                self.thermal_max_temp_mk = thermal.temp_mk;
+            }
+            match thermal.overheat_zone {
+                crate::OverheatZone::Warning => self.overheat_warning_count += 1,
+                crate::OverheatZone::Critical | crate::OverheatZone::Damage => {
+                    self.overheat_critical_count += 1;
+                }
+                crate::OverheatZone::Nominal => {}
+            }
+            self.heat_wear_multiplier_sum +=
+                crate::thermal::heat_wear_multiplier(thermal.overheat_zone, &content.constants);
+        }
+
+        if !module.enabled {
+            return;
+        }
+
+        match &def.behavior {
+            ModuleBehaviorDef::Processor(_) => {
+                self.refinery_active_count += 1;
+                if let ModuleKindState::Processor(ps) = &module.kind_state {
+                    if ps.stalled {
+                        self.refinery_stalled_count += 1;
+                    }
+                    if total_ore_at_station < ps.threshold_kg {
+                        self.refinery_starved_count += 1;
+                    }
+                }
+            }
+            ModuleBehaviorDef::Assembler(_) => {
+                self.assembler_active_count += 1;
+                if let ModuleKindState::Assembler(asmb) = &module.kind_state {
+                    if asmb.stalled {
+                        self.assembler_stalled_count += 1;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn accumulate_ship(&mut self, ship: &crate::ShipState, content: &GameContent) {
+        self.fleet_total += 1;
+        self.inv.accumulate(&ship.inventory);
 
         let volume_used = inventory_volume_m3(&ship.inventory, content);
         if ship.cargo_capacity_m3 > 0.0 {
-            ship_cargo_sum += volume_used / ship.cargo_capacity_m3;
+            self.ship_cargo_sum += volume_used / ship.cargo_capacity_m3;
         }
-        ship_count += 1;
+        self.ship_count += 1;
 
         match ship.task.as_ref().map(|t| &t.kind) {
-            None | Some(TaskKind::Idle) => fleet_idle += 1,
-            Some(TaskKind::Mine { .. }) => fleet_mining += 1,
-            Some(TaskKind::Transit { .. }) => fleet_transiting += 1,
+            None | Some(TaskKind::Idle) => self.fleet_idle += 1,
+            Some(TaskKind::Mine { .. }) => self.fleet_mining += 1,
+            Some(TaskKind::Transit { .. }) => self.fleet_transiting += 1,
             Some(TaskKind::Survey { .. } | TaskKind::DeepScan { .. }) => {
-                fleet_surveying += 1;
+                self.fleet_surveying += 1;
             }
-            Some(TaskKind::Deposit { .. }) => fleet_depositing += 1,
+            Some(TaskKind::Deposit { .. }) => self.fleet_depositing += 1,
         }
     }
 
-    // --- Exploration ---
-    let asteroids_depleted = state
-        .asteroids
-        .values()
-        .filter(|a| a.mass_kg <= 0.0)
-        .count() as u32;
-
-    // --- Research ---
-    let total_scan_data = state
-        .research
-        .data_pool
-        .get(&crate::DataKind::SurveyData)
-        .copied()
-        .unwrap_or(0.0);
-
-    let max_tech_evidence = state
-        .research
-        .evidence
-        .values()
-        .flat_map(|dp| dp.points.values())
-        .copied()
-        .fold(0.0_f32, f32::max);
-
-    // --- Finalize averages ---
-    let avg_ore_fe_fraction = if acc.ore_total_weight > 0.0 {
-        acc.ore_fe_weighted_sum / acc.ore_total_weight
-    } else {
-        0.0
-    };
-
-    let avg_material_quality = if acc.material_total_weight > 0.0 {
-        acc.material_quality_weighted_sum / acc.material_total_weight
-    } else {
-        0.0
-    };
-
-    let station_storage_used_pct = if station_count > 0 {
-        station_storage_sum / station_count as f32
-    } else {
-        0.0
-    };
-
-    let ship_cargo_used_pct = if ship_count > 0 {
-        ship_cargo_sum / ship_count as f32
-    } else {
-        0.0
-    };
-
-    let avg_module_wear = if wear_count > 0 {
-        wear_sum / wear_count as f32
-    } else {
-        0.0
-    };
-
-    // Clamp min/max to 0.0 when no ore lots exist.
-    let min_ore_fe_fraction = if acc.ore_lot_count > 0 {
-        acc.min_ore_fe
-    } else {
-        0.0
-    };
-    let max_ore_fe_fraction = if acc.ore_lot_count > 0 {
-        acc.max_ore_fe
-    } else {
-        0.0
-    };
-
-    let battery_charge_pct = if battery_capacity_kwh > 0.0 {
-        battery_stored_kwh / battery_capacity_kwh
-    } else {
-        0.0
-    };
-
-    let station_avg_temp_mk = if thermal_module_count > 0 {
-        (thermal_temp_sum / u64::from(thermal_module_count)) as u32
-    } else {
-        0
-    };
-
-    let heat_wear_multiplier_avg = if thermal_module_count > 0 {
-        heat_wear_multiplier_sum / thermal_module_count as f32
-    } else {
-        0.0
-    };
-
-    MetricsSnapshot {
-        tick: state.meta.tick,
-        metrics_version: METRICS_VERSION,
-        total_ore_kg: acc.total_ore_kg,
-        total_material_kg: acc.total_material_kg,
-        total_slag_kg: acc.total_slag_kg,
-        total_iron_material_kg: acc.total_iron_material_kg,
-        station_storage_used_pct,
-        ship_cargo_used_pct,
-        avg_ore_fe_fraction,
-        ore_lot_count: acc.ore_lot_count,
-        min_ore_fe_fraction,
-        max_ore_fe_fraction,
-        avg_material_quality,
-        refinery_active_count,
-        refinery_starved_count,
-        refinery_stalled_count,
-        assembler_active_count,
-        assembler_stalled_count,
-        fleet_total,
-        fleet_idle,
-        fleet_mining,
-        fleet_transiting,
-        fleet_surveying,
-        fleet_depositing,
-        scan_sites_remaining: state.scan_sites.len() as u32,
-        asteroids_discovered: state.asteroids.len() as u32,
-        asteroids_depleted,
-        techs_unlocked: state.research.unlocked.len() as u32,
-        total_scan_data,
-        max_tech_evidence,
-        avg_module_wear,
-        max_module_wear: max_wear,
-        repair_kits_remaining: total_repair_kits,
-        balance: state.balance,
-        thruster_count: total_thruster_count,
-        export_revenue_total: state.export_revenue_total,
-        export_count: state.export_count,
-        power_generated_kw,
-        power_consumed_kw,
-        power_deficit_kw,
-        battery_charge_pct,
-        total_h2o_kg: acc.total_h2o_kg,
-        total_lh2_kg: acc.total_lh2_kg,
-        total_lox_kg: acc.total_lox_kg,
-        station_max_temp_mk: thermal_max_temp_mk,
-        station_avg_temp_mk,
-        overheat_warning_count,
-        overheat_critical_count,
-        heat_wear_multiplier_avg,
+    #[allow(clippy::cast_possible_truncation)]
+    fn compute_averages(&self) -> Averages {
+        Averages {
+            avg_ore_fe_fraction: safe_div(self.inv.ore_fe_weighted_sum, self.inv.ore_total_weight),
+            avg_material_quality: safe_div(
+                self.inv.material_quality_weighted_sum,
+                self.inv.material_total_weight,
+            ),
+            station_storage_used_pct: safe_div(self.station_storage_sum, self.station_count as f32),
+            ship_cargo_used_pct: safe_div(self.ship_cargo_sum, self.ship_count as f32),
+            avg_module_wear: safe_div(self.wear_sum, self.wear_count as f32),
+            min_ore_fe_fraction: if self.inv.ore_lot_count > 0 {
+                self.inv.min_ore_fe
+            } else {
+                0.0
+            },
+            max_ore_fe_fraction: if self.inv.ore_lot_count > 0 {
+                self.inv.max_ore_fe
+            } else {
+                0.0
+            },
+            battery_charge_pct: safe_div(self.battery_stored_kwh, self.battery_capacity_kwh),
+            station_avg_temp_mk: if self.thermal_module_count > 0 {
+                (self.thermal_temp_sum / u64::from(self.thermal_module_count)) as u32
+            } else {
+                0
+            },
+            heat_wear_multiplier_avg: safe_div(
+                self.heat_wear_multiplier_sum,
+                self.thermal_module_count as f32,
+            ),
+        }
     }
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn finalize(self, state: &GameState) -> MetricsSnapshot {
+        let avgs = self.compute_averages();
+
+        let asteroids_depleted = state
+            .asteroids
+            .values()
+            .filter(|a| a.mass_kg <= 0.0)
+            .count() as u32;
+        let total_scan_data = state
+            .research
+            .data_pool
+            .get(&crate::DataKind::SurveyData)
+            .copied()
+            .unwrap_or(0.0);
+        let max_tech_evidence = state
+            .research
+            .evidence
+            .values()
+            .flat_map(|dp| dp.points.values())
+            .copied()
+            .fold(0.0_f32, f32::max);
+
+        MetricsSnapshot {
+            tick: state.meta.tick,
+            metrics_version: METRICS_VERSION,
+            total_ore_kg: self.inv.total_ore_kg,
+            total_material_kg: self.inv.total_material_kg,
+            total_slag_kg: self.inv.total_slag_kg,
+            total_iron_material_kg: self.inv.total_iron_material_kg,
+            station_storage_used_pct: avgs.station_storage_used_pct,
+            ship_cargo_used_pct: avgs.ship_cargo_used_pct,
+            avg_ore_fe_fraction: avgs.avg_ore_fe_fraction,
+            ore_lot_count: self.inv.ore_lot_count,
+            min_ore_fe_fraction: avgs.min_ore_fe_fraction,
+            max_ore_fe_fraction: avgs.max_ore_fe_fraction,
+            avg_material_quality: avgs.avg_material_quality,
+            refinery_active_count: self.refinery_active_count,
+            refinery_starved_count: self.refinery_starved_count,
+            refinery_stalled_count: self.refinery_stalled_count,
+            assembler_active_count: self.assembler_active_count,
+            assembler_stalled_count: self.assembler_stalled_count,
+            fleet_total: self.fleet_total,
+            fleet_idle: self.fleet_idle,
+            fleet_mining: self.fleet_mining,
+            fleet_transiting: self.fleet_transiting,
+            fleet_surveying: self.fleet_surveying,
+            fleet_depositing: self.fleet_depositing,
+            scan_sites_remaining: state.scan_sites.len() as u32,
+            asteroids_discovered: state.asteroids.len() as u32,
+            asteroids_depleted,
+            techs_unlocked: state.research.unlocked.len() as u32,
+            total_scan_data,
+            max_tech_evidence,
+            avg_module_wear: avgs.avg_module_wear,
+            max_module_wear: self.max_wear,
+            repair_kits_remaining: self.total_repair_kits,
+            balance: state.balance,
+            thruster_count: self.total_thruster_count,
+            export_revenue_total: state.export_revenue_total,
+            export_count: state.export_count,
+            power_generated_kw: self.power_generated_kw,
+            power_consumed_kw: self.power_consumed_kw,
+            power_deficit_kw: self.power_deficit_kw,
+            battery_charge_pct: avgs.battery_charge_pct,
+            total_h2o_kg: self.inv.total_h2o_kg,
+            total_lh2_kg: self.inv.total_lh2_kg,
+            total_lox_kg: self.inv.total_lox_kg,
+            station_max_temp_mk: self.thermal_max_temp_mk,
+            station_avg_temp_mk: avgs.station_avg_temp_mk,
+            overheat_warning_count: self.overheat_warning_count,
+            overheat_critical_count: self.overheat_critical_count,
+            heat_wear_multiplier_avg: avgs.heat_wear_multiplier_avg,
+        }
+    }
+}
+
+/// Divide numerator by denominator, returning 0.0 when denominator is zero.
+fn safe_div(numerator: f32, denominator: f32) -> f32 {
+    if denominator > 0.0 {
+        numerator / denominator
+    } else {
+        0.0
+    }
+}
+
+struct Averages {
+    avg_ore_fe_fraction: f32,
+    avg_material_quality: f32,
+    station_storage_used_pct: f32,
+    ship_cargo_used_pct: f32,
+    avg_module_wear: f32,
+    min_ore_fe_fraction: f32,
+    max_ore_fe_fraction: f32,
+    battery_charge_pct: f32,
+    station_avg_temp_mk: u32,
+    heat_wear_multiplier_avg: f32,
 }
 
 /// Write the CSV header row for metrics.
