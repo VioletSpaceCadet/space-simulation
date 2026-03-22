@@ -48,7 +48,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_bench** — Scenario runner. JSON overrides (constants + `module.*` dotted keys). Parallel seeds via rayon.
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags.
 - **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints. Includes `analytics` module (trend/rate/bottleneck analysis) and `GET /api/v1/advisor/digest` endpoint.
-- **mcp_advisor** — MCP server (TypeScript, stdio transport) for balance analysis. Auto-discovered via `.mcp.json`. Requires running `sim_daemon`.
+- **mcp_advisor** — MCP server (TypeScript, stdio transport) for balance analysis and knowledge capture. Tools: metrics digest, alerts, game parameters, parameter proposals, sim lifecycle, `save_run_journal`, `query_knowledge`, `update_playbook`. Auto-discovered via `.mcp.json`. Requires running `sim_daemon` for sim tools; knowledge tools work standalone.
 - **e2e** — Playwright E2E smoke tests. Global setup spawns daemon (port 3002) + Vite (port 5174). Kept minimal for CI stability; use Chrome browser tools for ad-hoc UI testing.
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
 
@@ -129,6 +129,27 @@ Use the **sim-e2e-tester agent** (`.claude/agents/sim-e2e-tester`) for balance a
 Use the **fe-chrome-tester agent** (`.claude/agents/fe-chrome-tester`) for browser-based UI testing. Requires `--chrome` flag. Tests panel rendering, SSE streaming, speed controls, alerts, economy, and save system at `localhost:5173`.
 
 **E2E tests** (`e2e/`) are intentionally minimal — they cover SSE streaming, pause/resume, speed controls, save, and spacebar toggle. Don't add complex E2E tests; they're fragile and better covered by vitest unit tests or the sim-e2e-tester agent with Chrome.
+
+## Knowledge System
+
+Game knowledge is captured in `content/knowledge/` and accessed via MCP tools on the balance-advisor server.
+
+**Files:**
+- `content/knowledge/journals/*.json` — Run journal entries (per-session observations, bottlenecks, strategy notes)
+- `content/knowledge/playbook.md` — Living strategy document (bottleneck resolutions, parameter relationships, fleet sizing)
+- `docs/run-journal-schema.md` — Journal schema reference
+- `mcp_advisor/src/types.ts` — TypeScript types for journal entries
+
+**MCP Tools (balance-advisor):**
+- `query_knowledge` — Search journals + playbook by text, tags, or source. **Use before starting analysis** to check past observations.
+- `save_run_journal` — Persist analysis session findings. Auto-generates UUID + timestamp, writes to `content/knowledge/journals/`.
+- `update_playbook` — Append to or replace sections of the strategy playbook.
+
+**Workflow — follow this loop during balance analysis sessions:**
+1. **Recall:** Call `query_knowledge` with relevant tags/keywords to check what's already known
+2. **Analyze:** Run simulation, observe metrics, identify patterns
+3. **Record:** Call `save_run_journal` with observations, bottlenecks, alerts, and strategy notes
+4. **Generalize:** When a pattern is confirmed across multiple runs, call `update_playbook` to add it as a strategy entry
 
 ## Skills
 
