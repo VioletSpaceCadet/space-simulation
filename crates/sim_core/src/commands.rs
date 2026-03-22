@@ -154,6 +154,7 @@ pub(crate) fn handle_install_module(
         wear: crate::WearState::default(),
         thermal,
         power_stalled: false,
+        manufacturing_priority: 0,
     });
 
     events.push(crate::emit(
@@ -504,6 +505,23 @@ pub(crate) fn handle_jettison_slag(
             },
         ));
     }
+    true
+}
+
+/// Set the manufacturing priority on a module (processor or assembler).
+pub(crate) fn handle_set_manufacturing_priority(
+    state: &mut GameState,
+    station_id: &crate::StationId,
+    module_id: &crate::ModuleInstanceId,
+    priority: u32,
+) -> bool {
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return false;
+    };
+    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+        return false;
+    };
+    module.manufacturing_priority = priority;
     true
 }
 

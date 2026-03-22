@@ -41,6 +41,7 @@ fn hot_smelter_with_radiators_state(content: &crate::GameContent) -> crate::Game
             ..Default::default()
         }),
         power_stalled: false,
+        manufacturing_priority: 0,
     });
     station.modules.push(crate::ModuleState {
         id: ModuleInstanceId("mod_radiator_002".to_string()),
@@ -54,6 +55,7 @@ fn hot_smelter_with_radiators_state(content: &crate::GameContent) -> crate::Game
             ..Default::default()
         }),
         power_stalled: false,
+        manufacturing_priority: 0,
     });
 
     state

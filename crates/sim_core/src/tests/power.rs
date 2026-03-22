@@ -48,6 +48,7 @@ fn state_with_solar_array(content: &GameContent) -> GameState {
         kind_state: ModuleKindState::SolarArray(SolarArrayState::default()),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
     state
@@ -103,6 +104,7 @@ fn power_budget_with_consumer() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -164,6 +166,7 @@ fn power_budget_deficit_when_insufficient() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -310,6 +313,7 @@ fn power_stall_lowest_priority_first() {
         kind_state: ModuleKindState::SolarArray(SolarArrayState::default()),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     };
 
@@ -328,6 +332,7 @@ fn power_stall_lowest_priority_first() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -337,6 +342,7 @@ fn power_stall_lowest_priority_first() {
         kind_state: ModuleKindState::SensorArray(SensorArrayState::default()),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -382,6 +388,7 @@ fn power_stall_no_stalling_without_solar_arrays() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -415,6 +422,7 @@ fn power_stall_clears_when_power_restored() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -424,6 +432,7 @@ fn power_stall_clears_when_power_restored() {
         kind_state: ModuleKindState::SensorArray(SensorArrayState::default()),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -493,6 +502,7 @@ fn battery_charges_from_surplus() {
         kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 0.0 }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -551,6 +561,7 @@ fn battery_discharges_to_cover_deficit() {
         kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 50.0 }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -565,6 +576,7 @@ fn battery_discharges_to_cover_deficit() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -635,6 +647,7 @@ fn battery_partial_discharge_then_stall() {
         kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 10.0 }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -649,6 +662,7 @@ fn battery_partial_discharge_then_stall() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -689,6 +703,7 @@ fn battery_charge_limited_by_capacity() {
         kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 95.0 }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -721,6 +736,7 @@ fn battery_wear_reduces_effective_capacity() {
             wear: content.constants.wear_band_degraded_threshold,
         },
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -758,6 +774,7 @@ fn battery_not_stalled_by_power_system() {
         kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 50.0 }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 

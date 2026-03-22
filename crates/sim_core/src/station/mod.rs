@@ -54,7 +54,16 @@ fn estimate_output_volume_m3(
                 let slag_density = element_density(content, crate::ELEMENT_SLAG);
                 total_volume += slag_kg / slag_density;
             }
-            OutputSpec::Component { .. } | OutputSpec::Ship { .. } => {}
+            OutputSpec::Component { component_id, .. } => {
+                if let Some(comp_def) = content
+                    .component_defs
+                    .iter()
+                    .find(|c| c.id == component_id.0)
+                {
+                    total_volume += comp_def.volume_m3;
+                }
+            }
+            OutputSpec::Ship { .. } => {}
         }
     }
     total_volume
@@ -771,6 +780,7 @@ mod framework_tests {
                         kind_state,
                         wear: WearState::default(),
                         power_stalled: false,
+                        manufacturing_priority: 0,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),

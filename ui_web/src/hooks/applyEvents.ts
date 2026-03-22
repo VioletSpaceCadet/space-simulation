@@ -815,6 +815,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   OverheatCleared: handleOverheatCleared,
   OverheatDamage: handleOverheatDamage,
   BoiloffLoss: handleBoiloffLoss,
+  RecipeSelectionReset: noOp,
 };
 
 export function applyEvents(

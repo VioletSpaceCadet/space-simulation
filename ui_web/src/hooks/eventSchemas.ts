@@ -354,6 +354,13 @@ export const eventSchemas = {
     element: z.string(),
     kg_lost: z.number(),
   }),
+
+  RecipeSelectionReset: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+    old_recipe: z.string(),
+    new_recipe: z.string(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

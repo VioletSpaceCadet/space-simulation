@@ -561,6 +561,7 @@ mod tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
+                        manufacturing_priority: 0,
                         thermal: Some(ThermalState {
                             temp_mk,
                             thermal_group: Some("smelting".to_string()),
@@ -750,6 +751,7 @@ mod tests {
             }),
             wear: WearState::default(),
             power_stalled: false,
+            manufacturing_priority: 0,
             thermal: Some(ThermalState {
                 temp_mk: 600_000,
                 thermal_group: Some("reactor".to_string()),
@@ -808,6 +810,7 @@ mod tests {
             kind_state: ModuleKindState::Radiator(RadiatorState::default()),
             wear: WearState { wear },
             power_stalled: false,
+            manufacturing_priority: 0,
             thermal: Some(ThermalState {
                 temp_mk: DEFAULT_AMBIENT_TEMP_MK,
                 thermal_group: Some("smelting".to_string()),

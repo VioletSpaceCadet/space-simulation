@@ -18,14 +18,33 @@ pub(super) fn tick_assembler_modules(
         .get(station_id)
         .map_or(0, |s| s.modules.len());
 
-    for module_idx in 0..module_count {
+    // Collect assembler module indices, sorted by priority (desc) then id (asc)
+    let mut assembler_indices: Vec<usize> = (0..module_count)
+        .filter(|&idx| {
+            state
+                .stations
+                .get(station_id)
+                .and_then(|s| s.modules.get(idx))
+                .and_then(|m| content.module_defs.get(&m.def_id))
+                .is_some_and(|d| matches!(d.behavior, ModuleBehaviorDef::Assembler(_)))
+        })
+        .collect();
+
+    if let Some(station) = state.stations.get(station_id) {
+        assembler_indices.sort_by(|&a, &b| {
+            let ma = &station.modules[a];
+            let mb = &station.modules[b];
+            mb.manufacturing_priority
+                .cmp(&ma.manufacturing_priority)
+                .then_with(|| ma.id.0.cmp(&mb.id.0))
+        });
+    }
+
+    for module_idx in assembler_indices {
         let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
             continue;
         };
 
-        let ModuleBehaviorDef::Assembler(_) = &ctx.def.behavior else {
-            continue;
-        };
         let assembler_def = if let ModuleBehaviorDef::Assembler(ad) = &ctx.def.behavior {
             ad.clone()
         } else {
@@ -60,10 +79,73 @@ fn execute(
             _ => return super::RunOutcome::Skipped { reset_timer: true },
         }
     };
-    let recipe_id = selected.as_ref().or_else(|| assembler_def.recipes.first());
+
+    // Recipe fallback: if selected recipe is not in assembler's recipe list, reset it
+    let recipe_id = if let Some(ref sel_id) = selected {
+        if assembler_def.recipes.contains(sel_id) {
+            selected
+        } else {
+            let new_recipe = assembler_def.recipes.first().cloned();
+            if let Some(station) = state.stations.get_mut(&ctx.station_id) {
+                if let crate::ModuleKindState::Assembler(asmb) =
+                    &mut station.modules[ctx.module_idx].kind_state
+                {
+                    asmb.selected_recipe.clone_from(&new_recipe);
+                }
+            }
+            let current_tick = state.meta.tick;
+            if let Some(ref new_id) = new_recipe {
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::RecipeSelectionReset {
+                        station_id: ctx.station_id.clone(),
+                        module_id: ctx.module_id.clone(),
+                        old_recipe: sel_id.clone(),
+                        new_recipe: new_id.clone(),
+                    },
+                ));
+            }
+            new_recipe
+        }
+    } else {
+        selected
+    };
+
+    let recipe_id = recipe_id.as_ref().or_else(|| assembler_def.recipes.first());
     let Some(recipe) = recipe_id.and_then(|id| content.recipes.get(id)) else {
         return super::RunOutcome::Skipped { reset_timer: true };
     };
+
+    // Tech gate: if recipe requires a tech that isn't unlocked, skip
+    if let Some(ref required_tech) = recipe.required_tech {
+        if !state.research.unlocked.iter().any(|t| t == required_tech) {
+            let first_trigger = {
+                let Some(station) = state.stations.get(&ctx.station_id) else {
+                    return super::RunOutcome::Skipped { reset_timer: false };
+                };
+                match &station.modules[ctx.module_idx].kind_state {
+                    crate::ModuleKindState::Assembler(asmb) => {
+                        asmb.ticks_since_last_run == assembler_def.assembly_interval_ticks
+                    }
+                    _ => false,
+                }
+            };
+            if first_trigger {
+                let current_tick = state.meta.tick;
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::ModuleAwaitingTech {
+                        station_id: ctx.station_id.clone(),
+                        module_id: ctx.module_id.clone(),
+                        tech_id: required_tech.clone(),
+                    },
+                ));
+            }
+            return super::RunOutcome::Skipped { reset_timer: false };
+        }
+    }
 
     // Check input availability
     let input_available = {
@@ -522,6 +604,7 @@ mod assembler_component_tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
+                        manufacturing_priority: 0,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
@@ -828,6 +911,7 @@ mod assembler_component_tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
+                        manufacturing_priority: 0,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
