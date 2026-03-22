@@ -86,6 +86,7 @@ fn replenish_test_content() -> GameContent {
             autopilot_fe_reserve_kg: 12_000.0,
             autopilot_export_batch_size_kg: 500.0,
             autopilot_export_min_revenue: 1_000.0,
+            autopilot_lh2_threshold_kg: 5_000.0,
             wear_band_degraded_threshold: 0.5,
             wear_band_critical_threshold: 0.8,
             wear_band_degraded_efficiency: 0.75,

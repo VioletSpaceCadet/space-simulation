@@ -23,6 +23,7 @@
   "autopilot_fe_reserve_kg": 12000.0,
   "autopilot_export_batch_size_kg": 500.0,
   "autopilot_export_min_revenue": 1000.0,
+  "autopilot_lh2_threshold_kg": 5000.0,
   "wear_band_degraded_threshold": 0.5,
   "wear_band_critical_threshold": 0.8,
   "wear_band_degraded_efficiency": 0.75,

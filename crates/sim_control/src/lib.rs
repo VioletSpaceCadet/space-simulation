@@ -100,8 +100,12 @@ fn station_module_commands(
             }
         }
         for module in &station.modules {
-            // Re-enable disabled modules, but not if auto-disabled due to max wear
-            if !module.enabled && module.wear.wear < 1.0 {
+            // Re-enable disabled modules, but not if auto-disabled due to max wear.
+            // Skip electrolysis — managed by propellant_pipeline_commands().
+            if !module.enabled
+                && module.wear.wear < 1.0
+                && module.def_id != "module_electrolysis_unit"
+            {
                 commands.push(make_cmd(
                     owner,
                     state.meta.tick,
@@ -123,6 +127,73 @@ fn station_module_commands(
                             station_id: station.id.clone(),
                             module_id: module.id.clone(),
                             threshold_kg: content.constants.autopilot_refinery_threshold_kg,
+                        },
+                    ));
+                }
+            }
+        }
+    }
+    commands
+}
+
+/// Propellant pipeline management — no-op if station lacks electrolysis module.
+///
+/// When LH2 is abundant (> 2x threshold), disable electrolysis to save 25 kW.
+/// When LH2 is low (< threshold), ensure electrolysis and heating are enabled.
+fn propellant_pipeline_commands(
+    state: &GameState,
+    content: &GameContent,
+    owner: &PrincipalId,
+    next_id: &mut u64,
+) -> Vec<CommandEnvelope> {
+    let mut commands = Vec::new();
+    let lh2_kg = total_lh2_inventory(state);
+    let threshold = content.constants.autopilot_lh2_threshold_kg;
+
+    for station in state.stations.values() {
+        let has_electrolysis = station
+            .modules
+            .iter()
+            .any(|m| m.def_id == "module_electrolysis_unit");
+        if !has_electrolysis {
+            continue;
+        }
+
+        if lh2_kg > threshold * 2.0 {
+            // LH2 abundant — disable electrolysis to save power
+            for module in &station.modules {
+                if module.def_id == "module_electrolysis_unit"
+                    && module.enabled
+                    && module.wear.wear < 1.0
+                {
+                    commands.push(make_cmd(
+                        owner,
+                        state.meta.tick,
+                        next_id,
+                        Command::SetModuleEnabled {
+                            station_id: station.id.clone(),
+                            module_id: module.id.clone(),
+                            enabled: false,
+                        },
+                    ));
+                }
+            }
+        } else if lh2_kg < threshold {
+            // LH2 low — ensure electrolysis and heating are enabled
+            for module in &station.modules {
+                if (module.def_id == "module_electrolysis_unit"
+                    || module.def_id == "module_heating_unit")
+                    && !module.enabled
+                    && module.wear.wear < 1.0
+                {
+                    commands.push(make_cmd(
+                        owner,
+                        state.meta.tick,
+                        next_id,
+                        Command::SetModuleEnabled {
+                            station_id: station.id.clone(),
+                            module_id: module.id.clone(),
+                            enabled: true,
                         },
                     ));
                 }
@@ -189,6 +260,19 @@ fn total_h2o_inventory(state: &GameState) -> f32 {
         .flat_map(|s| s.inventory.iter())
         .filter_map(|item| match item {
             InventoryItem::Material { element, kg, .. } if element == "H2O" => Some(*kg),
+            _ => None,
+        })
+        .sum()
+}
+
+/// Total LH2 material across all station inventories.
+fn total_lh2_inventory(state: &GameState) -> f32 {
+    state
+        .stations
+        .values()
+        .flat_map(|s| s.inventory.iter())
+        .filter_map(|item| match item {
+            InventoryItem::Material { element, kg, .. } if element == "LH2" => Some(*kg),
             _ => None,
         })
         .sum()
@@ -620,6 +704,12 @@ impl CommandSource for AutopilotController {
             next_command_id,
         ));
         commands.extend(export_commands(state, content, &owner, next_command_id));
+        commands.extend(propellant_pipeline_commands(
+            state,
+            content,
+            &owner,
+            next_command_id,
+        ));
 
         let idle_ships = collect_idle_ships(state, &owner);
         let deep_scan_unlocked = state
@@ -630,9 +720,16 @@ impl CommandSource for AutopilotController {
         let mut next_deep_scan = deep_scan_candidates.iter();
         let mut next_site = state.scan_sites.iter();
 
-        // Determine if we need volatile-rich mining
+        // Determine if we need volatile-rich mining (for H2O or propellant pipeline)
+        let has_electrolysis = state.stations.values().any(|s| {
+            s.modules
+                .iter()
+                .any(|m| m.def_id == "module_electrolysis_unit")
+        });
         let needs_water = station_has_heating_module(state)
-            && total_h2o_inventory(state) < content.constants.autopilot_volatile_threshold_kg;
+            && (total_h2o_inventory(state) < content.constants.autopilot_volatile_threshold_kg
+                || (has_electrolysis
+                    && total_lh2_inventory(state) < content.constants.autopilot_lh2_threshold_kg));
 
         let mut mine_candidates: Vec<&AsteroidState> = state
             .asteroids
