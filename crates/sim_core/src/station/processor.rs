@@ -42,7 +42,15 @@ fn execute(
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) -> super::RunOutcome {
-    // Check ore threshold
+    // Capacity pre-check
+    let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
+        return super::RunOutcome::Skipped { reset_timer: false };
+    };
+    let Some(recipe) = processor_def.recipes.first() else {
+        return super::RunOutcome::Skipped { reset_timer: false };
+    };
+
+    // Check input threshold using the recipe's actual input filter
     let threshold_kg = {
         let Some(station) = state.stations.get(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: false };
@@ -53,30 +61,23 @@ fn execute(
         }
     };
 
-    let total_ore_kg: f32 = state.stations.get(&ctx.station_id).map_or(0.0, |s| {
+    let input_filter_for_threshold = recipe.inputs.first().map(|i| &i.filter);
+    let total_input_kg: f32 = state.stations.get(&ctx.station_id).map_or(0.0, |s| {
         s.inventory
             .iter()
-            .filter_map(|i| {
-                if let InventoryItem::Ore { kg, .. } = i {
-                    Some(*kg)
-                } else {
-                    None
-                }
+            .filter(|item| matches_input_filter(item, input_filter_for_threshold))
+            .filter_map(|i| match i {
+                InventoryItem::Ore { kg, .. }
+                | InventoryItem::Material { kg, .. }
+                | InventoryItem::Slag { kg, .. } => Some(*kg),
+                _ => None,
             })
             .sum()
     });
 
-    if total_ore_kg < threshold_kg {
+    if total_input_kg < threshold_kg {
         return super::RunOutcome::Skipped { reset_timer: false };
     }
-
-    // Capacity pre-check
-    let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
-        return super::RunOutcome::Skipped { reset_timer: false };
-    };
-    let Some(recipe) = processor_def.recipes.first() else {
-        return super::RunOutcome::Skipped { reset_timer: false };
-    };
 
     // Thermal gating: check if recipe requires a minimum temperature
     let (thermal_eff, thermal_qual) = if let Some(ref thermal_req) = recipe.thermal_req {
@@ -335,7 +336,7 @@ fn resolve_processor_run(
     }
 }
 
-/// FIFO-consume up to `rate_kg` from matching Ore items.
+/// FIFO-consume up to `rate_kg` from matching inventory items (Ore or Material).
 /// Returns `(consumed_kg, Vec<(composition, kg_taken)>)` for weighted averaging.
 #[allow(clippy::type_complexity)]
 fn consume_ore_fifo_with_lots(
@@ -349,31 +350,54 @@ fn consume_ore_fifo_with_lots(
     let mut new_inventory: Vec<InventoryItem> = Vec::new();
 
     for item in inventory.drain(..) {
-        if remaining > 0.0 && matches!(item, InventoryItem::Ore { .. }) && filter(&item) {
-            let InventoryItem::Ore {
+        if remaining <= 0.0 || !filter(&item) {
+            new_inventory.push(item);
+            continue;
+        }
+        match item {
+            InventoryItem::Ore {
                 lot_id,
                 asteroid_id,
                 kg,
                 composition,
-            } = item
-            else {
-                unreachable!()
-            };
-            let take = kg.min(remaining);
-            remaining -= take;
-            consumed_kg += take;
-            lots.push((composition.clone(), take));
-            let leftover = kg - take;
-            if leftover > MIN_MEANINGFUL_KG {
-                new_inventory.push(InventoryItem::Ore {
-                    lot_id,
-                    asteroid_id,
-                    kg: leftover,
-                    composition,
-                });
+            } => {
+                let take = kg.min(remaining);
+                remaining -= take;
+                consumed_kg += take;
+                lots.push((composition.clone(), take));
+                let leftover = kg - take;
+                if leftover > MIN_MEANINGFUL_KG {
+                    new_inventory.push(InventoryItem::Ore {
+                        lot_id,
+                        asteroid_id,
+                        kg: leftover,
+                        composition,
+                    });
+                }
             }
-        } else {
-            new_inventory.push(item);
+            InventoryItem::Material {
+                element,
+                kg,
+                quality,
+                thermal,
+            } => {
+                let take = kg.min(remaining);
+                remaining -= take;
+                consumed_kg += take;
+                lots.push((HashMap::from([(element.clone(), 1.0)]), take));
+                let leftover = kg - take;
+                if leftover > MIN_MEANINGFUL_KG {
+                    new_inventory.push(InventoryItem::Material {
+                        element,
+                        kg: leftover,
+                        quality,
+                        thermal,
+                    });
+                }
+            }
+            other => {
+                new_inventory.push(other);
+            }
         }
     }
     *inventory = new_inventory;
@@ -396,17 +420,25 @@ fn peek_ore_fifo_with_lots(
         if remaining <= 0.0 {
             break;
         }
-        if matches!(item, InventoryItem::Ore { .. }) && filter(item) {
-            let InventoryItem::Ore {
+        if !filter(item) {
+            continue;
+        }
+        match item {
+            InventoryItem::Ore {
                 kg, composition, ..
-            } = item
-            else {
-                unreachable!()
-            };
-            let take = kg.min(remaining);
-            remaining -= take;
-            consumed_kg += take;
-            lots.push((composition.clone(), take));
+            } => {
+                let take = kg.min(remaining);
+                remaining -= take;
+                consumed_kg += take;
+                lots.push((composition.clone(), take));
+            }
+            InventoryItem::Material { element, kg, .. } => {
+                let take = kg.min(remaining);
+                remaining -= take;
+                consumed_kg += take;
+                lots.push((HashMap::from([(element.clone(), 1.0)]), take));
+            }
+            _ => {}
         }
     }
     (consumed_kg, lots)
