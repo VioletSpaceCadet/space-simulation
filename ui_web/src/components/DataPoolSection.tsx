@@ -24,8 +24,8 @@ export function DataPoolSection({ dataPool, dataRates }: DataPoolSectionProps) {
         const rate = dataRates[kind] ?? 0;
 
         return (
-          <div key={kind} className="flex items-center gap-1.5">
-            <span style={{ color }} className="font-medium">{label}</span>
+          <div key={kind} className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+            <span style={{ color }} className="font-medium truncate">{label}</span>
             <span className="text-muted">{amount.toFixed(1)}</span>
             {rate !== 0 && (
               <span style={{ color: rate > 0 ? SEMANTIC_COLORS.positive : SEMANTIC_COLORS.negative }}>
