@@ -1481,7 +1481,8 @@ mod tests {
             },
         );
 
-        let candidates = crate::behaviors::test_collect_deep_scan_candidates(&state, &content);
+        let candidates =
+            crate::behaviors::test_collect_deep_scan_candidates(&state, &content, &test_position());
         assert!(
             candidates.contains(&asteroid_id),
             "VolatileRich asteroids should be deep scan candidates"
@@ -1797,6 +1798,74 @@ mod tests {
         assert!(
             commands.is_empty(),
             "should not enable max-worn electrolysis module"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_surveys_nearest_site_first() {
+        use sim_core::{AngleMilliDeg, BodyId, Position, RadiusAuMicro, ScanSite};
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+
+        // Create two survey sites: one close, one far.
+        let near_site = ScanSite {
+            id: SiteId("site_near".to_string()),
+            position: Position {
+                parent_body: BodyId("test_body".to_string()),
+                radius_au_um: RadiusAuMicro(100),
+                angle_mdeg: AngleMilliDeg(0),
+            },
+            template_id: "tmpl_iron_rich".to_string(),
+        };
+        let far_site = ScanSite {
+            id: SiteId("site_far".to_string()),
+            position: Position {
+                parent_body: BodyId("test_body".to_string()),
+                radius_au_um: RadiusAuMicro(5_000_000),
+                angle_mdeg: AngleMilliDeg(180_000),
+            },
+            template_id: "tmpl_iron_rich".to_string(),
+        };
+        // Insert far site first to ensure sort overrides insertion order.
+        state.scan_sites = vec![far_site, near_site];
+
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let survey_cmd = commands
+            .iter()
+            .find(|cmd| {
+                matches!(
+                    &cmd.command,
+                    Command::AssignShipTask {
+                        task_kind: TaskKind::Survey { .. } | TaskKind::Transit { .. },
+                        ..
+                    }
+                )
+            })
+            .expect("should assign a survey task");
+
+        // Extract the survey site ID from the task (may be wrapped in Transit).
+        let site_id = match &survey_cmd.command {
+            Command::AssignShipTask {
+                task_kind: TaskKind::Survey { site },
+                ..
+            } => site.clone(),
+            Command::AssignShipTask {
+                task_kind: TaskKind::Transit { then, .. },
+                ..
+            } => match then.as_ref() {
+                TaskKind::Survey { site } => site.clone(),
+                other => panic!("expected Survey inside Transit, got {other:?}"),
+            },
+            other => panic!("expected AssignShipTask, got {other:?}"),
+        };
+
+        assert_eq!(
+            site_id,
+            SiteId("site_near".to_string()),
+            "autopilot should survey the nearest site, not the farthest"
         );
     }
 }
