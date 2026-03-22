@@ -72,7 +72,7 @@ pub(super) fn apply_boiloff(
         };
 
         #[allow(clippy::cast_possible_truncation)]
-        let loss = (f64::from(*kg) * base_rate * multiplier) as f32;
+        let loss = ((f64::from(*kg) * base_rate * multiplier) as f32).min(*kg);
         if loss > MIN_MEANINGFUL_KG {
             *kg -= loss;
             losses.push((element.clone(), loss));
