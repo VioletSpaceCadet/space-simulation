@@ -1,14 +1,18 @@
 //! Sim events engine — content-driven event system with composable effects.
 //!
-//! Types for event definitions, conditions, targeting, effects, and runtime state.
-//! Evaluation and effect application are in separate tickets (SE-02, SE-03).
+//! Types, evaluation engine, and validation for content-driven sim events.
+//! Effect application is in SE-03.
 
 use std::collections::{BTreeMap, VecDeque};
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::modifiers::{ModifierOp, StatId};
-use crate::{AlertSeverity, ModuleInstanceId, ShipId, StationId, TradeItemSpec};
+use crate::{
+    AlertSeverity, EventEnvelope, GameContent, GameState, ModuleInstanceId, ShipId, StationId,
+    TradeItemSpec,
+};
 
 // ---------------------------------------------------------------------------
 // EventDefId newtype
@@ -292,6 +296,290 @@ pub struct SimEventState {
     /// Currently active temporal effects (modifiers with expiry).
     #[serde(default)]
     pub active_effects: Vec<ActiveEffect>,
+}
+
+// ---------------------------------------------------------------------------
+// Evaluation engine
+// ---------------------------------------------------------------------------
+
+/// Evaluate sim events for this tick. Selects at most one event to fire,
+/// resolves its target, records it in history, and emits a `SimEventFired` event.
+/// Effect application is delegated to SE-03; for now effects are recorded but not applied.
+pub fn evaluate_events(
+    state: &mut GameState,
+    content: &GameContent,
+    rng: &mut impl Rng,
+    events: &mut Vec<EventEnvelope>,
+) {
+    // Guard: events disabled
+    if !content.constants.events_enabled {
+        return;
+    }
+
+    let tick = state.meta.tick;
+
+    // Check global cooldown
+    if tick < state.events.global_cooldown_until {
+        return;
+    }
+
+    // No event defs loaded
+    if content.events.is_empty() {
+        return;
+    }
+
+    // Build candidate pool: iterate event defs sorted by ID (content already sorted at load).
+    // Filter by: all conditions pass, per-event cooldown not active, effective weight > 0.
+    let mut candidates: Vec<(&SimEventDef, u64)> = Vec::new();
+
+    // Sort event defs by ID for determinism
+    let mut sorted_defs: Vec<&SimEventDef> = content.events.iter().collect();
+    sorted_defs.sort_by(|a, b| a.id.cmp(&b.id));
+
+    for def in &sorted_defs {
+        // Check per-event cooldown
+        if let Some(&cooldown_until) = state.events.cooldowns.get(&def.id) {
+            if tick < cooldown_until {
+                continue;
+            }
+        }
+
+        // Check all conditions
+        if !def.conditions.iter().all(|c| evaluate_condition(c, state)) {
+            continue;
+        }
+
+        // Compute effective weight
+        let weight = compute_effective_weight(def, state);
+        if weight == 0 {
+            continue;
+        }
+
+        candidates.push((def, weight));
+    }
+
+    if candidates.is_empty() {
+        return;
+    }
+
+    // Weighted random selection using cumulative weights
+    let total_weight: u64 = candidates.iter().map(|(_, w)| w).sum();
+    let roll = rng.gen_range(0..total_weight);
+
+    let mut cumulative = 0u64;
+    let mut selected_idx = 0;
+    for (index, (_, weight)) in candidates.iter().enumerate() {
+        cumulative += weight;
+        if roll < cumulative {
+            selected_idx = index;
+            break;
+        }
+    }
+
+    let (selected_def, _) = candidates[selected_idx];
+
+    // Resolve target
+    let Some(target) = resolve_target(&selected_def.targeting, state, rng) else {
+        return; // No valid target — skip this event
+    };
+
+    // Record fired event — effects not yet applied (SE-03 will add apply_effects here)
+    let effects_applied: Vec<AppliedEffect> = selected_def
+        .effects
+        .iter()
+        .map(|effect| AppliedEffect {
+            effect: effect.clone(),
+            target: target.clone(),
+        })
+        .collect();
+
+    let fired = FiredEvent {
+        event_def_id: selected_def.id.clone(),
+        tick,
+        target: target.clone(),
+        effects_applied: effects_applied.clone(),
+    };
+
+    // Update cooldowns
+    state
+        .events
+        .cooldowns
+        .insert(selected_def.id.clone(), tick + selected_def.cooldown_ticks);
+    state.events.global_cooldown_until = tick + content.constants.event_global_cooldown_ticks;
+
+    // Add to history ring buffer (respect capacity)
+    state.events.history.push_back(fired);
+    while state.events.history.len() > content.constants.event_history_capacity {
+        state.events.history.pop_front();
+    }
+
+    // Emit SimEventFired event
+    events.push(crate::emit(
+        &mut state.counters,
+        tick,
+        crate::Event::SimEventFired {
+            event_def_id: selected_def.id.clone(),
+            target,
+            effects_applied,
+        },
+    ));
+}
+
+/// Evaluate a single condition against the current game state.
+pub fn evaluate_condition(condition: &Condition, state: &GameState) -> bool {
+    let actual = extract_condition_value(&condition.field, state);
+    condition.op.evaluate(actual, condition.value)
+}
+
+/// Extract the numeric value for a condition field from the game state.
+fn extract_condition_value(field: &ConditionField, state: &GameState) -> f64 {
+    match field {
+        ConditionField::Tick => state.meta.tick as f64,
+        ConditionField::StationCount => state.stations.len() as f64,
+        ConditionField::ShipCount => state.ships.len() as f64,
+        ConditionField::AvgModuleWear => {
+            let mut total_wear = 0.0f64;
+            let mut module_count = 0u64;
+            for station in state.stations.values() {
+                for module in &station.modules {
+                    total_wear += f64::from(module.wear.wear);
+                    module_count += 1;
+                }
+            }
+            if module_count == 0 {
+                0.0
+            } else {
+                total_wear / module_count as f64
+            }
+        }
+        ConditionField::Balance => state.balance,
+        ConditionField::TechsUnlockedCount => state.research.unlocked.len() as f64,
+    }
+}
+
+/// Compute effective weight for an event def, applying weight modifiers.
+/// Uses integer arithmetic: `base_weight * product(applicable_pct) / 100^n`.
+pub fn compute_effective_weight(def: &SimEventDef, state: &GameState) -> u64 {
+    let mut weight = u64::from(def.resolved_weight);
+
+    for modifier in &def.weight_modifiers {
+        if evaluate_condition(&modifier.condition, state) {
+            weight = weight * u64::from(modifier.weight_multiplier_pct) / 100;
+        }
+    }
+
+    weight
+}
+
+/// Resolve a targeting rule to a concrete target entity.
+/// Returns `None` if no valid target exists (e.g., no stations when targeting a station).
+pub fn resolve_target(
+    rule: &TargetingRule,
+    state: &GameState,
+    rng: &mut impl Rng,
+) -> Option<ResolvedTarget> {
+    match rule {
+        TargetingRule::Global => Some(ResolvedTarget::Global),
+
+        TargetingRule::RandomStation => {
+            let mut station_ids: Vec<&StationId> = state.stations.keys().collect();
+            if station_ids.is_empty() {
+                return None;
+            }
+            station_ids.sort();
+            let index = rng.gen_range(0..station_ids.len());
+            Some(ResolvedTarget::Station {
+                station_id: station_ids[index].clone(),
+            })
+        }
+
+        TargetingRule::RandomShip => {
+            let mut ship_ids: Vec<&crate::ShipId> = state.ships.keys().collect();
+            if ship_ids.is_empty() {
+                return None;
+            }
+            ship_ids.sort();
+            let index = rng.gen_range(0..ship_ids.len());
+            Some(ResolvedTarget::Ship {
+                ship_id: ship_ids[index].clone(),
+            })
+        }
+
+        TargetingRule::RandomModule { station } => {
+            // First select a station
+            let selected_station_id = select_station(station, state, rng)?;
+            let station_state = state.stations.get(&selected_station_id)?;
+
+            if station_state.modules.is_empty() {
+                return None;
+            }
+
+            // Pick a random module (sorted by ID for determinism)
+            let mut module_ids: Vec<&ModuleInstanceId> =
+                station_state.modules.iter().map(|m| &m.id).collect();
+            module_ids.sort();
+            let index = rng.gen_range(0..module_ids.len());
+            Some(ResolvedTarget::Module {
+                station_id: selected_station_id,
+                module_id: module_ids[index].clone(),
+            })
+        }
+
+        TargetingRule::Zone { zone_id } => {
+            let zone = zone_id.clone().unwrap_or_else(|| "default".to_string());
+            Some(ResolvedTarget::Zone { zone_id: zone })
+        }
+    }
+}
+
+/// Select a station based on the targeting strategy.
+fn select_station(
+    strategy: &TargetStation,
+    state: &GameState,
+    rng: &mut impl Rng,
+) -> Option<StationId> {
+    if state.stations.is_empty() {
+        return None;
+    }
+
+    let mut station_ids: Vec<&StationId> = state.stations.keys().collect();
+    station_ids.sort();
+
+    match strategy {
+        TargetStation::Random => {
+            let index = rng.gen_range(0..station_ids.len());
+            Some(station_ids[index].clone())
+        }
+        TargetStation::MostModules => {
+            let best = station_ids
+                .iter()
+                .max_by_key(|id| state.stations[*id].modules.len())
+                .expect("non-empty stations");
+            Some((*best).clone())
+        }
+        TargetStation::HighestWear => {
+            let best = station_ids
+                .iter()
+                .max_by(|a, b| {
+                    let wear_a = avg_station_wear(&state.stations[*a]);
+                    let wear_b = avg_station_wear(&state.stations[*b]);
+                    wear_a
+                        .partial_cmp(&wear_b)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .expect("non-empty stations");
+            Some((*best).clone())
+        }
+    }
+}
+
+/// Compute average wear across all modules in a station.
+fn avg_station_wear(station: &crate::StationState) -> f32 {
+    if station.modules.is_empty() {
+        return 0.0;
+    }
+    let total: f32 = station.modules.iter().map(|m| m.wear.wear).sum();
+    total / station.modules.len() as f32
 }
 
 // ---------------------------------------------------------------------------
@@ -708,5 +996,378 @@ mod tests {
         let mut set2 = deserialized;
         set2.remove_by_source(&ModifierSource::Event("evt_solar_flare".to_string()));
         assert!(set2.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Evaluation engine tests
+    // -----------------------------------------------------------------------
+
+    use crate::test_fixtures::{base_content, base_state, make_rng};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    fn make_events_content() -> crate::GameContent {
+        let mut content = base_content();
+        content.constants.events_enabled = true;
+        content.constants.event_global_cooldown_ticks = 10;
+        content.constants.event_history_capacity = 5;
+        content.events = vec![
+            {
+                let mut def = make_event_def(
+                    "evt_a",
+                    TargetingRule::Global,
+                    vec![EffectDef::TriggerAlert {
+                        severity: AlertSeverity::Warning,
+                        message: "Event A".to_string(),
+                    }],
+                );
+                def.cooldown_ticks = 50;
+                def
+            },
+            {
+                let mut def = make_event_def(
+                    "evt_b",
+                    TargetingRule::Global,
+                    vec![EffectDef::TriggerAlert {
+                        severity: AlertSeverity::Warning,
+                        message: "Event B".to_string(),
+                    }],
+                );
+                def.cooldown_ticks = 50;
+                def.rarity = Rarity::Rare;
+                def.resolve_weight();
+                def
+            },
+        ];
+        content
+    }
+
+    #[test]
+    fn evaluate_condition_tick() {
+        let content = base_content();
+        let mut state = base_state(&content);
+        state.meta.tick = 500;
+
+        let condition = Condition {
+            field: ConditionField::Tick,
+            op: CompareOp::Gte,
+            value: 100.0,
+        };
+        assert!(evaluate_condition(&condition, &state));
+
+        let condition2 = Condition {
+            field: ConditionField::Tick,
+            op: CompareOp::Gte,
+            value: 1000.0,
+        };
+        assert!(!evaluate_condition(&condition2, &state));
+    }
+
+    #[test]
+    fn evaluate_condition_station_count() {
+        let content = base_content();
+        let state = base_state(&content);
+
+        let condition = Condition {
+            field: ConditionField::StationCount,
+            op: CompareOp::Gte,
+            value: 1.0,
+        };
+        assert!(evaluate_condition(&condition, &state));
+    }
+
+    #[test]
+    fn evaluate_condition_ship_count() {
+        let content = base_content();
+        let state = base_state(&content);
+
+        let condition = Condition {
+            field: ConditionField::ShipCount,
+            op: CompareOp::Gte,
+            value: 1.0,
+        };
+        assert!(evaluate_condition(&condition, &state));
+    }
+
+    #[test]
+    fn evaluate_condition_balance() {
+        let content = base_content();
+        let mut state = base_state(&content);
+        state.balance = 500_000.0;
+
+        let condition = Condition {
+            field: ConditionField::Balance,
+            op: CompareOp::Lt,
+            value: 1_000_000.0,
+        };
+        assert!(evaluate_condition(&condition, &state));
+    }
+
+    #[test]
+    fn evaluate_condition_techs_unlocked() {
+        let content = base_content();
+        let state = base_state(&content);
+
+        let condition = Condition {
+            field: ConditionField::TechsUnlockedCount,
+            op: CompareOp::Eq,
+            value: 0.0,
+        };
+        assert!(evaluate_condition(&condition, &state));
+    }
+
+    #[test]
+    fn compute_weight_no_modifiers() {
+        let content = base_content();
+        let state = base_state(&content);
+
+        let def = make_event_def("evt", TargetingRule::Global, vec![]);
+        assert_eq!(compute_effective_weight(&def, &state), 100); // Common = 100
+    }
+
+    #[test]
+    fn compute_weight_with_active_modifier() {
+        let content = base_content();
+        let mut state = base_state(&content);
+        state.meta.tick = 500;
+
+        let mut def = make_event_def("evt", TargetingRule::Global, vec![]);
+        def.weight_modifiers.push(WeightModifier {
+            condition: Condition {
+                field: ConditionField::Tick,
+                op: CompareOp::Gte,
+                value: 100.0,
+            },
+            weight_multiplier_pct: 300, // 3x
+        });
+        // base 100 * 300 / 100 = 300
+        assert_eq!(compute_effective_weight(&def, &state), 300);
+    }
+
+    #[test]
+    fn compute_weight_with_inactive_modifier() {
+        let content = base_content();
+        let mut state = base_state(&content);
+        state.meta.tick = 50;
+
+        let mut def = make_event_def("evt", TargetingRule::Global, vec![]);
+        def.weight_modifiers.push(WeightModifier {
+            condition: Condition {
+                field: ConditionField::Tick,
+                op: CompareOp::Gte,
+                value: 100.0,
+            },
+            weight_multiplier_pct: 300,
+        });
+        // Condition not met, base weight stays 100
+        assert_eq!(compute_effective_weight(&def, &state), 100);
+    }
+
+    #[test]
+    fn events_disabled_produces_nothing() {
+        let mut content = make_events_content();
+        content.constants.events_enabled = false;
+        let mut state = base_state(&content);
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn global_cooldown_blocks_events() {
+        let content = make_events_content();
+        let mut state = base_state(&content);
+        state.events.global_cooldown_until = 999; // Far future
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn per_event_cooldown_blocks_specific_event() {
+        let content = make_events_content();
+        let mut state = base_state(&content);
+        // Put both events on cooldown
+        state
+            .events
+            .cooldowns
+            .insert(EventDefId("evt_a".to_string()), 999);
+        state
+            .events
+            .cooldowns
+            .insert(EventDefId("evt_b".to_string()), 999);
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn condition_filters_events() {
+        let mut content = make_events_content();
+        // Add condition that tick >= 1000 for both events
+        for event in &mut content.events {
+            event.conditions.push(Condition {
+                field: ConditionField::Tick,
+                op: CompareOp::Gte,
+                value: 1000.0,
+            });
+        }
+
+        let mut state = base_state(&content);
+        state.meta.tick = 500; // Doesn't meet condition
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn event_fires_and_records_history() {
+        let content = make_events_content();
+        let mut state = base_state(&content);
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+
+        // Should have fired exactly one event
+        assert_eq!(events.len(), 1);
+        assert_eq!(state.events.history.len(), 1);
+
+        // Should have set cooldowns
+        assert!(state.events.global_cooldown_until > 0);
+        let fired = &state.events.history[0];
+        assert!(state.events.cooldowns.contains_key(&fired.event_def_id));
+    }
+
+    #[test]
+    fn history_ring_buffer_respects_capacity() {
+        let content = make_events_content();
+        let mut state = base_state(&content);
+        let mut rng = make_rng();
+
+        // Fire events 10 times (capacity is 5)
+        for tick_num in 0..10 {
+            state.meta.tick = tick_num * 100; // Space out past cooldowns
+            state.events.global_cooldown_until = 0;
+            state.events.cooldowns.clear();
+            let mut events = Vec::new();
+            evaluate_events(&mut state, &content, &mut rng, &mut events);
+        }
+
+        assert!(state.events.history.len() <= 5);
+    }
+
+    #[test]
+    fn determinism_same_seed_same_result() {
+        let content = make_events_content();
+
+        // Run 1
+        let mut state1 = base_state(&content);
+        let mut rng1 = ChaCha8Rng::seed_from_u64(42);
+        let mut events1 = Vec::new();
+        evaluate_events(&mut state1, &content, &mut rng1, &mut events1);
+
+        // Run 2
+        let mut state2 = base_state(&content);
+        let mut rng2 = ChaCha8Rng::seed_from_u64(42);
+        let mut events2 = Vec::new();
+        evaluate_events(&mut state2, &content, &mut rng2, &mut events2);
+
+        assert_eq!(events1.len(), events2.len());
+        assert_eq!(state1.events.history, state2.events.history);
+    }
+
+    #[test]
+    fn weighted_selection_favors_common() {
+        let content = make_events_content();
+        // evt_a = Common (100), evt_b = Rare (5)
+        let mut count_a = 0;
+        let mut count_b = 0;
+
+        for seed in 0..200 {
+            let mut state = base_state(&content);
+            let mut rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut events = Vec::new();
+            evaluate_events(&mut state, &content, &mut rng, &mut events);
+
+            if let Some(fired) = state.events.history.front() {
+                if fired.event_def_id.0 == "evt_a" {
+                    count_a += 1;
+                } else {
+                    count_b += 1;
+                }
+            }
+        }
+
+        // evt_a should fire much more often (100/105 ≈ 95%)
+        assert!(
+            count_a > count_b * 5,
+            "Expected evt_a ({count_a}) to fire much more than evt_b ({count_b})"
+        );
+    }
+
+    #[test]
+    fn resolve_target_random_station() {
+        let content = base_content();
+        let state = base_state(&content);
+        let mut rng = make_rng();
+
+        let target = resolve_target(&TargetingRule::RandomStation, &state, &mut rng);
+        assert!(matches!(target, Some(ResolvedTarget::Station { .. })));
+    }
+
+    #[test]
+    fn resolve_target_random_ship() {
+        let content = base_content();
+        let state = base_state(&content);
+        let mut rng = make_rng();
+
+        let target = resolve_target(&TargetingRule::RandomShip, &state, &mut rng);
+        assert!(matches!(target, Some(ResolvedTarget::Ship { .. })));
+    }
+
+    #[test]
+    fn resolve_target_returns_none_for_empty_entities() {
+        let content = base_content();
+        let mut state = base_state(&content);
+        state.stations.clear();
+        let mut rng = make_rng();
+
+        let target = resolve_target(&TargetingRule::RandomStation, &state, &mut rng);
+        assert!(target.is_none());
+    }
+
+    #[test]
+    fn resolve_target_global() {
+        let content = base_content();
+        let state = base_state(&content);
+        let mut rng = make_rng();
+
+        let target = resolve_target(&TargetingRule::Global, &state, &mut rng);
+        assert_eq!(target, Some(ResolvedTarget::Global));
+    }
+
+    #[test]
+    fn no_event_fires_with_no_valid_target() {
+        let mut content = make_events_content();
+        // Change targeting to RandomStation
+        for event in &mut content.events {
+            event.targeting = TargetingRule::RandomStation;
+        }
+        let mut state = base_state(&content);
+        state.stations.clear(); // No stations
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+        assert!(events.is_empty());
     }
 }
