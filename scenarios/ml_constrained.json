@@ -1,0 +1,14 @@
+{
+  "name": "ml_constrained",
+  "ticks": 4320,
+  "metrics_every": 10,
+  "seeds": {"range": [1, 20]},
+  "state": "./content/dev_base_state.json",
+  "overrides": {
+    "station_cargo_capacity_m3": 100.0,
+    "wear_band_degraded_threshold": 0.4,
+    "module.processor.wear_per_run": 0.01,
+    "module.lab.wear_per_run": 0.008,
+    "module.maintenance.wear_reduction_per_run": 0.05
+  }
+}

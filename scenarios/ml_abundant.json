@@ -1,0 +1,14 @@
+{
+  "name": "ml_abundant",
+  "ticks": 4320,
+  "metrics_every": 10,
+  "seeds": {"range": [1, 20]},
+  "state": "./content/dev_base_state.json",
+  "overrides": {
+    "station_cargo_capacity_m3": 500.0,
+    "wear_band_degraded_threshold": 0.8,
+    "module.processor.wear_per_run": 0.001,
+    "module.processor.processing_interval_minutes": 2,
+    "module.solar_array.base_output_kw": 100.0
+  }
+}
