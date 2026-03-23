@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { SimSnapshot } from '../types';
@@ -79,7 +79,7 @@ describe('SolarSystemMapCanvas', () => {
     expect(container.querySelector('canvas')).toBeInTheDocument();
   });
 
-  it('renders station entity markers (canvas — no DOM markers)', () => {
+  it('renders without errors with entities in snapshot', () => {
     const snapshotWithEntities: SimSnapshot = {
       ...emptySnapshot,
       stations: {
@@ -91,17 +91,64 @@ describe('SolarSystemMapCanvas', () => {
           cargo_capacity_m3: 10000,
           modules: [],
           power: {
-            generated_kw: 0, consumed_kw: 0, deficit_kw: 0,
+            generated_kw: 58, consumed_kw: 16, deficit_kw: 0,
             battery_discharge_kw: 0, battery_charge_kw: 0, battery_stored_kwh: 0,
           },
         },
       },
+      ships: {
+        ship_001: {
+          id: 'ship_001',
+          position: { parent_body: 'earth', radius_au_um: 5_000, angle_mdeg: 90_000 },
+          owner: 'player',
+          inventory: [],
+          cargo_capacity_m3: 20,
+          task: {
+            kind: { Transit: { destination: { parent_body: 'sun', radius_au_um: 0, angle_mdeg: 0 }, total_ticks: 100, then: {} } },
+            started_tick: 50,
+            eta_tick: 150,
+          },
+        },
+      },
+      asteroids: {
+        asteroid_001: {
+          id: 'asteroid_001',
+          position: { parent_body: 'inner_belt', radius_au_um: 2_400_000, angle_mdeg: 45_000 },
+          anomaly_tags: ['IronRich'],
+          mass_kg: 5000,
+          knowledge: { tag_beliefs: [['IronRich', 0.85]], composition: { Fe: 0.72, Si: 0.18 } },
+        },
+      },
+      scan_sites: [
+        {
+          id: 'site_001',
+          position: { parent_body: 'inner_belt', radius_au_um: 2_500_000, angle_mdeg: 180_000 },
+          template_id: 'tmpl_iron',
+        },
+      ],
     };
-    // Canvas-based rendering — entities are drawn on canvas, not DOM nodes.
-    // Just verify the component renders without errors.
     const { container } = render(
       <SolarSystemMapCanvas snapshot={snapshotWithEntities} currentTick={100} />,
     );
     expect(container.querySelector('canvas')).toBeInTheDocument();
+  });
+
+  it('renders HUD overlay components after config loads', async () => {
+    const { container } = render(
+      <SolarSystemMapCanvas snapshot={emptySnapshot} currentTick={100} />,
+    );
+    // ZoomInfo should render immediately or after config loads
+    await waitFor(() => {
+      // Quick-nav panel should be present after config loads
+      expect(container.querySelector('[class*="absolute"]')).toBeInTheDocument();
+    });
+  });
+
+  it('renders grab cursor by default', () => {
+    const { container } = render(
+      <SolarSystemMapCanvas snapshot={emptySnapshot} currentTick={100} />,
+    );
+    const mapContainer = container.firstElementChild;
+    expect(mapContainer).toHaveStyle({ cursor: 'grab' });
   });
 });
