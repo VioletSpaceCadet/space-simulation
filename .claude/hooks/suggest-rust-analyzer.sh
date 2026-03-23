@@ -36,7 +36,7 @@ fi
 # Common patterns that suggest definition/reference lookups
 if [[ "$IS_RUST_SEARCH" == "true" ]]; then
   # Patterns that look like struct/fn/trait/enum definitions
-  if echo "$PATTERN" | grep -qE '^(struct |fn |trait |enum |impl |pub fn |pub struct |pub trait |pub enum )'; then
+  if echo "$PATTERN" | grep -qE '(struct |^fn |^pub[ (]|^impl |^trait |^enum |^async fn |^type |^const |^mod )'; then
     touch "$MARKER"
     echo "Hint: For Rust definition/reference lookups, consider rust_analyzer_definition or rust_analyzer_references — they understand Rust semantics (trait impls, re-exports, generics) where text search cannot."
     exit 0

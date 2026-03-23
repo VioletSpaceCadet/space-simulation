@@ -47,7 +47,7 @@ Check `.claude/skills/` for domain-specific checklists before coding. Key skills
 HEREDOC
 
 # Escape for JSON: replace newlines with \n, escape quotes
-JSON_CONTEXT=$(echo "$CONTEXT" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+JSON_CONTEXT=$(echo "$CONTEXT" | jq -Rs .)
 
 cat <<ENDJSON
 {
