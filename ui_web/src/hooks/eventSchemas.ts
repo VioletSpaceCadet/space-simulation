@@ -361,6 +361,12 @@ export const eventSchemas = {
     old_recipe: z.string(),
     new_recipe: z.string(),
   }),
+
+  SimEventFired: z.object({
+    event_def_id: z.string(),
+    target: z.record(z.string(), z.unknown()),
+    effects_applied: z.array(z.record(z.string(), z.unknown())),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

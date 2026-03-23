@@ -23,6 +23,7 @@ const REPLENISH_BATCH_SIZE: usize = 5;
 /// 2. Resolve ship tasks whose eta has arrived.
 /// 3. Tick station modules (refinery processors).
 /// 4. Advance station research on all eligible techs.
+///    4.5. Evaluate sim events (content-driven random events).
 /// 5. Replenish scan sites if below threshold.
 /// 6. Increment tick counter.
 ///
@@ -40,6 +41,7 @@ pub fn tick(
     resolve_ship_tasks(state, content, rng, &mut events);
     tick_stations(state, content, rng, &mut events);
     advance_research(state, content, rng, event_level, &mut events);
+    crate::sim_events::evaluate_events(state, content, rng, &mut events);
     replenish_scan_sites(state, content, rng, &mut events);
 
     state.meta.tick += 1;

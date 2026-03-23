@@ -922,6 +922,11 @@ pub enum Event {
         old_recipe: RecipeId,
         new_recipe: RecipeId,
     },
+    SimEventFired {
+        event_def_id: crate::sim_events::EventDefId,
+        target: crate::sim_events::ResolvedTarget,
+        effects_applied: Vec<crate::sim_events::AppliedEffect>,
+    },
 }
 
 // ---------------------------------------------------------------------------
