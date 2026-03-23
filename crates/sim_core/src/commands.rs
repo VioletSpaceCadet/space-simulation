@@ -38,7 +38,7 @@ pub(crate) fn handle_assign_ship_task(
     true
 }
 
-/// Build the default `ModuleKindState` and `BehaviorType` for a module definition.
+/// Build the default `ModuleKindState`, `BehaviorType`, and optional `ThermalState` for a module.
 fn default_module_state(
     def: &crate::ModuleDef,
     content: &GameContent,
@@ -52,65 +52,7 @@ fn default_module_state(
         thermal_group: td.thermal_group.clone(),
         ..Default::default()
     });
-    let (kind_state, behavior_type) = match &def.behavior {
-        crate::ModuleBehaviorDef::Processor(_) => (
-            crate::ModuleKindState::Processor(crate::ProcessorState {
-                threshold_kg: 0.0,
-                ticks_since_last_run: 0,
-                stalled: false,
-                selected_recipe: None,
-            }),
-            crate::BehaviorType::Processor,
-        ),
-        crate::ModuleBehaviorDef::Storage { .. } => (
-            crate::ModuleKindState::Storage,
-            crate::BehaviorType::Storage,
-        ),
-        crate::ModuleBehaviorDef::Maintenance(_) => (
-            crate::ModuleKindState::Maintenance(crate::MaintenanceState {
-                ticks_since_last_run: 0,
-            }),
-            crate::BehaviorType::Maintenance,
-        ),
-        crate::ModuleBehaviorDef::Assembler(_) => (
-            crate::ModuleKindState::Assembler(crate::AssemblerState {
-                ticks_since_last_run: 0,
-                stalled: false,
-                capped: false,
-                cap_override: std::collections::HashMap::new(),
-                selected_recipe: None,
-            }),
-            crate::BehaviorType::Assembler,
-        ),
-        crate::ModuleBehaviorDef::Lab(_) => (
-            crate::ModuleKindState::Lab(crate::LabState {
-                ticks_since_last_run: 0,
-                assigned_tech: None,
-                starved: false,
-            }),
-            crate::BehaviorType::Lab,
-        ),
-        crate::ModuleBehaviorDef::SensorArray(_) => (
-            crate::ModuleKindState::SensorArray(crate::SensorArrayState::default()),
-            crate::BehaviorType::SensorArray,
-        ),
-        crate::ModuleBehaviorDef::SolarArray(_) => (
-            crate::ModuleKindState::SolarArray(crate::SolarArrayState::default()),
-            crate::BehaviorType::SolarArray,
-        ),
-        crate::ModuleBehaviorDef::Battery(_) => (
-            crate::ModuleKindState::Battery(crate::BatteryState { charge_kwh: 0.0 }),
-            crate::BehaviorType::Battery,
-        ),
-        crate::ModuleBehaviorDef::Radiator(_) => (
-            crate::ModuleKindState::Radiator(crate::RadiatorState::default()),
-            crate::BehaviorType::Radiator,
-        ),
-        crate::ModuleBehaviorDef::Equipment => (
-            crate::ModuleKindState::Equipment,
-            crate::BehaviorType::Equipment,
-        ),
-    };
+    let (kind_state, behavior_type) = def.behavior.default_state();
     (kind_state, behavior_type, thermal_state)
 }
 
