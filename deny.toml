@@ -7,7 +7,10 @@ no-default-features = false
 
 # -- Advisories: check against RustSec advisory database --
 [advisories]
-ignore = []
+ignore = [
+    # paste is archived but stable/no security issue; used transitively by arrow
+    "RUSTSEC-2024-0436",
+]
 
 # -- Licenses --
 [licenses]
