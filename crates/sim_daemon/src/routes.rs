@@ -368,12 +368,25 @@ pub async fn content_handler(State(app_state): State<AppState>) -> Json<ContentR
         }
     }
 
+    let event_defs: Vec<EventDefInfo> = sim
+        .content
+        .events
+        .iter()
+        .map(|e| EventDefInfo {
+            id: e.id.0.clone(),
+            name: e.name.clone(),
+            category: e.category.clone(),
+            description_template: e.description_template.clone(),
+        })
+        .collect();
+
     Json(ContentResponse {
         techs: sim.content.techs.clone(),
         lab_rates,
         data_rates,
         minutes_per_tick: mpt,
         recipes: sim.content.recipes.clone(),
+        event_defs,
     })
 }
 
@@ -384,6 +397,15 @@ pub struct ContentResponse {
     pub data_rates: std::collections::HashMap<DataKind, f64>,
     pub minutes_per_tick: u32,
     pub recipes: std::collections::BTreeMap<sim_core::RecipeId, sim_core::RecipeDef>,
+    pub event_defs: Vec<EventDefInfo>,
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct EventDefInfo {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    pub description_template: String,
 }
 
 #[derive(serde::Serialize)]
