@@ -198,6 +198,10 @@ export function buildRecipeGraph(
     // Create item nodes and edges for outputs
     for (const output of recipe.outputs) {
       const parsed = parseRecipeOutput(output);
+      // Ship outputs use recipe-derived name for meaningful display
+      if (parsed.type === 'ship') {
+        parsed.itemId = recipe.id.replace(/^recipe_/, '');
+      }
       if (!itemNodes.has(parsed.itemId)) {
         itemNodes.set(parsed.itemId, {
           id: parsed.itemId,

@@ -122,7 +122,7 @@ export function DagTooltip({ nodeId, x, y, graph, moduleFlowStats, itemFlowStats
         </div>
         <div className="text-zinc-400 mb-1">
           {recipe.inputs.map((input, index) => (
-            <div key={index}>In: {displayName(input.itemId)} x{input.amount}</div>
+            <div key={index}>In: {displayName(input.itemId)} x{input.amount}{input.unit === 'kg' ? ' kg' : ''}</div>
           ))}
           {recipe.outputs.map((output, index) => (
             <div key={index}>Out: {displayName(output.itemId)}</div>

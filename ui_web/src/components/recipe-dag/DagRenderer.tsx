@@ -109,7 +109,7 @@ function computeLayout(
 }
 
 function abbreviate(name: string): string {
-  const parts = name.split('_');
+  const parts = name.split('_').filter(Boolean);
   if (parts.length > 1) {
     return parts.map(p => p[0]).join('').slice(0, 3).toUpperCase();
   }
