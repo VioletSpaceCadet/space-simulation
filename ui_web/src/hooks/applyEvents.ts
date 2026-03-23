@@ -526,6 +526,43 @@ function handleShipConstructed(state: SimState, event: EventPayload<'ShipConstru
         inventory: [],
         cargo_capacity_m3: event.cargo_capacity_m3,
         task: null,
+        hull_id: event.hull_id,
+        fitted_modules: [],
+      },
+    },
+  };
+}
+
+function handleShipModuleFitted(state: SimState, event: EventPayload<'ShipModuleFitted'>): SimState {
+  const ship = state.ships[event.ship_id];
+  if (!ship) {return state;}
+  return {
+    ...state,
+    ships: {
+      ...state.ships,
+      [event.ship_id]: {
+        ...ship,
+        fitted_modules: [
+          ...(ship.fitted_modules ?? []),
+          { slot_index: event.slot_index, module_def_id: event.module_def_id },
+        ],
+      },
+    },
+  };
+}
+
+function handleShipModuleUnfitted(state: SimState, event: EventPayload<'ShipModuleUnfitted'>): SimState {
+  const ship = state.ships[event.ship_id];
+  if (!ship) {return state;}
+  return {
+    ...state,
+    ships: {
+      ...state.ships,
+      [event.ship_id]: {
+        ...ship,
+        fitted_modules: (ship.fitted_modules ?? []).filter(
+          (fm) => fm.slot_index !== event.slot_index,
+        ),
       },
     },
   };
@@ -818,8 +855,8 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   RecipeSelectionReset: noOp,
   SimEventFired: noOp, // SE-05 will add proper handler
   SimEventExpired: noOp, // SE-05 will add proper handler
-  ShipModuleFitted: noOp, // SH-05 will add proper handler
-  ShipModuleUnfitted: noOp, // SH-05 will add proper handler
+  ShipModuleFitted: handleShipModuleFitted,
+  ShipModuleUnfitted: handleShipModuleUnfitted,
 };
 
 export function applyEvents(
