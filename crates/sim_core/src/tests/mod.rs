@@ -23,6 +23,7 @@ mod thermal_determinism;
 mod transit;
 mod wear;
 
+mod manufacturing;
 mod replenish;
 mod trade;
 mod trade_integration;

@@ -8,7 +8,8 @@
 //! 5. Balance sanity checks — flag extreme outliers
 
 use sim_core::{
-    ComponentId, GameContent, InputFilter, ModuleBehaviorDef, OutputSpec, TechEffect, TechId,
+    ComponentId, GameContent, InputFilter, ModuleBehaviorDef, OutputSpec, RecipeId, TechEffect,
+    TechId,
 };
 use sim_world::load_content;
 use std::collections::HashSet;
@@ -1377,5 +1378,159 @@ fn thermal_recipe_requirements_are_consistent() {
                 }
             }
         }
+    }
+}
+
+// =========================================================================
+// 9. Recipe DAG validation (VIO-374)
+// =========================================================================
+
+/// Build a directed graph of recipe dependencies: recipe A depends on recipe B
+/// if A consumes a component that B produces.
+fn build_recipe_dependency_graph(
+    content: &GameContent,
+) -> std::collections::HashMap<&RecipeId, Vec<&RecipeId>> {
+    // Map: component_id → recipes that produce it
+    let mut producers: std::collections::HashMap<&str, Vec<&RecipeId>> =
+        std::collections::HashMap::new();
+    for (recipe_id, recipe) in &content.recipes {
+        for output in &recipe.outputs {
+            if let OutputSpec::Component { component_id, .. } = output {
+                producers
+                    .entry(component_id.0.as_str())
+                    .or_default()
+                    .push(recipe_id);
+            }
+        }
+    }
+
+    // Build adjacency: recipe → recipes it depends on (via component inputs)
+    let mut deps: std::collections::HashMap<&RecipeId, Vec<&RecipeId>> =
+        std::collections::HashMap::new();
+    for (recipe_id, recipe) in &content.recipes {
+        for input in &recipe.inputs {
+            if let InputFilter::Component(comp_id) = &input.filter {
+                if let Some(producing_recipes) = producers.get(comp_id.0.as_str()) {
+                    for producer in producing_recipes {
+                        // Don't add self-dependency
+                        if *producer != recipe_id {
+                            deps.entry(recipe_id).or_default().push(producer);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    deps
+}
+
+/// DFS cycle detection on the recipe dependency graph.
+fn has_recipe_cycle<'a>(
+    node: &'a RecipeId,
+    graph: &std::collections::HashMap<&'a RecipeId, Vec<&'a RecipeId>>,
+    visited: &mut HashSet<&'a RecipeId>,
+    in_stack: &mut HashSet<&'a RecipeId>,
+) -> bool {
+    if in_stack.contains(node) {
+        return true;
+    }
+    if visited.contains(node) {
+        return false;
+    }
+    visited.insert(node);
+    in_stack.insert(node);
+    if let Some(deps) = graph.get(node) {
+        for dep in deps {
+            if has_recipe_cycle(dep, graph, visited, in_stack) {
+                return true;
+            }
+        }
+    }
+    in_stack.remove(node);
+    false
+}
+
+/// The production content recipe graph must be acyclic (a valid DAG).
+#[test]
+fn recipe_graph_is_acyclic() {
+    let content = load_test_content();
+    let graph = build_recipe_dependency_graph(content);
+
+    let mut visited = HashSet::new();
+    let mut in_stack = HashSet::new();
+
+    for recipe_id in content.recipes.keys() {
+        assert!(
+            !has_recipe_cycle(recipe_id, &graph, &mut visited, &mut in_stack),
+            "cycle detected in recipe graph involving recipe '{}'",
+            recipe_id
+        );
+    }
+}
+
+/// Diamond shapes (reconvergent paths) should NOT be flagged as cycles.
+/// In production content: fe_plate is consumed by both structural_beam and hull_panel,
+/// and structural_beam is also consumed by hull_panel. This is a diamond, not a cycle.
+#[test]
+fn recipe_graph_allows_diamond_shapes() {
+    let content = load_test_content();
+
+    // Verify the diamond shape exists in production content:
+    // fe_plate → structural_beam → hull_panel
+    //         └──────────────────→ hull_panel
+    let hull_panel_recipe = content
+        .recipes
+        .get(&RecipeId("recipe_hull_panel".to_string()));
+    assert!(
+        hull_panel_recipe.is_some(),
+        "recipe_hull_panel should exist in content"
+    );
+    let hull_recipe = hull_panel_recipe.unwrap();
+
+    // hull_panel should consume both structural_beam and fe_plate
+    let consumes_structural_beam = hull_recipe.inputs.iter().any(
+        |input| matches!(&input.filter, InputFilter::Component(c) if c.0 == "structural_beam"),
+    );
+    let consumes_fe_plate = hull_recipe
+        .inputs
+        .iter()
+        .any(|input| matches!(&input.filter, InputFilter::Component(c) if c.0 == "fe_plate"));
+    assert!(
+        consumes_structural_beam,
+        "hull_panel recipe should consume structural_beam"
+    );
+    assert!(
+        consumes_fe_plate,
+        "hull_panel recipe should consume fe_plate (diamond reconvergence)"
+    );
+
+    // structural_beam also consumes fe_plate — this creates the diamond
+    let structural_beam_recipe = content
+        .recipes
+        .get(&RecipeId("recipe_structural_beam".to_string()));
+    assert!(
+        structural_beam_recipe.is_some(),
+        "recipe_structural_beam should exist"
+    );
+    let beam_recipe = structural_beam_recipe.unwrap();
+    let beam_consumes_fe_plate = beam_recipe
+        .inputs
+        .iter()
+        .any(|input| matches!(&input.filter, InputFilter::Component(c) if c.0 == "fe_plate"));
+    assert!(
+        beam_consumes_fe_plate,
+        "structural_beam recipe should consume fe_plate"
+    );
+
+    // The acyclicity check should still pass (diamond != cycle)
+    let graph = build_recipe_dependency_graph(content);
+    let mut visited = HashSet::new();
+    let mut in_stack = HashSet::new();
+    for recipe_id in content.recipes.keys() {
+        assert!(
+            !has_recipe_cycle(recipe_id, &graph, &mut visited, &mut in_stack),
+            "diamond shape should NOT be flagged as cycle for recipe '{}'",
+            recipe_id
+        );
     }
 }
