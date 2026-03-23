@@ -139,7 +139,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install duckdb pyarrow ruff pytest pytest-cov mypy
 
       - name: Format check
         run: ruff format --check scripts/analysis/

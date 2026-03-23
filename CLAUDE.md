@@ -31,7 +31,7 @@ cd e2e && npx playwright test --headed                    # E2E tests (visible b
 cargo llvm-cov --fail-under-lines 83                      # Rust coverage (83% line threshold)
 cd ui_web && npm run test:coverage                        # FE coverage (thresholds in vite.config.ts)
 
-pip install -e ".[dev]"                                   # Install Python deps (once, in venv)
+pip install duckdb pyarrow ruff pytest pytest-cov mypy    # Install Python deps (once, in venv)
 ruff check scripts/analysis/                              # Python lint
 ruff format scripts/analysis/                             # Python format
 mypy scripts/analysis/                                    # Python type check
