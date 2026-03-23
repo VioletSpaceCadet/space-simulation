@@ -1,0 +1,120 @@
+[
+  {
+    "id": "evt_equipment_failure",
+    "name": "Critical Equipment Failure",
+    "category": "operational",
+    "tags": ["damage", "station"],
+    "rarity": "uncommon",
+    "cooldown_ticks": 500,
+    "conditions": [
+      { "field": "station_count", "op": "gte", "value": 1 }
+    ],
+    "weight_modifiers": [
+      {
+        "condition": { "field": "avg_module_wear", "op": "gt", "value": 0.6 },
+        "weight_multiplier_pct": 300
+      }
+    ],
+    "targeting": { "type": "random_station" },
+    "effects": [
+      { "type": "damage_module", "wear_amount": 0.3 },
+      { "type": "trigger_alert", "severity": "Critical", "message": "Critical equipment failure detected!" }
+    ],
+    "description_template": "A critical failure strikes {target}!"
+  },
+  {
+    "id": "evt_comet_flyby",
+    "name": "Comet Flyby",
+    "category": "natural",
+    "tags": ["discovery", "scanning"],
+    "rarity": "rare",
+    "cooldown_ticks": 2000,
+    "conditions": [
+      { "field": "tick", "op": "gte", "value": 1000 }
+    ],
+    "weight_modifiers": [],
+    "targeting": { "type": "global" },
+    "effects": [
+      { "type": "spawn_scan_site" },
+      { "type": "spawn_scan_site" },
+      { "type": "trigger_alert", "severity": "Warning", "message": "A comet passes through the system, leaving volatile deposits!" }
+    ],
+    "description_template": "A comet passes through {target}, leaving volatile deposits!"
+  },
+  {
+    "id": "evt_supernova",
+    "name": "Supernova Observation",
+    "category": "natural",
+    "tags": ["research", "discovery"],
+    "rarity": "rare",
+    "cooldown_ticks": 3000,
+    "conditions": [
+      { "field": "tick", "op": "gte", "value": 2000 }
+    ],
+    "weight_modifiers": [],
+    "targeting": { "type": "global" },
+    "effects": [
+      { "type": "add_research_data", "domain": "Survey", "amount": 25.0 },
+      { "type": "add_research_data", "domain": "Materials", "amount": 25.0 },
+      { "type": "add_research_data", "domain": "Manufacturing", "amount": 25.0 },
+      { "type": "add_research_data", "domain": "Propulsion", "amount": 25.0 },
+      { "type": "trigger_alert", "severity": "Warning", "message": "A distant supernova illuminates the system with data!" }
+    ],
+    "description_template": "A distant supernova illuminates the system with data!"
+  },
+  {
+    "id": "evt_solar_flare",
+    "name": "Solar Flare",
+    "category": "natural",
+    "tags": ["damage", "station"],
+    "rarity": "uncommon",
+    "cooldown_ticks": 1000,
+    "conditions": [
+      { "field": "station_count", "op": "gte", "value": 1 }
+    ],
+    "weight_modifiers": [],
+    "targeting": { "type": "random_station" },
+    "effects": [
+      { "type": "apply_modifier", "stat": "wear_rate", "op": "pct_multiplicative", "value": 1.5, "duration_ticks": 500 },
+      { "type": "trigger_alert", "severity": "Warning", "message": "A solar flare disrupts operations!" }
+    ],
+    "description_template": "A solar flare disrupts operations at {target}!"
+  },
+  {
+    "id": "evt_micrometeorite",
+    "name": "Micrometeorite Shower",
+    "category": "natural",
+    "tags": ["damage", "station"],
+    "rarity": "common",
+    "cooldown_ticks": 300,
+    "conditions": [
+      { "field": "station_count", "op": "gte", "value": 1 }
+    ],
+    "weight_modifiers": [],
+    "targeting": { "type": "random_station" },
+    "effects": [
+      { "type": "damage_module", "wear_amount": 0.05 },
+      { "type": "apply_modifier", "stat": "wear_rate", "op": "pct_multiplicative", "value": 1.2, "duration_ticks": 200 }
+    ],
+    "description_template": "Micrometeorites pepper {target}!"
+  },
+  {
+    "id": "evt_supply_cache",
+    "name": "Supply Cache Discovery",
+    "category": "discovery",
+    "tags": ["supply", "station"],
+    "rarity": "rare",
+    "cooldown_ticks": 2500,
+    "conditions": [
+      { "field": "station_count", "op": "gte", "value": 1 },
+      { "field": "tick", "op": "gte", "value": 500 }
+    ],
+    "weight_modifiers": [],
+    "targeting": { "type": "random_station" },
+    "effects": [
+      { "type": "add_inventory", "item": { "Component": { "component_id": "repair_kit", "count": 5 } } },
+      { "type": "trigger_alert", "severity": "Warning", "message": "An abandoned supply cache is discovered!" }
+    ],
+    "description_template": "An abandoned supply cache is discovered near {target}!"
+  }
+]
