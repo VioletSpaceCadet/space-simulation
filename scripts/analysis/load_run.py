@@ -90,8 +90,7 @@ def _load_seed(conn: duckdb.DuckDBPyConnection, seed_dir: Path) -> duckdb.DuckDB
         return None
 
     # Add metadata columns
-    rel = rel.select(f"*, {seed} AS seed, '{content_version}' AS content_version, {metrics_every} AS metrics_every")
-    return rel
+    return rel.select(f"*, {seed} AS seed, '{content_version}' AS content_version, {metrics_every} AS metrics_every")
 
 
 def main() -> None:
@@ -113,7 +112,7 @@ def main() -> None:
     assert tick_range is not None
     print(f"  Rows: {row_count[0]}")
     print(f"  Seeds: {seeds[0]}")
-    print(f"  Tick range: {tick_range[0]} – {tick_range[1]}")
+    print(f"  Tick range: {tick_range[0]} - {tick_range[1]}")
     print(f"\nSchema ({len(rel.columns)} columns):")
     for col in rel.columns:
         print(f"  {col}")

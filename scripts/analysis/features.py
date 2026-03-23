@@ -6,7 +6,10 @@ relation with additional computed columns.
 
 from __future__ import annotations
 
-import duckdb
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import duckdb
 
 
 def add_throughput_rates(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
@@ -95,5 +98,4 @@ def add_all_features(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
     rel = add_throughput_rates(rel)
     rel = add_fleet_utilization(rel)
     rel = add_power_surplus(rel)
-    rel = add_storage_pressure(rel)
-    return rel
+    return add_storage_pressure(rel)
