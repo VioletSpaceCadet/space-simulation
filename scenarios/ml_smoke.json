@@ -1,0 +1,7 @@
+{
+  "name": "ml_smoke",
+  "ticks": 500,
+  "metrics_every": 1,
+  "seeds": [1],
+  "state": "./content/dev_base_state.json"
+}
