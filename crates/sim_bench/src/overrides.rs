@@ -135,8 +135,23 @@ fn apply_module_override(
     Ok(())
 }
 
+/// Derived fields that are computed by `derive_tick_values()` after deserialization.
+/// These use `#[serde(skip_deserializing)]` so overriding them has no effect —
+/// reject them explicitly to avoid silent no-ops.
+const DERIVED_CONSTANT_FIELDS: &[&str] = &[
+    "survey_scan_ticks",
+    "deep_scan_ticks",
+    "mining_rate_kg_per_tick",
+    "deposit_ticks",
+    "station_power_available_per_tick",
+    "research_roll_interval_ticks",
+];
+
 /// Apply constant overrides via serde: serialize current values, patch, deserialize back.
 /// New Constants fields are automatically overridable with zero additional code.
+///
+/// Callers must invoke `constants.derive_tick_values()` after this to recompute
+/// derived tick fields from the (potentially overridden) game-time minute values.
 fn apply_constant_overrides(
     constants: &mut Constants,
     overrides: &[(&str, &serde_json::Value)],
@@ -148,6 +163,12 @@ fn apply_constant_overrides(
     };
 
     for &(key, value) in overrides {
+        if DERIVED_CONSTANT_FIELDS.contains(&key) {
+            bail!(
+                "override key '{key}' targets a derived field that is recomputed from \
+                 its source (e.g., override the _minutes variant instead)"
+            );
+        }
         if !map.contains_key(key) {
             bail!(
                 "unknown override key '{key}'. \
