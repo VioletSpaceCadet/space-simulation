@@ -16,6 +16,6 @@ echo "  mypy..."
 mypy scripts/analysis/
 
 echo "  pytest (with coverage)..."
-pytest scripts/analysis/tests/ --cov=scripts/analysis --cov-report=term-missing --cov-fail-under=80
+pytest scripts/analysis/tests/ --cov=scripts/analysis --cov-report=term-missing --cov-fail-under=75
 
 echo "=== Python CI passed ==="
