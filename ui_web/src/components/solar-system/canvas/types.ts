@@ -20,8 +20,8 @@ export function auUmToWorld(auUm: number): number {
 /** Camera zoom constants. */
 export const MIN_ZOOM = 0.00001;
 export const MAX_ZOOM = 50;
-export const ZOOM_IN_RATIO = 1.22;
-export const ZOOM_OUT_RATIO = 0.82;
+export const ZOOM_IN_RATIO = 1.08;
+export const ZOOM_OUT_RATIO = 0.93;
 
 /** Camera interpolation rates. */
 export const LERP_ZOOM = 0.18;
