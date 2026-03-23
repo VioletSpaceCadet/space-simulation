@@ -261,6 +261,60 @@ pub enum InventoryItem {
     },
 }
 
+impl InventoryItem {
+    /// Mass in kg for mass-bearing variants (Ore, Slag, Material). Returns 0 for others.
+    pub fn mass_kg(&self) -> f32 {
+        match self {
+            Self::Ore { kg, .. } | Self::Slag { kg, .. } | Self::Material { kg, .. } => *kg,
+            Self::Component { .. } | Self::Module { .. } => 0.0,
+        }
+    }
+
+    /// Mutable reference to mass for mass-bearing variants. Returns `None` for others.
+    pub fn mass_kg_mut(&mut self) -> Option<&mut f32> {
+        match self {
+            Self::Ore { kg, .. } | Self::Slag { kg, .. } | Self::Material { kg, .. } => Some(kg),
+            Self::Component { .. } | Self::Module { .. } => None,
+        }
+    }
+
+    pub fn is_ore(&self) -> bool {
+        matches!(self, Self::Ore { .. })
+    }
+
+    pub fn is_slag(&self) -> bool {
+        matches!(self, Self::Slag { .. })
+    }
+
+    pub fn is_material(&self) -> bool {
+        matches!(self, Self::Material { .. })
+    }
+
+    pub fn is_component(&self) -> bool {
+        matches!(self, Self::Component { .. })
+    }
+
+    pub fn is_module(&self) -> bool {
+        matches!(self, Self::Module { .. })
+    }
+
+    /// Element ID for Material variants; `None` for others.
+    pub fn element_id(&self) -> Option<&str> {
+        match self {
+            Self::Material { element, .. } => Some(element),
+            _ => None,
+        }
+    }
+
+    /// Component ID for Component variants; `None` for others.
+    pub fn component_id(&self) -> Option<&str> {
+        match self {
+            Self::Component { component_id, .. } => Some(&component_id.0),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleState {
     pub id: ModuleInstanceId,

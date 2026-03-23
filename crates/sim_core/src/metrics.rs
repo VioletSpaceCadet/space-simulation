@@ -259,13 +259,8 @@ impl MetricsAccumulator {
         let total_ore_at_station: f32 = station
             .inventory
             .iter()
-            .filter_map(|item| {
-                if let InventoryItem::Ore { kg, .. } = item {
-                    Some(*kg)
-                } else {
-                    None
-                }
-            })
+            .filter(|item| item.is_ore())
+            .map(InventoryItem::mass_kg)
             .sum();
 
         for module in &station.modules {

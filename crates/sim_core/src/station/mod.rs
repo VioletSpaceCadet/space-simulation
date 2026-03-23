@@ -71,14 +71,10 @@ fn estimate_output_volume_m3(
 
 fn matches_input_filter(item: &InventoryItem, filter: Option<&InputFilter>) -> bool {
     match filter {
-        Some(InputFilter::ItemKind(ItemKind::Ore)) => matches!(item, InventoryItem::Ore { .. }),
-        Some(InputFilter::ItemKind(ItemKind::Material)) => {
-            matches!(item, InventoryItem::Material { .. })
-        }
-        Some(InputFilter::ItemKind(ItemKind::Slag)) => matches!(item, InventoryItem::Slag { .. }),
-        Some(InputFilter::Element(el)) => {
-            matches!(item, InventoryItem::Material { element, .. } if element == el)
-        }
+        Some(InputFilter::ItemKind(ItemKind::Ore)) => item.is_ore(),
+        Some(InputFilter::ItemKind(ItemKind::Material)) => item.is_material(),
+        Some(InputFilter::ItemKind(ItemKind::Slag)) => item.is_slag(),
+        Some(InputFilter::Element(el)) => item.element_id() == Some(el.as_str()),
         _ => false,
     }
 }
