@@ -13,6 +13,7 @@ const mockContent: ContentResponse = {
   lab_rates: [],
   data_rates: {},
   minutes_per_tick: 60,
+  recipes: {},
 };
 
 describe('useContent', () => {

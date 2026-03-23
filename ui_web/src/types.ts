@@ -311,9 +311,54 @@ export interface LabRateInfo {
   enabled: boolean
 }
 
+export interface RecipeInput {
+  filter: Record<string, unknown>
+  amount: Record<string, number>
+}
+
+export interface RecipeThermalReq {
+  min_temp_mk: number
+  optimal_min_mk: number
+  optimal_max_mk: number
+  max_temp_mk: number
+  heat_per_run_j: number
+}
+
+export interface RecipeDef {
+  id: string
+  inputs: RecipeInput[]
+  outputs: Record<string, unknown>[]
+  efficiency: number
+  thermal_req?: RecipeThermalReq | null
+  required_tech?: string | null
+  tags?: string[]
+}
+
+export interface ModuleFlowStats {
+  module_id: string
+  recipe_id: string
+  runs_in_window: number
+  total_input_kg: number
+  total_output_kg: number
+  total_output_count: number
+  last_run_tick: number
+  throughput_per_hour: number
+  utilization_pct: number
+  stall_reason: string | null
+}
+
+export interface ItemFlowStats {
+  item_id: string
+  current_qty: number
+  delta_per_hour: number
+  trend: 'rising' | 'falling' | 'stable'
+  ticks_at_zero: number
+}
+
 export interface ContentResponse {
   techs: TechDef[]
   lab_rates: LabRateInfo[]
   data_rates: Record<string, number>
   minutes_per_tick: number
+  recipes: Record<string, RecipeDef>
 }
