@@ -148,10 +148,12 @@ pub fn mine_duration(asteroid: &AsteroidState, ship: &ShipState, content: &GameC
     let free_volume = (ship.cargo_capacity_m3 - volume_used).max(0.0);
     let rate = content.constants.mining_rate_kg_per_tick;
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let ticks_to_fill = (free_volume / (rate * effective_m3_per_kg)).ceil() as u64;
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let ticks_to_deplete = (asteroid.mass_kg / rate).ceil() as u64;
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // clamp guards
+    let ticks_to_fill = (free_volume / (rate * effective_m3_per_kg))
+        .ceil()
+        .clamp(0.0, u64::MAX as f32) as u64;
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // clamp guards
+    let ticks_to_deplete = (asteroid.mass_kg / rate).ceil().clamp(0.0, u64::MAX as f32) as u64;
 
     ticks_to_fill.min(ticks_to_deplete).max(1)
 }
