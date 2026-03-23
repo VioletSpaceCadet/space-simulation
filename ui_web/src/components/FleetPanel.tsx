@@ -28,7 +28,9 @@ interface ShipRow {
   ship: ShipState
 }
 
-function ShipsTable({ ships, displayTick, hulls }: { ships: ShipState[]; displayTick: number; hulls: Record<string, HullDef> }) {
+function ShipsTable(
+  { ships, displayTick, hulls }: { ships: ShipState[]; displayTick: number; hulls: Record<string, HullDef> },
+) {
   const rows: ShipRow[] = ships.map((ship) => ({
     id: ship.id,
     hull: ship.hull_id ? (hulls[ship.hull_id]?.name ?? ship.hull_id) : 'unknown',
