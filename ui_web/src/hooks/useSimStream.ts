@@ -6,7 +6,7 @@ import { getEventKey } from '../utils';
 
 import { applyEvents } from './applyEvents';
 
-// Kept for backward compatibility with SolarSystemMap/DetailCard imports.
+// Kept for backward compatibility with DetailCard imports.
 // Composition is now embedded in InventoryItem::Ore; this type is unused in new code.
 export type OreCompositions = Record<string, Record<string, number>>
 
