@@ -15,6 +15,12 @@ Any work in `sim_daemon` — HTTP endpoints, SSE streaming, command queue, alert
 - [ ] **Command queue:** commands validated before queuing, invalid commands return errors
 - [ ] **CORS/headers:** check if new endpoints need CORS headers for UI access
 
+## Rust Analyzer Tools
+Use `rust_analyzer_*` MCP tools for Rust navigation:
+- **Finding handler definitions:** `rust_analyzer_definition` to jump to route handler implementations
+- **Tracing API usage:** `rust_analyzer_references` to find all callers of shared state types (`AppState`, `AlertEngine`)
+- **Checking axum types:** `rust_analyzer_hover` to verify extractor types and return types on handlers
+
 ## Testing
 - **Unit:** `cargo test -p sim_daemon`
 - **Integration:** start daemon (`cargo run -p sim_daemon -- run --seed 42`), curl endpoints

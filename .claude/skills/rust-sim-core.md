@@ -21,6 +21,13 @@ Any work in `sim_core`, `sim_world`, or `sim_control` — game state, tick logic
 - [ ] **Function size:** new functions over 80 lines should use the accumulator pattern (like `MetricsAccumulator`) or extract sub-functions. Never add `#[allow(clippy::too_many_lines)]` to suppress growth — decompose instead.
 - [ ] **Progression tests:** at least one test per major system should use `load_content("../../content")` with real content values (real wear rates, real timescales) — not just zero-wear fixtures
 
+## Rust Analyzer Tools
+Use `rust_analyzer_*` MCP tools for Rust navigation — they understand semantics where grep cannot:
+- **Navigating types:** `rust_analyzer_definition` to jump to `GameState`, `Event`, `ModuleBehaviorDef`, etc. instead of grepping
+- **Finding callers:** `rust_analyzer_references` to find all callers of `tick()`, all uses of a type across crates
+- **Checking signatures:** `rust_analyzer_hover` for quick type info without reading surrounding code
+- **File overview:** `rust_analyzer_symbols` to see what functions/structs a file contains with line ranges
+
 ## Testing
 - **Unit:** `cargo test -p sim_core` (runs automatically via PostToolUse hook on `.rs` edits)
 - **Scenario:** `cargo run -p sim_bench -- run --scenario scenarios/baseline.json`
