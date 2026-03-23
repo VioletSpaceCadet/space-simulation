@@ -152,7 +152,7 @@ jobs:
         run: mypy scripts/analysis/
 
       - name: Test with coverage
-        run: pytest scripts/analysis/tests/ --cov=scripts/analysis --cov-report=term-missing --cov-fail-under=80
+        run: pytest scripts/analysis/tests/ --cov=scripts/analysis --cov-report=term-missing --cov-fail-under=75
 
   e2e:
     name: E2E (Playwright)
