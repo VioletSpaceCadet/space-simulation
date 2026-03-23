@@ -261,7 +261,7 @@ impl SimEventDef {
 // ---------------------------------------------------------------------------
 
 /// A record of a fired event (stored in history ring buffer).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FiredEvent {
     pub event_def_id: EventDefId,
     pub tick: u64,
@@ -270,7 +270,7 @@ pub struct FiredEvent {
 }
 
 /// A currently active temporal effect (modifier with expiry).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActiveEffect {
     pub source_event_id: EventDefId,
     pub target: ResolvedTarget,
@@ -328,8 +328,19 @@ pub fn validate_event_defs(events: &[SimEventDef]) {
 
         // Effect-targeting coherence
         for effect in &event.effects {
+            validate_effect_values(effect, &event.id);
             validate_effect_targeting(effect, &event.targeting, &event.id);
         }
+    }
+}
+
+/// Validate effect parameter ranges.
+fn validate_effect_values(effect: &EffectDef, event_id: &EventDefId) {
+    if let EffectDef::DamageModule { wear_amount } = effect {
+        assert!(
+            *wear_amount > 0.0 && *wear_amount <= 1.0,
+            "event '{event_id}': DamageModule wear_amount must be in (0.0, 1.0], got {wear_amount}",
+        );
     }
 }
 
