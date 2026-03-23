@@ -26,7 +26,9 @@ export function ShipDetail({ ship, hulls, displayTick }: ShipDetailProps) {
           <div className="space-y-0.5 text-dim text-[10px] mb-2">
             <div>Cargo: {ship.cargo_capacity_m3.toFixed(0)} m³</div>
             {ship.propellant_kg != null && ship.propellant_capacity_kg != null && (
-              <div>Propellant: {ship.propellant_kg.toFixed(0)} / {ship.propellant_capacity_kg.toFixed(0)} kg</div>
+              <div>
+                Propellant: {ship.propellant_kg.toFixed(0)} / {ship.propellant_capacity_kg.toFixed(0)} kg
+              </div>
             )}
           </div>
         )}
