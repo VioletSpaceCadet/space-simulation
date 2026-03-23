@@ -14,12 +14,14 @@ import { EconomyPanel } from './components/EconomyPanel';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { EventsFeed } from './components/EventsFeed';
 import { FleetPanel } from './components/FleetPanel';
+import { FloatingWindow } from './components/FloatingWindow';
 import { LayoutRenderer } from './components/LayoutRenderer';
 import { RecipeDagPanel } from './components/RecipeDagPanel';
 import { ResearchPanel } from './components/ResearchPanel';
 import { SolarSystemMapCanvas } from './components/SolarSystemMapCanvas';
 import { SPEED_TPS_VALUES, StatusBar } from './components/StatusBar';
 import { useAnimatedTick } from './hooks/useAnimatedTick';
+import { useFloatingWindows } from './hooks/useFloatingWindows';
 import { useLayoutState } from './hooks/useLayoutState';
 import { useSimStream } from './hooks/useSimStream';
 import { ALL_PANELS, PANEL_LABELS } from './layout';
@@ -31,6 +33,10 @@ const PANEL_ID_SET: ReadonlySet<string> = new Set<string>(ALL_PANELS);
 export default function App() {
   const { snapshot, events, connected, currentTick, activeAlerts, dismissedAlerts, dismissAlert } = useSimStream();
   const { layout, visiblePanels, move, togglePanel, ensurePanelVisible } = useLayoutState();
+  const {
+    windows: floatingWindows, openWindow, closeWindow,
+    updateWindow, bringToFront, closeWindowByPanel,
+  } = useFloatingWindows();
 
   const [ticksPerSec, setTicksPerSec] = useState(10); // default fallback
   const [minutesPerTick, setMinutesPerTick] = useState(60);
@@ -77,6 +83,16 @@ export default function App() {
       ensurePanelVisible(panelId as PanelId);
     }
   }, [ensurePanelVisible]);
+
+  const handlePopOut = useCallback((panelId: PanelId) => {
+    togglePanel(panelId); // Remove from layout
+    openWindow(panelId);
+  }, [togglePanel, openWindow]);
+
+  const handleDock = useCallback((windowId: string, panelId: PanelId) => {
+    closeWindow(windowId);
+    ensurePanelVisible(panelId);
+  }, [closeWindow, ensurePanelVisible]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -181,20 +197,30 @@ export default function App() {
       />
       <div className="flex flex-1 overflow-hidden">
         <nav className="flex flex-col shrink-0 bg-surface border-r border-edge py-2 px-1 gap-0.5">
-          {ALL_PANELS.map((id) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => togglePanel(id)}
-              className={`text-[10px] uppercase tracking-widest px-2 py-1.5 rounded-sm transition-colors cursor-pointer text-left ${
-                visiblePanels.includes(id)
-                  ? 'text-active bg-edge/40'
-                  : 'text-muted hover:text-dim hover:bg-edge/15'
-              }`}
-            >
-              {PANEL_LABELS[id]}
-            </button>
-          ))}
+          {ALL_PANELS.map((id) => {
+            const isDocked = visiblePanels.includes(id);
+            const isFloating = floatingWindows.some(w => w.panelId === id);
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  if (isFloating) {
+                    closeWindowByPanel(id);
+                  } else {
+                    togglePanel(id);
+                  }
+                }}
+                className={`text-[10px] uppercase tracking-widest px-2 py-1.5 rounded-sm transition-colors cursor-pointer text-left ${
+                  isDocked || isFloating
+                    ? 'text-active bg-edge/40'
+                    : 'text-muted hover:text-dim hover:bg-edge/15'
+                }`}
+              >
+                {PANEL_LABELS[id]}{isFloating ? ' ↗' : ''}
+              </button>
+            );
+          })}
         </nav>
         {visiblePanels.length > 0 && (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -203,6 +229,7 @@ export default function App() {
               renderPanel={renderPanel}
               isDragging={activeDragId !== null}
               activeDragId={activeDragId}
+              onPopOut={handlePopOut}
             />
             <DragOverlay>
               {activeDragId ? (
@@ -215,6 +242,25 @@ export default function App() {
             </DragOverlay>
           </DndContext>
         )}
+        {/* Floating windows overlay */}
+        {floatingWindows.map((win) => (
+          <FloatingWindow
+            key={win.id}
+            id={win.id}
+            panelId={win.panelId}
+            x={win.x}
+            y={win.y}
+            width={win.width}
+            height={win.height}
+            zIndex={win.zIndex}
+            onClose={closeWindow}
+            onUpdate={updateWindow}
+            onFocus={bringToFront}
+            onDock={handleDock}
+          >
+            {renderPanel(win.panelId)}
+          </FloatingWindow>
+        ))}
       </div>
     </div>
   );
