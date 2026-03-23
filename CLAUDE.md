@@ -172,6 +172,37 @@ If no skills match, read `.claude/skills/general.md`. After loading, print a bri
 
 See `.claude/skills/README.md` for how to add or edit skills.
 
+## Rust Analyzer MCP (LSP Tools)
+
+The `rust-analyzer` MCP plugin provides IDE-quality Rust intelligence. **Prefer these over grep/read for Rust navigation tasks** — they understand Rust semantics (traits, impls, re-exports, generics) where text search cannot.
+
+**Setup:** In worktrees, call `rust_analyzer_set_workspace` with the worktree root at session start.
+
+**High-value tools (use proactively):**
+- `rust_analyzer_definition` — Jump to where a type/function/trait is defined. **Use instead of grepping for `struct Foo` or `fn bar`.** Returns exact file + line. Params: `file_path`, `line` (0-based), `character` (0-based).
+- `rust_analyzer_references` — Find all usages of a symbol across the entire workspace. **Use instead of `Grep` when you need all callers of a function, all uses of a type, or all implementors.** Understands re-exports and trait impls. Can produce large output for common types.
+- `rust_analyzer_hover` — Get the full type signature of any symbol at a position. Great for understanding function params/returns without reading surrounding code.
+- `rust_analyzer_symbols` — List all symbols (functions, structs, consts, modules) in a file with line ranges. **Use instead of `Read` when you just need a file's structure overview.**
+- `rust_analyzer_diagnostics` — Get rust-analyzer's **native** diagnostics for a single file (type mismatches, unresolved imports, syntax errors). **Does NOT include cargo/rustc/clippy diagnostics** — those only come from `cargo check`. Use for quick "does this type-check?" feedback, but always run `cargo check`/`cargo test` for full validation.
+
+**Situational tools:**
+- `rust_analyzer_completion` — Explore what methods/fields are available on a type at a position. Output is very large (~250K chars, no server-side filtering) — use sparingly.
+- `rust_analyzer_code_actions` — See available refactorings (extract function, destructure, etc.) at a range. List-only — cannot resolve or apply edits.
+- `rust_analyzer_workspace_diagnostics` — **Unreliable.** rust-analyzer sets `workspace_diagnostics: false` in capabilities. The MCP tool synthesizes results but often returns empty/unexpected format. **Use `cargo check` instead.**
+- `rust_analyzer_format` — Format a file. Redundant with the after-edit hook's `cargo fmt`.
+
+**When to use RA vs Grep/Read:**
+| Task | Use RA | Use Grep/Read |
+|------|--------|---------------|
+| Find where a type is defined | `definition` | — |
+| Find all callers of a function | `references` | — |
+| Check a function's signature | `hover` | — |
+| Get a file's symbol outline | `symbols` | — |
+| Search for a string literal | — | `Grep` |
+| Find files by name pattern | — | `Glob` |
+| Read actual code content | — | `Read` |
+| Search across non-Rust files | — | `Grep` |
+
 ## Notes
 
 - IDE: RustRover (JetBrains)

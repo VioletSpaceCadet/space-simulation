@@ -9,6 +9,7 @@ Fallback for any task that doesn't match a domain-specific skill — docs, confi
 
 ## Checklist
 - [ ] Read relevant existing code before modifying
+- [ ] For Rust navigation, prefer `rust_analyzer_*` MCP tools (definition, references, hover, symbols) over grep — they understand Rust semantics
 - [ ] Follow CLAUDE.md conventions (formatting, testing, workflow)
 - [ ] Run appropriate tests for the change
 - [ ] Update docs (`reference.md`, `CLAUDE.md`) if types or APIs changed
