@@ -60,5 +60,15 @@ export function thermalColorClass(
 
 export function formatQty(qty: number): string {
   if (qty >= 1000) { return `${(qty / 1000).toFixed(1)}k`; }
+  if (Number.isInteger(qty)) { return String(qty); }
   return qty.toFixed(qty < 10 ? 1 : 0);
+}
+
+/** Convert a snake_case ID to Title Case, stripping common prefixes like "recipe_". */
+export function displayName(id: string): string {
+  const stripped = id.replace(/^recipe_/, '');
+  return stripped
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }

@@ -172,6 +172,10 @@ export function buildRecipeGraph(
 
     const outputs: RecipeNode['outputs'] = recipe.outputs.map((output) => {
       const parsed = parseRecipeOutput(output);
+      // Ship outputs use the recipe name as item ID for a meaningful display name
+      if (parsed.type === 'ship') {
+        parsed.itemId = recipe.id.replace(/^recipe_/, '');
+      }
       return { itemId: parsed.itemId, amount: 0, unit: parsed.unit };
     });
 
