@@ -733,6 +733,91 @@ impl AutopilotBehavior for PropellantPipeline {
     }
 }
 
+/// Fits idle ships at stations with modules according to hull fitting templates.
+pub(crate) struct ShipFitting;
+
+impl AutopilotBehavior for ShipFitting {
+    fn name(&self) -> &'static str {
+        "ship_fitting"
+    }
+
+    fn generate(
+        &self,
+        state: &GameState,
+        content: &GameContent,
+        owner: &PrincipalId,
+        next_id: &mut u64,
+    ) -> Vec<CommandEnvelope> {
+        let mut commands = Vec::new();
+        let idle_ships = collect_idle_ships(state, owner);
+
+        // Track modules consumed this tick to avoid double-allocation
+        let mut consumed: Vec<(sim_core::StationId, String)> = Vec::new();
+
+        for ship_id in &idle_ships {
+            let Some(ship) = state.ships.get(ship_id) else {
+                continue;
+            };
+
+            // Ship must be at a station
+            let Some(station) = state
+                .stations
+                .values()
+                .find(|s| s.position == ship.position)
+            else {
+                continue;
+            };
+
+            // Look up fitting template for this hull
+            let Some(template) = content.fitting_templates.get(&ship.hull_id) else {
+                continue;
+            };
+
+            for entry in template {
+                // Skip if slot already filled
+                if ship
+                    .fitted_modules
+                    .iter()
+                    .any(|fm| fm.slot_index == entry.slot_index)
+                {
+                    continue;
+                }
+
+                // Check station inventory for matching module (accounting for already consumed this tick)
+                let module_def_id_str = &entry.module_def_id.0;
+                let in_inventory = station
+                    .inventory
+                    .iter()
+                    .filter(|item| {
+                        matches!(item, InventoryItem::Module { module_def_id, .. } if module_def_id == module_def_id_str)
+                    })
+                    .count();
+                let already_consumed = consumed
+                    .iter()
+                    .filter(|(sid, mid)| *sid == station.id && mid == module_def_id_str)
+                    .count();
+                let available = in_inventory > already_consumed;
+
+                if available {
+                    consumed.push((station.id.clone(), module_def_id_str.clone()));
+                    commands.push(make_cmd(
+                        owner,
+                        state.meta.tick,
+                        next_id,
+                        Command::FitShipModule {
+                            ship_id: ship_id.clone(),
+                            slot_index: entry.slot_index,
+                            module_def_id: entry.module_def_id.clone(),
+                            station_id: station.id.clone(),
+                        },
+                    ));
+                }
+            }
+        }
+        commands
+    }
+}
+
 /// Ship task scheduling: Deposit > Mine > `DeepScan` > Survey priority loop.
 pub(crate) struct ShipTaskScheduler;
 
@@ -919,6 +1004,7 @@ pub(crate) fn default_behaviors() -> Vec<Box<dyn AutopilotBehavior>> {
         Box::new(SlagJettison),
         Box::new(MaterialExport),
         Box::new(PropellantPipeline),
+        Box::new(ShipFitting),
         Box::new(ShipTaskScheduler),
     ]
 }
