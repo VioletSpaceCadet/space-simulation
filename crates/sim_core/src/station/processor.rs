@@ -91,12 +91,7 @@ fn execute(
         s.inventory
             .iter()
             .filter(|item| matches_input_filter(item, input_filter_for_threshold))
-            .filter_map(|i| match i {
-                InventoryItem::Ore { kg, .. }
-                | InventoryItem::Material { kg, .. }
-                | InventoryItem::Slag { kg, .. } => Some(*kg),
-                _ => None,
-            })
+            .map(InventoryItem::mass_kg)
             .sum()
     });
 
@@ -382,10 +377,7 @@ fn emit_slag_output(
 
     if slag_kg > MIN_MEANINGFUL_KG {
         if let Some(station) = state.stations.get_mut(run.station_id) {
-            let existing = station
-                .inventory
-                .iter_mut()
-                .find(|i| matches!(i, InventoryItem::Slag { .. }));
+            let existing = station.inventory.iter_mut().find(|i| i.is_slag());
             if let Some(InventoryItem::Slag {
                 kg: existing_kg,
                 composition: existing_comp,
@@ -732,7 +724,7 @@ mod tests {
             },
         ];
 
-        let filter = |item: &InventoryItem| matches!(item, InventoryItem::Ore { .. });
+        let filter = |item: &InventoryItem| item.is_ore();
         let (consumed_kg, lots) = peek_ore_fifo_with_lots(&inventory, 500.0, filter);
 
         assert!((consumed_kg - 500.0).abs() < 1e-3);
@@ -760,7 +752,7 @@ mod tests {
             },
         ];
 
-        let filter = |item: &InventoryItem| matches!(item, InventoryItem::Ore { .. });
+        let filter = |item: &InventoryItem| item.is_ore();
         let (consumed_kg, lots) = peek_ore_fifo_with_lots(&inventory, 500.0, filter);
 
         assert!((consumed_kg - 500.0).abs() < 1e-3);
