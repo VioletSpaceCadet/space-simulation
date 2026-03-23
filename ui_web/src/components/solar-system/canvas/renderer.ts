@@ -108,13 +108,6 @@ function drawOrbitRings(dc: DrawContext, bodies: OrbitalBodyDef[]): void {
     ctx.setLineDash([4, 6]);
     ctx.stroke();
     ctx.setLineDash([]);
-
-    if (radiusPx > 50) {
-      ctx.font = '11px monospace';
-      ctx.fillStyle = MAP_COLORS.orbitLabel;
-      ctx.textAlign = 'center';
-      ctx.fillText(`${body.name} orbit`, center.sx, center.sy - radiusPx - 4);
-    }
     ctx.globalAlpha = 1;
   }
 }

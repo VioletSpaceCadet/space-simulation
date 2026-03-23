@@ -122,7 +122,6 @@ export const LAB_STATUS_STYLES: Record<string, { bg: string; text: string; label
 // --- Map rendering colors (canvas-safe hex, no CSS vars) ---
 export const MAP_COLORS = {
   orbitRing: '#2a2e38',
-  orbitLabel: '#2a2e38',
   stationAccent: '#5ca0c8',
   scanSiteBg: '#1a1d26',
   scanSiteStroke: '#5c6070',
