@@ -237,18 +237,18 @@ pub struct SimEventDef {
     pub weight_modifiers: Vec<WeightModifier>,
     pub targeting: TargetingRule,
     pub effects: Vec<EffectDef>,
-    /// Presentation template for the frontend (not used by sim_core).
+    /// Presentation template for the frontend (not used by `sim_core`).
     #[serde(default)]
     pub description_template: String,
 
     // -- Resolved at load time --
-    /// Effective base weight (from rarity or weight_override). Set by content loading.
+    /// Effective base weight (from `rarity` or `weight_override`). Set by content loading.
     #[serde(skip)]
     pub resolved_weight: u32,
 }
 
 impl SimEventDef {
-    /// Resolve the base weight from rarity or weight_override.
+    /// Resolve the base weight from `rarity` or `weight_override`.
     pub fn resolve_weight(&mut self) {
         self.resolved_weight = self
             .weight_override
@@ -283,7 +283,7 @@ pub struct SimEventState {
     /// Ring buffer of recently fired events.
     #[serde(default)]
     pub history: VecDeque<FiredEvent>,
-    /// Per-event cooldowns: event_def_id → tick when cooldown expires.
+    /// Per-event cooldowns: `event_def_id` → tick when cooldown expires.
     #[serde(default)]
     pub cooldowns: BTreeMap<EventDefId, u64>,
     /// Tick until which no event can fire (global cooldown).
@@ -307,14 +307,14 @@ pub fn validate_event_defs(events: &[SimEventDef]) {
         assert!(
             seen_ids.insert(&event.id),
             "duplicate event def id '{}'",
-            event.id
+            event.id.0
         );
 
         // Cooldown must be positive
         assert!(
             event.cooldown_ticks > 0,
             "event '{}' must have cooldown_ticks > 0",
-            event.id
+            event.id.0
         );
 
         // Weight modifiers must have non-zero multiplier
@@ -322,7 +322,7 @@ pub fn validate_event_defs(events: &[SimEventDef]) {
             assert!(
                 modifier.weight_multiplier_pct > 0,
                 "event '{}' has weight_modifier with 0 multiplier",
-                event.id
+                event.id.0
             );
         }
 
@@ -342,8 +342,7 @@ fn validate_effect_targeting(effect: &EffectDef, targeting: &TargetingRule, even
                     targeting,
                     TargetingRule::RandomStation | TargetingRule::RandomModule { .. }
                 ),
-                "event '{}': DamageModule requires RandomStation or RandomModule targeting",
-                event_id
+                "event '{event_id}': DamageModule requires RandomStation or RandomModule targeting",
             );
         }
         EffectDef::AddInventory { .. } => {
@@ -352,8 +351,7 @@ fn validate_effect_targeting(effect: &EffectDef, targeting: &TargetingRule, even
                     targeting,
                     TargetingRule::RandomStation | TargetingRule::RandomModule { .. }
                 ),
-                "event '{}': AddInventory requires RandomStation or RandomModule targeting",
-                event_id
+                "event '{event_id}': AddInventory requires RandomStation or RandomModule targeting",
             );
         }
         EffectDef::SpawnScanSite { .. } => {
@@ -362,8 +360,7 @@ fn validate_effect_targeting(effect: &EffectDef, targeting: &TargetingRule, even
                     targeting,
                     TargetingRule::Global | TargetingRule::Zone { .. }
                 ),
-                "event '{}': SpawnScanSite requires Global or Zone targeting",
-                event_id
+                "event '{event_id}': SpawnScanSite requires Global or Zone targeting",
             );
         }
         // These effects work with any targeting — no validation needed
