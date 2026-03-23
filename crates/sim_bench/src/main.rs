@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 mod overrides;
+mod parquet_writer;
 mod run_result;
 mod runner;
 mod scenario;
