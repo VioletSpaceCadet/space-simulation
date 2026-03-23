@@ -69,7 +69,7 @@ fn check_condition(value: f64, condition: &str, threshold: f64) -> bool {
         "lt" => value < threshold,
         "gte" => value >= threshold,
         "lte" => value <= threshold,
-        "eq" => (value - threshold).abs() < f64::EPSILON,
+        "eq" => (value - threshold).abs() < 1e-6,
         other => {
             tracing::warn!("unknown alert condition operator: {other}");
             false
@@ -752,5 +752,13 @@ mod tests {
                 "missing expected rule ID: {expected_id}"
             );
         }
+    }
+
+    #[test]
+    fn check_condition_eq_tolerates_float_rounding() {
+        // 0.1 + 0.2 differs from 0.3 by ~5.5e-17 — within meaningful tolerance
+        assert!(check_condition(0.1 + 0.2, "eq", 0.3));
+        // Values that genuinely differ should not be equal
+        assert!(!check_condition(5.0, "eq", 5.1));
     }
 }

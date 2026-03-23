@@ -88,7 +88,7 @@ impl CompareOp {
             Self::Gte => lhs >= rhs,
             Self::Lt => lhs < rhs,
             Self::Lte => lhs <= rhs,
-            Self::Eq => (lhs - rhs).abs() < f64::EPSILON,
+            Self::Eq => (lhs - rhs).abs() < 1e-6,
         }
     }
 }
@@ -1058,6 +1058,10 @@ mod tests {
         assert!(CompareOp::Lte.evaluate(5.0, 5.0));
         assert!(CompareOp::Eq.evaluate(5.0, 5.0));
         assert!(!CompareOp::Eq.evaluate(5.0, 5.1));
+        // Computed values that are nearly equal should compare as equal.
+        // 0.1 + 0.2 differs from 0.3 by ~5.5e-17 — more than f64::EPSILON
+        // but well within meaningful game-value tolerance.
+        assert!(CompareOp::Eq.evaluate(0.1 + 0.2, 0.3));
     }
 
     #[test]
