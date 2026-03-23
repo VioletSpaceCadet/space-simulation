@@ -480,6 +480,14 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
                 item_id: ModuleItemId("module_item_0019".to_string()),
                 module_def_id: "module_propulsion_lab".to_string(),
             },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0020".to_string()),
+                module_def_id: "module_plate_press".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0021".to_string()),
+                module_def_id: "module_structural_assembler".to_string(),
+            },
             InventoryItem::Material {
                 element: "Fe".to_string(),
                 kg: 500.0,

@@ -45,6 +45,15 @@
       "effects": [
         { "type": "StatModifier", "stat": "ship_speed", "op": "pct_additive", "value": 0.10 }
       ]
+    },
+    {
+      "id": "tech_advanced_manufacturing",
+      "name": "Advanced Manufacturing",
+      "prereqs": [],
+      "domain_requirements": { "Manufacturing": 200.0 },
+      "accepted_data": ["ManufacturingData"],
+      "difficulty": 500.0,
+      "effects": []
     }
   ]
 }

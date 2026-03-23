@@ -10,5 +10,29 @@
     "name": "Thruster",
     "mass_kg": 200.0,
     "volume_m3": 0.5
+  },
+  {
+    "id": "fe_plate",
+    "name": "Iron Plate",
+    "mass_kg": 25.0,
+    "volume_m3": 0.05
+  },
+  {
+    "id": "structural_beam",
+    "name": "Structural Beam",
+    "mass_kg": 100.0,
+    "volume_m3": 0.3
+  },
+  {
+    "id": "hull_panel",
+    "name": "Hull Panel",
+    "mass_kg": 350.0,
+    "volume_m3": 1.0
+  },
+  {
+    "id": "advanced_repair_kit",
+    "name": "Advanced Repair Kit",
+    "mass_kg": 75.0,
+    "volume_m3": 0.15
   }
 ]
