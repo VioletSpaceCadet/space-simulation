@@ -39,7 +39,7 @@ interface ParsedAmount {
 export function parseRecipeInputItem(input: RecipeInput): ParsedItem {
   const filter = input.filter;
   if ('ItemKind' in filter) {
-    const kind = filter.ItemKind;
+    const kind = filter.ItemKind as string;
     if (kind === 'Ore') { return { itemId: 'ore', type: 'raw' }; }
     if (kind === 'Slag') { return { itemId: 'slag', type: 'raw' }; }
     if (kind === 'Material') { return { itemId: 'material', type: 'refined' }; }
@@ -47,14 +47,14 @@ export function parseRecipeInputItem(input: RecipeInput): ParsedItem {
     return { itemId: kind.toLowerCase(), type: 'raw' };
   }
   if ('Element' in filter) {
-    return { itemId: filter.Element, type: 'refined' };
+    return { itemId: filter.Element as string, type: 'refined' };
   }
   if ('ElementWithMinQuality' in filter) {
-    const element = (filter as unknown as { element: string }).element;
-    return { itemId: element, type: 'refined' };
+    const nested = filter.ElementWithMinQuality as unknown as { element: string };
+    return { itemId: nested.element, type: 'refined' };
   }
   if ('Component' in filter) {
-    return { itemId: filter.Component, type: 'component' };
+    return { itemId: filter.Component as string, type: 'component' };
   }
   return { itemId: 'unknown', type: 'raw' };
 }

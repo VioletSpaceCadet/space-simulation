@@ -60,7 +60,8 @@ export function useModuleFlowStats(
     // Compute derived fields
     const windowHours = (windowSize * minutesPerTick) / 60;
     for (const stat of stats.values()) {
-      stat.throughput_per_hour = windowHours > 0 ? stat.total_output_kg / windowHours : 0;
+      const outputTotal = stat.total_output_kg > 0 ? stat.total_output_kg : stat.total_output_count;
+      stat.throughput_per_hour = windowHours > 0 ? outputTotal / windowHours : 0;
       stat.utilization_pct = windowSize > 0 ? (stat.runs_in_window / windowSize) * 100 : 0;
     }
 

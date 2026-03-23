@@ -312,7 +312,7 @@ export interface LabRateInfo {
 }
 
 export interface RecipeInput {
-  filter: Record<string, string>
+  filter: Record<string, unknown>
   amount: Record<string, number>
 }
 
