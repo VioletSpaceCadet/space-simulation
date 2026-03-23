@@ -196,7 +196,7 @@ fn validate_module_recipes(content: &GameContent, element_ids: &HashSet<&str>) {
                         module_def.id, recipe_id
                     );
                 });
-                validate_recipe_elements(element_ids, &module_def.id, recipe);
+                validate_recipe_elements(content, element_ids, &module_def.id, recipe);
             }
         }
         if let ModuleBehaviorDef::Assembler(assembler) = &module_def.behavior {
@@ -222,6 +222,7 @@ fn validate_module_recipes(content: &GameContent, element_ids: &HashSet<&str>) {
 }
 
 fn validate_recipe_elements(
+    content: &GameContent,
     element_ids: &HashSet<&str>,
     module_id: &str,
     recipe: &sim_core::RecipeDef,
@@ -272,7 +273,16 @@ fn validate_recipe_elements(
                     );
                 }
             }
-            OutputSpec::Slag { .. } | OutputSpec::Component { .. } | OutputSpec::Ship { .. } => {}
+            OutputSpec::Slag { .. } | OutputSpec::Component { .. } => {}
+            OutputSpec::Ship { hull_id } => {
+                assert!(
+                    content.hulls.contains_key(hull_id),
+                    "module '{}' recipe '{}' OutputSpec::Ship references unknown hull_id '{}'",
+                    module_id,
+                    recipe.id,
+                    hull_id.0,
+                );
+            }
         }
     }
 }
@@ -575,7 +585,8 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     };
     let ship_id = ShipId("ship_0001".to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
-    let ship = ShipState {
+    let hull_id = sim_core::HullId("hull_general_purpose".to_string());
+    let mut ship = ShipState {
         id: ship_id.clone(),
         position: earth_orbit_pos.clone(),
         owner,
@@ -584,7 +595,14 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         task: None,
         speed_ticks_per_au: None,
         modifiers: sim_core::modifiers::ModifierSet::default(),
+        hull_id: hull_id.clone(),
+        fitted_modules: vec![],
+        propellant_kg: 0.0,
+        propellant_capacity_kg: 0.0,
     };
+    if content.hulls.contains_key(&hull_id) {
+        sim_core::recompute_ship_stats(&mut ship, content);
+    }
     // Place scan sites in zone bodies using weighted picking + area-sampled positions.
     let zone_bodies: Vec<&sim_core::OrbitalBodyDef> = content
         .solar_system

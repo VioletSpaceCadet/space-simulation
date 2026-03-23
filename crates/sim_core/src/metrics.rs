@@ -744,9 +744,9 @@ mod tests {
     use crate::{
         test_fixtures::{base_content, test_position},
         AsteroidId, AsteroidKnowledge, AsteroidState, Counters, DataKind, DomainProgress,
-        GameState, LotId, MetaState, ModuleInstanceId, ModuleState, PrincipalId, ProcessorState,
-        ResearchDomain, ResearchState, ShipId, ShipState, StationId, StationState, TaskState,
-        TechId,
+        GameState, HullId, LotId, MetaState, ModuleInstanceId, ModuleState, PrincipalId,
+        ProcessorState, ResearchDomain, ResearchState, ShipId, ShipState, StationId, StationState,
+        TaskState, TechId,
     };
     use std::collections::{HashMap, HashSet};
 
@@ -812,6 +812,10 @@ mod tests {
             task,
             speed_ticks_per_au: None,
             modifiers: crate::modifiers::ModifierSet::default(),
+            hull_id: HullId("hull_general_purpose".to_string()),
+            fitted_modules: vec![],
+            propellant_kg: 0.0,
+            propellant_capacity_kg: 0.0,
         }
     }
 

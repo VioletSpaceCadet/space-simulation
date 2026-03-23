@@ -6,7 +6,8 @@
 
 use crate::tasks::{deep_scan_enabled, inventory_volume_m3};
 use crate::{
-    trade, EventEnvelope, GameContent, GameState, InventoryItem, ShipId, TaskKind, TaskState,
+    trade, EventEnvelope, FittedModule, GameContent, GameState, InventoryItem, ModuleDefId, ShipId,
+    StationId, TaskKind, TaskState,
 };
 use rand::Rng;
 
@@ -526,6 +527,212 @@ pub(crate) fn handle_set_manufacturing_priority(
         return false;
     };
     module.manufacturing_priority = priority;
+    true
+}
+
+/// Recompute ship cached stats (cargo, speed, propellant capacity) from hull + fitted modules.
+pub fn recompute_ship_stats(ship: &mut crate::ShipState, content: &GameContent) {
+    use crate::modifiers::{ModifierSource, StatId};
+
+    let hull = content
+        .hulls
+        .get(&ship.hull_id)
+        .expect("ship references valid hull_id");
+
+    // Clear all hull + fitted modifiers, then rebuild
+    ship.modifiers.remove_where(|s| {
+        matches!(
+            s,
+            ModifierSource::Hull(_) | ModifierSource::FittedModule(_, _)
+        )
+    });
+
+    // Apply hull bonuses
+    for bonus in &hull.bonuses {
+        let mut modifier = bonus.clone();
+        modifier.source = ModifierSource::Hull(ship.hull_id.clone());
+        ship.modifiers.add(modifier);
+    }
+
+    // Apply fitted module modifiers
+    for fitted in &ship.fitted_modules {
+        if let Some(def) = content.module_defs.get(&fitted.module_def_id.0) {
+            for ship_modifier in &def.ship_modifiers {
+                let mut modifier = ship_modifier.clone();
+                modifier.source =
+                    ModifierSource::FittedModule(fitted.module_def_id.clone(), fitted.slot_index);
+                ship.modifiers.add(modifier);
+            }
+        }
+    }
+
+    // Recompute cached stats
+    ship.cargo_capacity_m3 = ship
+        .modifiers
+        .resolve_f32(StatId::CargoCapacity, hull.cargo_capacity_m3);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    {
+        ship.speed_ticks_per_au = Some(
+            ship.modifiers
+                .resolve(StatId::ShipSpeed, hull.base_speed_ticks_per_au as f64) as u64,
+        );
+    }
+    ship.propellant_capacity_kg = ship
+        .modifiers
+        .resolve_f32(StatId::PropellantCapacity, hull.base_propellant_capacity_kg);
+    ship.propellant_kg = ship.propellant_kg.min(ship.propellant_capacity_kg);
+}
+
+/// Fit a ship module into a hull slot at the given station.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn handle_fit_ship_module(
+    state: &mut GameState,
+    content: &GameContent,
+    ship_id: &ShipId,
+    slot_index: usize,
+    module_def_id: &ModuleDefId,
+    station_id: &StationId,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    // Ship must exist and be at the same station location
+    let Some(ship) = state.ships.get(ship_id) else {
+        return false;
+    };
+    let Some(station) = state.stations.get(station_id) else {
+        return false;
+    };
+    if ship.position != station.position {
+        return false;
+    }
+    // Ship must be idle
+    if ship.task.is_some() {
+        return false;
+    }
+    // Hull must exist and slot_index must be valid
+    let Some(hull) = content.hulls.get(&ship.hull_id) else {
+        return false;
+    };
+    let Some(slot_def) = hull.slots.get(slot_index) else {
+        return false;
+    };
+    // Slot must not already be occupied
+    if ship
+        .fitted_modules
+        .iter()
+        .any(|fm| fm.slot_index == slot_index)
+    {
+        return false;
+    }
+    // Module def must exist and be compatible with the slot type
+    let Some(module_def) = content.module_defs.get(&module_def_id.0) else {
+        return false;
+    };
+    if !module_def.compatible_slots.contains(&slot_def.slot_type) {
+        return false;
+    }
+    // Station must have an InventoryItem::Module with matching module_def_id
+    let item_pos = station.inventory.iter().position(|item| {
+        matches!(item, InventoryItem::Module { module_def_id: def_id, .. } if *def_id == module_def_id.0)
+    });
+    let Some(pos) = item_pos else { return false };
+
+    // Execute: remove module from station inventory
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return false;
+    };
+    station.inventory.remove(pos);
+    station.invalidate_volume_cache();
+
+    // Add FittedModule to ship
+    let Some(ship) = state.ships.get_mut(ship_id) else {
+        return false;
+    };
+    ship.fitted_modules.push(FittedModule {
+        slot_index,
+        module_def_id: module_def_id.clone(),
+    });
+    recompute_ship_stats(ship, content);
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::ShipModuleFitted {
+            ship_id: ship_id.clone(),
+            slot_index,
+            module_def_id: module_def_id.clone(),
+            station_id: station_id.clone(),
+        },
+    ));
+    true
+}
+
+/// Unfit a ship module from a hull slot, returning it to station inventory.
+pub(crate) fn handle_unfit_ship_module(
+    state: &mut GameState,
+    content: &GameContent,
+    ship_id: &ShipId,
+    slot_index: usize,
+    station_id: &StationId,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    // Ship must exist and be at the same station location
+    let Some(ship) = state.ships.get(ship_id) else {
+        return false;
+    };
+    let Some(station) = state.stations.get(station_id) else {
+        return false;
+    };
+    if ship.position != station.position {
+        return false;
+    }
+    // Ship must be idle
+    if ship.task.is_some() {
+        return false;
+    }
+    // Slot must have a fitted module
+    let Some(fitted_pos) = ship
+        .fitted_modules
+        .iter()
+        .position(|fm| fm.slot_index == slot_index)
+    else {
+        return false;
+    };
+
+    // Execute: remove FittedModule from ship
+    let Some(ship) = state.ships.get_mut(ship_id) else {
+        return false;
+    };
+    let removed = ship.fitted_modules.remove(fitted_pos);
+    recompute_ship_stats(ship, content);
+
+    // Create a fresh module item and add to station inventory
+    let item_id = crate::ModuleItemId(format!(
+        "module_item_{:04}",
+        state.counters.next_module_instance_id
+    ));
+    state.counters.next_module_instance_id += 1;
+
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return false;
+    };
+    station.inventory.push(InventoryItem::Module {
+        item_id: item_id.clone(),
+        module_def_id: removed.module_def_id.0.clone(),
+    });
+    station.invalidate_volume_cache();
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::ShipModuleUnfitted {
+            ship_id: ship_id.clone(),
+            slot_index,
+            module_def_id: removed.module_def_id,
+            station_id: station_id.clone(),
+        },
+    ));
     true
 }
 

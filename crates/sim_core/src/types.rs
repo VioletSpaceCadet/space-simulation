@@ -399,6 +399,22 @@ pub struct ShipState {
     /// Per-ship modifiers (from equipment, buffs).
     #[serde(default)]
     pub modifiers: crate::modifiers::ModifierSet,
+    /// Hull class. Determines base stats, slot layout, and bonuses.
+    #[serde(default = "default_hull_id")]
+    pub hull_id: HullId,
+    /// Modules fitted into hull slots.
+    #[serde(default)]
+    pub fitted_modules: Vec<FittedModule>,
+    /// Current propellant level (kg). Consumed during transit, refueled at stations.
+    #[serde(default)]
+    pub propellant_kg: f32,
+    /// Cached propellant capacity (kg). Recomputed from hull + tank module modifiers.
+    #[serde(default)]
+    pub propellant_capacity_kg: f32,
+}
+
+fn default_hull_id() -> HullId {
+    HullId("hull_general_purpose".to_string())
 }
 
 impl ShipState {
@@ -655,6 +671,17 @@ pub enum Command {
         module_id: ModuleInstanceId,
         priority: u32,
     },
+    FitShipModule {
+        ship_id: ShipId,
+        slot_index: usize,
+        module_def_id: ModuleDefId,
+        station_id: StationId,
+    },
+    UnfitShipModule {
+        ship_id: ShipId,
+        slot_index: usize,
+        station_id: StationId,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -870,6 +897,19 @@ pub enum Event {
         ship_id: ShipId,
         position: crate::Position,
         cargo_capacity_m3: f64,
+        hull_id: HullId,
+    },
+    ShipModuleFitted {
+        ship_id: ShipId,
+        slot_index: usize,
+        module_def_id: ModuleDefId,
+        station_id: StationId,
+    },
+    ShipModuleUnfitted {
+        ship_id: ShipId,
+        slot_index: usize,
+        module_def_id: ModuleDefId,
+        station_id: StationId,
     },
     InsufficientFunds {
         station_id: StationId,
@@ -1412,7 +1452,7 @@ pub enum OutputSpec {
         quality_formula: QualityFormula,
     },
     Ship {
-        cargo_capacity_m3: f32,
+        hull_id: HullId,
     },
 }
 

@@ -361,6 +361,10 @@ mod tests {
                 task: None,
                 speed_ticks_per_au: None,
                 modifiers: sim_core::modifiers::ModifierSet::default(),
+                hull_id: sim_core::HullId("hull_general_purpose".to_string()),
+                fitted_modules: vec![],
+                propellant_kg: 0.0,
+                propellant_capacity_kg: 0.0,
             },
         );
 
@@ -802,6 +806,23 @@ mod tests {
         content.techs.clear();
         content.constants.station_power_available_per_tick = 0.0;
 
+        // Add a hull def for the shipyard test
+        content.hulls.insert(
+            sim_core::HullId("hull_test_ship".to_string()),
+            sim_core::HullDef {
+                id: sim_core::HullId("hull_test_ship".to_string()),
+                name: "Test Ship Hull".to_string(),
+                mass_kg: 1000.0,
+                cargo_capacity_m3: 50.0,
+                base_speed_ticks_per_au: 2000,
+                base_propellant_capacity_kg: 100.0,
+                slots: vec![],
+                bonuses: vec![],
+                required_tech: None,
+                tags: vec![],
+            },
+        );
+
         // Add shipyard recipe to catalog
         let ship_recipe = sim_core::RecipeDef {
             id: sim_core::RecipeId("recipe_test_ship".to_string()),
@@ -816,7 +837,7 @@ mod tests {
                 },
             ],
             outputs: vec![sim_core::OutputSpec::Ship {
-                cargo_capacity_m3: 50.0,
+                hull_id: sim_core::HullId("hull_test_ship".to_string()),
             }],
             efficiency: 1.0,
             thermal_req: None,

@@ -451,23 +451,31 @@ fn resolve_assembler_run(
                     },
                 ));
             }
-            OutputSpec::Ship { cargo_capacity_m3 } => {
+            OutputSpec::Ship { hull_id } => {
+                let Some(hull) = content.hulls.get(hull_id) else {
+                    return; // hull_id not found in content
+                };
                 let uuid = crate::generate_uuid(rng);
                 let ship_id = ShipId(format!("ship_{uuid}"));
                 let Some(station) = state.stations.get(&ctx.station_id) else {
                     return;
                 };
                 let ship_position = station.position.clone();
-                let ship = ShipState {
+                let mut ship = ShipState {
                     id: ship_id.clone(),
                     position: ship_position.clone(),
                     owner: PrincipalId("principal_autopilot".to_string()),
                     inventory: vec![],
-                    cargo_capacity_m3: *cargo_capacity_m3,
+                    cargo_capacity_m3: hull.cargo_capacity_m3,
                     task: None,
-                    speed_ticks_per_au: None,
+                    speed_ticks_per_au: Some(hull.base_speed_ticks_per_au),
                     modifiers: crate::modifiers::ModifierSet::default(),
+                    hull_id: hull_id.clone(),
+                    fitted_modules: vec![],
+                    propellant_kg: hull.base_propellant_capacity_kg,
+                    propellant_capacity_kg: hull.base_propellant_capacity_kg,
                 };
+                crate::commands::recompute_ship_stats(&mut ship, content);
                 state.ships.insert(ship_id.clone(), ship);
                 events.push(crate::emit(
                     &mut state.counters,
@@ -476,7 +484,8 @@ fn resolve_assembler_run(
                         station_id: ctx.station_id.clone(),
                         ship_id,
                         position: ship_position,
-                        cargo_capacity_m3: f64::from(*cargo_capacity_m3),
+                        cargo_capacity_m3: f64::from(hull.cargo_capacity_m3),
+                        hull_id: hull_id.clone(),
                     },
                 ));
             }
@@ -826,7 +835,23 @@ mod assembler_component_tests {
             mass_kg: 50.0,
             volume_m3: 2.0,
         });
-        // Shipyard recipe: 100kg Fe + 2 thrusters => Ship with 50 m3 cargo
+        // Add a hull def for the shipyard test
+        content.hulls.insert(
+            crate::HullId("hull_test_ship".to_string()),
+            crate::HullDef {
+                id: crate::HullId("hull_test_ship".to_string()),
+                name: "Test Ship Hull".to_string(),
+                mass_kg: 1000.0,
+                cargo_capacity_m3: 50.0,
+                base_speed_ticks_per_au: 2000,
+                base_propellant_capacity_kg: 100.0,
+                slots: vec![],
+                bonuses: vec![],
+                required_tech: None,
+                tags: vec![],
+            },
+        );
+        // Shipyard recipe: 100kg Fe + 2 thrusters => Ship with test hull
         let ship_recipe = RecipeDef {
             id: RecipeId("recipe_build_ship".to_string()),
             inputs: vec![
@@ -840,7 +865,7 @@ mod assembler_component_tests {
                 },
             ],
             outputs: vec![OutputSpec::Ship {
-                cargo_capacity_m3: 50.0,
+                hull_id: crate::HullId("hull_test_ship".to_string()),
             }],
             efficiency: 1.0,
             thermal_req: None,

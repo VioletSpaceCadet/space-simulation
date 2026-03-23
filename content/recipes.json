@@ -110,7 +110,7 @@
     "outputs": [
       {
         "Ship": {
-          "cargo_capacity_m3": 50.0
+          "hull_id": "hull_general_purpose"
         }
       }
     ],

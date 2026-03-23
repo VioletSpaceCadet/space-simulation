@@ -520,6 +520,23 @@ fn sensor_data_generation_rate_at_mpt_60() {
 fn ships_built_after_tech_unlock_and_trade_available() {
     let mut content = production_like_content();
 
+    // Add a hull def for the shipyard test
+    content.hulls.insert(
+        HullId("hull_test_ship".to_string()),
+        HullDef {
+            id: HullId("hull_test_ship".to_string()),
+            name: "Test Ship Hull".to_string(),
+            mass_kg: 1000.0,
+            cargo_capacity_m3: 50.0,
+            base_speed_ticks_per_au: 2000,
+            base_propellant_capacity_kg: 100.0,
+            slots: vec![],
+            bonuses: vec![],
+            required_tech: None,
+            tags: vec![],
+        },
+    );
+
     // Add shipyard recipe to catalog
     let shuttle_recipe = RecipeDef {
         id: RecipeId("recipe_basic_mining_shuttle".to_string()),
@@ -534,7 +551,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
             },
         ],
         outputs: vec![OutputSpec::Ship {
-            cargo_capacity_m3: 50.0,
+            hull_id: HullId("hull_test_ship".to_string()),
         }],
         efficiency: 1.0,
         thermal_req: None,

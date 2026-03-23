@@ -1168,7 +1168,7 @@ describe('applyEvents', () => {
         event: {
           ShipConstructed: {
             ship_id: 'ship_new', station_id: 'station_001',
-            position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, cargo_capacity_m3: 30,
+            position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, cargo_capacity_m3: 30, hull_id: 'hull_general_purpose',
           },
         },
       }];

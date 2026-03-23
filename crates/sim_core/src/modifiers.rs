@@ -148,6 +148,11 @@ impl ModifierSet {
         self.modifiers.retain(|m| m.source != *source);
     }
 
+    /// Remove all modifiers whose source matches the predicate.
+    pub fn remove_where(&mut self, predicate: impl Fn(&ModifierSource) -> bool) {
+        self.modifiers.retain(|m| !predicate(&m.source));
+    }
+
     /// Resolve a stat using only this set's modifiers.
     #[must_use]
     pub fn resolve(&self, stat: StatId, base: f64) -> f64 {

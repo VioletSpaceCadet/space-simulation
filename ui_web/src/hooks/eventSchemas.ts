@@ -229,6 +229,21 @@ export const eventSchemas = {
     station_id: z.string(),
     position: positionSchema,
     cargo_capacity_m3: z.number(),
+    hull_id: z.string(),
+  }),
+
+  ShipModuleFitted: z.object({
+    ship_id: z.string(),
+    slot_index: z.number(),
+    module_def_id: z.string(),
+    station_id: z.string(),
+  }),
+
+  ShipModuleUnfitted: z.object({
+    ship_id: z.string(),
+    slot_index: z.number(),
+    module_def_id: z.string(),
+    station_id: z.string(),
   }),
 
   ItemImported: z.object({

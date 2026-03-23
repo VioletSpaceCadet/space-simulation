@@ -44,6 +44,27 @@ pub fn tick(
     crate::sim_events::evaluate_events(state, content, rng, &mut events);
     replenish_scan_sites(state, content, rng, &mut events);
 
+    // Debug-only: verify cached ship stats match fresh recomputation.
+    #[cfg(debug_assertions)]
+    {
+        for ship in state.ships.values_mut() {
+            if content.hulls.contains_key(&ship.hull_id) {
+                let before_cargo = ship.cargo_capacity_m3;
+                let before_speed = ship.speed_ticks_per_au;
+                let before_propellant_cap = ship.propellant_capacity_kg;
+                crate::commands::recompute_ship_stats(ship, content);
+                debug_assert!(
+                    (ship.cargo_capacity_m3 - before_cargo).abs() < f32::EPSILON
+                        && ship.speed_ticks_per_au == before_speed
+                        && (ship.propellant_capacity_kg - before_propellant_cap).abs()
+                            < f32::EPSILON,
+                    "ship {} cached stats diverged from recomputation",
+                    ship.id.0
+                );
+            }
+        }
+    }
+
     state.meta.tick += 1;
     events
 }
@@ -196,6 +217,38 @@ fn apply_commands(
             } => {
                 commands::handle_set_manufacturing_priority(
                     state, station_id, module_id, *priority,
+                );
+            }
+            Command::FitShipModule {
+                ship_id,
+                slot_index,
+                module_def_id,
+                station_id,
+            } => {
+                commands::handle_fit_ship_module(
+                    state,
+                    content,
+                    ship_id,
+                    *slot_index,
+                    module_def_id,
+                    station_id,
+                    current_tick,
+                    events,
+                );
+            }
+            Command::UnfitShipModule {
+                ship_id,
+                slot_index,
+                station_id,
+            } => {
+                commands::handle_unfit_ship_module(
+                    state,
+                    content,
+                    ship_id,
+                    *slot_index,
+                    station_id,
+                    current_tick,
+                    events,
                 );
             }
         }
