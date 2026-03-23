@@ -1516,4 +1516,84 @@ mod tests {
         // Should not panic — empty hulls is valid
         validate_hull_defs(&content);
     }
+
+    #[test]
+    #[should_panic(expected = "references unknown module")]
+    fn test_fitting_template_bad_module_panics() {
+        let mut content = base_content();
+        content.hulls.insert(
+            sim_core::HullId("hull_test".to_string()),
+            sim_core::HullDef {
+                id: sim_core::HullId("hull_test".to_string()),
+                name: "Test".to_string(),
+                mass_kg: 1000.0,
+                cargo_capacity_m3: 10.0,
+                base_speed_ticks_per_au: 100,
+                base_propellant_capacity_kg: 5000.0,
+                slots: vec![sim_core::SlotDef {
+                    slot_type: sim_core::SlotType("utility".to_string()),
+                    label: "Utility 1".to_string(),
+                }],
+                bonuses: vec![],
+                required_tech: None,
+                tags: vec![],
+            },
+        );
+        content.fitting_templates.insert(
+            sim_core::HullId("hull_test".to_string()),
+            vec![sim_core::FittedModule {
+                slot_index: 0,
+                module_def_id: sim_core::ModuleDefId("nonexistent_module".to_string()),
+            }],
+        );
+        validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "slot_index")]
+    fn test_fitting_template_bad_slot_index_panics() {
+        let mut content = base_content();
+        content.hulls.insert(
+            sim_core::HullId("hull_test".to_string()),
+            sim_core::HullDef {
+                id: sim_core::HullId("hull_test".to_string()),
+                name: "Test".to_string(),
+                mass_kg: 1000.0,
+                cargo_capacity_m3: 10.0,
+                base_speed_ticks_per_au: 100,
+                base_propellant_capacity_kg: 5000.0,
+                slots: vec![sim_core::SlotDef {
+                    slot_type: sim_core::SlotType("utility".to_string()),
+                    label: "Utility 1".to_string(),
+                }],
+                bonuses: vec![],
+                required_tech: None,
+                tags: vec![],
+            },
+        );
+        // Add a valid module def
+        content.module_defs.insert(
+            "mod_valid".to_string(),
+            sim_core::ModuleDef {
+                id: "mod_valid".to_string(),
+                name: "Valid".to_string(),
+                mass_kg: 100.0,
+                volume_m3: 1.0,
+                power_consumption_per_run: 0.0,
+                wear_per_run: 0.0,
+                behavior: sim_core::ModuleBehaviorDef::Equipment,
+                thermal: None,
+                compatible_slots: vec![sim_core::SlotType("utility".to_string())],
+                ship_modifiers: vec![],
+            },
+        );
+        content.fitting_templates.insert(
+            sim_core::HullId("hull_test".to_string()),
+            vec![sim_core::FittedModule {
+                slot_index: 99, // out of bounds
+                module_def_id: sim_core::ModuleDefId("mod_valid".to_string()),
+            }],
+        );
+        validate_content(&content);
+    }
 }

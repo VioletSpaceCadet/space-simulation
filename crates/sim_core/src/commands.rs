@@ -1001,4 +1001,156 @@ mod tests {
             crate::Event::ShipModuleUnfitted { .. }
         ));
     }
+
+    #[test]
+    fn hull_bonus_persists_through_fit_unfit_cycle() {
+        let mut content = content_with_hull();
+        // Add a mining barge hull with MiningRate +25% bonus
+        content.hulls.insert(
+            HullId("hull_mining_barge".to_string()),
+            HullDef {
+                id: HullId("hull_mining_barge".to_string()),
+                name: "Mining Barge".to_string(),
+                mass_kg: 8000.0,
+                cargo_capacity_m3: 80.0,
+                base_speed_ticks_per_au: 180,
+                base_propellant_capacity_kg: 8000.0,
+                slots: vec![
+                    SlotDef {
+                        slot_type: SlotType("industrial".to_string()),
+                        label: "Industrial 1".to_string(),
+                    },
+                    SlotDef {
+                        slot_type: SlotType("utility".to_string()),
+                        label: "Utility 1".to_string(),
+                    },
+                ],
+                bonuses: vec![crate::modifiers::Modifier::pct_mult(
+                    StatId::MiningRate,
+                    1.25,
+                    ModifierSource::Hull(HullId("hull_mining_barge".to_string())),
+                )],
+                required_tech: None,
+                tags: vec![],
+            },
+        );
+        // Add a mining laser equipment module
+        content.module_defs.insert(
+            "module_mining_laser".to_string(),
+            crate::ModuleDef {
+                id: "module_mining_laser".to_string(),
+                name: "Mining Laser".to_string(),
+                mass_kg: 800.0,
+                volume_m3: 3.0,
+                power_consumption_per_run: 0.0,
+                wear_per_run: 0.0,
+                behavior: crate::ModuleBehaviorDef::Equipment,
+                thermal: None,
+                compatible_slots: vec![SlotType("industrial".to_string())],
+                ship_modifiers: vec![crate::modifiers::Modifier::pct_mult(
+                    StatId::MiningRate,
+                    1.2,
+                    ModifierSource::Equipment("mining_laser".to_string()),
+                )],
+            },
+        );
+
+        let mut state = base_state(&content);
+        let ship_id = crate::ShipId("ship_0001".to_string());
+        let station_id = crate::StationId("station_earth_orbit".to_string());
+
+        // Set ship hull to mining barge
+        let ship = state.ships.get_mut(&ship_id).unwrap();
+        ship.hull_id = HullId("hull_mining_barge".to_string());
+        recompute_ship_stats(ship, &content);
+
+        // Verify hull bonus is active
+        let mining_rate = ship.modifiers.resolve(StatId::MiningRate, 1.0);
+        assert!(
+            (mining_rate - 1.25).abs() < 0.01,
+            "hull bonus should be 1.25"
+        );
+
+        // Add module to station inventory
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.inventory.push(InventoryItem::Module {
+            item_id: ModuleItemId("mod_item_laser".to_string()),
+            module_def_id: "module_mining_laser".to_string(),
+        });
+
+        // Fit mining laser
+        let mut events = vec![];
+        handle_fit_ship_module(
+            &mut state,
+            &content,
+            &ship_id,
+            0,
+            &ModuleDefId("module_mining_laser".to_string()),
+            &station_id,
+            1,
+            &mut events,
+        );
+        let ship = state.ships.get(&ship_id).unwrap();
+        let mining_rate = ship.modifiers.resolve(StatId::MiningRate, 1.0);
+        // Both hull (+25%) and module (+20%) should stack: 1.0 * 1.25 * 1.2 = 1.5
+        assert!(
+            (mining_rate - 1.5).abs() < 0.01,
+            "hull + module should stack to 1.5"
+        );
+
+        // Unfit mining laser
+        let mut events = vec![];
+        handle_unfit_ship_module(
+            &mut state,
+            &content,
+            &ship_id,
+            0,
+            &station_id,
+            2,
+            &mut events,
+        );
+        let ship = state.ships.get(&ship_id).unwrap();
+        let mining_rate = ship.modifiers.resolve(StatId::MiningRate, 1.0);
+        // Hull bonus should still be active after unfit
+        assert!(
+            (mining_rate - 1.25).abs() < 0.01,
+            "hull bonus should persist after unfit"
+        );
+    }
+
+    #[test]
+    fn modifier_source_hull_serialization_roundtrip() {
+        let source = ModifierSource::Hull(HullId("hull_test".to_string()));
+        let json = serde_json::to_string(&source).unwrap();
+        let deserialized: ModifierSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(source, deserialized);
+    }
+
+    #[test]
+    fn modifier_source_fitted_module_serialization_roundtrip() {
+        let source = ModifierSource::FittedModule(ModuleDefId("mod_test".to_string()), 2);
+        let json = serde_json::to_string(&source).unwrap();
+        let deserialized: ModifierSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(source, deserialized);
+    }
+
+    #[test]
+    fn cargo_capacity_stat_resolution() {
+        let content = content_with_hull();
+        let mut state = base_state(&content);
+        let ship = state.ships.values_mut().next().unwrap();
+        recompute_ship_stats(ship, &content);
+
+        // Base cargo is 50 from hull
+        assert!((ship.cargo_capacity_m3 - 50.0).abs() < 0.01);
+
+        // Fit cargo expander (+30%)
+        ship.fitted_modules.push(FittedModule {
+            slot_index: 0,
+            module_def_id: ModuleDefId("module_cargo_expander".to_string()),
+        });
+        recompute_ship_stats(ship, &content);
+        // 50 * 1.3 = 65
+        assert!((ship.cargo_capacity_m3 - 65.0).abs() < 0.1);
+    }
 }

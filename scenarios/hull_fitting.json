@@ -1,0 +1,7 @@
+{
+  "name": "hull_fitting",
+  "ticks": 5000,
+  "metrics_every": 100,
+  "seeds": [42, 99],
+  "state": "./content/dev_base_state.json"
+}
