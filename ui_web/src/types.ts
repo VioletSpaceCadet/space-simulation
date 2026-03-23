@@ -143,6 +143,11 @@ export interface Position {
   angle_mdeg: number
 }
 
+export interface FittedModule {
+  slot_index: number
+  module_def_id: string
+}
+
 export interface ShipState {
   id: string
   position: Position
@@ -150,6 +155,10 @@ export interface ShipState {
   inventory: InventoryItem[]
   cargo_capacity_m3: number
   task: TaskState | null
+  hull_id?: string
+  fitted_modules?: FittedModule[]
+  propellant_kg?: number
+  propellant_capacity_kg?: number
 }
 
 export interface PowerState {
@@ -355,10 +364,28 @@ export interface ItemFlowStats {
   ticks_at_zero: number
 }
 
+export interface SlotDef {
+  slot_type: string
+  label: string
+}
+
+export interface HullDef {
+  id: string
+  name: string
+  mass_kg: number
+  cargo_capacity_m3: number
+  base_speed_ticks_per_au: number
+  base_propellant_capacity_kg: number
+  slots: SlotDef[]
+  bonuses: unknown[]
+  tags: string[]
+}
+
 export interface ContentResponse {
   techs: TechDef[]
   lab_rates: LabRateInfo[]
   data_rates: Record<string, number>
   minutes_per_tick: number
   recipes: Record<string, RecipeDef>
+  hulls: Record<string, HullDef>
 }

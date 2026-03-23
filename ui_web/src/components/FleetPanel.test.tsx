@@ -1,10 +1,17 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ModuleState, PowerState, ShipState, StationState } from '../types';
 import { formatTempMk, thermalColorClass } from '../utils';
 
 import { FleetPanel } from './FleetPanel';
+
+vi.mock('../hooks/useContent', () => ({
+  useContent: () => ({
+    content: { hulls: {}, techs: [], lab_rates: [], data_rates: {}, minutes_per_tick: 60, recipes: {} },
+    refetch: () => {},
+  }),
+}));
 
 const zeroPower: PowerState = {
   generated_kw: 0, consumed_kw: 0, deficit_kw: 0,

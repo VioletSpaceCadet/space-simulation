@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
-import type { PowerState, ShipState, StationState } from '../types';
+import { useContent } from '../hooks/useContent';
+import type { HullDef, PowerState, ShipState, StationState } from '../types';
 import { getTaskKind } from '../utils';
 
 import { type ColumnDef, ExpandableTable } from './ExpandableTable';
@@ -20,15 +21,17 @@ function taskLabel(task: ShipState['task']): string {
 
 interface ShipRow {
   id: string
+  hull: string
   parent_body: string
   task: string
   cargo_kg: number
   ship: ShipState
 }
 
-function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: number }) {
+function ShipsTable({ ships, displayTick, hulls }: { ships: ShipState[]; displayTick: number; hulls: Record<string, HullDef> }) {
   const rows: ShipRow[] = ships.map((ship) => ({
     id: ship.id,
+    hull: ship.hull_id ? (hulls[ship.hull_id]?.name ?? ship.hull_id) : 'unknown',
     parent_body: ship.position.parent_body,
     task: taskLabel(ship.task),
     cargo_kg: totalInventoryKg(ship.inventory),
@@ -37,6 +40,7 @@ function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: n
 
   const columns: ColumnDef<ShipRow>[] = [
     { key: 'id', label: 'ID', render: (r) => r.id },
+    { key: 'hull', label: 'Hull', render: (r) => r.hull },
     { key: 'parent_body', label: 'Location', render: (r) => r.parent_body },
     { key: 'task', label: 'Task', render: (r) => r.task },
     { key: 'progress', label: 'Progress', sortable: false, render: (r) => <TaskProgress task={r.ship.task} displayTick={displayTick} /> },
@@ -50,7 +54,7 @@ function ShipsTable({ ships, displayTick }: { ships: ShipState[]; displayTick: n
     <ExpandableTable
       data={rows}
       columns={columns}
-      renderDetail={(r) => <ShipDetail ship={r.ship} displayTick={displayTick} />}
+      renderDetail={(r) => <ShipDetail ship={r.ship} hulls={hulls} displayTick={displayTick} />}
     />
   );
 }
@@ -193,6 +197,8 @@ interface Props {
 }
 
 export function FleetPanel({ ships, stations, displayTick }: Props) {
+  const { content } = useContent();
+  const hulls = content?.hulls ?? {};
   const shipRows = Object.values(ships);
   const stationRows = Object.values(stations);
 
@@ -201,7 +207,7 @@ export function FleetPanel({ ships, stations, displayTick }: Props) {
       {shipRows.length === 0 ? (
         <div className="text-faint italic py-1">no ships</div>
       ) : (
-        <ShipsTable ships={shipRows} displayTick={displayTick} />
+        <ShipsTable ships={shipRows} displayTick={displayTick} hulls={hulls} />
       )}
 
       <div className="text-[10px] uppercase tracking-widest text-label mt-3 mb-1.5 pb-1 border-b border-edge">
