@@ -1058,10 +1058,10 @@ mod tests {
         assert!(CompareOp::Lte.evaluate(5.0, 5.0));
         assert!(CompareOp::Eq.evaluate(5.0, 5.0));
         assert!(!CompareOp::Eq.evaluate(5.0, 5.1));
-        // Computed values that are nearly equal should compare as equal.
-        // 0.1 + 0.2 differs from 0.3 by ~5.5e-17 — more than f64::EPSILON
-        // but well within meaningful game-value tolerance.
-        assert!(CompareOp::Eq.evaluate(0.1 + 0.2, 0.3));
+        // f32→f64 conversion introduces ~1.2e-8 error, which exceeds
+        // f64::EPSILON (~2.2e-16) but is within the 1e-6 game tolerance.
+        // This mirrors real usage: extract_condition_value casts f32 fields to f64.
+        assert!(CompareOp::Eq.evaluate(0.3_f32 as f64, 0.3_f64));
     }
 
     #[test]

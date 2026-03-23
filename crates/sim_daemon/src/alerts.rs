@@ -756,8 +756,9 @@ mod tests {
 
     #[test]
     fn check_condition_eq_tolerates_float_rounding() {
-        // 0.1 + 0.2 differs from 0.3 by ~5.5e-17 — within meaningful tolerance
-        assert!(check_condition(0.1 + 0.2, "eq", 0.3));
+        // f32→f64 conversion introduces ~1.2e-8 error, exceeding f64::EPSILON
+        // but within the 1e-6 game tolerance. Mirrors real metric value paths.
+        assert!(check_condition(0.3_f32 as f64, "eq", 0.3_f64));
         // Values that genuinely differ should not be equal
         assert!(!check_condition(5.0, "eq", 5.1));
     }
