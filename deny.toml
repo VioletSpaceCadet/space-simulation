@@ -23,6 +23,7 @@ allow = [
     "Unicode-DFS-2016",
     "Unlicense",
     "Zlib",
+    "CC0-1.0",
 ]
 confidence-threshold = 0.8
 
