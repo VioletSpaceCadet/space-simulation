@@ -805,6 +805,7 @@ mod framework_tests {
                 next_module_instance_id: 0,
             },
             modifiers: crate::modifiers::ModifierSet::default(),
+            events: crate::sim_events::SimEventState::default(),
             body_cache: std::collections::HashMap::new(),
         }
     }

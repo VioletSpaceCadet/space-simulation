@@ -10,6 +10,7 @@ mod id;
 pub mod metrics;
 pub mod modifiers;
 mod research;
+pub mod sim_events;
 pub mod spatial;
 mod station;
 pub(crate) mod tasks;

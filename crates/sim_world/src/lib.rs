@@ -349,6 +349,14 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         Ok(text) => serde_json::from_str(&text).context("parsing alerts.json")?,
         Err(_) => Vec::new(),
     };
+    let mut sim_events: Vec<sim_core::sim_events::SimEventDef> =
+        match std::fs::read_to_string(dir.join("events.json")) {
+            Ok(text) => serde_json::from_str(&text).context("parsing events.json")?,
+            Err(_) => Vec::new(),
+        };
+    for event in &mut sim_events {
+        event.resolve_weight();
+    }
     let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
     )
@@ -376,11 +384,13 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         pricing,
         constants,
         alert_rules,
+        events: sim_events,
         density_map: std::collections::HashMap::new(),
     };
     content.constants.derive_tick_values();
     sim_core::derive_module_tick_values(&mut content.module_defs, &content.constants);
     content.init_caches();
+    sim_core::sim_events::validate_event_defs(&content.events);
     validate_content(&content);
     Ok(content)
 }
@@ -567,6 +577,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             next_module_instance_id: 0,
         },
         modifiers: sim_core::modifiers::ModifierSet::default(),
+        events: sim_core::sim_events::SimEventState::default(),
         body_cache: sim_core::build_body_cache(&content.solar_system.bodies),
     }
 }
@@ -1127,6 +1138,7 @@ mod tests {
                 next_module_instance_id: 0,
             },
             modifiers: sim_core::modifiers::ModifierSet::default(),
+            events: sim_core::sim_events::SimEventState::default(),
             body_cache: std::collections::HashMap::new(),
         };
         validate_state(&state, &content);

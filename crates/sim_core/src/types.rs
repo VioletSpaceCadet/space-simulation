@@ -119,7 +119,7 @@ pub enum EventLevel {
     Debug,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AlertSeverity {
     Warning,
     Critical,
@@ -193,6 +193,9 @@ pub struct GameState {
     /// Global modifiers (from research, game-wide buffs).
     #[serde(default)]
     pub modifiers: crate::modifiers::ModifierSet,
+    /// Sim events system runtime state.
+    #[serde(default)]
+    pub events: crate::sim_events::SimEventState,
     /// Cached absolute positions for orbital bodies. Not serialized — recomputed on load.
     #[serde(skip, default)]
     pub body_cache: std::collections::HashMap<BodyId, crate::spatial::BodyCache>,
@@ -942,6 +945,9 @@ pub struct GameContent {
     /// Alert rules loaded from `content/alerts.json`. Empty if file is missing.
     #[serde(default)]
     pub alert_rules: Vec<AlertRuleDef>,
+    /// Sim event definitions loaded from `content/events.json`. Empty if file is missing.
+    #[serde(default)]
+    pub events: Vec<crate::sim_events::SimEventDef>,
     /// Pre-computed element id → density (kg/m³) lookup. Populated by `init_caches()`.
     #[serde(skip)]
     pub density_map: HashMap<String, f32>,
@@ -1451,6 +1457,16 @@ pub struct Constants {
     /// Wear rate multiplier when module is in overheat critical zone.
     #[serde(default = "default_thermal_wear_multiplier_critical")]
     pub thermal_wear_multiplier_critical: f32,
+    // Sim events system
+    /// Whether the sim events system is enabled.
+    #[serde(default = "default_events_enabled")]
+    pub events_enabled: bool,
+    /// Global cooldown between any two sim events (ticks).
+    #[serde(default = "default_event_global_cooldown_ticks")]
+    pub event_global_cooldown_ticks: u64,
+    /// Maximum number of fired events to keep in history ring buffer.
+    #[serde(default = "default_event_history_capacity")]
+    pub event_history_capacity: usize,
 
     // -- Derived tick fields (computed at load time, not in JSON) --
     #[serde(skip_deserializing, default)]
@@ -1634,6 +1650,15 @@ fn default_replenish_check_interval_ticks() -> u64 {
 }
 fn default_replenish_target_count() -> u32 {
     5 // matches legacy MIN_UNSCANNED_SITES
+}
+fn default_events_enabled() -> bool {
+    true
+}
+fn default_event_global_cooldown_ticks() -> u64 {
+    200
+}
+fn default_event_history_capacity() -> usize {
+    100
 }
 
 // ---------------------------------------------------------------------------

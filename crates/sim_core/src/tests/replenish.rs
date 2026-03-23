@@ -113,8 +113,12 @@ fn replenish_test_content() -> GameContent {
             deposit_ticks: 0,
             station_power_available_per_tick: 0.0,
             research_roll_interval_ticks: 0,
+            events_enabled: false,
+            event_global_cooldown_ticks: 200,
+            event_history_capacity: 100,
         },
         alert_rules: Vec::new(),
+        events: Vec::new(),
         density_map: HashMap::new(),
     };
     content.constants.derive_tick_values();
@@ -164,6 +168,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
             next_module_instance_id: 0,
         },
         modifiers: crate::modifiers::ModifierSet::default(),
+        events: crate::sim_events::SimEventState::default(),
         body_cache: std::collections::HashMap::new(),
     }
 }

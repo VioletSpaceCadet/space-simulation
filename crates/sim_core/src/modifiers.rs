@@ -69,6 +69,7 @@ pub enum ModifierOp {
 pub enum ModifierSource {
     Environment,
     Equipment(String),
+    Event(String),
     Tech(String),
     Thermal,
     Wear,
