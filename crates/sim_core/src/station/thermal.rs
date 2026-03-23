@@ -191,8 +191,8 @@ fn apply_idle_heat(
             delta_mk >= 0,
             "idle heat delta must be >= 0, got {delta_mk}"
         );
-        #[allow(clippy::cast_sign_loss)]
-        let new_temp = thermal.temp_mk.saturating_add(delta_mk as u32);
+        #[allow(clippy::cast_sign_loss)] // .max(0) guarantees non-negative
+        let new_temp = thermal.temp_mk.saturating_add(delta_mk.max(0) as u32);
         thermal.temp_mk = new_temp.min(T_MAX_ABSOLUTE_MK);
     }
 }

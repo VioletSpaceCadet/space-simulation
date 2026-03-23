@@ -570,11 +570,12 @@ pub fn recompute_ship_stats(ship: &mut crate::ShipState, content: &GameContent) 
     ship.cargo_capacity_m3 = ship
         .modifiers
         .resolve_f32(StatId::CargoCapacity, hull.cargo_capacity_m3);
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // clamp guards
     {
         ship.speed_ticks_per_au = Some(
             ship.modifiers
-                .resolve(StatId::ShipSpeed, hull.base_speed_ticks_per_au as f64) as u64,
+                .resolve(StatId::ShipSpeed, hull.base_speed_ticks_per_au as f64)
+                .clamp(0.0, u64::MAX as f64) as u64,
         );
     }
     ship.propellant_capacity_kg = ship

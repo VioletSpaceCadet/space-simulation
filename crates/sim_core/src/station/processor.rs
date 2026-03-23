@@ -413,11 +413,9 @@ fn resolve_processor_run(
                     );
                     if let Some(ref mut thermal_state) = module.thermal {
                         if delta_mk >= 0 {
-                            #[allow(clippy::cast_sign_loss)]
-                            {
-                                thermal_state.temp_mk =
-                                    thermal_state.temp_mk.saturating_add(delta_mk as u32);
-                            }
+                            #[allow(clippy::cast_sign_loss)] // .max(0) guarantees non-negative
+                            let delta = delta_mk.max(0) as u32;
+                            thermal_state.temp_mk = thermal_state.temp_mk.saturating_add(delta);
                         } else {
                             thermal_state.temp_mk = thermal_state
                                 .temp_mk

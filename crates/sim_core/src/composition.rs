@@ -80,13 +80,15 @@ pub(crate) fn blend_thermal(
             }
             let wa = f64::from(a_kg) / total;
             let wb = f64::from(b_kg) / total;
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let blended_temp =
-                (f64::from(ta.temp_mk) * wa + f64::from(tb.temp_mk) * wb).round() as u32;
-            #[allow(clippy::cast_possible_truncation)]
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // clamp guards
+            let blended_temp = (f64::from(ta.temp_mk) * wa + f64::from(tb.temp_mk) * wb)
+                .round()
+                .clamp(0.0, f64::from(u32::MAX)) as u32;
+            #[allow(clippy::cast_possible_truncation)] // clamp guards
             let blended_latent = (ta.latent_heat_buffer_j as f64 * wa
                 + tb.latent_heat_buffer_j as f64 * wb)
-                .round() as i64;
+                .round()
+                .clamp(i64::MIN as f64, i64::MAX as f64) as i64;
             let phase = if a_kg >= b_kg { ta.phase } else { tb.phase };
             Some(MaterialThermalProps {
                 temp_mk: blended_temp,
