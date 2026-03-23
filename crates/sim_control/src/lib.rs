@@ -1999,6 +1999,8 @@ mod tests {
             assert_eq!(*ship_id, ShipId("ship_0001".to_string()));
             assert_eq!(*slot_index, 0);
             assert_eq!(module_def_id.0, "module_cargo_expander");
+        } else {
+            panic!("expected FitShipModule command");
         }
     }
 

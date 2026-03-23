@@ -605,8 +605,12 @@ pub(crate) fn handle_fit_ship_module(
     if ship.position != station.position {
         return false;
     }
-    // Ship must be idle
-    if ship.task.is_some() {
+    // Ship must be idle (None = freshly constructed, Some(Idle) = completed task)
+    if ship
+        .task
+        .as_ref()
+        .is_some_and(|t| !matches!(t.kind, crate::TaskKind::Idle))
+    {
         return false;
     }
     // Hull must exist and slot_index must be valid
@@ -687,8 +691,12 @@ pub(crate) fn handle_unfit_ship_module(
     if ship.position != station.position {
         return false;
     }
-    // Ship must be idle
-    if ship.task.is_some() {
+    // Ship must be idle (None = freshly constructed, Some(Idle) = completed task)
+    if ship
+        .task
+        .as_ref()
+        .is_some_and(|t| !matches!(t.kind, crate::TaskKind::Idle))
+    {
         return false;
     }
     // Hull must exist in content
