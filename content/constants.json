@@ -39,5 +39,8 @@
   "ticks_per_au": 2133,
   "min_transit_ticks": 1,
   "replenish_check_interval_ticks": 24,
-  "replenish_target_count": 10
+  "replenish_target_count": 10,
+  "events_enabled": true,
+  "event_global_cooldown_ticks": 200,
+  "event_history_capacity": 100
 }

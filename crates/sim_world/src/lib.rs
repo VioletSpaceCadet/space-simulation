@@ -1277,4 +1277,33 @@ mod tests {
              Loaded: {loaded_modules:?}"
         );
     }
+
+    #[test]
+    fn events_json_loads_and_validates() {
+        let content = load_content("../../content").unwrap();
+        assert_eq!(content.events.len(), 6, "Expected 6 event definitions");
+
+        // Verify all event IDs are present
+        let ids: Vec<&str> = content.events.iter().map(|e| e.id.0.as_str()).collect();
+        assert!(ids.contains(&"evt_equipment_failure"));
+        assert!(ids.contains(&"evt_comet_flyby"));
+        assert!(ids.contains(&"evt_supernova"));
+        assert!(ids.contains(&"evt_solar_flare"));
+        assert!(ids.contains(&"evt_micrometeorite"));
+        assert!(ids.contains(&"evt_supply_cache"));
+
+        // Verify weights were resolved
+        for event in &content.events {
+            assert!(
+                event.resolved_weight > 0,
+                "event '{}' should have resolved_weight > 0",
+                event.id.0
+            );
+        }
+
+        // Verify constants loaded
+        assert!(content.constants.events_enabled);
+        assert_eq!(content.constants.event_global_cooldown_ticks, 200);
+        assert_eq!(content.constants.event_history_capacity, 100);
+    }
 }
