@@ -80,6 +80,8 @@ fn electrolysis_content() -> GameContent {
                 recipes: vec![recipe_id],
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 
@@ -97,6 +99,8 @@ fn electrolysis_content() -> GameContent {
                 base_output_kw: 50.0,
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 
@@ -474,6 +478,8 @@ fn test_full_chain_ore_to_propellant() {
                 recipes: vec![water_recipe_id],
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 

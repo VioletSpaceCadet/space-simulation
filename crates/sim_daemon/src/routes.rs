@@ -387,6 +387,7 @@ pub async fn content_handler(State(app_state): State<AppState>) -> Json<ContentR
         minutes_per_tick: mpt,
         recipes: sim.content.recipes.clone(),
         event_defs,
+        hulls: sim.content.hulls.clone(),
     })
 }
 
@@ -398,6 +399,7 @@ pub struct ContentResponse {
     pub minutes_per_tick: u32,
     pub recipes: std::collections::BTreeMap<sim_core::RecipeId, sim_core::RecipeDef>,
     pub event_defs: Vec<EventDefInfo>,
+    pub hulls: std::collections::BTreeMap<sim_core::HullId, sim_core::HullDef>,
 }
 
 #[derive(serde::Serialize, Clone)]

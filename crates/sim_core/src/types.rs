@@ -70,6 +70,9 @@ string_id!(ModuleItemId);
 string_id!(ModuleInstanceId);
 string_id!(ComponentId);
 string_id!(RecipeId);
+string_id!(HullId);
+string_id!(SlotType);
+string_id!(ModuleDefId);
 
 // ---------------------------------------------------------------------------
 // Core enums
@@ -288,6 +291,7 @@ pub enum ModuleKindState {
     SolarArray(SolarArrayState),
     Battery(BatteryState),
     Radiator(RadiatorState),
+    Equipment,
 }
 
 impl ModuleKindState {
@@ -299,7 +303,11 @@ impl ModuleKindState {
             Self::SensorArray(s) => Some(&mut s.ticks_since_last_run),
             Self::Lab(s) => Some(&mut s.ticks_since_last_run),
             Self::Maintenance(s) => Some(&mut s.ticks_since_last_run),
-            Self::Storage | Self::SolarArray(_) | Self::Battery(_) | Self::Radiator(_) => None,
+            Self::Storage
+            | Self::SolarArray(_)
+            | Self::Battery(_)
+            | Self::Radiator(_)
+            | Self::Equipment => None,
         }
     }
 }
@@ -671,6 +679,7 @@ pub enum BehaviorType {
     SolarArray,
     Battery,
     Radiator,
+    Equipment,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -956,6 +965,9 @@ pub struct GameContent {
     /// Sim event definitions loaded from `content/events.json`. Empty if file is missing.
     #[serde(default)]
     pub events: Vec<crate::sim_events::SimEventDef>,
+    /// Hull definitions loaded from `content/hull_defs.json`. Empty if file is missing.
+    #[serde(default)]
+    pub hulls: BTreeMap<HullId, HullDef>,
     /// Pre-computed element id → density (kg/m³) lookup. Populated by `init_caches()`.
     #[serde(skip)]
     pub density_map: HashMap<String, f32>,
@@ -1142,6 +1154,39 @@ pub struct ThermalDef {
     pub idle_heat_generation_w: Option<f32>,
 }
 
+// ---------------------------------------------------------------------------
+// Hull + slot types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HullDef {
+    pub id: HullId,
+    pub name: String,
+    pub mass_kg: f32,
+    pub cargo_capacity_m3: f32,
+    pub base_speed_ticks_per_au: u64,
+    pub base_propellant_capacity_kg: f32,
+    pub slots: Vec<SlotDef>,
+    #[serde(default)]
+    pub bonuses: Vec<crate::modifiers::Modifier>,
+    #[serde(default)]
+    pub required_tech: Option<TechId>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlotDef {
+    pub slot_type: SlotType,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FittedModule {
+    pub slot_index: usize,
+    pub module_def_id: ModuleDefId,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleDef {
     pub id: String,
@@ -1155,12 +1200,20 @@ pub struct ModuleDef {
     /// Thermal properties. `None` for modules with no thermal behavior.
     #[serde(default)]
     pub thermal: Option<ThermalDef>,
+    /// Slot types this module can be fitted into on a ship hull. Empty = station-only.
+    #[serde(default)]
+    pub compatible_slots: Vec<SlotType>,
+    /// Modifiers applied to a ship when this module is fitted.
+    #[serde(default)]
+    pub ship_modifiers: Vec<crate::modifiers::Modifier>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ModuleBehaviorDef {
     Processor(ProcessorDef),
-    Storage { capacity_m3: f32 },
+    Storage {
+        capacity_m3: f32,
+    },
     Maintenance(MaintenanceDef),
     Assembler(AssemblerDef),
     Lab(LabDef),
@@ -1168,6 +1221,8 @@ pub enum ModuleBehaviorDef {
     SolarArray(SolarArrayDef),
     Battery(BatteryDef),
     Radiator(RadiatorDef),
+    /// Passive stat provider for ship fitting. No tick behavior.
+    Equipment,
 }
 
 impl ModuleBehaviorDef {
@@ -1179,9 +1234,11 @@ impl ModuleBehaviorDef {
             Self::SensorArray(s) => Some(s.scan_interval_ticks),
             Self::Lab(l) => Some(l.research_interval_ticks),
             Self::Maintenance(m) => Some(m.repair_interval_ticks),
-            Self::Storage { .. } | Self::SolarArray(_) | Self::Battery(_) | Self::Radiator(_) => {
-                None
-            }
+            Self::Storage { .. }
+            | Self::SolarArray(_)
+            | Self::Battery(_)
+            | Self::Radiator(_)
+            | Self::Equipment => None,
         }
     }
 
@@ -1194,9 +1251,11 @@ impl ModuleBehaviorDef {
             Self::Assembler(_) => Some(2),
             Self::Processor(_) => Some(3),
             Self::Maintenance(_) => Some(4),
-            Self::Storage { .. } | Self::SolarArray(_) | Self::Battery(_) | Self::Radiator(_) => {
-                None
-            }
+            Self::Storage { .. }
+            | Self::SolarArray(_)
+            | Self::Battery(_)
+            | Self::Radiator(_)
+            | Self::Equipment => None,
         }
     }
 }

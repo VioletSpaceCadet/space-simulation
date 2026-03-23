@@ -101,6 +101,8 @@ fn economy_content() -> GameContent {
                 max_stock: HashMap::new(),
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     )]);
 

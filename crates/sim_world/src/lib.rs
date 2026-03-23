@@ -44,6 +44,7 @@ pub fn validate_content(content: &GameContent) {
     validate_orbital_bodies(content);
     validate_asteroid_templates(content, &element_ids);
     validate_module_recipes(content, &element_ids);
+    validate_hull_defs(content);
 }
 
 fn validate_constants(content: &GameContent) {
@@ -276,6 +277,43 @@ fn validate_recipe_elements(
     }
 }
 
+fn validate_hull_defs(content: &GameContent) {
+    // Collect all slot types defined across hulls
+    let hull_slot_types: HashSet<&sim_core::SlotType> = content
+        .hulls
+        .values()
+        .flat_map(|h| h.slots.iter().map(|s| &s.slot_type))
+        .collect();
+
+    // Warn about modules with compatible_slots referencing types not in any hull
+    for module_def in content.module_defs.values() {
+        for slot_type in &module_def.compatible_slots {
+            if !hull_slot_types.contains(slot_type) {
+                eprintln!(
+                    "WARNING: module '{}' has compatible_slot '{}' not found in any hull",
+                    module_def.id, slot_type
+                );
+            }
+        }
+    }
+
+    // Warn about hull slot types with no compatible modules
+    for hull in content.hulls.values() {
+        for slot in &hull.slots {
+            let has_compatible = content
+                .module_defs
+                .values()
+                .any(|m| m.compatible_slots.contains(&slot.slot_type));
+            if !has_compatible {
+                eprintln!(
+                    "WARNING: hull '{}' slot '{}' (type '{}') has no compatible modules",
+                    hull.id, slot.label, slot.slot_type
+                );
+            }
+        }
+    }
+}
+
 pub fn validate_state(state: &GameState, content: &GameContent) {
     let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
     for station in state.stations.values() {
@@ -301,6 +339,27 @@ pub fn validate_state(state: &GameState, content: &GameContent) {
                 );
             }
         }
+    }
+}
+
+fn load_hull_defs(
+    dir: &Path,
+) -> Result<std::collections::BTreeMap<sim_core::HullId, sim_core::HullDef>> {
+    match std::fs::read_to_string(dir.join("hull_defs.json")) {
+        Ok(text) => {
+            let defs: Vec<sim_core::HullDef> =
+                serde_json::from_str(&text).context("parsing hull_defs.json")?;
+            let mut map = std::collections::BTreeMap::new();
+            for def in defs {
+                let id = def.id.clone();
+                assert!(
+                    map.insert(id.clone(), def).is_none(),
+                    "duplicate hull ID: {id}"
+                );
+            }
+            Ok(map)
+        }
+        Err(_) => Ok(std::collections::BTreeMap::new()),
     }
 }
 
@@ -357,6 +416,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     for event in &mut sim_events {
         event.resolve_weight();
     }
+    let hulls = load_hull_defs(dir)?;
     let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
     )
@@ -385,6 +445,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         constants,
         alert_rules,
         events: sim_events,
+        hulls,
         density_map: std::collections::HashMap::new(),
     };
     content.constants.derive_tick_values();
@@ -869,6 +930,8 @@ mod tests {
                     recipes: vec![sim_core::RecipeId("recipe_test".to_string())],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         validate_content(&content);
@@ -957,6 +1020,8 @@ mod tests {
                     recipes: vec![sim_core::RecipeId("recipe_asm_test".to_string())],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         validate_content(&content);

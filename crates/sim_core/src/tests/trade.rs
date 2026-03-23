@@ -95,6 +95,8 @@ fn trade_content() -> GameContent {
                 recipes: vec![],
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     )]);
     content

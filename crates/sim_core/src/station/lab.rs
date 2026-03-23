@@ -160,6 +160,8 @@ mod tests {
                     research_interval_ticks: 1,
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content

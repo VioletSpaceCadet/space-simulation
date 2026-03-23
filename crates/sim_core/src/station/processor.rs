@@ -769,6 +769,8 @@ mod tests {
                     thermal_group: Some("smelting".to_string()),
                     idle_heat_generation_w: None,
                 }),
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content
@@ -1091,6 +1093,8 @@ mod tests {
                     recipes: vec![recipe_id],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content
@@ -1377,6 +1381,8 @@ mod tests {
                     recipes: vec![recipe_id],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
 
@@ -1516,6 +1522,8 @@ mod tests {
                     recipes: vec![recipe_id],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
 

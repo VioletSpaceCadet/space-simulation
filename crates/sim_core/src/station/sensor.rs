@@ -86,6 +86,8 @@ mod tests {
                     scan_interval_ticks: 5,
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content

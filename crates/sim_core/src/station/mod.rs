@@ -748,6 +748,8 @@ mod framework_tests {
                     recipes: vec![],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content
@@ -884,6 +886,8 @@ mod framework_tests {
                 wear_per_run: 0.0,
                 behavior: ModuleBehaviorDef::Storage { capacity_m3: 500.0 },
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         assert!(extract_context(&state, &station_id, 0, &content2).is_none());
