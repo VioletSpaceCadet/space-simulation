@@ -137,9 +137,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install dependencies
-        run: pip install duckdb pyarrow ruff pytest pytest-cov mypy
+        run: pip install "duckdb>=1.0" "pyarrow>=17.0" "ruff>=0.9" "pytest>=8.0" "pytest-cov>=6.0" "mypy>=1.14"
 
       - name: Format check
         run: ruff format --check scripts/analysis/

@@ -5,7 +5,7 @@ import sys
 
 
 def test_python_version() -> None:
-    """Verify Python >= 3.11 is in use."""
+    """Verify Python >= 3.10 is in use."""
     assert sys.version_info >= (3, 10), f"Python >= 3.10 required, got {sys.version}"
 
 
