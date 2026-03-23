@@ -1,0 +1,10 @@
+{
+  "name": "events_test",
+  "ticks": 5000,
+  "metrics_every": 100,
+  "seeds": [1, 2, 3],
+  "state": "./content/dev_base_state.json",
+  "overrides": {
+    "event_global_cooldown_ticks": 10
+  }
+}
