@@ -67,8 +67,8 @@
     "behavior": {
       "Assembler": {
         "assembly_interval_minutes": 360,
-        "recipes": ["recipe_basic_repair_kit"],
-        "max_stock": { "repair_kit": 50 }
+        "recipes": ["recipe_basic_repair_kit", "recipe_advanced_repair_kit"],
+        "max_stock": { "repair_kit": 50, "advanced_repair_kit": 20 }
       }
     }
   },

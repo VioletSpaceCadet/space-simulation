@@ -52,7 +52,7 @@
       "prereqs": [],
       "domain_requirements": { "Manufacturing": 200.0 },
       "accepted_data": ["ManufacturingData"],
-      "difficulty": 50.0,
+      "difficulty": 500.0,
       "effects": []
     }
   ]
