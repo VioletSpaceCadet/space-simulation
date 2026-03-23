@@ -25,4 +25,50 @@ describe('EventsFeed', () => {
     render(<EventsFeed events={[]} />);
     expect(screen.getByText(/waiting for stream data/i)).toBeInTheDocument();
   });
+
+  it('renders SimEventFired with target and label', () => {
+    const simEvents: SimEvent[] = [
+      {
+        id: 'evt_000010', tick: 42, event: {
+          SimEventFired: {
+            event_def_id: 'evt_solar_flare',
+            target: { type: 'station', station_id: 'station_earth_orbit' },
+            effects_applied: [{ effect: { type: 'trigger_alert' }, target: { type: 'global' } }],
+          },
+        },
+      },
+    ];
+    render(<EventsFeed events={simEvents} />);
+    expect(screen.getByText('EVENT')).toBeInTheDocument();
+    expect(screen.getByText('solar flare')).toBeInTheDocument();
+    expect(screen.getByText(/station_earth_orbit/)).toBeInTheDocument();
+  });
+
+  it('renders SimEventExpired with effect ended label', () => {
+    const simEvents: SimEvent[] = [
+      {
+        id: 'evt_000020', tick: 100, event: {
+          SimEventExpired: { event_def_id: 'evt_solar_flare' },
+        },
+      },
+    ];
+    render(<EventsFeed events={simEvents} />);
+    expect(screen.getByText(/solar flare effect ended/)).toBeInTheDocument();
+  });
+
+  it('falls back to event_def_id when unknown event', () => {
+    const simEvents: SimEvent[] = [
+      {
+        id: 'evt_000030', tick: 50, event: {
+          SimEventFired: {
+            event_def_id: 'evt_unknown_thing',
+            target: { type: 'global' },
+            effects_applied: [],
+          },
+        },
+      },
+    ];
+    render(<EventsFeed events={simEvents} />);
+    expect(screen.getByText('unknown thing')).toBeInTheDocument();
+  });
 });
