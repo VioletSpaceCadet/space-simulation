@@ -1,7 +1,7 @@
 //! Sim events engine — content-driven event system with composable effects.
 //!
-//! Types, evaluation engine, and validation for content-driven sim events.
-//! Effect application is in SE-03.
+//! Types, evaluation engine, effect application, and validation for
+//! content-driven sim events.
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -304,7 +304,7 @@ pub struct SimEventState {
 
 /// Evaluate sim events for this tick. Selects at most one event to fire,
 /// resolves its target, records it in history, and emits a `SimEventFired` event.
-/// Effect application is delegated to SE-03; for now effects are recorded but not applied.
+/// Applies effects, records the event in history, and emits `SimEventFired`.
 pub fn evaluate_events(
     state: &mut GameState,
     content: &GameContent,
@@ -603,8 +603,6 @@ fn domain_to_data_kind(domain: &crate::ResearchDomain) -> crate::DataKind {
     }
 }
 
-/// Apply all effects from a fired event. Returns the list of applied effects.
-/// Each effect also emits its own mechanical event (dual emission contract).
 /// Apply all effects from a fired event. Returns the list of applied effects.
 /// Each effect also emits its own mechanical event (dual emission contract).
 fn apply_effects(
