@@ -299,6 +299,8 @@ VIO-406 (Constants serde) ──related──> VIO-415 (Extract constants)
 
 ### Three-Layer Architecture (VIO-181)
 
+**Key architectural insight:** Time-scale separation means each layer can fail independently without bringing down the others. A bad LLM strategic call doesn't crash the sim — L1 keeps running with sane defaults. A poorly trained scoring model doesn't corrupt game state — it just makes suboptimal recommendations that the next training cycle can correct. Fault isolation by time scale.
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ Layer 3: Offline ML Optimization                        │
@@ -336,10 +338,10 @@ VIO-406 (Constants serde) ──related──> VIO-415 (Extract constants)
 - Modifier system can express tech-granted bonuses
 - **Gap:** Behaviors are hardcoded if-chains, not tunable. Need `AutopilotConfig` struct that L2 can write and L1 reads (priority weights, thresholds, template rankings). VIO-412 (content-driven autopilot) is the key enabler.
 
-**Layer 2 (LLM advisor): ~60% ready**
+**Layer 2 (LLM advisor): ~55% ready**
 - MCP tools exist (digest, alerts, parameters, proposals, knowledge query/save)
 - Knowledge Phase 1 done (playbook with real strategic knowledge from actual runs)
-- **Gap:** Strategy config output format not defined. Advisor currently proposes parameter changes; needs to also output autopilot config and template designs. This is the VIO-181 design doc deliverable.
+- **Gap:** Strategy config output format is entirely undesigned. Advisor currently proposes parameter changes; needs to also output autopilot config and template designs. This is the VIO-181 design doc deliverable — and defining what an `AutopilotConfig` looks like is a design problem that could easily take as long as any single feature project. The ~55% estimate reflects that the infrastructure exists but the hard design work hasn't started.
 - **Gap:** Template design interface. Once hull+slots lands, LLM needs a way to express "build ship with hull X, fitted modules Y, Z" as a template L1 executes.
 
 **Layer 3 (Offline ML): ~40% ready**
@@ -404,6 +406,8 @@ Per VIO-182 revision:
 8. **A/B validation** — automated sim_bench comparison: heuristic vs optimized, report % improvement
 
 **Outcome:** "Optimized strategy scores 23% higher than default across 200 seeds." First data-driven proof that the pipeline works end-to-end.
+
+**Side benefit:** Phase 2 is also a playtesting accelerator. Running 100 seeds with strategy A vs strategy B reveals dynamics about the simulation that no amount of reading the code will show. "Optimized strategy always builds transport haulers before mining barges" — why? That kind of discovery feeds back into game design, not just AI development.
 
 ### Phase 3: Expand the Decision Space
 
@@ -470,21 +474,43 @@ This is where the LLM layer becomes not just helpful but an order of magnitude b
 
 The classical optimization layers (L1 + L3) handle the tactics. The LLM layer (L2) handles the strategy. The richer the game gets through Phases 1-5, the more valuable the LLM becomes — which is exactly why it should come last.
 
+The difference is between AI that *optimizes* and AI that *strategizes*. Classical game AI can play competently. An LLM-integrated system can play *interestingly* — making plans that have narrative coherence, responding to crises with causal reasoning, learning lessons that transfer to novel situations. The deterministic, fast sim makes this tractable in a way it wouldn't be for almost any other game — that's the genuine competitive advantage.
+
+**Biggest risk:** Sustaining development long enough to reach Phase 6. The mitigation is built into the plan: each phase delivers standalone value. Phase 2's optimization loop is interesting even if Phase 6 never ships. That's the design intent.
+
 ---
 
 ## Part 6: What Will Be Hard
 
 ### The AutopilotConfig Schema Is the Crux
 
-Getting the config format right — expressive enough for meaningful strategy choices, constrained enough for deterministic execution — is a design problem, not an implementation problem. The good news: it needs to serve classical optimization first (Phase 2), which is a simpler consumer than an LLM. Design for `scipy.optimize`, the LLM interface will be a superset later.
+Getting the config format right — expressive enough for meaningful strategy choices, constrained enough for deterministic execution — is a design problem, not an implementation problem. It deserves its own multi-section design session with the same rigor as events, hulls, crew, and manufacturing. It's the interface between human intent, classical optimization, and eventually LLM reasoning. If it's too rigid, the optimizer can't explore. If it's too loose, the search space explodes.
 
-### Content Depth Is the Rate Limiter
+The sweet spot is probably hierarchical: high-level strategy enums (`expand` / `consolidate` / `optimize`) that set broad parameters, with per-system tuning knobs underneath. Design for `scipy.optimize` first — the LLM interface will be a superset later.
+
+### Content Depth Is the Rate Limiter — and Refactors Are AI Infrastructure
 
 Even with perfect AI architecture, if the decision space is "mine iron or mine iron," there's nothing to optimize. The code quality refactors (Part 3) directly impact how fast content can be added. After the refactors, adding 10 new modules is ~600 lines of focused game logic instead of ~1,500 lines of boilerplate. This is what enables Phase 3 (expanding the decision space) to move at the speed the optimization loop needs.
+
+The code quality audit quantifies this precisely: adding a new module type costs 12 files and 150 lines of boilerplate. Every new decision dimension for the AI to optimize over has a high implementation tax. The refactoring tickets (VIO-402 through 407 especially) aren't just code hygiene — they're AI infrastructure. Cutting the "add a module" cost from 150 lines to 60 lines means the decision space can grow in half the time, which means the optimization loop gets interesting sooner.
 
 ### ML Training Needs Scale (Eventually)
 
 Current: 3 scenarios x 20 seeds = 60 runs. Sufficient for gradient boosted trees (Phase 2). Not enough for RL (Phase 6). At ~435K TPS, 10,000 ticks x 1,000 seeds = ~23 seconds. At 2M TPS target = ~5 seconds. Classical optimization (Phase 2) works fine at current speed. RL (Phase 6) needs the Performance project.
+
+### MCTS Clone Cost Needs Early Validation
+
+The "clone state, rollout 200 ticks" assumption in Phase 4 (MCTS for tactical subproblems) needs benchmarking before building the infrastructure. How large is `GameState`? If it's a few megabytes with `BTreeMap`s and `Vec`s, cloning it thousands of times for MCTS rollouts has memory implications. Tick throughput is fast, but clone cost could dominate. Worth benchmarking a state clone early to know whether a copy-on-write state representation is needed.
+
+### Float Determinism Affects ML Training Data
+
+The float determinism audit (VIO-413) has implications beyond cross-platform correctness. If ML models are trained on `sim_bench` outputs and those outputs vary between development machines and CI runners due to float differences, the training data has noise you can't control. For classical optimization (Phase 2) this is likely fine — variance washes out over 100 seeds. For RL with millions of runs (Phase 6), it could matter. The thermal system's milli-unit integer pattern is the right model, but migrating ~120 float fields is substantial. The honest question: is this a "do it all at once" migration or a "convert systems incrementally as you touch them" effort? Incremental conversion per-system (as each system gets major changes) is more realistic.
+
+### Credit Assignment: The Phase 5→6 Gap
+
+The gap between Phase 5 and Phase 6 is larger than it appears. Phase 5 ends with "a multi-station space economy with supply chains." Phase 6 starts with "LLM strategic advisor outputs autopilot config." The missing piece is evaluation: how does the LLM know its strategy was good? It needs to observe outcomes over thousands of ticks and correlate them with its decisions. That's a credit assignment problem that's genuinely hard.
+
+The knowledge system helps (the playbook accumulates lessons), but automated feedback from "LLM made decision X → 5000 ticks later, outcome Y" needs explicit design. This is likely a Phase 5.5 deliverable: a structured outcome attribution system that traces strategic decisions to measurable results.
 
 ### The Feedback Loop Must Be Automated
 
