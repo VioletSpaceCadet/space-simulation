@@ -31,8 +31,15 @@ cd e2e && npx playwright test --headed                    # E2E tests (visible b
 cargo llvm-cov --fail-under-lines 83                      # Rust coverage (83% line threshold)
 cd ui_web && npm run test:coverage                        # FE coverage (thresholds in vite.config.ts)
 
+pip install duckdb pyarrow ruff pytest pytest-cov mypy    # Install Python deps (once, in venv)
+ruff check scripts/analysis/                              # Python lint
+ruff format scripts/analysis/                             # Python format
+mypy scripts/analysis/                                    # Python type check
+pytest scripts/analysis/tests/                            # Python tests
+
 ./scripts/ci_rust.sh                                      # fmt + clippy + test + coverage
 ./scripts/ci_web.sh                                       # npm ci + lint + tsc + vitest + coverage
+./scripts/ci_python.sh                                    # ruff + mypy + pytest + coverage
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
 ./scripts/ci_e2e.sh                                       # E2E Playwright tests
 ./scripts/ci_event_sync.sh                                # Event exhaustiveness check
@@ -45,7 +52,8 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_core** — Pure deterministic sim. No IO. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, etc.
 - **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management).
 - **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json`.
-- **sim_bench** — Scenario runner. JSON overrides (constants + `module.*` dotted keys). Parallel seeds via rayon.
+- **sim_bench** — Scenario runner. JSON overrides (constants + `module.*` dotted keys). Parallel seeds via rayon. Outputs Parquet + CSV metrics.
+- **scripts/analysis** — Python ML data pipeline (DuckDB + pyarrow). Feature extraction, outcome labeling, cross-seed analysis. Tooling: ruff (lint/format), mypy (types), pytest (tests).
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags.
 - **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints. Includes `analytics` module (trend/rate/bottleneck analysis) and `GET /api/v1/advisor/digest` endpoint.
 - **mcp_advisor** — MCP server (TypeScript, stdio transport) for balance analysis and knowledge capture. Tools: metrics digest, alerts, game parameters, parameter proposals, sim lifecycle, `save_run_journal`, `query_knowledge`, `update_playbook`. Auto-discovered via `.mcp.json`. Requires running `sim_daemon` for sim tools; knowledge tools work standalone.

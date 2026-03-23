@@ -55,5 +55,19 @@ ui_web/coverage/
 e2e/test-results/
 e2e/playwright-report/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# ML training data (generated, not committed)
+data/training/
+
 # Superpowers brainstorm mockups
 .superpowers/

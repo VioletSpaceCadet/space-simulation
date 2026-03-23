@@ -128,6 +128,32 @@ jobs:
           path: artifacts/
           retention-days: 30
 
+  python:
+    name: Python (ruff + mypy + pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install "duckdb>=1.0" "pyarrow>=17.0" "ruff>=0.9" "pytest>=8.0" "pytest-cov>=6.0" "mypy>=1.14"
+
+      - name: Format check
+        run: ruff format --check scripts/analysis/
+
+      - name: Lint
+        run: ruff check scripts/analysis/
+
+      - name: Type check
+        run: mypy scripts/analysis/
+
+      - name: Test with coverage
+        run: pytest scripts/analysis/tests/ --cov=scripts/analysis --cov-report=term-missing --cov-fail-under=80
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
