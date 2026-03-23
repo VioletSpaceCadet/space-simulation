@@ -440,3 +440,245 @@ fn build_record_batch(
 
     RecordBatch::try_new(Arc::clone(schema), columns).context("building record batch")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::array::{AsArray, Float32Array, Float64Array, UInt32Array, UInt64Array};
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    use parquet::file::reader::FileReader;
+    use sim_core::{MetricsSnapshot, OreElementStats, METRICS_VERSION};
+    use std::collections::BTreeMap;
+
+    /// Build a test `MetricsSnapshot` with deterministic values derived from `index`.
+    fn make_snapshot(index: u64) -> MetricsSnapshot {
+        let mut per_element_material_kg = BTreeMap::new();
+        per_element_material_kg.insert("Fe".to_string(), 100.0 + index as f32);
+        per_element_material_kg.insert("H2O".to_string(), 50.0 + index as f32);
+
+        let mut per_element_ore_stats = BTreeMap::new();
+        per_element_ore_stats.insert(
+            "Fe".to_string(),
+            OreElementStats {
+                avg_fraction: 0.5 + (index as f32) * 0.001,
+                min_fraction: 0.3,
+                max_fraction: 0.7,
+            },
+        );
+        per_element_ore_stats.insert(
+            "H2O".to_string(),
+            OreElementStats {
+                avg_fraction: 0.2,
+                min_fraction: 0.1,
+                max_fraction: 0.3,
+            },
+        );
+
+        MetricsSnapshot {
+            tick: index * 10,
+            metrics_version: METRICS_VERSION,
+            total_ore_kg: 1000.0 + index as f32,
+            total_material_kg: 500.0 + index as f32,
+            total_slag_kg: 200.0 + index as f32,
+            per_element_material_kg,
+            station_storage_used_pct: 0.45,
+            ship_cargo_used_pct: 0.3,
+            per_element_ore_stats,
+            ore_lot_count: 5 + index as u32,
+            avg_material_quality: 0.85,
+            refinery_active_count: 2,
+            refinery_starved_count: 0,
+            refinery_stalled_count: 1,
+            assembler_active_count: 1,
+            assembler_stalled_count: 0,
+            fleet_total: 3,
+            fleet_idle: 1,
+            fleet_mining: 1,
+            fleet_transiting: 1,
+            fleet_surveying: 0,
+            fleet_depositing: 0,
+            scan_sites_remaining: 10,
+            asteroids_discovered: 5 + index as u32,
+            asteroids_depleted: 2,
+            techs_unlocked: 3,
+            total_scan_data: 150.0 + index as f32,
+            max_tech_evidence: 0.9,
+            avg_module_wear: 0.15,
+            max_module_wear: 0.35,
+            repair_kits_remaining: 8,
+            balance: 1_000_000.0 + index as f64 * 1000.0,
+            thruster_count: 2,
+            export_revenue_total: 50_000.0 + index as f64 * 500.0,
+            export_count: 10 + index as u32,
+            power_generated_kw: 100.0,
+            power_consumed_kw: 75.0,
+            power_deficit_kw: 0.0,
+            battery_charge_pct: 0.95,
+            station_max_temp_mk: 350_000,
+            station_avg_temp_mk: 300_000,
+            overheat_warning_count: 0,
+            overheat_critical_count: 0,
+            heat_wear_multiplier_avg: 1.0,
+        }
+    }
+
+    #[test]
+    fn round_trip_100_rows() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("metrics.parquet");
+        let element_ids = vec!["Fe".to_string(), "H2O".to_string()];
+
+        // Write 100 rows
+        let mut writer = ParquetMetricsWriter::new(&path, element_ids.clone()).unwrap();
+        let snapshots: Vec<MetricsSnapshot> = (0..100).map(make_snapshot).collect();
+        for snap in &snapshots {
+            writer.write_row(snap).unwrap();
+        }
+        writer.finish().unwrap();
+
+        // Read back
+        let file = std::fs::File::open(&path).unwrap();
+        let reader = ParquetRecordBatchReaderBuilder::try_new(file)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let mut total_rows = 0usize;
+        for batch_result in reader {
+            let batch = batch_result.unwrap();
+            let row_count = batch.num_rows();
+
+            // Verify tick values
+            let ticks = batch
+                .column_by_name("tick")
+                .unwrap()
+                .as_primitive::<arrow::datatypes::UInt64Type>();
+            for row in 0..row_count {
+                let expected_tick = (total_rows + row) as u64 * 10;
+                assert_eq!(
+                    ticks.value(row),
+                    expected_tick,
+                    "tick mismatch at row {}",
+                    total_rows + row
+                );
+            }
+
+            // Verify f32 field
+            let ore = batch.column_by_name("total_ore_kg").unwrap();
+            let ore_values: &Float32Array = ore.as_any().downcast_ref().unwrap();
+            for row in 0..row_count {
+                let expected = 1000.0 + (total_rows + row) as f32;
+                assert!(
+                    (ore_values.value(row) - expected).abs() < f32::EPSILON,
+                    "total_ore_kg mismatch at row {}",
+                    total_rows + row
+                );
+            }
+
+            // Verify f64 field (balance)
+            let balance = batch.column_by_name("balance").unwrap();
+            let balance_values: &Float64Array = balance.as_any().downcast_ref().unwrap();
+            for row in 0..row_count {
+                let expected = 1_000_000.0 + (total_rows + row) as f64 * 1000.0;
+                assert!(
+                    (balance_values.value(row) - expected).abs() < f64::EPSILON,
+                    "balance mismatch at row {}",
+                    total_rows + row
+                );
+            }
+
+            // Verify dynamic element column
+            let fe_material = batch.column_by_name("material_kg_Fe").unwrap();
+            let fe_values: &Float32Array = fe_material.as_any().downcast_ref().unwrap();
+            for row in 0..row_count {
+                let expected = 100.0 + (total_rows + row) as f32;
+                assert!(
+                    (fe_values.value(row) - expected).abs() < f32::EPSILON,
+                    "material_kg_Fe mismatch at row {}",
+                    total_rows + row
+                );
+            }
+
+            // Verify u32 field
+            let fleet = batch.column_by_name("fleet_total").unwrap();
+            let fleet_values: &UInt32Array = fleet.as_any().downcast_ref().unwrap();
+            for row in 0..row_count {
+                assert_eq!(
+                    fleet_values.value(row),
+                    3,
+                    "fleet_total mismatch at row {}",
+                    total_rows + row
+                );
+            }
+
+            total_rows += row_count;
+        }
+
+        assert_eq!(total_rows, 100, "expected 100 rows, got {total_rows}");
+    }
+
+    #[test]
+    fn schema_version_in_metadata() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("metrics.parquet");
+        let element_ids = vec!["Fe".to_string()];
+
+        let mut writer = ParquetMetricsWriter::new(&path, element_ids).unwrap();
+        writer.write_row(&make_snapshot(0)).unwrap();
+        writer.finish().unwrap();
+
+        // Read file metadata
+        let file = std::fs::File::open(&path).unwrap();
+        let reader = parquet::file::reader::SerializedFileReader::new(file).unwrap();
+        let metadata = reader.metadata().file_metadata();
+        let kv = metadata
+            .key_value_metadata()
+            .expect("expected key-value metadata");
+
+        let version_entry = kv
+            .iter()
+            .find(|entry| entry.key == "metrics_version")
+            .expect("metrics_version key not found in metadata");
+
+        assert_eq!(
+            version_entry.value.as_deref(),
+            Some(&*METRICS_VERSION.to_string()),
+            "metrics_version should match METRICS_VERSION constant"
+        );
+    }
+
+    #[test]
+    fn empty_file_is_valid_parquet() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("metrics.parquet");
+        let element_ids = vec!["Fe".to_string(), "H2O".to_string()];
+
+        // Write 0 rows
+        let writer = ParquetMetricsWriter::new(&path, element_ids.clone()).unwrap();
+        writer.finish().unwrap();
+
+        // Verify the file exists and is valid Parquet
+        let file = std::fs::File::open(&path).unwrap();
+        let reader = ParquetRecordBatchReaderBuilder::try_new(file)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let mut total_rows = 0usize;
+        for batch_result in reader {
+            total_rows += batch_result.unwrap().num_rows();
+        }
+        assert_eq!(total_rows, 0, "empty file should have 0 rows");
+
+        // Verify schema has correct column count
+        let file2 = std::fs::File::open(&path).unwrap();
+        let reader2 = ParquetRecordBatchReaderBuilder::try_new(file2).unwrap();
+        let schema = reader2.schema();
+        let expected_schema = build_schema(&element_ids);
+        assert_eq!(
+            schema.fields().len(),
+            expected_schema.fields().len(),
+            "empty file schema should have same column count as build_schema"
+        );
+    }
+}
