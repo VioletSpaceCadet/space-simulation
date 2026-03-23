@@ -313,10 +313,15 @@ pub fn evaluate_events(
 ) {
     // Guard: events disabled
     if !content.constants.events_enabled {
+        // Still sweep expired effects even when events are disabled
+        sweep_expired_effects(state, events);
         return;
     }
 
     let tick = state.meta.tick;
+
+    // Sweep expired temporal effects before evaluating new events
+    sweep_expired_effects(state, events);
 
     // Check global cooldown
     if tick < state.events.global_cooldown_until {
@@ -383,15 +388,17 @@ pub fn evaluate_events(
         return; // No valid target — skip this event
     };
 
-    // Record fired event — effects not yet applied (SE-03 will add apply_effects here)
-    let effects_applied: Vec<AppliedEffect> = selected_def
-        .effects
-        .iter()
-        .map(|effect| AppliedEffect {
-            effect: effect.clone(),
-            target: target.clone(),
-        })
-        .collect();
+    // Apply effects and record what was applied
+    // Dual emission: SimEventFired = narrative, individual events = mechanical updates
+    let effects_applied = apply_effects(
+        &selected_def.id,
+        &selected_def.effects,
+        &target,
+        state,
+        content,
+        rng,
+        events,
+    );
 
     let fired = FiredEvent {
         event_def_id: selected_def.id.clone(),
@@ -580,6 +587,336 @@ fn avg_station_wear(station: &crate::StationState) -> f32 {
     }
     let total: f32 = station.modules.iter().map(|m| m.wear.wear).sum();
     total / station.modules.len() as f32
+}
+
+// ---------------------------------------------------------------------------
+// Effect application
+// ---------------------------------------------------------------------------
+
+/// Map a research domain to its corresponding data kind.
+fn domain_to_data_kind(domain: &crate::ResearchDomain) -> crate::DataKind {
+    match domain {
+        crate::ResearchDomain::Survey => crate::DataKind::SurveyData,
+        crate::ResearchDomain::Materials => crate::DataKind::AssayData,
+        crate::ResearchDomain::Manufacturing => crate::DataKind::ManufacturingData,
+        crate::ResearchDomain::Propulsion => crate::DataKind::TransitData,
+    }
+}
+
+/// Apply all effects from a fired event. Returns the list of applied effects.
+/// Each effect also emits its own mechanical event (dual emission contract).
+/// Apply all effects from a fired event. Returns the list of applied effects.
+/// Each effect also emits its own mechanical event (dual emission contract).
+fn apply_effects(
+    event_def_id: &EventDefId,
+    effect_defs: &[EffectDef],
+    target: &ResolvedTarget,
+    state: &mut GameState,
+    content: &GameContent,
+    rng: &mut impl Rng,
+    events: &mut Vec<EventEnvelope>,
+) -> Vec<AppliedEffect> {
+    let mut applied = Vec::new();
+    for effect in effect_defs {
+        if let Some(result) =
+            apply_single_effect(event_def_id, effect, target, state, content, rng, events)
+        {
+            applied.push(result);
+        }
+    }
+    applied
+}
+
+fn apply_single_effect(
+    event_def_id: &EventDefId,
+    effect: &EffectDef,
+    target: &ResolvedTarget,
+    state: &mut GameState,
+    content: &GameContent,
+    rng: &mut impl Rng,
+    events: &mut Vec<EventEnvelope>,
+) -> Option<AppliedEffect> {
+    let tick = state.meta.tick;
+    match effect {
+        EffectDef::DamageModule { wear_amount } => {
+            apply_damage_module(*wear_amount, effect, target, state, rng, events)
+        }
+        EffectDef::AddInventory { item } => apply_add_inventory(item, effect, target, state, rng),
+        EffectDef::AddResearchData { domain, amount } => {
+            let data_kind = domain_to_data_kind(domain);
+            *state
+                .research
+                .data_pool
+                .entry(data_kind.clone())
+                .or_insert(0.0) += amount;
+            events.push(crate::emit(
+                &mut state.counters,
+                tick,
+                crate::Event::DataGenerated {
+                    kind: data_kind,
+                    amount: *amount,
+                },
+            ));
+            Some(AppliedEffect {
+                effect: effect.clone(),
+                target: target.clone(),
+            })
+        }
+        EffectDef::SpawnScanSite { .. } => {
+            apply_spawn_scan_site(effect, target, state, content, rng, events)
+        }
+        EffectDef::ApplyModifier {
+            stat,
+            op,
+            value,
+            duration_ticks,
+        } => apply_modifier(
+            event_def_id,
+            effect,
+            target,
+            state,
+            *stat,
+            *op,
+            *value,
+            *duration_ticks,
+        ),
+        EffectDef::TriggerAlert { severity, message } => {
+            let alert_id = format!("evt_{}", event_def_id.0);
+            events.push(crate::emit(
+                &mut state.counters,
+                tick,
+                crate::Event::AlertRaised {
+                    alert_id,
+                    severity: severity.clone(),
+                    message: message.clone(),
+                    suggested_action: String::new(),
+                },
+            ));
+            Some(AppliedEffect {
+                effect: effect.clone(),
+                target: target.clone(),
+            })
+        }
+    }
+}
+
+fn apply_damage_module(
+    wear_amount: f32,
+    effect: &EffectDef,
+    target: &ResolvedTarget,
+    state: &mut GameState,
+    rng: &mut impl Rng,
+    events: &mut Vec<EventEnvelope>,
+) -> Option<AppliedEffect> {
+    let (station_id, module_id) = resolve_module_target(target, state, rng)?;
+    let station = state.stations.get_mut(&station_id)?;
+    let module = station.modules.iter_mut().find(|m| m.id == module_id)?;
+    let wear_before = module.wear.wear;
+    module.wear.wear = (module.wear.wear + wear_amount).min(1.0);
+    events.push(crate::emit(
+        &mut state.counters,
+        state.meta.tick,
+        crate::Event::WearAccumulated {
+            station_id: station_id.clone(),
+            module_id: module_id.clone(),
+            wear_before,
+            wear_after: module.wear.wear,
+        },
+    ));
+    Some(AppliedEffect {
+        effect: effect.clone(),
+        target: ResolvedTarget::Module {
+            station_id,
+            module_id,
+        },
+    })
+}
+
+fn apply_add_inventory(
+    item: &TradeItemSpec,
+    effect: &EffectDef,
+    target: &ResolvedTarget,
+    state: &mut GameState,
+    rng: &mut impl Rng,
+) -> Option<AppliedEffect> {
+    let station_id = resolve_station_target(target)?;
+    let station = state.stations.get_mut(&station_id)?;
+    let new_items = crate::trade::create_inventory_items(item, rng);
+    station.inventory.extend(new_items);
+    station.invalidate_volume_cache();
+    Some(AppliedEffect {
+        effect: effect.clone(),
+        target: ResolvedTarget::Station { station_id },
+    })
+}
+
+fn apply_spawn_scan_site(
+    effect: &EffectDef,
+    target: &ResolvedTarget,
+    state: &mut GameState,
+    content: &GameContent,
+    rng: &mut impl Rng,
+    events: &mut Vec<EventEnvelope>,
+) -> Option<AppliedEffect> {
+    let zone_bodies: Vec<&crate::OrbitalBodyDef> = content
+        .solar_system
+        .bodies
+        .iter()
+        .filter(|b| b.zone.is_some())
+        .collect();
+    if zone_bodies.is_empty() || content.asteroid_templates.is_empty() {
+        return None;
+    }
+    let body = crate::pick_zone_weighted(&zone_bodies, rng);
+    let zone_class = body.zone.as_ref().expect("zone body").resource_class;
+    let template = crate::pick_template_biased(&content.asteroid_templates, zone_class, rng);
+    let position = crate::random_position_in_zone(body, rng);
+    let site_id = crate::SiteId(format!("site_evt_{}", crate::generate_uuid(rng)));
+    state.scan_sites.push(crate::ScanSite {
+        id: site_id.clone(),
+        position: position.clone(),
+        template_id: template.id.clone(),
+    });
+    events.push(crate::emit(
+        &mut state.counters,
+        state.meta.tick,
+        crate::Event::ScanSiteSpawned {
+            site_id,
+            position,
+            template_id: template.id.clone(),
+        },
+    ));
+    Some(AppliedEffect {
+        effect: effect.clone(),
+        target: target.clone(),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_modifier(
+    event_def_id: &EventDefId,
+    effect: &EffectDef,
+    target: &ResolvedTarget,
+    state: &mut GameState,
+    stat: StatId,
+    op: ModifierOp,
+    value: f64,
+    duration_ticks: u64,
+) -> Option<AppliedEffect> {
+    let modifier = crate::modifiers::Modifier {
+        stat,
+        op,
+        value,
+        source: crate::modifiers::ModifierSource::Event(event_def_id.0.clone()),
+        condition: None,
+    };
+    match target {
+        ResolvedTarget::Global | ResolvedTarget::Zone { .. } => state.modifiers.add(modifier),
+        ResolvedTarget::Station { station_id } | ResolvedTarget::Module { station_id, .. } => {
+            state.stations.get_mut(station_id)?.modifiers.add(modifier);
+        }
+        ResolvedTarget::Ship { ship_id } => {
+            state.ships.get_mut(ship_id)?.modifiers.add(modifier);
+        }
+    }
+    state.events.active_effects.push(ActiveEffect {
+        source_event_id: event_def_id.clone(),
+        target: target.clone(),
+        expires_at_tick: state.meta.tick + duration_ticks,
+    });
+    Some(AppliedEffect {
+        effect: effect.clone(),
+        target: target.clone(),
+    })
+}
+
+/// Resolve a target to a (`station_id`, `module_id`) pair.
+/// For Station targets, picks a random module within the station.
+fn resolve_module_target(
+    target: &ResolvedTarget,
+    state: &GameState,
+    rng: &mut impl Rng,
+) -> Option<(StationId, ModuleInstanceId)> {
+    match target {
+        ResolvedTarget::Module {
+            station_id,
+            module_id,
+        } => Some((station_id.clone(), module_id.clone())),
+        ResolvedTarget::Station { station_id } => {
+            let station = state.stations.get(station_id)?;
+            if station.modules.is_empty() {
+                return None;
+            }
+            let mut module_ids: Vec<&ModuleInstanceId> =
+                station.modules.iter().map(|m| &m.id).collect();
+            module_ids.sort();
+            let index = rng.gen_range(0..module_ids.len());
+            Some((station_id.clone(), module_ids[index].clone()))
+        }
+        _ => None,
+    }
+}
+
+/// Resolve a target to a `station_id`.
+fn resolve_station_target(target: &ResolvedTarget) -> Option<StationId> {
+    match target {
+        ResolvedTarget::Station { station_id } | ResolvedTarget::Module { station_id, .. } => {
+            Some(station_id.clone())
+        }
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Expiry sweep
+// ---------------------------------------------------------------------------
+
+/// Remove expired temporal effects and clean up their modifiers.
+fn sweep_expired_effects(state: &mut GameState, events: &mut Vec<EventEnvelope>) {
+    if state.events.active_effects.is_empty() {
+        return;
+    }
+
+    let tick = state.meta.tick;
+
+    // Collect expired effects
+    let (expired, remaining): (Vec<_>, Vec<_>) = state
+        .events
+        .active_effects
+        .drain(..)
+        .partition(|effect| effect.expires_at_tick <= tick);
+
+    state.events.active_effects = remaining;
+
+    // Remove modifiers and emit expiry events
+    for expired_effect in &expired {
+        let source =
+            crate::modifiers::ModifierSource::Event(expired_effect.source_event_id.0.clone());
+
+        match &expired_effect.target {
+            ResolvedTarget::Global | ResolvedTarget::Zone { .. } => {
+                state.modifiers.remove_by_source(&source);
+            }
+            ResolvedTarget::Station { station_id } | ResolvedTarget::Module { station_id, .. } => {
+                if let Some(station) = state.stations.get_mut(station_id) {
+                    station.modifiers.remove_by_source(&source);
+                }
+            }
+            ResolvedTarget::Ship { ship_id } => {
+                if let Some(ship) = state.ships.get_mut(ship_id) {
+                    ship.modifiers.remove_by_source(&source);
+                }
+            }
+        }
+
+        events.push(crate::emit(
+            &mut state.counters,
+            tick,
+            crate::Event::SimEventExpired {
+                event_def_id: expired_effect.source_event_id.clone(),
+            },
+        ));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1237,9 +1574,20 @@ mod tests {
 
         evaluate_events(&mut state, &content, &mut rng, &mut events);
 
-        // Should have fired exactly one event
-        assert_eq!(events.len(), 1);
+        // Should have fired one sim event (dual emission: effect events + SimEventFired)
+        assert!(
+            events.len() >= 2,
+            "Expected at least 2 events (effect + SimEventFired), got {}",
+            events.len()
+        );
         assert_eq!(state.events.history.len(), 1);
+
+        // Last event should be SimEventFired
+        let last = &events.last().expect("events").event;
+        assert!(
+            matches!(last, crate::Event::SimEventFired { .. }),
+            "Last event should be SimEventFired"
+        );
 
         // Should have set cooldowns
         assert!(state.events.global_cooldown_until > 0);
@@ -1368,6 +1716,258 @@ mod tests {
         let mut events = Vec::new();
 
         evaluate_events(&mut state, &content, &mut rng, &mut events);
+        assert!(events.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Effect application tests
+    // -----------------------------------------------------------------------
+
+    fn make_damage_event_content() -> crate::GameContent {
+        let mut content = base_content();
+        content.constants.events_enabled = true;
+        content.constants.event_global_cooldown_ticks = 10;
+        content.events = vec![{
+            let mut def = make_event_def(
+                "evt_damage",
+                TargetingRule::RandomStation,
+                vec![EffectDef::DamageModule { wear_amount: 0.2 }],
+            );
+            def.cooldown_ticks = 50;
+            def
+        }];
+        content
+    }
+
+    /// Add a test module to the first station.
+    fn add_test_module(state: &mut crate::GameState) {
+        let station = state.stations.values_mut().next().expect("station");
+        station.modules.push(crate::ModuleState {
+            id: ModuleInstanceId("mod_test".to_string()),
+            def_id: "module_basic_iron_refinery".to_string(),
+            enabled: true,
+            kind_state: crate::ModuleKindState::Processor(crate::ProcessorState {
+                threshold_kg: 100.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+                selected_recipe: None,
+            }),
+            wear: crate::WearState { wear: 0.1 },
+            thermal: None,
+            power_stalled: false,
+            manufacturing_priority: 0,
+        });
+    }
+
+    #[test]
+    fn effect_damage_module_increases_wear() {
+        let content = make_damage_event_content();
+        let mut state = base_state(&content);
+        add_test_module(&mut state);
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+
+        // Check wear increased from 0.1
+        let station = state.stations.values().next().expect("station");
+        let module = &station.modules[0];
+        assert!(
+            module.wear.wear > 0.1,
+            "wear should have increased from 0.1 to {}",
+            module.wear.wear
+        );
+
+        // Should have WearAccumulated + SimEventFired events
+        assert!(events
+            .iter()
+            .any(|e| matches!(&e.event, crate::Event::WearAccumulated { .. })));
+    }
+
+    #[test]
+    fn effect_add_research_data() {
+        let mut content = base_content();
+        content.constants.events_enabled = true;
+        content.constants.event_global_cooldown_ticks = 10;
+        content.events = vec![{
+            let mut def = make_event_def(
+                "evt_data",
+                TargetingRule::Global,
+                vec![EffectDef::AddResearchData {
+                    domain: crate::ResearchDomain::Survey,
+                    amount: 50.0,
+                }],
+            );
+            def.cooldown_ticks = 50;
+            def
+        }];
+
+        let mut state = base_state(&content);
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+
+        let survey_data = state
+            .research
+            .data_pool
+            .get(&crate::DataKind::SurveyData)
+            .copied()
+            .unwrap_or(0.0);
+        assert!(
+            survey_data >= 50.0,
+            "Expected >=50 survey data, got {survey_data}"
+        );
+
+        assert!(events
+            .iter()
+            .any(|e| matches!(&e.event, crate::Event::DataGenerated { .. })));
+    }
+
+    #[test]
+    fn effect_trigger_alert() {
+        let content = make_events_content(); // Uses TriggerAlert effects
+        let mut state = base_state(&content);
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+
+        assert!(events
+            .iter()
+            .any(|e| matches!(&e.event, crate::Event::AlertRaised { .. })));
+    }
+
+    #[test]
+    fn effect_apply_modifier_lifecycle() {
+        let mut content = base_content();
+        content.constants.events_enabled = true;
+        content.constants.event_global_cooldown_ticks = 10;
+        content.events = vec![{
+            let mut def = make_event_def(
+                "evt_modifier",
+                TargetingRule::Global,
+                vec![EffectDef::ApplyModifier {
+                    stat: StatId::WearRate,
+                    op: ModifierOp::PctMultiplicative,
+                    value: 1.5,
+                    duration_ticks: 100,
+                }],
+            );
+            def.cooldown_ticks = 50;
+            def
+        }];
+
+        let mut state = base_state(&content);
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        // Fire event at tick 0
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+
+        // Modifier should be active
+        assert_eq!(state.events.active_effects.len(), 1);
+        let wear_rate = state.modifiers.resolve(StatId::WearRate, 1.0);
+        assert!(
+            (wear_rate - 1.5).abs() < 1e-10,
+            "Expected 1.5x wear rate, got {wear_rate}"
+        );
+
+        // Advance past expiry and disable events to test sweep only
+        state.meta.tick = 200;
+        let mut content2 = content.clone();
+        content2.constants.events_enabled = false;
+        let mut events2 = Vec::new();
+        evaluate_events(&mut state, &content2, &mut rng, &mut events2);
+
+        // Modifier should be expired and removed
+        assert!(
+            state.events.active_effects.is_empty(),
+            "active effects should be empty after expiry"
+        );
+        let wear_rate_after = state.modifiers.resolve(StatId::WearRate, 1.0);
+        assert!(
+            (wear_rate_after - 1.0).abs() < 1e-10,
+            "Expected 1.0x wear rate after expiry, got {wear_rate_after}"
+        );
+
+        // Should have SimEventExpired event
+        assert!(events2
+            .iter()
+            .any(|e| matches!(&e.event, crate::Event::SimEventExpired { .. })));
+    }
+
+    #[test]
+    fn effect_add_inventory_components() {
+        let mut content = base_content();
+        content.constants.events_enabled = true;
+        content.constants.event_global_cooldown_ticks = 10;
+        content.events = vec![{
+            let mut def = make_event_def(
+                "evt_supply",
+                TargetingRule::RandomStation,
+                vec![EffectDef::AddInventory {
+                    item: TradeItemSpec::Component {
+                        component_id: crate::ComponentId("repair_kit".to_string()),
+                        count: 5,
+                    },
+                }],
+            );
+            def.cooldown_ticks = 50;
+            def
+        }];
+
+        let mut state = base_state(&content);
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+
+        // Count initial repair kits
+        let station = state.stations.values().next().expect("station");
+        let initial_kits: u32 = station
+            .inventory
+            .iter()
+            .filter_map(|item| match item {
+                crate::InventoryItem::Component {
+                    component_id,
+                    count,
+                    ..
+                } if component_id.0 == "repair_kit" => Some(*count),
+                _ => None,
+            })
+            .sum();
+
+        evaluate_events(&mut state, &content, &mut rng, &mut events);
+
+        let station = state.stations.values().next().expect("station");
+        let final_kits: u32 = station
+            .inventory
+            .iter()
+            .filter_map(|item| match item {
+                crate::InventoryItem::Component {
+                    component_id,
+                    count,
+                    ..
+                } if component_id.0 == "repair_kit" => Some(*count),
+                _ => None,
+            })
+            .sum();
+
+        assert_eq!(
+            final_kits,
+            initial_kits + 5,
+            "Expected {initial_kits} + 5 = {} kits, got {final_kits}",
+            initial_kits + 5
+        );
+    }
+
+    #[test]
+    fn sweep_only_runs_when_active_effects_exist() {
+        let content = make_events_content();
+        let mut state = base_state(&content);
+        let mut events = Vec::new();
+
+        // No active effects — sweep should be a no-op
+        sweep_expired_effects(&mut state, &mut events);
         assert!(events.is_empty());
     }
 }
