@@ -54,7 +54,7 @@ describe('App', () => {
     expect(nav).toBeInTheDocument();
     const buttons = Array.from(nav.querySelectorAll('button'));
     const labels = buttons.map((b) => b.textContent);
-    expect(labels).toEqual(['Map', 'Events', 'Asteroids', 'Fleet', 'Research', 'Economy']);
+    expect(labels).toEqual(['Map', 'Events', 'Asteroids', 'Fleet', 'Research', 'Economy', 'Manufacturing']);
   });
 
   it('renders all six panel headings by default', () => {

@@ -15,6 +15,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { EventsFeed } from './components/EventsFeed';
 import { FleetPanel } from './components/FleetPanel';
 import { LayoutRenderer } from './components/LayoutRenderer';
+import { RecipeDagPanel } from './components/RecipeDagPanel';
 import { ResearchPanel } from './components/ResearchPanel';
 import { SolarSystemMapCanvas } from './components/SolarSystemMapCanvas';
 import { SPEED_TPS_VALUES, StatusBar } from './components/StatusBar';
@@ -126,6 +127,8 @@ export default function App() {
             return snapshot ? <ResearchPanel research={snapshot.research} /> : null;
           case 'economy':
             return <EconomyPanel snapshot={snapshot} events={events} />;
+          case 'manufacturing':
+            return <RecipeDagPanel snapshot={snapshot} events={events} currentTick={currentTick} />;
         }
       })();
       return (
@@ -134,7 +137,7 @@ export default function App() {
         </ErrorBoundary>
       );
     },
-    [snapshot, events, displayTick],
+    [snapshot, events, displayTick, currentTick],
   );
 
   function handleDragStart(event: DragStartEvent) {

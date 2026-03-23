@@ -138,3 +138,20 @@ export const SEMANTIC_COLORS = {
   positive: '#4caf7d',
   negative: '#e05252',
 } as const;
+
+// --- Manufacturing DAG item types ---
+export const ITEM_TYPE_COLORS: Record<string, string> = {
+  raw: '#f59e0b',
+  refined: '#eab308',
+  component: '#3b82f6',
+  ship: '#22c55e',
+};
+
+export function itemTypeColor(type: string): string {
+  return ITEM_TYPE_COLORS[type] ?? hashColor(type);
+}
+
+export const RECIPE_STATUS_COLORS: Record<string, string> = {
+  active: '#4caf7d',
+  available: '#60a5fa',
+};

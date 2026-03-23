@@ -16,8 +16,8 @@ import {
 } from './layout';
 
 describe('constants', () => {
-  it('ALL_PANELS contains all 6 panel ids', () => {
-    expect(ALL_PANELS).toEqual(['map', 'events', 'asteroids', 'fleet', 'research', 'economy']);
+  it('ALL_PANELS contains all 7 panel ids', () => {
+    expect(ALL_PANELS).toEqual(['map', 'events', 'asteroids', 'fleet', 'research', 'economy', 'manufacturing']);
   });
 
   it('PANEL_LABELS maps each panel id to a label', () => {
@@ -28,6 +28,7 @@ describe('constants', () => {
       fleet: 'Fleet',
       research: 'Research',
       economy: 'Economy',
+      manufacturing: 'Manufacturing',
     });
   });
 });
@@ -45,7 +46,7 @@ describe('buildDefaultLayout', () => {
 
   it('creates layout for all panels by default', () => {
     const layout = buildDefaultLayout(ALL_PANELS);
-    expect(layout.children).toHaveLength(6);
+    expect(layout.children).toHaveLength(7);
   });
 
   it('creates layout with single panel', () => {
