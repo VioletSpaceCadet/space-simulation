@@ -1181,6 +1181,90 @@ describe('applyEvents', () => {
       expect(result.ships['ship_new'].cargo_capacity_m3).toBe(30);
       expect(result.ships['ship_new'].inventory).toEqual([]);
       expect(result.ships['ship_new'].task).toBeNull();
+      expect(result.ships['ship_new'].hull_id).toBe('hull_general_purpose');
+      expect(result.ships['ship_new'].fitted_modules).toEqual([]);
+    });
+  });
+
+  describe('ShipModuleFitted', () => {
+    it('appends fitted module to ship', () => {
+      const ships = {
+        ship_001: {
+          id: 'ship_001', position: { parent_body: 'b', radius_au_um: 0, angle_mdeg: 0 },
+          owner: 'p', inventory: [], cargo_capacity_m3: 50, task: null,
+          hull_id: 'hull_general_purpose', fitted_modules: [],
+        },
+      };
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ShipModuleFitted: {
+            ship_id: 'ship_001', slot_index: 0,
+            module_def_id: 'module_cargo_expander', station_id: 's1',
+          },
+        },
+      }];
+      const result = applyEvents({}, ships, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_001'].fitted_modules).toEqual([
+        { slot_index: 0, module_def_id: 'module_cargo_expander' },
+      ]);
+    });
+
+    it('no-ops when ship does not exist', () => {
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ShipModuleFitted: {
+            ship_id: 'nonexistent', slot_index: 0,
+            module_def_id: 'module_cargo_expander', station_id: 's1',
+          },
+        },
+      }];
+      const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
+      expect(Object.keys(result.ships)).toHaveLength(0);
+    });
+  });
+
+  describe('ShipModuleUnfitted', () => {
+    it('removes fitted module by slot_index', () => {
+      const ships = {
+        ship_001: {
+          id: 'ship_001', position: { parent_body: 'b', radius_au_um: 0, angle_mdeg: 0 },
+          owner: 'p', inventory: [], cargo_capacity_m3: 50, task: null,
+          hull_id: 'hull_general_purpose',
+          fitted_modules: [
+            { slot_index: 0, module_def_id: 'module_cargo_expander' },
+            { slot_index: 1, module_def_id: 'module_mining_laser' },
+          ],
+        },
+      };
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ShipModuleUnfitted: {
+            ship_id: 'ship_001', slot_index: 0,
+            module_def_id: 'module_cargo_expander', station_id: 's1',
+          },
+        },
+      }];
+      const result = applyEvents({}, ships, {}, emptyResearch, [], defaultBalance, events);
+      expect(result.ships['ship_001'].fitted_modules).toEqual([
+        { slot_index: 1, module_def_id: 'module_mining_laser' },
+      ]);
+    });
+
+    it('no-ops when ship does not exist', () => {
+      const events = [{
+        id: 'e1', tick: 10,
+        event: {
+          ShipModuleUnfitted: {
+            ship_id: 'nonexistent', slot_index: 0,
+            module_def_id: 'module_cargo_expander', station_id: 's1',
+          },
+        },
+      }];
+      const result = applyEvents({}, {}, {}, emptyResearch, [], defaultBalance, events);
+      expect(Object.keys(result.ships)).toHaveLength(0);
     });
   });
 
