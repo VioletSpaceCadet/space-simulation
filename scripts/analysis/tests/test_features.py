@@ -50,13 +50,13 @@ def test_throughput_rates_values() -> None:
     rows = result.select("seed, tick, material_kg_delta").order("seed, tick").fetchall()
 
     # seed=0: tick 10 → delta=0 (first row), tick 20 → 60-50=10, tick 30 → 70-60=10
-    assert rows[0][2] == 0.0  # first row, no previous
-    assert abs(rows[1][2] - 10.0) < 0.01
-    assert abs(rows[2][2] - 10.0) < 0.01
+    assert float(rows[0][2]) == 0.0  # first row, no previous
+    assert abs(float(rows[1][2]) - 10.0) < 0.01
+    assert abs(float(rows[2][2]) - 10.0) < 0.01
 
     # seed=1: tick 10 → 0, tick 20 → 90-80=10
-    assert rows[3][2] == 0.0
-    assert abs(rows[4][2] - 10.0) < 0.01
+    assert float(rows[3][2]) == 0.0
+    assert abs(float(rows[4][2]) - 10.0) < 0.01
 
 
 def test_fleet_utilization() -> None:
@@ -66,37 +66,37 @@ def test_fleet_utilization() -> None:
     assert "fleet_idle_ratio" in result.columns
     assert "fleet_mining_ratio" in result.columns
 
-    rows = result.select("fleet_idle_ratio, fleet_mining_ratio").order("seed, tick").fetchall()
+    rows = result.select("seed, tick, fleet_idle_ratio, fleet_mining_ratio").order("seed, tick").fetchall()
     # seed=0, tick=10: idle=1/3, mining=1/3
-    assert abs(rows[0][0] - 1.0 / 3.0) < 0.01
-    assert abs(rows[0][1] - 1.0 / 3.0) < 0.01
+    assert abs(float(rows[0][2]) - 1.0 / 3.0) < 0.01
+    assert abs(float(rows[0][3]) - 1.0 / 3.0) < 0.01
     # seed=0, tick=20: idle=0/3, mining=2/3
-    assert abs(rows[1][0] - 0.0) < 0.01
-    assert abs(rows[1][1] - 2.0 / 3.0) < 0.01
+    assert abs(float(rows[1][2]) - 0.0) < 0.01
+    assert abs(float(rows[1][3]) - 2.0 / 3.0) < 0.01
 
 
 def test_power_surplus() -> None:
     """Power surplus is generated - consumed."""
     rel = _make_test_relation()
     result = add_power_surplus(rel)
-    rows = result.select("power_surplus_kw, power_surplus_ratio").order("seed, tick").fetchall()
+    rows = result.select("seed, tick, power_surplus_kw, power_surplus_ratio").order("seed, tick").fetchall()
     # First row: 100 - 75 = 25
-    assert abs(rows[0][0] - 25.0) < 0.01
-    assert abs(rows[0][1] - 0.25) < 0.01
+    assert abs(float(rows[0][2]) - 25.0) < 0.01
+    assert abs(float(rows[0][3]) - 0.25) < 0.01
     # seed=1: 120 - 90 = 30
-    assert abs(rows[3][0] - 30.0) < 0.01
+    assert abs(float(rows[3][2]) - 30.0) < 0.01
 
 
 def test_storage_pressure() -> None:
     """Storage critical flag and refinery efficiency."""
     rel = _make_test_relation()
     result = add_storage_pressure(rel)
-    rows = result.select("storage_critical, refinery_efficiency").order("seed, tick").fetchall()
+    rows = result.select("seed, tick, storage_critical, refinery_efficiency").order("seed, tick").fetchall()
     # tick=10: storage=0.5 → not critical, refinery=2/(2+0+1)=0.667
-    assert rows[0][0] == 0
-    assert abs(rows[0][1] - 2.0 / 3.0) < 0.01
+    assert rows[0][2] == 0
+    assert abs(float(rows[0][3]) - 2.0 / 3.0) < 0.01
     # tick=30: storage=0.96 → critical
-    assert rows[2][0] == 1
+    assert rows[2][2] == 1
 
 
 def test_add_all_features() -> None:
