@@ -927,6 +927,9 @@ pub enum Event {
         target: crate::sim_events::ResolvedTarget,
         effects_applied: Vec<crate::sim_events::AppliedEffect>,
     },
+    SimEventExpired {
+        event_def_id: crate::sim_events::EventDefId,
+    },
 }
 
 // ---------------------------------------------------------------------------

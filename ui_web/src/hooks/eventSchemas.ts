@@ -367,6 +367,10 @@ export const eventSchemas = {
     target: z.record(z.string(), z.unknown()),
     effects_applied: z.array(z.record(z.string(), z.unknown())),
   }),
+
+  SimEventExpired: z.object({
+    event_def_id: z.string(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

@@ -817,6 +817,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   BoiloffLoss: handleBoiloffLoss,
   RecipeSelectionReset: noOp,
   SimEventFired: noOp, // SE-05 will add proper handler
+  SimEventExpired: noOp, // SE-05 will add proper handler
 };
 
 export function applyEvents(
