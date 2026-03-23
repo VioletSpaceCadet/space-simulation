@@ -88,7 +88,7 @@ impl CompareOp {
             Self::Gte => lhs >= rhs,
             Self::Lt => lhs < rhs,
             Self::Lte => lhs <= rhs,
-            Self::Eq => (lhs - rhs).abs() < f64::EPSILON,
+            Self::Eq => (lhs - rhs).abs() < 1e-6,
         }
     }
 }
@@ -1058,6 +1058,10 @@ mod tests {
         assert!(CompareOp::Lte.evaluate(5.0, 5.0));
         assert!(CompareOp::Eq.evaluate(5.0, 5.0));
         assert!(!CompareOp::Eq.evaluate(5.0, 5.1));
+        // f32→f64 conversion introduces ~1.2e-8 error, which exceeds
+        // f64::EPSILON (~2.2e-16) but is within the 1e-6 game tolerance.
+        // This mirrors real usage: extract_condition_value casts f32 fields to f64.
+        assert!(CompareOp::Eq.evaluate(0.3_f32 as f64, 0.3_f64));
     }
 
     #[test]

@@ -69,7 +69,7 @@ fn check_condition(value: f64, condition: &str, threshold: f64) -> bool {
         "lt" => value < threshold,
         "gte" => value >= threshold,
         "lte" => value <= threshold,
-        "eq" => (value - threshold).abs() < f64::EPSILON,
+        "eq" => (value - threshold).abs() < 1e-6,
         other => {
             tracing::warn!("unknown alert condition operator: {other}");
             false
@@ -752,5 +752,14 @@ mod tests {
                 "missing expected rule ID: {expected_id}"
             );
         }
+    }
+
+    #[test]
+    fn check_condition_eq_tolerates_float_rounding() {
+        // f32→f64 conversion introduces ~1.2e-8 error, exceeding f64::EPSILON
+        // but within the 1e-6 game tolerance. Mirrors real metric value paths.
+        assert!(check_condition(0.3_f32 as f64, "eq", 0.3_f64));
+        // Values that genuinely differ should not be equal
+        assert!(!check_condition(5.0, "eq", 5.1));
     }
 }
