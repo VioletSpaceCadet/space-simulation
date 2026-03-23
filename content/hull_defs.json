@@ -6,8 +6,78 @@
     "cargo_capacity_m3": 50.0,
     "base_speed_ticks_per_au": 2133,
     "base_propellant_capacity_kg": 10000.0,
-    "slots": [],
+    "slots": [
+      { "slot_type": "utility", "label": "Utility 1" },
+      { "slot_type": "utility", "label": "Utility 2" },
+      { "slot_type": "industrial", "label": "Industrial 1" }
+    ],
     "bonuses": [],
+    "tags": []
+  },
+  {
+    "id": "hull_mining_barge",
+    "name": "Mining Barge",
+    "mass_kg": 8000.0,
+    "cargo_capacity_m3": 80.0,
+    "base_speed_ticks_per_au": 3200,
+    "base_propellant_capacity_kg": 8000.0,
+    "slots": [
+      { "slot_type": "industrial", "label": "Industrial 1" },
+      { "slot_type": "industrial", "label": "Industrial 2" },
+      { "slot_type": "utility", "label": "Utility 1" }
+    ],
+    "bonuses": [
+      {
+        "stat": "mining_rate",
+        "op": "pct_multiplicative",
+        "value": 1.25,
+        "source": { "hull": "hull_mining_barge" }
+      }
+    ],
+    "tags": []
+  },
+  {
+    "id": "hull_transport_hauler",
+    "name": "Transport Hauler",
+    "mass_kg": 12000.0,
+    "cargo_capacity_m3": 200.0,
+    "base_speed_ticks_per_au": 2666,
+    "base_propellant_capacity_kg": 15000.0,
+    "slots": [
+      { "slot_type": "utility", "label": "Utility 1" },
+      { "slot_type": "propulsion", "label": "Propulsion 1" },
+      { "slot_type": "propulsion", "label": "Propulsion 2" }
+    ],
+    "bonuses": [
+      {
+        "stat": "cargo_capacity",
+        "op": "pct_multiplicative",
+        "value": 1.5,
+        "source": { "hull": "hull_transport_hauler" }
+      }
+    ],
+    "tags": []
+  },
+  {
+    "id": "hull_survey_scout",
+    "name": "Survey Scout",
+    "mass_kg": 3000.0,
+    "cargo_capacity_m3": 20.0,
+    "base_speed_ticks_per_au": 1422,
+    "base_propellant_capacity_kg": 5000.0,
+    "slots": [
+      { "slot_type": "utility", "label": "Utility 1" },
+      { "slot_type": "utility", "label": "Utility 2" },
+      { "slot_type": "utility", "label": "Utility 3" }
+    ],
+    "bonuses": [
+      {
+        "stat": "scan_duration",
+        "op": "pct_multiplicative",
+        "value": 0.7,
+        "source": { "hull": "hull_survey_scout" }
+      }
+    ],
     "tags": []
   }
 ]

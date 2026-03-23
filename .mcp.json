@@ -7,6 +7,9 @@
         "DAEMON_URL": "http://localhost:3001",
         "CONTENT_DIR": "./content"
       }
+    },
+    "rust-analyzer": {
+      "command": "rust-analyzer-mcp"
     }
   }
 }

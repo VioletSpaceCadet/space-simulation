@@ -267,5 +267,95 @@
         "max_stock": { "structural_beam": 20, "hull_panel": 5 }
       }
     }
+  },
+  {
+    "id": "module_mining_laser",
+    "name": "Mining Laser",
+    "mass_kg": 800.0,
+    "volume_m3": 3.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.0,
+    "behavior": "Equipment",
+    "compatible_slots": ["industrial"],
+    "ship_modifiers": [
+      {
+        "stat": "mining_rate",
+        "op": "pct_multiplicative",
+        "value": 1.2,
+        "source": { "equipment": "module_mining_laser" }
+      }
+    ]
+  },
+  {
+    "id": "module_cargo_expander",
+    "name": "Cargo Expander",
+    "mass_kg": 400.0,
+    "volume_m3": 2.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.0,
+    "behavior": "Equipment",
+    "compatible_slots": ["utility"],
+    "ship_modifiers": [
+      {
+        "stat": "cargo_capacity",
+        "op": "pct_multiplicative",
+        "value": 1.3,
+        "source": { "equipment": "module_cargo_expander" }
+      }
+    ]
+  },
+  {
+    "id": "module_survey_scanner",
+    "name": "Survey Scanner",
+    "mass_kg": 300.0,
+    "volume_m3": 1.5,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.0,
+    "behavior": "Equipment",
+    "compatible_slots": ["utility"],
+    "ship_modifiers": [
+      {
+        "stat": "scan_duration",
+        "op": "pct_multiplicative",
+        "value": 0.85,
+        "source": { "equipment": "module_survey_scanner" }
+      }
+    ]
+  },
+  {
+    "id": "module_basic_engine",
+    "name": "Basic Engine",
+    "mass_kg": 1200.0,
+    "volume_m3": 4.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.0,
+    "behavior": "Equipment",
+    "compatible_slots": ["propulsion"],
+    "ship_modifiers": [
+      {
+        "stat": "ship_speed",
+        "op": "pct_multiplicative",
+        "value": 0.85,
+        "source": { "equipment": "module_basic_engine" }
+      }
+    ]
+  },
+  {
+    "id": "module_propellant_tank",
+    "name": "Propellant Tank",
+    "mass_kg": 600.0,
+    "volume_m3": 3.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.0,
+    "behavior": "Equipment",
+    "compatible_slots": ["utility"],
+    "ship_modifiers": [
+      {
+        "stat": "propellant_capacity",
+        "op": "pct_multiplicative",
+        "value": 1.5,
+        "source": { "equipment": "module_propellant_tank" }
+      }
+    ]
   }
 ]

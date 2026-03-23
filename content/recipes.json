@@ -229,5 +229,115 @@
       }
     ],
     "efficiency": 1.0
+  },
+  {
+    "id": "recipe_mining_laser",
+    "inputs": [
+      {
+        "filter": { "Component": "fe_plate" },
+        "amount": { "Count": 4 }
+      },
+      {
+        "filter": { "Component": "structural_beam" },
+        "amount": { "Count": 1 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "module_mining_laser",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0
+  },
+  {
+    "id": "recipe_cargo_expander",
+    "inputs": [
+      {
+        "filter": { "Component": "fe_plate" },
+        "amount": { "Count": 2 }
+      },
+      {
+        "filter": { "Component": "structural_beam" },
+        "amount": { "Count": 1 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "module_cargo_expander",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0
+  },
+  {
+    "id": "recipe_survey_scanner",
+    "inputs": [
+      {
+        "filter": { "Component": "fe_plate" },
+        "amount": { "Count": 2 }
+      },
+      {
+        "filter": { "Component": "thruster" },
+        "amount": { "Count": 1 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "module_survey_scanner",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0
+  },
+  {
+    "id": "recipe_basic_engine",
+    "inputs": [
+      {
+        "filter": { "Component": "fe_plate" },
+        "amount": { "Count": 3 }
+      },
+      {
+        "filter": { "Component": "thruster" },
+        "amount": { "Count": 2 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "module_basic_engine",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0
+  },
+  {
+    "id": "recipe_propellant_tank",
+    "inputs": [
+      {
+        "filter": { "Component": "fe_plate" },
+        "amount": { "Count": 3 }
+      },
+      {
+        "filter": { "Component": "structural_beam" },
+        "amount": { "Count": 1 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "module_propellant_tank",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0
   }
 ]

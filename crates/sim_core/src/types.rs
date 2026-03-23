@@ -1008,6 +1008,9 @@ pub struct GameContent {
     /// Hull definitions loaded from `content/hull_defs.json`. Empty if file is missing.
     #[serde(default)]
     pub hulls: BTreeMap<HullId, HullDef>,
+    /// Default fitting loadouts per hull from `content/fitting_templates.json`.
+    #[serde(default)]
+    pub fitting_templates: BTreeMap<HullId, Vec<FittedModule>>,
     /// Pre-computed element id → density (kg/m³) lookup. Populated by `init_caches()`.
     #[serde(skip)]
     pub density_map: HashMap<String, f32>,

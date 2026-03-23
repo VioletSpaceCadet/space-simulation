@@ -28,6 +28,11 @@
     "hull_panel":                   { "base_price_per_unit": 8000.0,     "importable": false, "exportable": true,  "category": "component" },
     "advanced_repair_kit":          { "base_price_per_unit": 1500.0,     "importable": false, "exportable": true,  "category": "component" },
     "module_plate_press":           { "base_price_per_unit": 3000000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_structural_assembler":  { "base_price_per_unit": 4000000.0,  "importable": true,  "exportable": true,  "category": "module" }
+    "module_structural_assembler":  { "base_price_per_unit": 4000000.0,  "importable": true,  "exportable": true,  "category": "module" },
+    "module_mining_laser":          { "base_price_per_unit": 500000.0,   "importable": true,  "exportable": true,  "category": "equipment" },
+    "module_cargo_expander":        { "base_price_per_unit": 300000.0,   "importable": true,  "exportable": true,  "category": "equipment" },
+    "module_survey_scanner":        { "base_price_per_unit": 400000.0,   "importable": true,  "exportable": true,  "category": "equipment" },
+    "module_basic_engine":          { "base_price_per_unit": 800000.0,   "importable": true,  "exportable": true,  "category": "equipment" },
+    "module_propellant_tank":       { "base_price_per_unit": 350000.0,   "importable": true,  "exportable": true,  "category": "equipment" }
   }
 }
