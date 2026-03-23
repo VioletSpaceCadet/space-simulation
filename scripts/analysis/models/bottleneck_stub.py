@@ -33,7 +33,7 @@ def majority_class_train(timeline: duckdb.DuckDBPyRelation) -> str:
             SUM(tick_end - tick_start + 1) AS total_ticks
         FROM t
         GROUP BY bottleneck_type
-        ORDER BY total_ticks DESC
+        ORDER BY total_ticks DESC, bottleneck_type ASC
         LIMIT 1
         """,
     )

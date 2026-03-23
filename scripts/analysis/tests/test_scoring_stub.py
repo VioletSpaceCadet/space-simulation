@@ -76,3 +76,16 @@ def test_mean_predict_evaluate_poor_prediction() -> None:
     good_mse = mean_predict_evaluate(scores, 0.25)
     bad_mse = mean_predict_evaluate(scores, 1.0)
     assert bad_mse > good_mse
+
+
+def test_mean_predict_train_empty() -> None:
+    """Empty scores returns 0.0."""
+    conn = duckdb.connect(":memory:")
+    scores = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 0.5, 1000)
+        ) AS t(seed, score, final_tick)
+        WHERE 1 = 0
+    """)
+    mean = mean_predict_train(scores)
+    assert mean == 0.0

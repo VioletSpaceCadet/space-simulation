@@ -80,3 +80,29 @@ def test_majority_class_evaluate_zero() -> None:
     """)
     accuracy = majority_class_evaluate(timeline, "Healthy")
     assert accuracy == 0.0
+
+
+def test_majority_class_train_empty() -> None:
+    """Empty timeline returns default 'Healthy'."""
+    conn = duckdb.connect(":memory:")
+    timeline = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 1, 100, 'Healthy')
+        ) AS t(seed, tick_start, tick_end, bottleneck_type)
+        WHERE 1 = 0
+    """)
+    result = majority_class_train(timeline)
+    assert result == "Healthy"
+
+
+def test_majority_class_evaluate_empty() -> None:
+    """Empty timeline returns 0.0 accuracy."""
+    conn = duckdb.connect(":memory:")
+    timeline = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 1, 100, 'Healthy')
+        ) AS t(seed, tick_start, tick_end, bottleneck_type)
+        WHERE 1 = 0
+    """)
+    accuracy = majority_class_evaluate(timeline, "Healthy")
+    assert accuracy == 0.0
