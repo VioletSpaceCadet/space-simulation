@@ -129,6 +129,7 @@ fn apply_module_override(
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)] // Thin dispatcher — one arm per constant field
 fn apply_constant_override(
     constants: &mut Constants,
     key: &str,
@@ -224,6 +225,18 @@ fn apply_constant_override(
         }
         "replenish_target_count" => {
             constants.replenish_target_count = as_u32(key, value)?;
+        }
+        "events_enabled" => {
+            constants.events_enabled = value
+                .as_bool()
+                .context(format!("{key} must be a boolean"))?;
+        }
+        "event_global_cooldown_ticks" => {
+            constants.event_global_cooldown_ticks = as_u64(key, value)?;
+        }
+        "event_history_capacity" => {
+            constants.event_history_capacity =
+                usize::try_from(as_u64(key, value)?).unwrap_or(usize::MAX);
         }
         _ => bail!(
             "unknown override key '{key}'. Constant keys or module.<type>.<field> keys are supported."
