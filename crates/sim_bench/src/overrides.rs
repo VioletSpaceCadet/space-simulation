@@ -6,12 +6,18 @@ pub fn apply_overrides(
     content: &mut GameContent,
     overrides: &HashMap<String, serde_json::Value>,
 ) -> Result<()> {
+    // Split overrides into constant and module groups.
+    let mut constant_overrides = Vec::new();
     for (key, value) in overrides {
         if let Some(rest) = key.strip_prefix("module.") {
             apply_module_override(&mut content.module_defs, rest, key, value)?;
         } else {
-            apply_constant_override(&mut content.constants, key, value)?;
+            constant_overrides.push((key.as_str(), value));
         }
+    }
+    // Apply constant overrides in a single serialize→patch→deserialize pass.
+    if !constant_overrides.is_empty() {
+        apply_constant_overrides(&mut content.constants, &constant_overrides)?;
     }
     Ok(())
 }
@@ -129,119 +135,30 @@ fn apply_module_override(
     Ok(())
 }
 
-#[allow(clippy::too_many_lines)] // Thin dispatcher — one arm per constant field
-fn apply_constant_override(
+/// Apply constant overrides via serde: serialize current values, patch, deserialize back.
+/// New Constants fields are automatically overridable with zero additional code.
+fn apply_constant_overrides(
     constants: &mut Constants,
-    key: &str,
-    value: &serde_json::Value,
+    overrides: &[(&str, &serde_json::Value)],
 ) -> Result<()> {
-    match key {
-        "survey_scan_minutes" => constants.survey_scan_minutes = as_u64(key, value)?,
-        "deep_scan_minutes" => constants.deep_scan_minutes = as_u64(key, value)?,
-        "survey_tag_detection_probability" => {
-            constants.survey_tag_detection_probability = as_f32(key, value)?;
+    let serde_json::Value::Object(mut map) =
+        serde_json::to_value(&*constants).context("failed to serialize Constants")?
+    else {
+        unreachable!("Constants serializes to JSON object")
+    };
+
+    for &(key, value) in overrides {
+        if !map.contains_key(key) {
+            bail!(
+                "unknown override key '{key}'. \
+                 Constant keys or module.<type>.<field> keys are supported."
+            );
         }
-        "asteroid_count_per_template" => {
-            constants.asteroid_count_per_template = as_u32(key, value)?;
-        }
-        "asteroid_mass_min_kg" => constants.asteroid_mass_min_kg = as_f32(key, value)?,
-        "asteroid_mass_max_kg" => constants.asteroid_mass_max_kg = as_f32(key, value)?,
-        "ship_cargo_capacity_m3" => constants.ship_cargo_capacity_m3 = as_f32(key, value)?,
-        "station_cargo_capacity_m3" => {
-            constants.station_cargo_capacity_m3 = as_f32(key, value)?;
-        }
-        "mining_rate_kg_per_minute" => constants.mining_rate_kg_per_minute = as_f32(key, value)?,
-        "deposit_minutes" => constants.deposit_minutes = as_u64(key, value)?,
-        "station_power_available_per_minute" => {
-            constants.station_power_available_per_minute = as_f32(key, value)?;
-        }
-        "autopilot_iron_rich_confidence_threshold" => {
-            constants.autopilot_iron_rich_confidence_threshold = as_f32(key, value)?;
-        }
-        "autopilot_refinery_threshold_kg" => {
-            constants.autopilot_refinery_threshold_kg = as_f32(key, value)?;
-        }
-        "autopilot_slag_jettison_pct" => {
-            constants.autopilot_slag_jettison_pct = as_f32(key, value)?;
-        }
-        "autopilot_repair_kit_reserve" => {
-            constants.autopilot_repair_kit_reserve = as_u32(key, value)?;
-        }
-        "autopilot_fe_reserve_kg" => {
-            constants.autopilot_fe_reserve_kg = as_f32(key, value)?;
-        }
-        "autopilot_export_batch_size_kg" => {
-            constants.autopilot_export_batch_size_kg = as_f32(key, value)?;
-        }
-        "autopilot_export_min_revenue" => {
-            constants.autopilot_export_min_revenue = as_f64(key, value)?;
-        }
-        "research_roll_interval_minutes" => {
-            constants.research_roll_interval_minutes = as_u64(key, value)?;
-        }
-        "data_generation_peak" => constants.data_generation_peak = as_f32(key, value)?,
-        "data_generation_floor" => constants.data_generation_floor = as_f32(key, value)?,
-        "data_generation_decay_rate" => {
-            constants.data_generation_decay_rate = as_f32(key, value)?;
-        }
-        "wear_band_degraded_threshold" => {
-            constants.wear_band_degraded_threshold = as_f32(key, value)?;
-        }
-        "wear_band_critical_threshold" => {
-            constants.wear_band_critical_threshold = as_f32(key, value)?;
-        }
-        "wear_band_degraded_efficiency" => {
-            constants.wear_band_degraded_efficiency = as_f32(key, value)?;
-        }
-        "wear_band_critical_efficiency" => {
-            constants.wear_band_critical_efficiency = as_f32(key, value)?;
-        }
-        "minutes_per_tick" => {
-            constants.minutes_per_tick = as_u32(key, value)?;
-        }
-        "thermal_sink_temp_mk" => {
-            constants.thermal_sink_temp_mk = as_u32(key, value)?;
-        }
-        "thermal_overheat_warning_offset_mk" => {
-            constants.thermal_overheat_warning_offset_mk = as_u32(key, value)?;
-        }
-        "thermal_overheat_critical_offset_mk" => {
-            constants.thermal_overheat_critical_offset_mk = as_u32(key, value)?;
-        }
-        "thermal_overheat_damage_offset_mk" => {
-            constants.thermal_overheat_damage_offset_mk = as_u32(key, value)?;
-        }
-        "thermal_wear_multiplier_warning" => {
-            constants.thermal_wear_multiplier_warning = as_f32(key, value)?;
-        }
-        "thermal_wear_multiplier_critical" => {
-            constants.thermal_wear_multiplier_critical = as_f32(key, value)?;
-        }
-        "docking_range_au_um" => constants.docking_range_au_um = as_u64(key, value)?,
-        "ticks_per_au" => constants.ticks_per_au = as_u64(key, value)?,
-        "min_transit_ticks" => constants.min_transit_ticks = as_u64(key, value)?,
-        "replenish_check_interval_ticks" => {
-            constants.replenish_check_interval_ticks = as_u64(key, value)?;
-        }
-        "replenish_target_count" => {
-            constants.replenish_target_count = as_u32(key, value)?;
-        }
-        "events_enabled" => {
-            constants.events_enabled = value
-                .as_bool()
-                .context(format!("{key} must be a boolean"))?;
-        }
-        "event_global_cooldown_ticks" => {
-            constants.event_global_cooldown_ticks = as_u64(key, value)?;
-        }
-        "event_history_capacity" => {
-            constants.event_history_capacity =
-                usize::try_from(as_u64(key, value)?).unwrap_or(usize::MAX);
-        }
-        _ => bail!(
-            "unknown override key '{key}'. Constant keys or module.<type>.<field> keys are supported."
-        ),
+        map.insert(key.to_string(), value.clone());
     }
+
+    *constants = serde_json::from_value(serde_json::Value::Object(map))
+        .context("failed to deserialize Constants after applying overrides")?;
     Ok(())
 }
 
@@ -257,12 +174,6 @@ fn as_u64(key: &str, value: &serde_json::Value) -> Result<u64> {
     value.as_u64().ok_or_else(|| {
         anyhow::anyhow!("override '{key}': expected a positive integer, got {value}")
     })
-}
-
-fn as_f64(key: &str, value: &serde_json::Value) -> Result<f64> {
-    value
-        .as_f64()
-        .ok_or_else(|| anyhow::anyhow!("override '{key}': expected a number, got {value}"))
 }
 
 fn as_u32(key: &str, value: &serde_json::Value) -> Result<u32> {
