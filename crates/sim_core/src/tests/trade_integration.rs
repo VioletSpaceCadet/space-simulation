@@ -62,7 +62,24 @@ fn economy_content() -> GameContent {
         volume_m3: 0.5,
     }];
 
-    // Shipyard assembler: consumes 100kg Fe + 2 thrusters => Ship (50 m3 cargo)
+    // Add a hull def for the shipyard test
+    content.hulls.insert(
+        HullId("hull_test_ship".to_string()),
+        HullDef {
+            id: HullId("hull_test_ship".to_string()),
+            name: "Test Ship Hull".to_string(),
+            mass_kg: 1000.0,
+            cargo_capacity_m3: 50.0,
+            base_speed_ticks_per_au: 2000,
+            base_propellant_capacity_kg: 100.0,
+            slots: vec![],
+            bonuses: vec![],
+            required_tech: None,
+            tags: vec![],
+        },
+    );
+
+    // Shipyard assembler: consumes 100kg Fe + 2 thrusters => Ship (test hull)
     // Use assembly_interval_ticks=2 so the test doesn't need thousands of ticks.
     let ship_recipe = RecipeDef {
         id: RecipeId("recipe_build_ship".to_string()),
@@ -77,7 +94,7 @@ fn economy_content() -> GameContent {
             },
         ],
         outputs: vec![OutputSpec::Ship {
-            cargo_capacity_m3: 50.0,
+            hull_id: HullId("hull_test_ship".to_string()),
         }],
         efficiency: 1.0,
         thermal_req: None,

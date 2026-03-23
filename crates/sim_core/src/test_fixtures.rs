@@ -7,12 +7,12 @@
 use crate::{AngleMilliDeg, BodyId, Position, RadiusAuMicro};
 use crate::{
     AnomalyTag, AsteroidId, AsteroidTemplateDef, BodyType, Constants, Counters, DataKind,
-    ElementDef, GameContent, GameState, InputAmount, InputFilter, ItemKind, LotId, MetaState,
-    ModuleDef, ModuleInstanceId, ModuleKindState, ModuleState, NodeDef, NodeId, OrbitalBodyDef,
-    OutputSpec, PricingTable, PrincipalId, ProcessorDef, ProcessorState, QualityFormula,
-    RadiatorDef, RadiatorState, RecipeDef, RecipeId, RecipeThermalReq, ResearchState, ScanSite,
-    ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState, TechDef, TechEffect,
-    TechId, ThermalDef, ThermalState, WearState, YieldFormula,
+    ElementDef, GameContent, GameState, HullId, InputAmount, InputFilter, ItemKind, LotId,
+    MetaState, ModuleDef, ModuleInstanceId, ModuleKindState, ModuleState, NodeDef, NodeId,
+    OrbitalBodyDef, OutputSpec, PricingTable, PrincipalId, ProcessorDef, ProcessorState,
+    QualityFormula, RadiatorDef, RadiatorState, RecipeDef, RecipeId, RecipeThermalReq,
+    ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState,
+    TechDef, TechEffect, TechId, ThermalDef, ThermalState, WearState, YieldFormula,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -423,6 +423,10 @@ pub fn base_state(content: &GameContent) -> GameState {
                 task: None,
                 speed_ticks_per_au: None,
                 modifiers: crate::modifiers::ModifierSet::default(),
+                hull_id: HullId("hull_general_purpose".to_string()),
+                fitted_modules: vec![],
+                propellant_kg: 0.0,
+                propellant_capacity_kg: 0.0,
             },
         )]),
         stations: std::collections::HashMap::from([(

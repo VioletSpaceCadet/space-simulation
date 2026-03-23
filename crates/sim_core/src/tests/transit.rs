@@ -65,6 +65,10 @@ fn transit_moves_ship_and_starts_next_task() {
                 task: None,
                 speed_ticks_per_au: None,
                 modifiers: crate::modifiers::ModifierSet::default(),
+                hull_id: HullId("hull_general_purpose".to_string()),
+                fitted_modules: vec![],
+                propellant_kg: 0.0,
+                propellant_capacity_kg: 0.0,
             },
         )]),
         stations: HashMap::from([(
@@ -250,6 +254,10 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 task: None,
                 speed_ticks_per_au: None,
                 modifiers: crate::modifiers::ModifierSet::default(),
+                hull_id: HullId("hull_general_purpose".to_string()),
+                fitted_modules: vec![],
+                propellant_kg: 0.0,
+                propellant_capacity_kg: 0.0,
             },
         )]),
         stations: HashMap::from([(
@@ -387,6 +395,10 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         task: None,
         speed_ticks_per_au: None,
         modifiers: crate::modifiers::ModifierSet::default(),
+        hull_id: HullId("hull_general_purpose".to_string()),
+        fitted_modules: vec![],
+        propellant_kg: 0.0,
+        propellant_capacity_kg: 0.0,
     };
     let ship_fast = ShipState {
         id: ShipId("ship_fast".to_string()),
@@ -397,6 +409,10 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         task: None,
         speed_ticks_per_au: Some(1000),
         modifiers: crate::modifiers::ModifierSet::default(),
+        hull_id: HullId("hull_general_purpose".to_string()),
+        fitted_modules: vec![],
+        propellant_kg: 0.0,
+        propellant_capacity_kg: 0.0,
     };
     let ship_slow = ShipState {
         id: ShipId("ship_slow".to_string()),
@@ -407,6 +423,10 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         task: None,
         speed_ticks_per_au: Some(5000),
         modifiers: crate::modifiers::ModifierSet::default(),
+        hull_id: HullId("hull_general_purpose".to_string()),
+        fitted_modules: vec![],
+        propellant_kg: 0.0,
+        propellant_capacity_kg: 0.0,
     };
 
     let global = 2133;

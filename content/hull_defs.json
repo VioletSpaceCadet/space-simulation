@@ -1,0 +1,13 @@
+[
+  {
+    "id": "hull_general_purpose",
+    "name": "General Purpose Mining Shuttle",
+    "mass_kg": 5000.0,
+    "cargo_capacity_m3": 50.0,
+    "base_speed_ticks_per_au": 2133,
+    "base_propellant_capacity_kg": 10000.0,
+    "slots": [],
+    "bonuses": [],
+    "tags": []
+  }
+]

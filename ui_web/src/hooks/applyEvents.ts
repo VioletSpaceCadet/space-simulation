@@ -818,6 +818,8 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   RecipeSelectionReset: noOp,
   SimEventFired: noOp, // SE-05 will add proper handler
   SimEventExpired: noOp, // SE-05 will add proper handler
+  ShipModuleFitted: noOp, // SH-05 will add proper handler
+  ShipModuleUnfitted: noOp, // SH-05 will add proper handler
 };
 
 export function applyEvents(

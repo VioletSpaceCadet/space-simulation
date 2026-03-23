@@ -25,7 +25,12 @@
       "owner": "principal_autopilot",
       "inventory": [],
       "cargo_capacity_m3": 50.0,
-      "task": null
+      "task": null,
+      "hull_id": "hull_general_purpose",
+      "fitted_modules": [],
+      "propellant_kg": 10000.0,
+      "propellant_capacity_kg": 10000.0,
+      "speed_ticks_per_au": 2133
     }
   },
   "stations": {
