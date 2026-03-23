@@ -240,6 +240,8 @@ mod tests {
                     maintenance_component_id: "repair_kit".to_string(),
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         let mut state = autopilot_state(&content);
@@ -533,6 +535,8 @@ mod tests {
                     research_interval_ticks: 10,
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -739,6 +743,8 @@ mod tests {
                     research_interval_ticks: 1,
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -836,6 +842,8 @@ mod tests {
                     max_stock: HashMap::new(),
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
 

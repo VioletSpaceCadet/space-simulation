@@ -554,6 +554,8 @@ mod assembler_component_tests {
                     max_stock: HashMap::new(),
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content
@@ -862,6 +864,8 @@ mod assembler_component_tests {
                     max_stock: HashMap::new(),
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content

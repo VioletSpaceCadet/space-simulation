@@ -1023,6 +1023,8 @@ mod tests {
                     recipes: vec![],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         )]);
 
@@ -1192,6 +1194,8 @@ mod tests {
                     recipes: vec![],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         )]);
 
@@ -1300,6 +1304,8 @@ mod tests {
                     recipes: vec![],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         )]);
 
@@ -1375,6 +1381,8 @@ mod tests {
                     discharge_rate_kw: 30.0,
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         let mut state = empty_state();
@@ -1440,6 +1448,8 @@ mod tests {
                     thermal_group: None,
                     idle_heat_generation_w: None,
                 }),
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
 
@@ -1548,6 +1558,8 @@ mod tests {
                     recipes: vec![],
                 }),
                 thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
 

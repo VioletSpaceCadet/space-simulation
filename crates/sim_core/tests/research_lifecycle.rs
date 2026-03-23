@@ -30,6 +30,8 @@ fn full_research_lifecycle() {
                 research_interval_ticks: 1,
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 
@@ -106,6 +108,8 @@ fn research_lifecycle_no_data_means_no_unlock() {
                 research_interval_ticks: 1,
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 

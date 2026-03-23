@@ -190,6 +190,7 @@ pub fn base_content() -> GameContent {
         },
         alert_rules: Vec::new(),
         events: Vec::new(),
+        hulls: BTreeMap::new(),
         density_map: HashMap::new(),
     };
     content.constants.derive_tick_values();
@@ -384,6 +385,7 @@ pub fn minimal_content() -> GameContent {
         },
         alert_rules: Vec::new(),
         events: Vec::new(),
+        hulls: BTreeMap::new(),
         density_map: HashMap::new(),
     };
     content.constants.derive_tick_values();
@@ -497,6 +499,8 @@ pub fn thermal_content() -> GameContent {
                 thermal_group: Some("default".to_string()),
                 idle_heat_generation_w: None,
             }),
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 
@@ -521,6 +525,8 @@ pub fn thermal_content() -> GameContent {
                 thermal_group: Some("default".to_string()),
                 idle_heat_generation_w: None,
             }),
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 

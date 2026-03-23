@@ -523,6 +523,8 @@ mod tests {
                     thermal_group: Some("smelting".to_string()),
                     idle_heat_generation_w: None,
                 }),
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content
@@ -732,6 +734,8 @@ mod tests {
                     thermal_group: Some("reactor".to_string()),
                     idle_heat_generation_w: None,
                 }),
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
 
@@ -801,6 +805,8 @@ mod tests {
                     thermal_group: Some("smelting".to_string()),
                     idle_heat_generation_w: None,
                 }),
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         let station = state.stations.get_mut(station_id).unwrap();
@@ -1318,6 +1324,8 @@ mod tests {
                     thermal_group: Some("smelting".to_string()),
                     idle_heat_generation_w: Some(idle_w),
                 }),
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
             },
         );
         content

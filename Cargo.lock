@@ -1077,6 +1077,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sim_core",
+ "tempfile",
 ]
 
 [[package]]

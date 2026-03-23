@@ -31,6 +31,8 @@ pub enum StatId {
     ResearchSpeed,
 
     // Ship
+    CargoCapacity,
+    PropellantCapacity,
     ShipSpeed,
 
     // Station
@@ -70,6 +72,9 @@ pub enum ModifierSource {
     Environment,
     Equipment(String),
     Event(String),
+    #[serde(rename = "fitted_module")]
+    FittedModule(crate::ModuleDefId, usize),
+    Hull(crate::HullId),
     Tech(String),
     Thermal,
     Wear,

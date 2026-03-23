@@ -105,6 +105,10 @@ fn default_module_state(
             crate::ModuleKindState::Radiator(crate::RadiatorState::default()),
             crate::BehaviorType::Radiator,
         ),
+        crate::ModuleBehaviorDef::Equipment => (
+            crate::ModuleKindState::Equipment,
+            crate::BehaviorType::Equipment,
+        ),
     };
     (kind_state, behavior_type, thermal_state)
 }

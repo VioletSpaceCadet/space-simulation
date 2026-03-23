@@ -152,6 +152,8 @@ fn refinery_content() -> GameContent {
                 recipes: vec![recipe_id],
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     )]);
     content
@@ -225,6 +227,8 @@ fn assembler_content() -> GameContent {
                 recipes: vec![recipe_id],
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     )]);
     content.component_defs = vec![crate::ComponentDef {
@@ -288,6 +292,8 @@ fn maintenance_content() -> GameContent {
                 maintenance_component_id: "repair_kit".to_string(),
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
     content

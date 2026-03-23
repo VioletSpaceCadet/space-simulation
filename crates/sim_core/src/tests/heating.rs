@@ -58,6 +58,8 @@ fn heating_content() -> GameContent {
                 recipes: vec![recipe_id],
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     )]);
     content

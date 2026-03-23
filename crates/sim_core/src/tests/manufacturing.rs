@@ -141,6 +141,8 @@ fn competing_demand_content() -> GameContent {
                 recipes: vec![recipe_fe_plate_id],
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 
@@ -160,6 +162,8 @@ fn competing_demand_content() -> GameContent {
                 recipes: vec![recipe_structural_beam_id],
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 
@@ -179,6 +183,8 @@ fn competing_demand_content() -> GameContent {
                 recipes: vec![recipe_advanced_repair_kit_id],
             }),
             thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
         },
     );
 
