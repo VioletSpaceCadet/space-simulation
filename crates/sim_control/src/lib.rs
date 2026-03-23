@@ -1914,4 +1914,173 @@ mod tests {
             "autopilot should survey the nearest site, not the farthest"
         );
     }
+
+    #[test]
+    fn test_ship_fitting_fits_idle_ship_at_station() {
+        use sim_core::{
+            FittedModule, HullDef, HullId, ModuleDefId, ModuleItemId, SlotDef, SlotType,
+        };
+
+        let mut content = autopilot_content();
+        // Add hull with one utility slot
+        content.hulls.insert(
+            HullId("hull_general_purpose".to_string()),
+            HullDef {
+                id: HullId("hull_general_purpose".to_string()),
+                name: "General Purpose".to_string(),
+                mass_kg: 5000.0,
+                cargo_capacity_m3: 50.0,
+                base_speed_ticks_per_au: 120,
+                base_propellant_capacity_kg: 10000.0,
+                slots: vec![SlotDef {
+                    slot_type: SlotType("utility".to_string()),
+                    label: "Utility 1".to_string(),
+                }],
+                bonuses: vec![],
+                required_tech: None,
+                tags: vec![],
+            },
+        );
+        // Add equipment module def
+        content.module_defs.insert(
+            "module_cargo_expander".to_string(),
+            sim_core::ModuleDef {
+                id: "module_cargo_expander".to_string(),
+                name: "Cargo Expander".to_string(),
+                mass_kg: 400.0,
+                volume_m3: 2.0,
+                power_consumption_per_run: 0.0,
+                wear_per_run: 0.0,
+                behavior: sim_core::ModuleBehaviorDef::Equipment,
+                thermal: None,
+                compatible_slots: vec![SlotType("utility".to_string())],
+                ship_modifiers: vec![],
+            },
+        );
+        // Add fitting template
+        content.fitting_templates.insert(
+            HullId("hull_general_purpose".to_string()),
+            vec![FittedModule {
+                slot_index: 0,
+                module_def_id: ModuleDefId("module_cargo_expander".to_string()),
+            }],
+        );
+
+        let mut state = autopilot_state(&content);
+        // Add module to station inventory
+        let station_id = StationId("station_earth_orbit".to_string());
+        if let Some(station) = state.stations.get_mut(&station_id) {
+            station.inventory.push(InventoryItem::Module {
+                item_id: ModuleItemId("mod_item_fit_test".to_string()),
+                module_def_id: "module_cargo_expander".to_string(),
+            });
+        }
+
+        let mut controller = crate::AutopilotController::default();
+        let mut cmd_id = 0u64;
+        let commands = controller.generate_commands(&state, &content, &mut cmd_id);
+
+        let fit_commands: Vec<_> = commands
+            .iter()
+            .filter(|c| matches!(&c.command, Command::FitShipModule { .. }))
+            .collect();
+        assert_eq!(
+            fit_commands.len(),
+            1,
+            "should generate exactly one fit command"
+        );
+        if let Command::FitShipModule {
+            ship_id,
+            slot_index,
+            module_def_id,
+            ..
+        } = &fit_commands[0].command
+        {
+            assert_eq!(*ship_id, ShipId("ship_0001".to_string()));
+            assert_eq!(*slot_index, 0);
+            assert_eq!(module_def_id.0, "module_cargo_expander");
+        } else {
+            panic!("expected FitShipModule command");
+        }
+    }
+
+    #[test]
+    fn test_ship_fitting_skips_already_fitted_slot() {
+        use sim_core::{
+            FittedModule, HullDef, HullId, ModuleDefId, ModuleItemId, SlotDef, SlotType,
+        };
+
+        let mut content = autopilot_content();
+        content.hulls.insert(
+            HullId("hull_general_purpose".to_string()),
+            HullDef {
+                id: HullId("hull_general_purpose".to_string()),
+                name: "General Purpose".to_string(),
+                mass_kg: 5000.0,
+                cargo_capacity_m3: 50.0,
+                base_speed_ticks_per_au: 120,
+                base_propellant_capacity_kg: 10000.0,
+                slots: vec![SlotDef {
+                    slot_type: SlotType("utility".to_string()),
+                    label: "Utility 1".to_string(),
+                }],
+                bonuses: vec![],
+                required_tech: None,
+                tags: vec![],
+            },
+        );
+        content.module_defs.insert(
+            "module_cargo_expander".to_string(),
+            sim_core::ModuleDef {
+                id: "module_cargo_expander".to_string(),
+                name: "Cargo Expander".to_string(),
+                mass_kg: 400.0,
+                volume_m3: 2.0,
+                power_consumption_per_run: 0.0,
+                wear_per_run: 0.0,
+                behavior: sim_core::ModuleBehaviorDef::Equipment,
+                thermal: None,
+                compatible_slots: vec![SlotType("utility".to_string())],
+                ship_modifiers: vec![],
+            },
+        );
+        content.fitting_templates.insert(
+            HullId("hull_general_purpose".to_string()),
+            vec![FittedModule {
+                slot_index: 0,
+                module_def_id: ModuleDefId("module_cargo_expander".to_string()),
+            }],
+        );
+
+        let mut state = autopilot_state(&content);
+        // Pre-fit the slot
+        let ship_id = ShipId("ship_0001".to_string());
+        if let Some(ship) = state.ships.get_mut(&ship_id) {
+            ship.fitted_modules.push(FittedModule {
+                slot_index: 0,
+                module_def_id: ModuleDefId("module_cargo_expander".to_string()),
+            });
+        }
+        // Module available but slot already occupied
+        let station_id = StationId("station_earth_orbit".to_string());
+        if let Some(station) = state.stations.get_mut(&station_id) {
+            station.inventory.push(InventoryItem::Module {
+                item_id: ModuleItemId("mod_item_skip".to_string()),
+                module_def_id: "module_cargo_expander".to_string(),
+            });
+        }
+
+        let mut controller = crate::AutopilotController::default();
+        let mut cmd_id = 0u64;
+        let commands = controller.generate_commands(&state, &content, &mut cmd_id);
+
+        let fit_commands: Vec<_> = commands
+            .iter()
+            .filter(|c| matches!(&c.command, Command::FitShipModule { .. }))
+            .collect();
+        assert!(
+            fit_commands.is_empty(),
+            "should not fit into already-occupied slot"
+        );
+    }
 }
