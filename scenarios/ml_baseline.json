@@ -1,0 +1,7 @@
+{
+  "name": "ml_baseline",
+  "ticks": 4320,
+  "metrics_every": 10,
+  "seeds": {"range": [1, 20]},
+  "state": "./content/dev_base_state.json"
+}
