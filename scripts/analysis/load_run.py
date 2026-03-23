@@ -84,8 +84,9 @@ def _load_seed(conn: duckdb.DuckDBPyConnection, seed_dir: Path) -> duckdb.DuckDB
     if parquet_path.exists():
         rel = conn.read_parquet(str(parquet_path))
     elif csv_files:
-        csv_paths = [str(p) for p in csv_files]
-        rel = conn.read_csv(csv_paths)
+        # DuckDB read_csv accepts a single path; use SQL for multiple files
+        csv_paths_str = ", ".join(f"'{p}'" for p in csv_files)
+        rel = conn.sql(f"SELECT * FROM read_csv_auto([{csv_paths_str}])")
     else:
         return None
 

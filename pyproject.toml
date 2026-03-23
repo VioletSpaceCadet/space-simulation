@@ -66,3 +66,7 @@ check_untyped_defs = true
 explicit_package_bases = true
 mypy_path = ["."]
 files = ["scripts/analysis"]
+
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
