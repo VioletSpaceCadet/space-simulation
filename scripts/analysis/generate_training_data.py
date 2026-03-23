@@ -125,8 +125,15 @@ def main() -> None:
         print()
 
     print("=== Summary ===")
-    total_seeds = sum(int(s["seeds"]) for s in all_stats.values())
-    total_collapses = sum(int(s["collapses"]) for s in all_stats.values())
+    total_seeds = 0
+    total_collapses = 0
+    for s in all_stats.values():
+        seeds = s["seeds"]
+        collapses = s["collapses"]
+        assert isinstance(seeds, int)
+        assert isinstance(collapses, int)
+        total_seeds += seeds
+        total_collapses += collapses
     print(f"Total seeds: {total_seeds}")
     print(f"Total collapses: {total_collapses}")
     print(f"Scenarios processed: {len(all_stats)}")
