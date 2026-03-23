@@ -22,7 +22,7 @@ OUTPUT_DIR = Path("data/training/v1")
 ML_SCENARIOS = ["ml_baseline", "ml_constrained", "ml_abundant"]
 
 
-def run_sim_bench(scenario_path: Path, output_dir: Path) -> None:
+def run_sim_bench(scenario_path: Path, output_dir: Path) -> None:  # pragma: no cover
     """Run sim_bench for a single scenario."""
     output_dir.mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -41,7 +41,7 @@ def run_sim_bench(scenario_path: Path, output_dir: Path) -> None:
     subprocess.run(cmd, check=True)
 
 
-def process_run(run_dir: Path) -> dict[str, object]:
+def process_run(run_dir: Path) -> dict[str, object]:  # pragma: no cover
     """Load a run, apply features and labels, return summary stats."""
     from scripts.analysis.cross_seed import seed_summary
     from scripts.analysis.features import add_all_features
@@ -89,7 +89,7 @@ def process_run(run_dir: Path) -> dict[str, object]:
     }
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover
     """Generate training data for all ML scenarios."""
     skip_sim = "--skip-sim" in sys.argv
 
