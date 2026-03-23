@@ -139,6 +139,16 @@
           "element": "Fe",
           "kg": 500.0,
           "quality": 0.7
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0020",
+          "module_def_id": "module_plate_press"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0021",
+          "module_def_id": "module_structural_assembler"
         }
       ],
       "cargo_capacity_m3": 2000.0,

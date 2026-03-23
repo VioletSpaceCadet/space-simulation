@@ -22,6 +22,12 @@
     "module_shipyard":              { "base_price_per_unit": 10000000.0, "importable": true,  "exportable": true,  "category": "module" },
     "module_basic_solar_array":     { "base_price_per_unit": 1800000.0,  "importable": true,  "exportable": true,  "category": "module" },
     "module_basic_battery":         { "base_price_per_unit": 2200000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_electrolysis_unit":     { "base_price_per_unit": 3500000.0,  "importable": true,  "exportable": true,  "category": "module" }
+    "module_electrolysis_unit":     { "base_price_per_unit": 3500000.0,  "importable": true,  "exportable": true,  "category": "module" },
+    "fe_plate":                     { "base_price_per_unit": 500.0,      "importable": false, "exportable": true,  "category": "component" },
+    "structural_beam":              { "base_price_per_unit": 2000.0,     "importable": false, "exportable": true,  "category": "component" },
+    "hull_panel":                   { "base_price_per_unit": 8000.0,     "importable": false, "exportable": true,  "category": "component" },
+    "advanced_repair_kit":          { "base_price_per_unit": 1500.0,     "importable": false, "exportable": true,  "category": "component" },
+    "module_plate_press":           { "base_price_per_unit": 3000000.0,  "importable": true,  "exportable": true,  "category": "module" },
+    "module_structural_assembler":  { "base_price_per_unit": 4000000.0,  "importable": true,  "exportable": true,  "category": "module" }
   }
 }
