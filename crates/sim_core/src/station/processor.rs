@@ -171,8 +171,17 @@ fn execute(
         });
     }
 
-    // Process the ore
-    resolve_processor_run(ctx, state, content, events, thermal_eff, thermal_qual);
+    // Process the ore — pass the already-resolved recipe ID to avoid double resolution
+    let recipe_id = recipe.id.clone();
+    resolve_processor_run(
+        ctx,
+        state,
+        content,
+        events,
+        thermal_eff,
+        thermal_qual,
+        &recipe_id,
+    );
 
     super::RunOutcome::Completed
 }
@@ -185,14 +194,11 @@ fn resolve_processor_run(
     events: &mut Vec<EventEnvelope>,
     thermal_efficiency: f32,
     thermal_quality: f32,
+    recipe_id: &crate::RecipeId,
 ) {
     let current_tick = state.meta.tick;
 
-    let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
-        return;
-    };
-
-    let Some(recipe) = resolve_recipe(state, ctx, processor_def, content, events) else {
+    let Some(recipe) = content.recipes.get(recipe_id) else {
         return;
     };
 
@@ -339,20 +345,23 @@ fn resolve_processor_run(
                 component_id,
                 quality_formula,
             } => {
-                let quality = match quality_formula {
-                    QualityFormula::Fixed(q) => *q * thermal_quality,
+                let base_quality = match quality_formula {
+                    QualityFormula::Fixed(q) => *q,
                     QualityFormula::ElementFractionTimesMultiplier {
                         element,
                         multiplier,
-                    } => {
-                        avg_composition
-                            .get(element.as_str())
-                            .copied()
-                            .unwrap_or(0.0)
-                            * multiplier
-                            * thermal_quality
-                    }
+                    } => (avg_composition
+                        .get(element.as_str())
+                        .copied()
+                        .unwrap_or(0.0)
+                        * multiplier)
+                        .clamp(0.0, 1.0),
                 };
+                let quality = proc_mods.resolve_with_f32(
+                    crate::modifiers::StatId::ProcessingQuality,
+                    base_quality,
+                    &state.modifiers,
+                );
                 let produced_count = 1u32;
                 if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                     let existing = station.inventory.iter_mut().find(|i| {
