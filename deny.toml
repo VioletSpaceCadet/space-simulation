@@ -7,7 +7,10 @@ no-default-features = false
 
 # -- Advisories: check against RustSec advisory database --
 [advisories]
-ignore = []
+ignore = [
+    # paste is archived but stable/no security issue; used transitively by arrow
+    "RUSTSEC-2024-0436",
+]
 
 # -- Licenses --
 [licenses]
@@ -23,6 +26,7 @@ allow = [
     "Unicode-DFS-2016",
     "Unlicense",
     "Zlib",
+    "CC0-1.0",
 ]
 confidence-threshold = 0.8
 

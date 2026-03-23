@@ -1,3 +1,4 @@
+use crate::parquet_writer::ParquetMetricsWriter;
 use crate::run_result::{self, RunResult, SummaryMetrics};
 use anyhow::{Context, Result};
 use rand::SeedableRng;
@@ -59,8 +60,12 @@ pub fn run_seed(
     )?;
 
     let element_ids = sim_core::content_element_ids(content);
-    let mut metrics_writer = sim_core::MetricsFileWriter::new(seed_dir.to_path_buf(), element_ids)
-        .with_context(|| format!("opening metrics CSV in {}", seed_dir.display()))?;
+    let mut metrics_writer =
+        sim_core::MetricsFileWriter::new(seed_dir.to_path_buf(), element_ids.clone())
+            .with_context(|| format!("opening metrics CSV in {}", seed_dir.display()))?;
+    let mut parquet_writer =
+        ParquetMetricsWriter::new(&seed_dir.join("metrics.parquet"), element_ids)
+            .with_context(|| format!("opening metrics Parquet in {}", seed_dir.display()))?;
 
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(&state, content, &mut next_command_id);
@@ -70,7 +75,10 @@ pub fn run_seed(
             let snapshot = sim_core::compute_metrics(&state, content);
             metrics_writer
                 .write_row(&snapshot)
-                .context("writing metrics row")?;
+                .context("writing CSV metrics row")?;
+            parquet_writer
+                .write_row(&snapshot)
+                .context("writing Parquet metrics row")?;
         }
     }
 
@@ -79,9 +87,13 @@ pub fn run_seed(
     if state.meta.tick % metrics_every != 0 {
         metrics_writer
             .write_row(&final_snapshot)
-            .context("writing final metrics row")?;
+            .context("writing final CSV metrics row")?;
+        parquet_writer
+            .write_row(&final_snapshot)
+            .context("writing final Parquet metrics row")?;
     }
-    metrics_writer.flush().context("flushing metrics")?;
+    metrics_writer.flush().context("flushing CSV metrics")?;
+    parquet_writer.finish().context("finishing Parquet file")?;
 
     #[allow(clippy::cast_possible_truncation)]
     let wall_time_ms = start.elapsed().as_millis() as u64;
@@ -91,12 +103,44 @@ pub fn run_seed(
         0.0
     };
 
-    let (collapse_occurred, collapse_reason) = run_result::detect_collapse(&final_snapshot);
+    write_run_result(
+        seed_dir,
+        &run_id,
+        seed,
+        scenario_name,
+        scenario_params,
+        ticks,
+        wall_time_ms,
+        sim_ticks_per_second,
+        &final_snapshot,
+    )?;
 
-    let run_result = RunResult {
+    Ok(SeedResult {
+        seed,
+        final_snapshot,
+        wall_time_ms,
+        run_id,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn write_run_result(
+    seed_dir: &Path,
+    run_id: &str,
+    seed: u64,
+    scenario_name: &str,
+    scenario_params: &serde_json::Value,
+    ticks: u64,
+    wall_time_ms: u64,
+    sim_ticks_per_second: f64,
+    final_snapshot: &MetricsSnapshot,
+) -> Result<()> {
+    let (collapse_occurred, collapse_reason) = run_result::detect_collapse(final_snapshot);
+
+    let result = RunResult {
         run_schema_version: 1,
         run_status: "completed".to_string(),
-        run_id: run_id.clone(),
+        run_id: run_id.to_string(),
         git_sha: run_result::git_sha(),
         git_dirty: run_result::git_dirty(),
         seed,
@@ -107,7 +151,7 @@ pub fn run_seed(
         total_ticks: ticks,
         wall_time_ms,
         sim_ticks_per_second,
-        summary_metrics: Some(SummaryMetrics::from_snapshot(&final_snapshot)),
+        summary_metrics: Some(SummaryMetrics::from_snapshot(final_snapshot)),
         alert_counts_by_type: HashMap::new(),
         alert_first_tick_by_type: HashMap::new(),
         alert_last_tick_by_type: HashMap::new(),
@@ -124,16 +168,9 @@ pub fn run_seed(
         error_message: None,
     };
 
-    run_result
+    result
         .write_atomic(&seed_dir.join("run_result.json"))
-        .context("writing run_result.json")?;
-
-    Ok(SeedResult {
-        seed,
-        final_snapshot,
-        wall_time_ms,
-        run_id,
-    })
+        .context("writing run_result.json")
 }
 
 #[cfg(test)]
@@ -166,6 +203,7 @@ mod tests {
         assert!(!result.run_id.is_empty());
         assert!(seed_dir.join("run_info.json").exists());
         assert!(seed_dir.join("metrics_000.csv").exists());
+        assert!(seed_dir.join("metrics.parquet").exists());
         assert!(seed_dir.join("run_result.json").exists());
 
         // Verify run_result.json content

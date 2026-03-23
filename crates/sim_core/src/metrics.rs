@@ -15,7 +15,7 @@ use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
 /// v9: Replace element-specific fields with dynamic per-element maps.
-const METRICS_VERSION: u32 = 9;
+pub const METRICS_VERSION: u32 = 9;
 
 /// Per-element ore composition statistics (avg/min/max fraction across all ore lots).
 #[derive(Debug, Clone, Serialize, Default, PartialEq)]
