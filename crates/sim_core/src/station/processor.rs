@@ -18,12 +18,30 @@ pub(super) fn tick_station_modules(
         .get(station_id)
         .map_or(0, |s| s.modules.len());
 
-    for module_idx in 0..module_count {
-        let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
-            continue;
-        };
+    // Collect processor module indices, sorted by priority (desc) then id (asc)
+    let mut processor_indices: Vec<usize> = (0..module_count)
+        .filter(|&idx| {
+            state
+                .stations
+                .get(station_id)
+                .and_then(|s| s.modules.get(idx))
+                .and_then(|m| content.module_defs.get(&m.def_id))
+                .is_some_and(|d| matches!(d.behavior, ModuleBehaviorDef::Processor(_)))
+        })
+        .collect();
 
-        let ModuleBehaviorDef::Processor(_) = &ctx.def.behavior else {
+    if let Some(station) = state.stations.get(station_id) {
+        processor_indices.sort_by(|&a, &b| {
+            let ma = &station.modules[a];
+            let mb = &station.modules[b];
+            mb.manufacturing_priority
+                .cmp(&ma.manufacturing_priority)
+                .then_with(|| ma.id.0.cmp(&mb.id.0))
+        });
+    }
+
+    for module_idx in processor_indices {
+        let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
             continue;
         };
 
@@ -58,10 +76,15 @@ fn execute(
         }
     };
 
-    let recipe = resolve_recipe(state, ctx, processor_def, content);
+    let recipe = resolve_recipe(state, ctx, processor_def, content, events);
     let Some(recipe) = recipe else {
         return super::RunOutcome::Skipped { reset_timer: false };
     };
+
+    // Tech gate: if recipe requires a tech that isn't unlocked, skip
+    if let Some(outcome) = check_tech_gate(state, ctx, processor_def, recipe, events) {
+        return outcome;
+    }
 
     let input_filter_for_threshold = recipe.inputs.first().map(|i| &i.filter);
     let total_input_kg: f32 = state.stations.get(&ctx.station_id).map_or(0.0, |s| {
@@ -148,8 +171,17 @@ fn execute(
         });
     }
 
-    // Process the ore
-    resolve_processor_run(ctx, state, content, events, thermal_eff, thermal_qual);
+    // Process the ore — pass the already-resolved recipe ID to avoid double resolution
+    let recipe_id = recipe.id.clone();
+    resolve_processor_run(
+        ctx,
+        state,
+        content,
+        events,
+        thermal_eff,
+        thermal_qual,
+        &recipe_id,
+    );
 
     super::RunOutcome::Completed
 }
@@ -162,14 +194,11 @@ fn resolve_processor_run(
     events: &mut Vec<EventEnvelope>,
     thermal_efficiency: f32,
     thermal_quality: f32,
+    recipe_id: &crate::RecipeId,
 ) {
     let current_tick = state.meta.tick;
 
-    let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
-        return;
-    };
-
-    let Some(recipe) = resolve_recipe(state, ctx, processor_def, content) else {
+    let Some(recipe) = content.recipes.get(recipe_id) else {
         return;
     };
 
@@ -312,7 +341,45 @@ fn resolve_processor_run(
                     }
                 }
             }
-            OutputSpec::Component { .. } | OutputSpec::Ship { .. } => {} // not yet implemented
+            OutputSpec::Component {
+                component_id,
+                quality_formula,
+            } => {
+                let base_quality = match quality_formula {
+                    QualityFormula::Fixed(q) => *q,
+                    QualityFormula::ElementFractionTimesMultiplier {
+                        element,
+                        multiplier,
+                    } => (avg_composition
+                        .get(element.as_str())
+                        .copied()
+                        .unwrap_or(0.0)
+                        * multiplier)
+                        .clamp(0.0, 1.0),
+                };
+                let quality = proc_mods.resolve_with_f32(
+                    crate::modifiers::StatId::ProcessingQuality,
+                    base_quality,
+                    &state.modifiers,
+                );
+                let produced_count = 1u32;
+                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
+                    let existing = station.inventory.iter_mut().find(|i| {
+                        matches!(i, InventoryItem::Component { component_id: cid, quality: q, .. }
+                            if cid.0 == component_id.0 && (*q - quality).abs() < 1e-3)
+                    });
+                    if let Some(InventoryItem::Component { count, .. }) = existing {
+                        *count += produced_count;
+                    } else {
+                        station.inventory.push(InventoryItem::Component {
+                            component_id: component_id.clone(),
+                            count: produced_count,
+                            quality,
+                        });
+                    }
+                }
+            }
+            OutputSpec::Ship { .. } => {} // Ship output only from assembler
         }
     }
 
@@ -363,22 +430,94 @@ fn resolve_processor_run(
     }
 }
 
+/// Check if the recipe requires a tech that isn't unlocked.
+/// Returns `Some(RunOutcome)` if the tech gate blocks execution, `None` if OK to proceed.
+fn check_tech_gate(
+    state: &mut GameState,
+    ctx: &super::ModuleTickContext,
+    processor_def: &crate::ProcessorDef,
+    recipe: &crate::RecipeDef,
+    events: &mut Vec<EventEnvelope>,
+) -> Option<super::RunOutcome> {
+    let required_tech = recipe.required_tech.as_ref()?;
+    if state.research.unlocked.iter().any(|t| t == required_tech) {
+        return None; // Tech unlocked — no gate
+    }
+
+    // Emit ModuleAwaitingTech once per interval
+    let first_trigger = state
+        .stations
+        .get(&ctx.station_id)
+        .and_then(|s| match &s.modules[ctx.module_idx].kind_state {
+            ModuleKindState::Processor(ps) => {
+                Some(ps.ticks_since_last_run == processor_def.processing_interval_ticks)
+            }
+            _ => None,
+        })
+        .unwrap_or(false);
+    if first_trigger {
+        let current_tick = state.meta.tick;
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::ModuleAwaitingTech {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+                tech_id: required_tech.clone(),
+            },
+        ));
+    }
+    Some(super::RunOutcome::Skipped { reset_timer: false })
+}
+
 /// Resolve the active recipe for a processor module.
 /// Uses `selected_recipe` from state if set, otherwise falls back to the first recipe in the
-/// module's recipe list. Returns `None` if no valid recipe can be resolved.
+/// module's recipe list. If the selected recipe is not in the processor's recipe list, resets
+/// to the first recipe and emits a `RecipeSelectionReset` event. Returns `None` if no valid
+/// recipe can be resolved.
 fn resolve_recipe<'a>(
-    state: &GameState,
+    state: &mut GameState,
     ctx: &super::ModuleTickContext,
     processor_def: &crate::ProcessorDef,
     content: &'a GameContent,
+    events: &mut Vec<EventEnvelope>,
 ) -> Option<&'a crate::RecipeDef> {
     let selected = state.stations.get(&ctx.station_id).and_then(|s| {
         match &s.modules[ctx.module_idx].kind_state {
-            crate::ModuleKindState::Processor(ps) => ps.selected_recipe.as_ref(),
+            crate::ModuleKindState::Processor(ps) => ps.selected_recipe.clone(),
             _ => None,
         }
     });
-    let recipe_id = selected.or_else(|| processor_def.recipes.first());
+
+    if let Some(ref sel_id) = selected {
+        if !processor_def.recipes.contains(sel_id) {
+            // Invalid selection — fall back to first recipe and emit reset event
+            let new_recipe = processor_def.recipes.first().cloned();
+            if let Some(station) = state.stations.get_mut(&ctx.station_id) {
+                if let ModuleKindState::Processor(ps) =
+                    &mut station.modules[ctx.module_idx].kind_state
+                {
+                    ps.selected_recipe.clone_from(&new_recipe);
+                }
+            }
+            let current_tick = state.meta.tick;
+            if let Some(ref new_id) = new_recipe {
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::RecipeSelectionReset {
+                        station_id: ctx.station_id.clone(),
+                        module_id: ctx.module_id.clone(),
+                        old_recipe: sel_id.clone(),
+                        new_recipe: new_id.clone(),
+                    },
+                ));
+            }
+            return new_recipe.as_ref().and_then(|id| content.recipes.get(id));
+        }
+    }
+
+    let recipe_id = selected.as_ref().or_else(|| processor_def.recipes.first());
     recipe_id.and_then(|id| content.recipes.get(id))
 }
 
@@ -676,6 +815,7 @@ mod tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
+                        manufacturing_priority: 0,
                         thermal: Some(ThermalState {
                             temp_mk,
                             thermal_group: Some("smelting".to_string()),
@@ -908,6 +1048,599 @@ mod tests {
                 .iter()
                 .any(|e| matches!(&e.event, Event::ProcessorTooCold { .. })),
             "missing ThermalState with thermal recipe should stall as TooCold"
+        );
+    }
+
+    // ── Manufacturing priority tests ─────────────────────────────
+
+    /// Build content with two processor modules sharing the same recipe.
+    fn priority_content() -> GameContent {
+        let mut content = crate::test_fixtures::base_content();
+        let recipe = crate::RecipeDef {
+            id: RecipeId("recipe_ore_to_fe".to_string()),
+            inputs: vec![crate::RecipeInput {
+                filter: crate::InputFilter::ItemKind(crate::ItemKind::Ore),
+                amount: InputAmount::Kg(100.0),
+            }],
+            outputs: vec![OutputSpec::Material {
+                element: "Fe".to_string(),
+                yield_formula: YieldFormula::ElementFraction {
+                    element: "Fe".to_string(),
+                },
+                quality_formula: QualityFormula::Fixed(0.9),
+            }],
+            efficiency: 1.0,
+            thermal_req: None,
+            required_tech: None,
+            tags: vec![],
+        };
+        let recipe_id = crate::test_fixtures::insert_recipe(&mut content, recipe);
+        content.module_defs.insert(
+            "module_refinery".to_string(),
+            crate::ModuleDef {
+                id: "module_refinery".to_string(),
+                name: "Refinery".to_string(),
+                mass_kg: 1000.0,
+                volume_m3: 5.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.0,
+                behavior: crate::ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_minutes: 1,
+                    processing_interval_ticks: 1,
+                    recipes: vec![recipe_id],
+                }),
+                thermal: None,
+            },
+        );
+        content
+    }
+
+    #[test]
+    fn higher_priority_processor_consumes_first() {
+        let content = priority_content();
+        let station_id = StationId("station_test".to_string());
+        let mut state = GameState {
+            meta: crate::MetaState {
+                tick: 10,
+                seed: 42,
+                schema_version: 1,
+                content_version: content.content_version.clone(),
+            },
+            scan_sites: vec![],
+            asteroids: HashMap::new(),
+            ships: HashMap::new(),
+            stations: HashMap::from([(
+                station_id.clone(),
+                crate::StationState {
+                    id: station_id.clone(),
+                    position: crate::test_fixtures::test_position(),
+                    // Only 100 kg ore — enough for exactly one processor run
+                    inventory: vec![crate::InventoryItem::Ore {
+                        lot_id: crate::LotId("lot_0001".to_string()),
+                        asteroid_id: crate::AsteroidId("ast_0001".to_string()),
+                        kg: 100.0,
+                        composition: HashMap::from([
+                            ("Fe".to_string(), 0.7),
+                            ("Si".to_string(), 0.3),
+                        ]),
+                    }],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![
+                        // Low-priority processor (id comes first alphabetically)
+                        ModuleState {
+                            id: ModuleInstanceId("proc_aaa".to_string()),
+                            def_id: "module_refinery".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Processor(ProcessorState {
+                                threshold_kg: 0.0,
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                                selected_recipe: None,
+                            }),
+                            wear: crate::WearState::default(),
+                            thermal: None,
+                            power_stalled: false,
+                            manufacturing_priority: 0,
+                        },
+                        // High-priority processor
+                        ModuleState {
+                            id: ModuleInstanceId("proc_bbb".to_string()),
+                            def_id: "module_refinery".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Processor(ProcessorState {
+                                threshold_kg: 0.0,
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                                selected_recipe: None,
+                            }),
+                            wear: crate::WearState::default(),
+                            thermal: None,
+                            power_stalled: false,
+                            manufacturing_priority: 10,
+                        },
+                    ],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    power: PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                },
+            )]),
+            research: crate::ResearchState {
+                unlocked: HashSet::new(),
+                data_pool: HashMap::new(),
+                evidence: HashMap::new(),
+                action_counts: HashMap::new(),
+            },
+            balance: 0.0,
+            export_revenue_total: 0.0,
+            export_count: 0,
+            counters: Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 0,
+            },
+            modifiers: crate::modifiers::ModifierSet::default(),
+            body_cache: std::collections::HashMap::new(),
+        };
+
+        let mut events = Vec::new();
+        tick_station_modules(&mut state, &station_id, &content, &mut events);
+
+        // The high-priority processor (proc_bbb) should run first and consume the ore
+        let ran_events: Vec<_> = events
+            .iter()
+            .filter_map(|e| {
+                if let Event::RefineryRan { module_id, .. } = &e.event {
+                    Some(module_id.0.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        assert_eq!(ran_events.len(), 1, "exactly one processor should run");
+        assert_eq!(
+            ran_events[0], "proc_bbb",
+            "high-priority processor should run first"
+        );
+    }
+
+    // ── Recipe fallback tests ────────────────────────────────────
+
+    #[test]
+    fn invalid_selected_recipe_falls_back_and_emits_reset() {
+        let content = priority_content();
+        let station_id = StationId("station_test".to_string());
+        let first_recipe = content
+            .module_defs
+            .get("module_refinery")
+            .and_then(|d| {
+                if let crate::ModuleBehaviorDef::Processor(p) = &d.behavior {
+                    p.recipes.first().cloned()
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+
+        let mut state = GameState {
+            meta: crate::MetaState {
+                tick: 10,
+                seed: 42,
+                schema_version: 1,
+                content_version: content.content_version.clone(),
+            },
+            scan_sites: vec![],
+            asteroids: HashMap::new(),
+            ships: HashMap::new(),
+            stations: HashMap::from([(
+                station_id.clone(),
+                crate::StationState {
+                    id: station_id.clone(),
+                    position: crate::test_fixtures::test_position(),
+                    inventory: vec![crate::InventoryItem::Ore {
+                        lot_id: crate::LotId("lot_0001".to_string()),
+                        asteroid_id: crate::AsteroidId("ast_0001".to_string()),
+                        kg: 500.0,
+                        composition: HashMap::from([
+                            ("Fe".to_string(), 0.7),
+                            ("Si".to_string(), 0.3),
+                        ]),
+                    }],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![ModuleState {
+                        id: ModuleInstanceId("proc_0001".to_string()),
+                        def_id: "module_refinery".to_string(),
+                        enabled: true,
+                        kind_state: ModuleKindState::Processor(ProcessorState {
+                            threshold_kg: 0.0,
+                            ticks_since_last_run: 0,
+                            stalled: false,
+                            // Select a recipe that does NOT exist in the processor's recipe list
+                            selected_recipe: Some(RecipeId("nonexistent_recipe".to_string())),
+                        }),
+                        wear: crate::WearState::default(),
+                        thermal: None,
+                        power_stalled: false,
+                        manufacturing_priority: 0,
+                    }],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    power: PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                },
+            )]),
+            research: crate::ResearchState {
+                unlocked: HashSet::new(),
+                data_pool: HashMap::new(),
+                evidence: HashMap::new(),
+                action_counts: HashMap::new(),
+            },
+            balance: 0.0,
+            export_revenue_total: 0.0,
+            export_count: 0,
+            counters: Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 0,
+            },
+            modifiers: crate::modifiers::ModifierSet::default(),
+            body_cache: std::collections::HashMap::new(),
+        };
+
+        let mut events = Vec::new();
+        tick_station_modules(&mut state, &station_id, &content, &mut events);
+
+        // Should emit RecipeSelectionReset
+        let reset_event = events.iter().find(|e| {
+            matches!(
+                &e.event,
+                Event::RecipeSelectionReset {
+                    old_recipe,
+                    new_recipe,
+                    ..
+                } if old_recipe.0 == "nonexistent_recipe" && *new_recipe == first_recipe
+            )
+        });
+        assert!(reset_event.is_some(), "expected RecipeSelectionReset event");
+
+        // Processor state should have the first recipe
+        let station = state.stations.get(&station_id).unwrap();
+        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+            assert_eq!(
+                ps.selected_recipe,
+                Some(first_recipe),
+                "selected_recipe should be reset to first recipe"
+            );
+        }
+
+        // Should still run with the fallback recipe
+        let ran = events
+            .iter()
+            .any(|e| matches!(&e.event, Event::RefineryRan { .. }));
+        assert!(ran, "processor should run with fallback recipe");
+    }
+
+    // ── Tech gate tests ──────────────────────────────────────────
+
+    #[test]
+    fn processor_skips_when_tech_not_unlocked() {
+        let mut content = crate::test_fixtures::base_content();
+        let tech_id = crate::TechId("tech_advanced_smelting".to_string());
+        content.techs.push(crate::TechDef {
+            id: tech_id.clone(),
+            name: "Advanced Smelting".to_string(),
+            prereqs: vec![],
+            domain_requirements: HashMap::new(),
+            accepted_data: vec![],
+            difficulty: 1_000_000.0,
+            effects: vec![],
+        });
+        let recipe = crate::RecipeDef {
+            id: RecipeId("recipe_tech_gated".to_string()),
+            inputs: vec![crate::RecipeInput {
+                filter: crate::InputFilter::ItemKind(crate::ItemKind::Ore),
+                amount: InputAmount::Kg(100.0),
+            }],
+            outputs: vec![OutputSpec::Material {
+                element: "Fe".to_string(),
+                yield_formula: YieldFormula::ElementFraction {
+                    element: "Fe".to_string(),
+                },
+                quality_formula: QualityFormula::Fixed(0.9),
+            }],
+            efficiency: 1.0,
+            thermal_req: None,
+            required_tech: Some(tech_id.clone()),
+            tags: vec![],
+        };
+        let recipe_id = crate::test_fixtures::insert_recipe(&mut content, recipe);
+        content.module_defs.insert(
+            "module_adv_refinery".to_string(),
+            crate::ModuleDef {
+                id: "module_adv_refinery".to_string(),
+                name: "Adv Refinery".to_string(),
+                mass_kg: 1000.0,
+                volume_m3: 5.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.0,
+                behavior: crate::ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_minutes: 1,
+                    processing_interval_ticks: 1,
+                    recipes: vec![recipe_id],
+                }),
+                thermal: None,
+            },
+        );
+
+        let station_id = StationId("station_test".to_string());
+        let mut state = GameState {
+            meta: crate::MetaState {
+                tick: 10,
+                seed: 42,
+                schema_version: 1,
+                content_version: content.content_version.clone(),
+            },
+            scan_sites: vec![],
+            asteroids: HashMap::new(),
+            ships: HashMap::new(),
+            stations: HashMap::from([(
+                station_id.clone(),
+                crate::StationState {
+                    id: station_id.clone(),
+                    position: crate::test_fixtures::test_position(),
+                    inventory: vec![crate::InventoryItem::Ore {
+                        lot_id: crate::LotId("lot_0001".to_string()),
+                        asteroid_id: crate::AsteroidId("ast_0001".to_string()),
+                        kg: 500.0,
+                        composition: HashMap::from([
+                            ("Fe".to_string(), 0.7),
+                            ("Si".to_string(), 0.3),
+                        ]),
+                    }],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![ModuleState {
+                        id: ModuleInstanceId("proc_0001".to_string()),
+                        def_id: "module_adv_refinery".to_string(),
+                        enabled: true,
+                        kind_state: ModuleKindState::Processor(ProcessorState {
+                            threshold_kg: 0.0,
+                            ticks_since_last_run: 0,
+                            stalled: false,
+                            selected_recipe: None,
+                        }),
+                        wear: crate::WearState::default(),
+                        thermal: None,
+                        power_stalled: false,
+                        manufacturing_priority: 0,
+                    }],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    power: PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                },
+            )]),
+            research: crate::ResearchState {
+                unlocked: HashSet::new(), // tech NOT unlocked
+                data_pool: HashMap::new(),
+                evidence: HashMap::new(),
+                action_counts: HashMap::new(),
+            },
+            balance: 0.0,
+            export_revenue_total: 0.0,
+            export_count: 0,
+            counters: Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 0,
+            },
+            modifiers: crate::modifiers::ModifierSet::default(),
+            body_cache: std::collections::HashMap::new(),
+        };
+
+        let mut events = Vec::new();
+        tick_station_modules(&mut state, &station_id, &content, &mut events);
+
+        // Should NOT run
+        let ran = events
+            .iter()
+            .any(|e| matches!(&e.event, Event::RefineryRan { .. }));
+        assert!(!ran, "processor should not run without required tech");
+
+        // Should emit ModuleAwaitingTech
+        let awaiting = events.iter().any(|e| {
+            matches!(&e.event, Event::ModuleAwaitingTech { tech_id: tid, .. } if *tid == tech_id)
+        });
+        assert!(awaiting, "should emit ModuleAwaitingTech event");
+
+        // Now unlock the tech and run again
+        state.research.unlocked.insert(tech_id);
+        let mut events2 = Vec::new();
+        tick_station_modules(&mut state, &station_id, &content, &mut events2);
+
+        let ran2 = events2
+            .iter()
+            .any(|e| matches!(&e.event, Event::RefineryRan { .. }));
+        assert!(ran2, "processor should run after tech is unlocked");
+    }
+
+    // ── Component output tests ───────────────────────────────────
+
+    #[test]
+    fn processor_produces_component_output() {
+        let mut content = crate::test_fixtures::base_content();
+        content.component_defs.push(crate::ComponentDef {
+            id: "ingot".to_string(),
+            name: "Iron Ingot".to_string(),
+            mass_kg: 10.0,
+            volume_m3: 0.5,
+        });
+        let recipe = crate::RecipeDef {
+            id: RecipeId("recipe_ore_to_ingot".to_string()),
+            inputs: vec![crate::RecipeInput {
+                filter: crate::InputFilter::ItemKind(crate::ItemKind::Ore),
+                amount: InputAmount::Kg(100.0),
+            }],
+            outputs: vec![OutputSpec::Component {
+                component_id: crate::ComponentId("ingot".to_string()),
+                quality_formula: QualityFormula::Fixed(0.8),
+            }],
+            efficiency: 1.0,
+            thermal_req: None,
+            required_tech: None,
+            tags: vec![],
+        };
+        let recipe_id = crate::test_fixtures::insert_recipe(&mut content, recipe);
+        content.module_defs.insert(
+            "module_ingot_maker".to_string(),
+            crate::ModuleDef {
+                id: "module_ingot_maker".to_string(),
+                name: "Ingot Maker".to_string(),
+                mass_kg: 1000.0,
+                volume_m3: 5.0,
+                power_consumption_per_run: 10.0,
+                wear_per_run: 0.0,
+                behavior: crate::ModuleBehaviorDef::Processor(crate::ProcessorDef {
+                    processing_interval_minutes: 1,
+                    processing_interval_ticks: 1,
+                    recipes: vec![recipe_id],
+                }),
+                thermal: None,
+            },
+        );
+
+        let station_id = StationId("station_test".to_string());
+        let mut state = GameState {
+            meta: crate::MetaState {
+                tick: 10,
+                seed: 42,
+                schema_version: 1,
+                content_version: content.content_version.clone(),
+            },
+            scan_sites: vec![],
+            asteroids: HashMap::new(),
+            ships: HashMap::new(),
+            stations: HashMap::from([(
+                station_id.clone(),
+                crate::StationState {
+                    id: station_id.clone(),
+                    position: crate::test_fixtures::test_position(),
+                    inventory: vec![crate::InventoryItem::Ore {
+                        lot_id: crate::LotId("lot_0001".to_string()),
+                        asteroid_id: crate::AsteroidId("ast_0001".to_string()),
+                        kg: 300.0,
+                        composition: HashMap::from([
+                            ("Fe".to_string(), 0.7),
+                            ("Si".to_string(), 0.3),
+                        ]),
+                    }],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![ModuleState {
+                        id: ModuleInstanceId("ingot_maker_0001".to_string()),
+                        def_id: "module_ingot_maker".to_string(),
+                        enabled: true,
+                        kind_state: ModuleKindState::Processor(ProcessorState {
+                            threshold_kg: 0.0,
+                            ticks_since_last_run: 0,
+                            stalled: false,
+                            selected_recipe: None,
+                        }),
+                        wear: crate::WearState::default(),
+                        thermal: None,
+                        power_stalled: false,
+                        manufacturing_priority: 0,
+                    }],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    power: PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                },
+            )]),
+            research: crate::ResearchState {
+                unlocked: HashSet::new(),
+                data_pool: HashMap::new(),
+                evidence: HashMap::new(),
+                action_counts: HashMap::new(),
+            },
+            balance: 0.0,
+            export_revenue_total: 0.0,
+            export_count: 0,
+            counters: Counters {
+                next_event_id: 0,
+                next_command_id: 0,
+                next_asteroid_id: 0,
+                next_lot_id: 0,
+                next_module_instance_id: 0,
+            },
+            modifiers: crate::modifiers::ModifierSet::default(),
+            body_cache: std::collections::HashMap::new(),
+        };
+
+        let mut events = Vec::new();
+        tick_station_modules(&mut state, &station_id, &content, &mut events);
+
+        // Should have run
+        let ran = events
+            .iter()
+            .any(|e| matches!(&e.event, Event::RefineryRan { .. }));
+        assert!(ran, "processor should run");
+
+        // Should have produced a component
+        let station = state.stations.get(&station_id).unwrap();
+        let ingot_count: u32 = station
+            .inventory
+            .iter()
+            .filter_map(|i| match i {
+                InventoryItem::Component {
+                    component_id,
+                    count,
+                    ..
+                } if component_id.0 == "ingot" => Some(*count),
+                _ => None,
+            })
+            .sum();
+        assert_eq!(ingot_count, 1, "expected 1 ingot produced");
+
+        // Quality should be Fixed(0.8) * 1.0 thermal_quality = 0.8
+        let quality = station.inventory.iter().find_map(|i| match i {
+            InventoryItem::Component {
+                component_id,
+                quality,
+                ..
+            } if component_id.0 == "ingot" => Some(*quality),
+            _ => None,
+        });
+        assert!(
+            (quality.unwrap() - 0.8).abs() < 0.01,
+            "expected quality ~0.8"
+        );
+
+        // Run again — components should merge by quality
+        let mut events2 = Vec::new();
+        tick_station_modules(&mut state, &station_id, &content, &mut events2);
+
+        let station = state.stations.get(&station_id).unwrap();
+        let ingot_count2: u32 = station
+            .inventory
+            .iter()
+            .filter_map(|i| match i {
+                InventoryItem::Component {
+                    component_id,
+                    count,
+                    ..
+                } if component_id.0 == "ingot" => Some(*count),
+                _ => None,
+            })
+            .sum();
+        assert_eq!(
+            ingot_count2, 2,
+            "expected 2 ingots after second run (merged)"
         );
     }
 }

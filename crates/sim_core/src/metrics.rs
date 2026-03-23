@@ -1046,6 +1046,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
+                manufacturing_priority: 0,
                 thermal: None,
             }],
         );
@@ -1213,6 +1214,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
+                manufacturing_priority: 0,
                 thermal: None,
             }],
         );
@@ -1320,6 +1322,7 @@ mod tests {
                     }),
                     wear: crate::WearState { wear: 0.3 },
                     power_stalled: false,
+                    manufacturing_priority: 0,
                     thermal: None,
                 },
                 ModuleState {
@@ -1334,6 +1337,7 @@ mod tests {
                     }),
                     wear: crate::WearState { wear: 0.7 },
                     power_stalled: false,
+                    manufacturing_priority: 0,
                     thermal: None,
                 },
             ],
@@ -1391,6 +1395,7 @@ mod tests {
             kind_state: ModuleKindState::Battery(crate::BatteryState { charge_kwh: 50.0 }),
             wear: crate::WearState::default(),
             power_stalled: false,
+            manufacturing_priority: 0,
             thermal: None,
         });
         state.stations.insert(station.id.clone(), station);
@@ -1454,6 +1459,7 @@ mod tests {
                     }),
                     wear: crate::WearState::default(),
                     power_stalled: false,
+                    manufacturing_priority: 0,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 1_800_000,
                         thermal_group: None,
@@ -1474,6 +1480,7 @@ mod tests {
                     }),
                     wear: crate::WearState::default(),
                     power_stalled: false,
+                    manufacturing_priority: 0,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 2_400_000,
                         thermal_group: None,
@@ -1494,6 +1501,7 @@ mod tests {
                     }),
                     wear: crate::WearState::default(),
                     power_stalled: false,
+                    manufacturing_priority: 0,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 2_800_000,
                         thermal_group: None,
@@ -1557,6 +1565,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
+                manufacturing_priority: 0,
                 thermal: None,
             }],
         );

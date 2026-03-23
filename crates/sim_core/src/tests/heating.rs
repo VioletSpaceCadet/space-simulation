@@ -80,6 +80,7 @@ fn state_with_heating(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -198,6 +199,7 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 

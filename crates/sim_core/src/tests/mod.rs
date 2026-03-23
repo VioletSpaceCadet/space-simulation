@@ -173,6 +173,7 @@ fn state_with_refinery(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -252,6 +253,7 @@ fn state_with_assembler(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -304,6 +306,7 @@ fn state_with_maintenance(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 

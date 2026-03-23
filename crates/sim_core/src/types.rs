@@ -268,6 +268,10 @@ pub struct ModuleState {
     /// Set each tick by power budget computation. Stalled modules skip their tick.
     #[serde(skip, default)]
     pub power_stalled: bool,
+    /// Manufacturing priority. Higher values run first within each behavior class.
+    /// Used to control which modules consume shared inventory first. 0 = default.
+    #[serde(default)]
+    pub manufacturing_priority: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -635,6 +639,11 @@ pub enum Command {
         module_id: ModuleInstanceId,
         recipe_id: RecipeId,
     },
+    SetManufacturingPriority {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        priority: u32,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -903,6 +912,12 @@ pub enum Event {
         station_id: StationId,
         element: ElementId,
         kg_lost: f32,
+    },
+    RecipeSelectionReset {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        old_recipe: RecipeId,
+        new_recipe: RecipeId,
     },
 }
 

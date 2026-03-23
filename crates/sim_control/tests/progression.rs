@@ -474,6 +474,7 @@ fn sensor_data_generation_rate_at_mpt_60() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 

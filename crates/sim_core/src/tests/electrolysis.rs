@@ -116,6 +116,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         kind_state: ModuleKindState::SolarArray(SolarArrayState::default()),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -132,6 +133,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -487,6 +489,7 @@ fn test_full_chain_ore_to_propellant() {
         kind_state: ModuleKindState::SolarArray(SolarArrayState::default()),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -503,6 +506,7 @@ fn test_full_chain_ore_to_propellant() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -519,6 +523,7 @@ fn test_full_chain_ore_to_propellant() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 

@@ -120,6 +120,7 @@ mod tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
+                        manufacturing_priority: 0,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),

@@ -225,6 +225,7 @@ fn non_thermal_storage_module_has_thermal_none() {
         kind_state: ModuleKindState::Storage,
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -282,6 +283,7 @@ fn non_thermal_lab_module_has_thermal_none() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -307,6 +309,7 @@ fn non_thermal_sensor_array_has_thermal_none() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -332,6 +335,7 @@ fn non_thermal_solar_array_has_thermal_none() {
         }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -355,6 +359,7 @@ fn non_thermal_battery_has_thermal_none() {
         kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 0.0 }),
         wear: WearState::default(),
         power_stalled: false,
+        manufacturing_priority: 0,
         thermal: None,
     });
 
@@ -452,6 +457,7 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
             ..Default::default()
         }),
         power_stalled: false,
+        manufacturing_priority: 0,
     });
 
     let mut rng = make_rng();

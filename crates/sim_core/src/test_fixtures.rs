@@ -536,6 +536,7 @@ fn smelter_module(temp_mk: u32) -> ModuleState {
             ..Default::default()
         }),
         power_stalled: false,
+        manufacturing_priority: 0,
     }
 }
 
@@ -552,6 +553,7 @@ fn radiator_module() -> ModuleState {
             ..Default::default()
         }),
         power_stalled: false,
+        manufacturing_priority: 0,
     }
 }
 

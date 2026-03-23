@@ -202,6 +202,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                manufacturing_priority: 0,
                 thermal: None,
             });
 
@@ -425,6 +426,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState { wear: 1.0 },
                 power_stalled: false,
+                manufacturing_priority: 0,
                 thermal: None,
             });
 
@@ -588,6 +590,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                manufacturing_priority: 0,
                 thermal: None,
             });
 
@@ -628,6 +631,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                manufacturing_priority: 0,
                 thermal: None,
             });
 
@@ -682,6 +686,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                manufacturing_priority: 0,
                 thermal: None,
             });
 
@@ -762,6 +767,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
+                manufacturing_priority: 0,
                 thermal: None,
             });
 
@@ -877,6 +883,7 @@ mod tests {
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
+            manufacturing_priority: 0,
             thermal: None,
         });
 
@@ -1322,6 +1329,7 @@ mod tests {
             }),
             thermal: None,
             power_stalled: false,
+            manufacturing_priority: 0,
         });
         // No H2O in inventory → needs_water = true
 
@@ -1528,6 +1536,7 @@ mod tests {
             }),
             thermal: None,
             power_stalled: false,
+            manufacturing_priority: 0,
         });
         // Add H2O above threshold (500 kg) → should NOT trigger volatile targeting
         station.inventory.push(InventoryItem::Material {
@@ -1620,6 +1629,7 @@ mod tests {
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
+            manufacturing_priority: 0,
             thermal: None,
         });
     }
@@ -1639,6 +1649,7 @@ mod tests {
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
+            manufacturing_priority: 0,
             thermal: None,
         });
     }
@@ -1787,6 +1798,7 @@ mod tests {
             }),
             wear: sim_core::WearState { wear: 1.0 },
             power_stalled: false,
+            manufacturing_priority: 0,
             thermal: None,
         });
         // LH2 = 0 (below threshold)
