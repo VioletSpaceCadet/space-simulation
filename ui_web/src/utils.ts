@@ -57,3 +57,8 @@ export function thermalColorClass(
   };
   return zoneColors[thermal.overheat_zone];
 }
+
+export function formatQty(qty: number): string {
+  if (qty >= 1000) { return `${(qty / 1000).toFixed(1)}k`; }
+  return qty.toFixed(qty < 10 ? 1 : 0);
+}

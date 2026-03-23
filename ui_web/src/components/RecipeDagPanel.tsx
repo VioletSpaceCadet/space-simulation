@@ -59,6 +59,11 @@ export function RecipeDagPanel({ snapshot, events, currentTick }: RecipeDagPanel
     return buildRecipeGraph(recipes, snapshot.stations, unlockedTechs);
   }, [recipes, snapshot]);
 
+  const moduleSummary = useMemo(
+    () => (snapshot ? computeModuleSummary(snapshot.stations) : ''),
+    [snapshot],
+  );
+
   if (!snapshot || !content || !graph) {
     return (
       <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
@@ -66,8 +71,6 @@ export function RecipeDagPanel({ snapshot, events, currentTick }: RecipeDagPanel
       </div>
     );
   }
-
-  const moduleSummary = computeModuleSummary(snapshot.stations);
 
   return (
     <div className="flex flex-col h-full min-w-[20rem] overflow-hidden">

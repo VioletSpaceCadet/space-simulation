@@ -1,5 +1,6 @@
 import { ITEM_TYPE_COLORS, RECIPE_STATUS_COLORS } from '../../config/theme';
 import type { ItemFlowStats, ModuleFlowStats } from '../../types';
+import { formatQty } from '../../utils';
 import type { RecipeGraph } from '../../utils/recipeGraph';
 
 interface DagTooltipProps {
@@ -17,11 +18,6 @@ function trendArrow(trend: 'rising' | 'falling' | 'stable'): string {
     case 'falling': return '\u2193';
     case 'stable': return '\u2192';
   }
-}
-
-function formatQty(qty: number): string {
-  if (qty >= 1000) { return `${(qty / 1000).toFixed(1)}k`; }
-  return qty.toFixed(qty < 10 ? 1 : 0);
 }
 
 export function DagTooltip({ nodeId, x, y, graph, moduleFlowStats, itemFlowStats }: DagTooltipProps) {

@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 
 import { RECIPE_STATUS_COLORS, itemTypeColor } from '../../config/theme';
 import type { ItemFlowStats, ModuleFlowStats } from '../../types';
+import { formatQty } from '../../utils';
 import type { GraphEdge, ItemNode, RecipeGraph, RecipeNode } from '../../utils/recipeGraph';
 
 const ITEM_NODE_WIDTH = 80;
@@ -110,11 +111,6 @@ function computeLayout(
 function abbreviate(name: string): string {
   if (name.length <= 3) { return name.toUpperCase(); }
   return name.slice(0, 3).toUpperCase();
-}
-
-function formatQty(qty: number): string {
-  if (qty >= 1000) { return `${(qty / 1000).toFixed(1)}k`; }
-  return qty.toFixed(qty < 10 ? 1 : 0);
 }
 
 /** Collect IDs of all nodes connected to selectedNodeId via edges */
