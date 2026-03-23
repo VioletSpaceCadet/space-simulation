@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { daemonPost, getMeta } from "./helpers";
 
-test.describe("Speed controls via keyboard presets", () => {
+test.describe("Speed controls via keyboard arrows", () => {
   test.beforeEach(async ({ page }) => {
     await daemonPost("/api/v1/resume");
     await daemonPost("/api/v1/speed", { ticks_per_sec: 10 });
@@ -13,24 +13,30 @@ test.describe("Speed controls via keyboard presets", () => {
     await daemonPost("/api/v1/pause");
   });
 
-  test("pressing 1 sets speed to 100 TPS", async ({ page }) => {
-    await page.keyboard.press("Digit1");
+  test("pressing ArrowRight increases speed to first preset", async ({ page }) => {
+    // Start at 10 TPS (not a preset), ArrowRight should go to 100
+    await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(200);
     const meta = await getMeta();
     expect(meta.ticks_per_sec).toBe(100);
   });
 
-  test("pressing 2 sets speed to 1K TPS", async ({ page }) => {
-    await page.keyboard.press("Digit2");
+  test("pressing ArrowRight twice reaches 1K TPS", async ({ page }) => {
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(100);
+    await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(200);
     const meta = await getMeta();
     expect(meta.ticks_per_sec).toBe(1000);
   });
 
-  test("pressing 5 sets speed to max (0)", async ({ page }) => {
-    await page.keyboard.press("Digit5");
+  test("pressing ArrowLeft decreases speed", async ({ page }) => {
+    // Set to 1K first, then decrease
+    await daemonPost("/api/v1/speed", { ticks_per_sec: 1000 });
+    await page.waitForTimeout(200);
+    await page.keyboard.press("ArrowLeft");
     await page.waitForTimeout(200);
     const meta = await getMeta();
-    expect(meta.ticks_per_sec).toBe(0);
+    expect(meta.ticks_per_sec).toBe(100);
   });
 });

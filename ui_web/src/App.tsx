@@ -17,7 +17,7 @@ import { FleetPanel } from './components/FleetPanel';
 import { LayoutRenderer } from './components/LayoutRenderer';
 import { ResearchPanel } from './components/ResearchPanel';
 import { SolarSystemMapCanvas } from './components/SolarSystemMapCanvas';
-import { StatusBar } from './components/StatusBar';
+import { SPEED_TPS_VALUES, StatusBar } from './components/StatusBar';
 import { useAnimatedTick } from './hooks/useAnimatedTick';
 import { useLayoutState } from './hooks/useLayoutState';
 import { useSimStream } from './hooks/useSimStream';
@@ -78,18 +78,6 @@ export default function App() {
   }, [ensurePanelVisible]);
 
   useEffect(() => {
-    const SPEED_KEYS: Record<string, number> = {
-      'Digit1': 100,
-      'Digit2': 1_000,
-      'Digit3': 10_000,
-      'Digit4': 100_000,
-      'Digit5': 0,
-      'Numpad1': 100,
-      'Numpad2': 1_000,
-      'Numpad3': 10_000,
-      'Numpad4': 100_000,
-      'Numpad5': 0,
-    };
     function handleKeyDown(event: KeyboardEvent) {
       const tag = (event.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT') {return;}
@@ -98,15 +86,23 @@ export default function App() {
         handleTogglePause();
         return;
       }
-      const speedTps = SPEED_KEYS[event.code];
-      if (speedTps !== undefined) {
-        handleSetSpeed(speedTps);
+      if (event.code === 'ArrowRight' || event.code === 'ArrowLeft') {
+        event.preventDefault();
+        const currentIndex = SPEED_TPS_VALUES.indexOf(ticksPerSec as typeof SPEED_TPS_VALUES[number]);
+        const base = currentIndex === -1 ? 0 : currentIndex;
+        if (event.code === 'ArrowLeft') {
+          const nextIndex = Math.max(0, base - 1);
+          handleSetSpeed(SPEED_TPS_VALUES[nextIndex]);
+        } else {
+          const nextIndex = Math.min(SPEED_TPS_VALUES.length - 1, base + 1);
+          handleSetSpeed(SPEED_TPS_VALUES[nextIndex]);
+        }
         return;
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleTogglePause, handleSetSpeed]);
+  }, [handleTogglePause, handleSetSpeed, ticksPerSec]);
 
   const renderPanel = useCallback(
     (id: PanelId) => {

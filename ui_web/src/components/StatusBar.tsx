@@ -7,6 +7,9 @@ import { formatCurrency } from '../utils';
 
 import { AlertBadges } from './AlertBadges';
 
+/** Ordered speed tps values shared by StatusBar buttons and keyboard shortcuts. */
+export const SPEED_TPS_VALUES = [100, 1_000, 10_000, 100_000, 0] as const;
+
 const SPEED_PRESETS = [
   { label: '100', tps: 100 },
   { label: '1K', tps: 1_000 },
