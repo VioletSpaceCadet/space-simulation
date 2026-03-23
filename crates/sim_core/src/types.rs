@@ -1285,6 +1285,63 @@ impl ModuleBehaviorDef {
         }
     }
 
+    /// Returns the default runtime state and behavior type tag for this module behavior.
+    pub fn default_state(&self) -> (ModuleKindState, BehaviorType) {
+        match self {
+            Self::Processor(_) => (
+                ModuleKindState::Processor(ProcessorState {
+                    threshold_kg: 0.0,
+                    ticks_since_last_run: 0,
+                    stalled: false,
+                    selected_recipe: None,
+                }),
+                BehaviorType::Processor,
+            ),
+            Self::Storage { .. } => (ModuleKindState::Storage, BehaviorType::Storage),
+            Self::Maintenance(_) => (
+                ModuleKindState::Maintenance(MaintenanceState {
+                    ticks_since_last_run: 0,
+                }),
+                BehaviorType::Maintenance,
+            ),
+            Self::Assembler(_) => (
+                ModuleKindState::Assembler(AssemblerState {
+                    ticks_since_last_run: 0,
+                    stalled: false,
+                    capped: false,
+                    cap_override: std::collections::HashMap::new(),
+                    selected_recipe: None,
+                }),
+                BehaviorType::Assembler,
+            ),
+            Self::Lab(_) => (
+                ModuleKindState::Lab(LabState {
+                    ticks_since_last_run: 0,
+                    assigned_tech: None,
+                    starved: false,
+                }),
+                BehaviorType::Lab,
+            ),
+            Self::SensorArray(_) => (
+                ModuleKindState::SensorArray(SensorArrayState::default()),
+                BehaviorType::SensorArray,
+            ),
+            Self::SolarArray(_) => (
+                ModuleKindState::SolarArray(SolarArrayState::default()),
+                BehaviorType::SolarArray,
+            ),
+            Self::Battery(_) => (
+                ModuleKindState::Battery(BatteryState { charge_kwh: 0.0 }),
+                BehaviorType::Battery,
+            ),
+            Self::Radiator(_) => (
+                ModuleKindState::Radiator(RadiatorState::default()),
+                BehaviorType::Radiator,
+            ),
+            Self::Equipment => (ModuleKindState::Equipment, BehaviorType::Equipment),
+        }
+    }
+
     /// Returns the power-stall priority for ticking modules. Lower = stalled first.
     /// Passive modules (solar, storage, battery, radiator) return `None`.
     pub fn power_priority(&self) -> Option<u8> {
