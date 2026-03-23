@@ -186,7 +186,38 @@ fn execute(
     super::RunOutcome::Completed
 }
 
-#[allow(clippy::too_many_lines)]
+/// Shared context for processor output emission helpers.
+struct ProcessorRunCtx<'a> {
+    station_id: &'a StationId,
+    avg_composition: &'a HashMap<String, f32>,
+    consumed_kg: f32,
+    proc_mods: &'a crate::modifiers::ModifierSet,
+}
+
+fn build_processor_modifiers(
+    wear_efficiency: f32,
+    thermal_efficiency: f32,
+    thermal_quality: f32,
+) -> crate::modifiers::ModifierSet {
+    let mut mods = crate::modifiers::ModifierSet::new();
+    mods.add(crate::modifiers::Modifier::pct_mult(
+        crate::modifiers::StatId::ProcessingYield,
+        f64::from(wear_efficiency),
+        crate::modifiers::ModifierSource::Wear,
+    ));
+    mods.add(crate::modifiers::Modifier::pct_mult(
+        crate::modifiers::StatId::ProcessingYield,
+        f64::from(thermal_efficiency),
+        crate::modifiers::ModifierSource::Thermal,
+    ));
+    mods.add(crate::modifiers::Modifier::pct_mult(
+        crate::modifiers::StatId::ProcessingQuality,
+        f64::from(thermal_quality),
+        crate::modifiers::ModifierSource::Thermal,
+    ));
+    mods
+}
+
 fn resolve_processor_run(
     ctx: &super::ModuleTickContext,
     state: &mut GameState,
@@ -197,19 +228,15 @@ fn resolve_processor_run(
     recipe_id: &crate::RecipeId,
 ) {
     let current_tick = state.meta.tick;
-
     let Some(recipe) = content.recipes.get(recipe_id) else {
         return;
     };
-
     let rate_kg = match recipe.inputs.first().map(|i| &i.amount) {
         Some(InputAmount::Kg(kg)) => *kg,
         _ => return,
     };
-
     let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
 
-    // FIFO-consume ore and compute weighted average composition.
     let (consumed_kg, lots) = {
         let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return;
@@ -218,7 +245,6 @@ fn resolve_processor_run(
             matches_input_filter(item, input_filter.as_ref())
         })
     };
-
     if consumed_kg < MIN_MEANINGFUL_KG {
         return;
     }
@@ -226,7 +252,6 @@ fn resolve_processor_run(
     let lot_refs: Vec<(&HashMap<String, f32>, f32)> =
         lots.iter().map(|(comp, kg)| (comp, *kg)).collect();
     let avg_composition = weighted_composition(&lot_refs);
-
     let extracted_element: Option<String> = recipe.outputs.iter().find_map(|o| {
         if let OutputSpec::Material { element, .. } = o {
             Some(element.clone())
@@ -235,28 +260,17 @@ fn resolve_processor_run(
         }
     });
 
-    // Build modifier set for this processor run.
-    let mut proc_mods = crate::modifiers::ModifierSet::new();
-    proc_mods.add(crate::modifiers::Modifier::pct_mult(
-        crate::modifiers::StatId::ProcessingYield,
-        f64::from(ctx.efficiency),
-        crate::modifiers::ModifierSource::Wear,
-    ));
-    proc_mods.add(crate::modifiers::Modifier::pct_mult(
-        crate::modifiers::StatId::ProcessingYield,
-        f64::from(thermal_efficiency),
-        crate::modifiers::ModifierSource::Thermal,
-    ));
-    proc_mods.add(crate::modifiers::Modifier::pct_mult(
-        crate::modifiers::StatId::ProcessingQuality,
-        f64::from(thermal_quality),
-        crate::modifiers::ModifierSource::Thermal,
-    ));
+    let proc_mods = build_processor_modifiers(ctx.efficiency, thermal_efficiency, thermal_quality);
+    let run_ctx = ProcessorRunCtx {
+        station_id: &ctx.station_id,
+        avg_composition: &avg_composition,
+        consumed_kg,
+        proc_mods: &proc_mods,
+    };
 
     let mut material_kg = 0.0_f32;
     let mut material_quality = 0.0_f32;
     let mut slag_kg = 0.0_f32;
-
     for output in &recipe.outputs {
         match output {
             OutputSpec::Material {
@@ -264,122 +278,25 @@ fn resolve_processor_run(
                 yield_formula,
                 quality_formula,
             } => {
-                let yield_frac = match yield_formula {
-                    YieldFormula::ElementFraction { element: el } => {
-                        avg_composition.get(el).copied().unwrap_or(0.0)
-                    }
-                    YieldFormula::FixedFraction(f) => *f,
-                };
-                material_kg = proc_mods.resolve_with_f32(
-                    crate::modifiers::StatId::ProcessingYield,
-                    consumed_kg * yield_frac,
-                    &state.modifiers,
-                );
-                let base_quality = match quality_formula {
-                    QualityFormula::ElementFractionTimesMultiplier {
-                        element: el,
-                        multiplier,
-                    } => (avg_composition.get(el).copied().unwrap_or(0.0) * multiplier)
-                        .clamp(0.0, 1.0),
-                    QualityFormula::Fixed(q) => *q,
-                };
-                material_quality = proc_mods.resolve_with_f32(
-                    crate::modifiers::StatId::ProcessingQuality,
-                    base_quality,
-                    &state.modifiers,
-                );
-                if material_kg > MIN_MEANINGFUL_KG {
-                    if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                        merge_material_lot(
-                            &mut station.inventory,
-                            element.clone(),
-                            material_kg,
-                            material_quality,
-                            None,
-                        );
-                    }
-                }
+                (material_kg, material_quality) =
+                    emit_material_output(state, &run_ctx, element, yield_formula, quality_formula);
             }
             OutputSpec::Slag { yield_formula } => {
-                let yield_frac = match yield_formula {
-                    YieldFormula::FixedFraction(f) => *f,
-                    YieldFormula::ElementFraction { element } => {
-                        avg_composition.get(element).copied().unwrap_or(0.0)
-                    }
-                };
-                slag_kg = (consumed_kg - material_kg) * yield_frac;
-
-                // Slag composition: non-extracted elements, re-normalized.
-                let slag_composition =
-                    slag_composition_from_avg(&avg_composition, extracted_element.as_deref());
-
-                if slag_kg > MIN_MEANINGFUL_KG {
-                    if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                        let existing = station
-                            .inventory
-                            .iter_mut()
-                            .find(|i| matches!(i, InventoryItem::Slag { .. }));
-                        if let Some(InventoryItem::Slag {
-                            kg: existing_kg,
-                            composition: existing_comp,
-                        }) = existing
-                        {
-                            let blended = blend_slag_composition(
-                                existing_comp,
-                                *existing_kg,
-                                &slag_composition,
-                                slag_kg,
-                            );
-                            *existing_kg += slag_kg;
-                            *existing_comp = blended;
-                        } else {
-                            station.inventory.push(InventoryItem::Slag {
-                                kg: slag_kg,
-                                composition: slag_composition,
-                            });
-                        }
-                    }
-                }
+                slag_kg = emit_slag_output(
+                    state,
+                    &run_ctx,
+                    yield_formula,
+                    material_kg,
+                    extracted_element.as_deref(),
+                );
             }
             OutputSpec::Component {
                 component_id,
                 quality_formula,
             } => {
-                let base_quality = match quality_formula {
-                    QualityFormula::Fixed(q) => *q,
-                    QualityFormula::ElementFractionTimesMultiplier {
-                        element,
-                        multiplier,
-                    } => (avg_composition
-                        .get(element.as_str())
-                        .copied()
-                        .unwrap_or(0.0)
-                        * multiplier)
-                        .clamp(0.0, 1.0),
-                };
-                let quality = proc_mods.resolve_with_f32(
-                    crate::modifiers::StatId::ProcessingQuality,
-                    base_quality,
-                    &state.modifiers,
-                );
-                let produced_count = 1u32;
-                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                    let existing = station.inventory.iter_mut().find(|i| {
-                        matches!(i, InventoryItem::Component { component_id: cid, quality: q, .. }
-                            if cid.0 == component_id.0 && (*q - quality).abs() < 1e-3)
-                    });
-                    if let Some(InventoryItem::Component { count, .. }) = existing {
-                        *count += produced_count;
-                    } else {
-                        station.inventory.push(InventoryItem::Component {
-                            component_id: component_id.clone(),
-                            count: produced_count,
-                            quality,
-                        });
-                    }
-                }
+                emit_component_output(state, &run_ctx, component_id, quality_formula);
             }
-            OutputSpec::Ship { .. } => {} // Ship output only from assembler
+            OutputSpec::Ship { .. } => {}
         }
     }
 
@@ -396,34 +313,179 @@ fn resolve_processor_run(
             material_element: extracted_element.unwrap_or_default(),
         },
     ));
+    apply_recipe_heat(state, ctx, content, recipe);
+}
 
-    // Apply recipe heat generation to module thermal state
-    if let Some(ref thermal_req) = recipe.thermal_req {
-        if thermal_req.heat_per_run_j != 0 {
-            if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                let module = &mut station.modules[ctx.module_idx];
-                if let Some(thermal_def) = content
-                    .module_defs
-                    .get(&module.def_id)
-                    .and_then(|d| d.thermal.as_ref())
-                {
-                    let delta_mk = thermal::heat_to_temp_delta_mk(
-                        thermal_req.heat_per_run_j,
-                        thermal_def.heat_capacity_j_per_k,
-                    );
-                    if let Some(ref mut thermal_state) = module.thermal {
-                        if delta_mk >= 0 {
-                            #[allow(clippy::cast_sign_loss)] // .max(0) guarantees non-negative
-                            let delta = delta_mk.max(0) as u32;
-                            thermal_state.temp_mk = thermal_state.temp_mk.saturating_add(delta);
-                        } else {
-                            thermal_state.temp_mk = thermal_state
-                                .temp_mk
-                                .saturating_sub(delta_mk.unsigned_abs());
-                        }
-                    }
-                }
+/// Compute material output from a processor run and merge into station inventory.
+/// Returns `(material_kg, material_quality)`.
+fn emit_material_output(
+    state: &mut GameState,
+    run: &ProcessorRunCtx,
+    element: &str,
+    yield_formula: &YieldFormula,
+    quality_formula: &QualityFormula,
+) -> (f32, f32) {
+    let yield_frac = match yield_formula {
+        YieldFormula::ElementFraction { element: el } => {
+            run.avg_composition.get(el).copied().unwrap_or(0.0)
+        }
+        YieldFormula::FixedFraction(f) => *f,
+    };
+    let material_kg = run.proc_mods.resolve_with_f32(
+        crate::modifiers::StatId::ProcessingYield,
+        run.consumed_kg * yield_frac,
+        &state.modifiers,
+    );
+    let base_quality = match quality_formula {
+        QualityFormula::ElementFractionTimesMultiplier {
+            element: el,
+            multiplier,
+        } => (run.avg_composition.get(el).copied().unwrap_or(0.0) * multiplier).clamp(0.0, 1.0),
+        QualityFormula::Fixed(q) => *q,
+    };
+    let material_quality = run.proc_mods.resolve_with_f32(
+        crate::modifiers::StatId::ProcessingQuality,
+        base_quality,
+        &state.modifiers,
+    );
+    if material_kg > MIN_MEANINGFUL_KG {
+        if let Some(station) = state.stations.get_mut(run.station_id) {
+            merge_material_lot(
+                &mut station.inventory,
+                element.to_string(),
+                material_kg,
+                material_quality,
+                None,
+            );
+        }
+    }
+    (material_kg, material_quality)
+}
+
+/// Compute slag output from a processor run and merge into station inventory.
+/// Returns the slag mass produced.
+fn emit_slag_output(
+    state: &mut GameState,
+    run: &ProcessorRunCtx,
+    yield_formula: &YieldFormula,
+    material_kg: f32,
+    extracted_element: Option<&str>,
+) -> f32 {
+    let yield_frac = match yield_formula {
+        YieldFormula::FixedFraction(f) => *f,
+        YieldFormula::ElementFraction { element } => {
+            run.avg_composition.get(element).copied().unwrap_or(0.0)
+        }
+    };
+    let slag_kg = (run.consumed_kg - material_kg) * yield_frac;
+    let slag_composition = slag_composition_from_avg(run.avg_composition, extracted_element);
+
+    if slag_kg > MIN_MEANINGFUL_KG {
+        if let Some(station) = state.stations.get_mut(run.station_id) {
+            let existing = station
+                .inventory
+                .iter_mut()
+                .find(|i| matches!(i, InventoryItem::Slag { .. }));
+            if let Some(InventoryItem::Slag {
+                kg: existing_kg,
+                composition: existing_comp,
+            }) = existing
+            {
+                let blended =
+                    blend_slag_composition(existing_comp, *existing_kg, &slag_composition, slag_kg);
+                *existing_kg += slag_kg;
+                *existing_comp = blended;
+            } else {
+                station.inventory.push(InventoryItem::Slag {
+                    kg: slag_kg,
+                    composition: slag_composition,
+                });
             }
+        }
+    }
+    slag_kg
+}
+
+/// Produce a component from a processor run and add to station inventory.
+fn emit_component_output(
+    state: &mut GameState,
+    run: &ProcessorRunCtx,
+    component_id: &crate::ComponentId,
+    quality_formula: &QualityFormula,
+) {
+    let base_quality = match quality_formula {
+        QualityFormula::Fixed(q) => *q,
+        QualityFormula::ElementFractionTimesMultiplier {
+            element,
+            multiplier,
+        } => (run
+            .avg_composition
+            .get(element.as_str())
+            .copied()
+            .unwrap_or(0.0)
+            * multiplier)
+            .clamp(0.0, 1.0),
+    };
+    let quality = run.proc_mods.resolve_with_f32(
+        crate::modifiers::StatId::ProcessingQuality,
+        base_quality,
+        &state.modifiers,
+    );
+    let produced_count = 1u32;
+    if let Some(station) = state.stations.get_mut(run.station_id) {
+        let existing = station.inventory.iter_mut().find(|i| {
+            matches!(i, InventoryItem::Component { component_id: cid, quality: q, .. }
+                if cid.0 == component_id.0 && (*q - quality).abs() < 1e-3)
+        });
+        if let Some(InventoryItem::Component { count, .. }) = existing {
+            *count += produced_count;
+        } else {
+            station.inventory.push(InventoryItem::Component {
+                component_id: component_id.clone(),
+                count: produced_count,
+                quality,
+            });
+        }
+    }
+}
+
+/// Apply recipe heat generation to the module's thermal state after a successful run.
+fn apply_recipe_heat(
+    state: &mut GameState,
+    ctx: &super::ModuleTickContext,
+    content: &GameContent,
+    recipe: &crate::RecipeDef,
+) {
+    let Some(ref thermal_req) = recipe.thermal_req else {
+        return;
+    };
+    if thermal_req.heat_per_run_j == 0 {
+        return;
+    }
+    let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+        return;
+    };
+    let module = &mut station.modules[ctx.module_idx];
+    let Some(thermal_def) = content
+        .module_defs
+        .get(&module.def_id)
+        .and_then(|d| d.thermal.as_ref())
+    else {
+        return;
+    };
+    let delta_mk = thermal::heat_to_temp_delta_mk(
+        thermal_req.heat_per_run_j,
+        thermal_def.heat_capacity_j_per_k,
+    );
+    if let Some(ref mut thermal_state) = module.thermal {
+        if delta_mk >= 0 {
+            #[allow(clippy::cast_sign_loss)] // .max(0) guarantees non-negative
+            let delta = delta_mk.max(0) as u32;
+            thermal_state.temp_mk = thermal_state.temp_mk.saturating_add(delta);
+        } else {
+            thermal_state.temp_mk = thermal_state
+                .temp_mk
+                .saturating_sub(delta_mk.unsigned_abs());
         }
     }
 }
