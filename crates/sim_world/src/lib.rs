@@ -1371,4 +1371,76 @@ mod tests {
         assert_eq!(content.constants.event_global_cooldown_ticks, 200);
         assert_eq!(content.constants.event_history_capacity, 100);
     }
+
+    #[test]
+    fn test_load_hull_defs_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let hull_json = r#"[
+            {
+                "id": "hull_test",
+                "name": "Test Hull",
+                "mass_kg": 5000.0,
+                "cargo_capacity_m3": 50.0,
+                "base_speed_ticks_per_au": 120,
+                "base_propellant_capacity_kg": 10000.0,
+                "slots": [
+                    { "slot_type": "utility", "label": "Utility 1" }
+                ]
+            }
+        ]"#;
+        std::fs::write(dir.path().join("hull_defs.json"), hull_json).unwrap();
+        let hulls = load_hull_defs(dir.path()).unwrap();
+        assert_eq!(hulls.len(), 1);
+        let hull = &hulls[&sim_core::HullId("hull_test".to_string())];
+        assert_eq!(hull.name, "Test Hull");
+        assert_eq!(hull.slots.len(), 1);
+        assert_eq!(
+            hull.slots[0].slot_type,
+            sim_core::SlotType("utility".to_string())
+        );
+        assert_eq!(hull.base_propellant_capacity_kg, 10000.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate hull ID")]
+    fn test_load_hull_defs_duplicate_panics() {
+        let dir = tempfile::tempdir().unwrap();
+        let hull_json = r#"[
+            {
+                "id": "hull_dup",
+                "name": "Hull A",
+                "mass_kg": 1000.0,
+                "cargo_capacity_m3": 10.0,
+                "base_speed_ticks_per_au": 100,
+                "base_propellant_capacity_kg": 5000.0,
+                "slots": []
+            },
+            {
+                "id": "hull_dup",
+                "name": "Hull B",
+                "mass_kg": 2000.0,
+                "cargo_capacity_m3": 20.0,
+                "base_speed_ticks_per_au": 200,
+                "base_propellant_capacity_kg": 8000.0,
+                "slots": []
+            }
+        ]"#;
+        std::fs::write(dir.path().join("hull_defs.json"), hull_json).unwrap();
+        let _ = load_hull_defs(dir.path()).unwrap();
+    }
+
+    #[test]
+    fn test_load_hull_defs_missing_file_returns_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        // No hull_defs.json written
+        let hulls = load_hull_defs(dir.path()).unwrap();
+        assert!(hulls.is_empty());
+    }
+
+    #[test]
+    fn test_validate_hull_defs_no_panic_on_empty() {
+        let content = base_content();
+        // Should not panic — empty hulls is valid
+        validate_hull_defs(&content);
+    }
 }
