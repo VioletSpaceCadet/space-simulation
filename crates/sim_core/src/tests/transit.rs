@@ -98,6 +98,7 @@ fn transit_moves_ship_and_starts_next_task() {
             next_module_instance_id: 0,
         },
         modifiers: crate::modifiers::ModifierSet::default(),
+        events: crate::sim_events::SimEventState::default(),
         body_cache: std::collections::HashMap::new(),
     };
 
@@ -282,6 +283,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
             next_module_instance_id: 0,
         },
         modifiers: crate::modifiers::ModifierSet::default(),
+        events: crate::sim_events::SimEventState::default(),
         body_cache: std::collections::HashMap::new(),
     };
 
