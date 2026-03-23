@@ -1,6 +1,6 @@
 import { ITEM_TYPE_COLORS, RECIPE_STATUS_COLORS } from '../../config/theme';
 import type { ItemFlowStats, ModuleFlowStats } from '../../types';
-import { formatQty } from '../../utils';
+import { displayName, formatQty } from '../../utils';
 import type { RecipeGraph } from '../../utils/recipeGraph';
 
 interface DagTooltipProps {
@@ -51,7 +51,7 @@ export function DagTooltip({ nodeId, x, y, graph, moduleFlowStats, itemFlowStats
         className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[10px] shadow-lg pointer-events-none max-w-[200px]"
       >
         <div className="flex items-center gap-1.5 mb-1">
-          <span className="font-bold text-zinc-200">{item.name}</span>
+          <span className="font-bold text-zinc-200">{displayName(item.name)}</span>
           <span
             className="px-1 rounded text-[9px] text-white"
             style={{ background: typeBg }}
@@ -69,12 +69,12 @@ export function DagTooltip({ nodeId, x, y, graph, moduleFlowStats, itemFlowStats
         </div>
         {producedBy.length > 0 && (
           <div className="text-zinc-500 mt-1">
-            Produced by: {[...new Set(producedBy)].join(', ')}
+            Produced by: {[...new Set(producedBy)].map(displayName).join(', ')}
           </div>
         )}
         {consumedBy.length > 0 && (
           <div className="text-zinc-500 mt-0.5">
-            Consumed by: {[...new Set(consumedBy)].join(', ')}
+            Consumed by: {[...new Set(consumedBy)].map(displayName).join(', ')}
           </div>
         )}
       </div>
@@ -112,7 +112,7 @@ export function DagTooltip({ nodeId, x, y, graph, moduleFlowStats, itemFlowStats
         className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[10px] shadow-lg pointer-events-none max-w-[220px]"
       >
         <div className="flex items-center gap-1.5 mb-1">
-          <span className="font-bold text-zinc-200">{recipeId}</span>
+          <span className="font-bold text-zinc-200">{displayName(recipeId)}</span>
           <span
             className="px-1 rounded text-[9px] text-white"
             style={{ background: statusColor }}
@@ -122,10 +122,10 @@ export function DagTooltip({ nodeId, x, y, graph, moduleFlowStats, itemFlowStats
         </div>
         <div className="text-zinc-400 mb-1">
           {recipe.inputs.map((input, index) => (
-            <div key={index}>In: {input.itemId} x{input.amount} {input.unit}</div>
+            <div key={index}>In: {displayName(input.itemId)} x{input.amount}{input.unit === 'kg' ? ' kg' : ''}</div>
           ))}
           {recipe.outputs.map((output, index) => (
-            <div key={index}>Out: {output.itemId}</div>
+            <div key={index}>Out: {displayName(output.itemId)}</div>
           ))}
         </div>
         {totalThroughput > 0 && (

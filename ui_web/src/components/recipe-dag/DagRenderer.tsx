@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 
 import { RECIPE_STATUS_COLORS, itemTypeColor } from '../../config/theme';
 import type { ItemFlowStats, ModuleFlowStats } from '../../types';
-import { formatQty } from '../../utils';
+import { displayName, formatQty } from '../../utils';
 import type { GraphEdge, ItemNode, RecipeGraph, RecipeNode } from '../../utils/recipeGraph';
 
 const ITEM_NODE_WIDTH = 80;
@@ -109,6 +109,10 @@ function computeLayout(
 }
 
 function abbreviate(name: string): string {
+  const parts = name.split('_').filter(Boolean);
+  if (parts.length > 1) {
+    return parts.map(p => p[0]).join('').slice(0, 3).toUpperCase();
+  }
   if (name.length <= 3) { return name.toUpperCase(); }
   return name.slice(0, 3).toUpperCase();
 }
@@ -325,18 +329,16 @@ export function DagRenderer({
               onMouseLeave={() => onNodeHover(null, 0, 0)}
             >
               <div
-                className="w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0"
+                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
                 style={{
                   background: itemTypeColor(item.type),
-                  borderColor: isSelected ? '#fff' : itemTypeColor(item.type),
+                  outline: isSelected ? '2px solid #fff' : 'none',
+                  outlineOffset: '1px',
                 }}
               >
                 <span className="text-[10px] font-bold text-white leading-none">
                   {abbreviate(item.name)}
                 </span>
-              </div>
-              <div className="text-[9px] text-zinc-400 truncate max-w-full text-center">
-                {item.name}
               </div>
               <div className="text-[9px] text-zinc-500">
                 {formatQty(displayQty)}
@@ -400,7 +402,7 @@ export function DagRenderer({
                 style={{ background: statusColor }}
               />
               <span className="text-[11px] text-zinc-200 truncate flex-1">
-                {recipe.id}
+                {displayName(recipe.id)}
               </span>
               {/* Utilization bar at bottom */}
               <div

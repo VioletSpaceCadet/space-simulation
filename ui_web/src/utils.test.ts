@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getEventKey, getTaskKind } from './utils';
+import { displayName, formatQty, getEventKey, getTaskKind } from './utils';
 
 describe('getEventKey', () => {
   it('extracts the discriminant key from a tagged union event', () => {
@@ -24,5 +24,36 @@ describe('getTaskKind', () => {
 
   it('returns null when task is undefined', () => {
     expect(getTaskKind(undefined as never)).toBeNull();
+  });
+});
+
+describe('formatQty', () => {
+  it('shows integers without decimals', () => {
+    expect(formatQty(0)).toBe('0');
+    expect(formatQty(5)).toBe('5');
+    expect(formatQty(100)).toBe('100');
+  });
+
+  it('shows one decimal for small fractional values', () => {
+    expect(formatQty(3.7)).toBe('3.7');
+  });
+
+  it('abbreviates thousands', () => {
+    expect(formatQty(1200)).toBe('1.2k');
+  });
+});
+
+describe('displayName', () => {
+  it('strips recipe_ prefix and converts to title case', () => {
+    expect(displayName('recipe_hull_panel')).toBe('Hull Panel');
+  });
+
+  it('converts plain snake_case to title case', () => {
+    expect(displayName('structural_beam')).toBe('Structural Beam');
+  });
+
+  it('capitalizes single words', () => {
+    expect(displayName('ore')).toBe('Ore');
+    expect(displayName('Fe')).toBe('Fe');
   });
 });
