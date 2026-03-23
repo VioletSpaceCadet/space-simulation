@@ -78,18 +78,7 @@ export default function App() {
   }, [ensurePanelVisible]);
 
   useEffect(() => {
-    const SPEED_KEYS: Record<string, number> = {
-      'Digit1': 100,
-      'Digit2': 1_000,
-      'Digit3': 10_000,
-      'Digit4': 100_000,
-      'Digit5': 0,
-      'Numpad1': 100,
-      'Numpad2': 1_000,
-      'Numpad3': 10_000,
-      'Numpad4': 100_000,
-      'Numpad5': 0,
-    };
+    const SPEED_STEPS = [100, 1_000, 10_000, 100_000, 0];
     function handleKeyDown(event: KeyboardEvent) {
       const tag = (event.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT') {return;}
@@ -98,15 +87,23 @@ export default function App() {
         handleTogglePause();
         return;
       }
-      const speedTps = SPEED_KEYS[event.code];
-      if (speedTps !== undefined) {
-        handleSetSpeed(speedTps);
+      if (event.code === 'Tab') {
+        event.preventDefault();
+        const currentIndex = SPEED_STEPS.indexOf(ticksPerSec);
+        const base = currentIndex === -1 ? 0 : currentIndex;
+        if (event.shiftKey) {
+          const nextIndex = Math.max(0, base - 1);
+          handleSetSpeed(SPEED_STEPS[nextIndex]);
+        } else {
+          const nextIndex = Math.min(SPEED_STEPS.length - 1, base + 1);
+          handleSetSpeed(SPEED_STEPS[nextIndex]);
+        }
         return;
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleTogglePause, handleSetSpeed]);
+  }, [handleTogglePause, handleSetSpeed, ticksPerSec]);
 
   const renderPanel = useCallback(
     (id: PanelId) => {
