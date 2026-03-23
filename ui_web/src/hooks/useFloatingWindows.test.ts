@@ -6,10 +6,12 @@ import { useFloatingWindows } from './useFloatingWindows';
 describe('useFloatingWindows', () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.useFakeTimers();
     vi.spyOn(Storage.prototype, 'setItem');
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -143,5 +145,39 @@ describe('useFloatingWindows', () => {
 
     expect(result.current.windows[0].x).toBe(250);
     expect(result.current.windows[0].y).toBe(150);
+  });
+
+  it('filters out invalid entries from localStorage', () => {
+    const saved = [
+      { id: 'ok', panelId: 'map', x: 0, y: 0, width: 480, height: 360, zIndex: 100 },
+      { id: 'bad', panelId: 'nonexistent', x: 0, y: 0, width: 480, height: 360, zIndex: 101 },
+      { id: 'incomplete' },
+    ];
+    localStorage.setItem('floating-windows', JSON.stringify(saved));
+
+    const { result } = renderHook(() => useFloatingWindows());
+
+    expect(result.current.windows).toHaveLength(1);
+    expect(result.current.windows[0].panelId).toBe('map');
+  });
+
+  it('debounces persistence for updateWindow', () => {
+    const { result } = renderHook(() => useFloatingWindows());
+
+    act(() => { result.current.openWindow('map'); });
+    const callsBefore = (localStorage.setItem as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    act(() => { result.current.updateWindow(result.current.windows[0].id, { x: 200 }); });
+    act(() => { result.current.updateWindow(result.current.windows[0].id, { x: 250 }); });
+
+    // Not yet persisted (debounced)
+    const callsAfterUpdates = (localStorage.setItem as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(callsAfterUpdates).toBe(callsBefore);
+
+    // Flush the debounce timer
+    act(() => { vi.advanceTimersByTime(300); });
+
+    const callsAfterFlush = (localStorage.setItem as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(callsAfterFlush).toBeGreaterThan(callsBefore);
   });
 });

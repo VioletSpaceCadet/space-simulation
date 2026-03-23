@@ -85,9 +85,11 @@ export default function App() {
   }, [ensurePanelVisible]);
 
   const handlePopOut = useCallback((panelId: PanelId) => {
+    // Guard: don't pop out if already floating
+    if (floatingWindows.some(w => w.panelId === panelId)) { return; }
     togglePanel(panelId); // Remove from layout
     openWindow(panelId);
-  }, [togglePanel, openWindow]);
+  }, [togglePanel, openWindow, floatingWindows]);
 
   const handleDock = useCallback((windowId: string, panelId: PanelId) => {
     closeWindow(windowId);

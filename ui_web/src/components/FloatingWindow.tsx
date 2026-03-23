@@ -19,6 +19,7 @@ interface FloatingWindowProps {
 
 const MIN_WIDTH = 200;
 const MIN_HEIGHT = 150;
+const VISIBLE_MARGIN = 50; // px that must remain on-screen
 
 export function FloatingWindow({
   id, panelId, x, y, width, height, zIndex,
@@ -43,9 +44,11 @@ export function FloatingWindow({
       if (!dragRef.current) { return; }
       const dx = me.clientX - dragRef.current.startX;
       const dy = me.clientY - dragRef.current.startY;
+      const maxX = window.innerWidth - VISIBLE_MARGIN;
+      const maxY = window.innerHeight - VISIBLE_MARGIN;
       onUpdate(id, {
-        x: Math.max(0, dragRef.current.origX + dx),
-        y: Math.max(0, dragRef.current.origY + dy),
+        x: Math.min(maxX, Math.max(0, dragRef.current.origX + dx)),
+        y: Math.min(maxY, Math.max(0, dragRef.current.origY + dy)),
       });
     };
 
