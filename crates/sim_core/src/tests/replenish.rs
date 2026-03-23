@@ -120,6 +120,7 @@ fn replenish_test_content() -> GameContent {
         alert_rules: Vec::new(),
         events: Vec::new(),
         hulls: std::collections::BTreeMap::new(),
+        fitting_templates: std::collections::BTreeMap::new(),
         density_map: HashMap::new(),
     };
     content.constants.derive_tick_values();

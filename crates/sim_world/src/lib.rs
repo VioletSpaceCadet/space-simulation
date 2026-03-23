@@ -322,6 +322,43 @@ fn validate_hull_defs(content: &GameContent) {
             }
         }
     }
+
+    // Validate fitting templates reference valid hulls, modules, and compatible slots
+    for (hull_id, fittings) in &content.fitting_templates {
+        let hull = content.hulls.get(hull_id);
+        assert!(
+            hull.is_some(),
+            "fitting_templates references unknown hull '{hull_id}'"
+        );
+        let hull = hull.unwrap();
+        for fitting in fittings {
+            assert!(
+                fitting.slot_index < hull.slots.len(),
+                "fitting_templates hull '{}' slot_index {} out of range (hull has {} slots)",
+                hull_id,
+                fitting.slot_index,
+                hull.slots.len()
+            );
+            let module_def = content.module_defs.get(&fitting.module_def_id.0);
+            assert!(
+                module_def.is_some(),
+                "fitting_templates hull '{}' references unknown module '{}'",
+                hull_id,
+                fitting.module_def_id
+            );
+            let module_def = module_def.unwrap();
+            let slot_type = &hull.slots[fitting.slot_index].slot_type;
+            assert!(
+                module_def.compatible_slots.contains(slot_type),
+                "fitting_templates hull '{}' slot {} (type '{}') incompatible with module '{}' (compatible: {:?})",
+                hull_id,
+                fitting.slot_index,
+                slot_type,
+                fitting.module_def_id,
+                module_def.compatible_slots
+            );
+        }
+    }
 }
 
 pub fn validate_state(state: &GameState, content: &GameContent) {
@@ -368,6 +405,22 @@ fn load_hull_defs(
                 );
             }
             Ok(map)
+        }
+        Err(_) => Ok(std::collections::BTreeMap::new()),
+    }
+}
+
+fn load_fitting_templates(
+    dir: &Path,
+) -> Result<std::collections::BTreeMap<sim_core::HullId, Vec<sim_core::FittedModule>>> {
+    match std::fs::read_to_string(dir.join("fitting_templates.json")) {
+        Ok(text) => {
+            let map: std::collections::BTreeMap<String, Vec<sim_core::FittedModule>> =
+                serde_json::from_str(&text).context("parsing fitting_templates.json")?;
+            Ok(map
+                .into_iter()
+                .map(|(key, value)| (sim_core::HullId(key), value))
+                .collect())
         }
         Err(_) => Ok(std::collections::BTreeMap::new()),
     }
@@ -427,6 +480,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         event.resolve_weight();
     }
     let hulls = load_hull_defs(dir)?;
+    let fitting_templates = load_fitting_templates(dir)?;
     let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
     )
@@ -456,6 +510,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         alert_rules,
         events: sim_events,
         hulls,
+        fitting_templates,
         density_map: std::collections::HashMap::new(),
     };
     content.constants.derive_tick_values();

@@ -1,0 +1,22 @@
+{
+  "hull_general_purpose": [
+    { "slot_index": 0, "module_def_id": "module_cargo_expander" },
+    { "slot_index": 1, "module_def_id": "module_propellant_tank" },
+    { "slot_index": 2, "module_def_id": "module_mining_laser" }
+  ],
+  "hull_mining_barge": [
+    { "slot_index": 0, "module_def_id": "module_mining_laser" },
+    { "slot_index": 1, "module_def_id": "module_mining_laser" },
+    { "slot_index": 2, "module_def_id": "module_cargo_expander" }
+  ],
+  "hull_transport_hauler": [
+    { "slot_index": 0, "module_def_id": "module_cargo_expander" },
+    { "slot_index": 1, "module_def_id": "module_basic_engine" },
+    { "slot_index": 2, "module_def_id": "module_basic_engine" }
+  ],
+  "hull_survey_scout": [
+    { "slot_index": 0, "module_def_id": "module_survey_scanner" },
+    { "slot_index": 1, "module_def_id": "module_survey_scanner" },
+    { "slot_index": 2, "module_def_id": "module_propellant_tank" }
+  ]
+}
