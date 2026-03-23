@@ -17,7 +17,7 @@ import { FleetPanel } from './components/FleetPanel';
 import { LayoutRenderer } from './components/LayoutRenderer';
 import { ResearchPanel } from './components/ResearchPanel';
 import { SolarSystemMapCanvas } from './components/SolarSystemMapCanvas';
-import { StatusBar } from './components/StatusBar';
+import { SPEED_TPS_VALUES, StatusBar } from './components/StatusBar';
 import { useAnimatedTick } from './hooks/useAnimatedTick';
 import { useLayoutState } from './hooks/useLayoutState';
 import { useSimStream } from './hooks/useSimStream';
@@ -78,7 +78,6 @@ export default function App() {
   }, [ensurePanelVisible]);
 
   useEffect(() => {
-    const SPEED_STEPS = [100, 1_000, 10_000, 100_000, 0];
     function handleKeyDown(event: KeyboardEvent) {
       const tag = (event.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT') {return;}
@@ -87,16 +86,16 @@ export default function App() {
         handleTogglePause();
         return;
       }
-      if (event.code === 'Tab') {
+      if (event.code === 'ArrowRight' || event.code === 'ArrowLeft') {
         event.preventDefault();
-        const currentIndex = SPEED_STEPS.indexOf(ticksPerSec);
+        const currentIndex = SPEED_TPS_VALUES.indexOf(ticksPerSec as typeof SPEED_TPS_VALUES[number]);
         const base = currentIndex === -1 ? 0 : currentIndex;
-        if (event.shiftKey) {
+        if (event.code === 'ArrowLeft') {
           const nextIndex = Math.max(0, base - 1);
-          handleSetSpeed(SPEED_STEPS[nextIndex]);
+          handleSetSpeed(SPEED_TPS_VALUES[nextIndex]);
         } else {
-          const nextIndex = Math.min(SPEED_STEPS.length - 1, base + 1);
-          handleSetSpeed(SPEED_STEPS[nextIndex]);
+          const nextIndex = Math.min(SPEED_TPS_VALUES.length - 1, base + 1);
+          handleSetSpeed(SPEED_TPS_VALUES[nextIndex]);
         }
         return;
       }
