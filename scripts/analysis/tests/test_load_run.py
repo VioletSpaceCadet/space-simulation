@@ -33,26 +33,28 @@ def _write_seed_dir(
         json.dump(info, f)
 
     # Build a minimal Arrow table with required columns
-    table = pa.table({
-        "tick": pa.array(ticks, type=pa.uint64()),
-        "metrics_version": pa.array([9] * len(ticks), type=pa.uint32()),
-        "total_ore_kg": pa.array([100.0 + i for i in range(len(ticks))], type=pa.float32()),
-        "total_material_kg": pa.array([50.0 + i for i in range(len(ticks))], type=pa.float32()),
-        "total_slag_kg": pa.array([10.0] * len(ticks), type=pa.float32()),
-        "station_storage_used_pct": pa.array([0.5] * len(ticks), type=pa.float32()),
-        "ship_cargo_used_pct": pa.array([0.3] * len(ticks), type=pa.float32()),
-        "fleet_total": pa.array([3] * len(ticks), type=pa.uint32()),
-        "fleet_idle": pa.array([1] * len(ticks), type=pa.uint32()),
-        "fleet_mining": pa.array([1] * len(ticks), type=pa.uint32()),
-        "fleet_transiting": pa.array([1] * len(ticks), type=pa.uint32()),
-        "fleet_surveying": pa.array([0] * len(ticks), type=pa.uint32()),
-        "fleet_depositing": pa.array([0] * len(ticks), type=pa.uint32()),
-        "refinery_active_count": pa.array([2] * len(ticks), type=pa.uint32()),
-        "refinery_starved_count": pa.array([0] * len(ticks), type=pa.uint32()),
-        "refinery_stalled_count": pa.array([1] * len(ticks), type=pa.uint32()),
-        "power_generated_kw": pa.array([100.0] * len(ticks), type=pa.float32()),
-        "power_consumed_kw": pa.array([75.0] * len(ticks), type=pa.float32()),
-    })
+    table = pa.table(
+        {
+            "tick": pa.array(ticks, type=pa.uint64()),
+            "metrics_version": pa.array([9] * len(ticks), type=pa.uint32()),
+            "total_ore_kg": pa.array([100.0 + i for i in range(len(ticks))], type=pa.float32()),
+            "total_material_kg": pa.array([50.0 + i for i in range(len(ticks))], type=pa.float32()),
+            "total_slag_kg": pa.array([10.0] * len(ticks), type=pa.float32()),
+            "station_storage_used_pct": pa.array([0.5] * len(ticks), type=pa.float32()),
+            "ship_cargo_used_pct": pa.array([0.3] * len(ticks), type=pa.float32()),
+            "fleet_total": pa.array([3] * len(ticks), type=pa.uint32()),
+            "fleet_idle": pa.array([1] * len(ticks), type=pa.uint32()),
+            "fleet_mining": pa.array([1] * len(ticks), type=pa.uint32()),
+            "fleet_transiting": pa.array([1] * len(ticks), type=pa.uint32()),
+            "fleet_surveying": pa.array([0] * len(ticks), type=pa.uint32()),
+            "fleet_depositing": pa.array([0] * len(ticks), type=pa.uint32()),
+            "refinery_active_count": pa.array([2] * len(ticks), type=pa.uint32()),
+            "refinery_starved_count": pa.array([0] * len(ticks), type=pa.uint32()),
+            "refinery_stalled_count": pa.array([1] * len(ticks), type=pa.uint32()),
+            "power_generated_kw": pa.array([100.0] * len(ticks), type=pa.float32()),
+            "power_consumed_kw": pa.array([75.0] * len(ticks), type=pa.float32()),
+        }
+    )
 
     if use_parquet:
         pq.write_table(table, seed_dir / "metrics.parquet")

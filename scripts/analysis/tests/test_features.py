@@ -103,9 +103,16 @@ def test_add_all_features() -> None:
     """All features compose without error."""
     rel = _make_test_relation()
     result = add_all_features(rel)
-    expected_new = {"material_kg_delta", "ore_kg_delta", "slag_kg_delta",
-                    "fleet_idle_ratio", "fleet_mining_ratio",
-                    "power_surplus_kw", "power_surplus_ratio",
-                    "storage_critical", "refinery_efficiency"}
+    expected_new = {
+        "material_kg_delta",
+        "ore_kg_delta",
+        "slag_kg_delta",
+        "fleet_idle_ratio",
+        "fleet_mining_ratio",
+        "power_surplus_kw",
+        "power_surplus_ratio",
+        "storage_critical",
+        "refinery_efficiency",
+    }
     result_cols = set(result.columns)
     assert expected_new.issubset(result_cols)
