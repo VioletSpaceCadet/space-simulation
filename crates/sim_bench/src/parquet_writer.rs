@@ -161,7 +161,7 @@ impl ParquetMetricsWriter {
             .set_compression(Compression::ZSTD(ZstdLevel::default()))
             .set_key_value_metadata(Some(vec![parquet::format::KeyValue {
                 key: "metrics_version".to_string(),
-                value: Some("9".to_string()),
+                value: Some(sim_core::METRICS_VERSION.to_string()),
             }]))
             .build();
 
@@ -207,7 +207,7 @@ impl ParquetMetricsWriter {
 }
 
 /// Build the Arrow schema with fixed + dynamic element columns.
-pub fn build_schema(element_ids: &[String]) -> Schema {
+pub(crate) fn build_schema(element_ids: &[String]) -> Schema {
     let mut fields = vec![
         Field::new("tick", DataType::UInt64, false),
         Field::new("metrics_version", DataType::UInt32, false),
