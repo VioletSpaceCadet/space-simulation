@@ -691,6 +691,10 @@ pub(crate) fn handle_unfit_ship_module(
     if ship.task.is_some() {
         return false;
     }
+    // Hull must exist in content
+    if !content.hulls.contains_key(&ship.hull_id) {
+        return false;
+    }
     // Slot must have a fitted module
     let Some(fitted_pos) = ship
         .fitted_modules
@@ -765,6 +769,228 @@ pub(crate) fn apply_ship_assignments(
                 task_kind: label,
                 target,
             },
+        ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::modifiers::{ModifierSource, StatId};
+    use crate::test_fixtures::{base_content, base_state};
+    use crate::{
+        FittedModule, HullDef, HullId, InventoryItem, ModuleDefId, ModuleItemId, SlotDef, SlotType,
+    };
+    use std::collections::BTreeMap;
+
+    fn content_with_hull() -> GameContent {
+        let mut content = base_content();
+        let mut hulls = BTreeMap::new();
+        hulls.insert(
+            HullId("hull_general_purpose".to_string()),
+            HullDef {
+                id: HullId("hull_general_purpose".to_string()),
+                name: "General Purpose".to_string(),
+                mass_kg: 5000.0,
+                cargo_capacity_m3: 50.0,
+                base_speed_ticks_per_au: 120,
+                base_propellant_capacity_kg: 10000.0,
+                slots: vec![
+                    SlotDef {
+                        slot_type: SlotType("utility".to_string()),
+                        label: "Utility 1".to_string(),
+                    },
+                    SlotDef {
+                        slot_type: SlotType("industrial".to_string()),
+                        label: "Industrial 1".to_string(),
+                    },
+                ],
+                bonuses: vec![],
+                required_tech: None,
+                tags: vec![],
+            },
+        );
+        content.hulls = hulls;
+
+        // Add an equipment module def compatible with utility slots
+        content.module_defs.insert(
+            "module_cargo_expander".to_string(),
+            crate::ModuleDef {
+                id: "module_cargo_expander".to_string(),
+                name: "Cargo Expander".to_string(),
+                mass_kg: 500.0,
+                volume_m3: 2.0,
+                power_consumption_per_run: 0.0,
+                wear_per_run: 0.0,
+                behavior: crate::ModuleBehaviorDef::Equipment,
+                thermal: None,
+                compatible_slots: vec![SlotType("utility".to_string())],
+                ship_modifiers: vec![crate::modifiers::Modifier::pct_mult(
+                    StatId::CargoCapacity,
+                    1.3,
+                    ModifierSource::Equipment("cargo_expander".to_string()),
+                )],
+            },
+        );
+        content
+    }
+
+    fn state_with_module_in_inventory(content: &GameContent) -> GameState {
+        let mut state = base_state(content);
+        let station = state.stations.values_mut().next().unwrap();
+        station.inventory.push(InventoryItem::Module {
+            item_id: ModuleItemId("mod_item_0001".to_string()),
+            module_def_id: "module_cargo_expander".to_string(),
+        });
+        state
+    }
+
+    #[test]
+    fn recompute_ship_stats_applies_hull_base() {
+        let content = content_with_hull();
+        let mut state = base_state(&content);
+        let ship = state.ships.values_mut().next().unwrap();
+        recompute_ship_stats(ship, &content);
+
+        assert!((ship.cargo_capacity_m3 - 50.0).abs() < 0.01);
+        assert_eq!(ship.speed_ticks_per_au, Some(120));
+        assert!((ship.propellant_capacity_kg - 10000.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn fit_ship_module_success() {
+        let content = content_with_hull();
+        let mut state = state_with_module_in_inventory(&content);
+        let ship_id = crate::ShipId("ship_0001".to_string());
+        let station_id = crate::StationId("station_earth_orbit".to_string());
+        let module_def_id = ModuleDefId("module_cargo_expander".to_string());
+        let mut events = vec![];
+
+        let result = handle_fit_ship_module(
+            &mut state,
+            &content,
+            &ship_id,
+            0, // utility slot
+            &module_def_id,
+            &station_id,
+            1,
+            &mut events,
+        );
+
+        assert!(result);
+        let ship = state.ships.get(&ship_id).unwrap();
+        assert_eq!(ship.fitted_modules.len(), 1);
+        assert_eq!(ship.fitted_modules[0].slot_index, 0);
+        // Cargo should be 50 * 1.3 = 65 from the modifier
+        assert!((ship.cargo_capacity_m3 - 65.0).abs() < 0.1);
+        // Module removed from station inventory
+        let station = state.stations.get(&station_id).unwrap();
+        assert!(!station
+            .inventory
+            .iter()
+            .any(|i| matches!(i, InventoryItem::Module { .. })));
+        // Event emitted
+        assert_eq!(events.len(), 1);
+        assert!(matches!(
+            &events[0].event,
+            crate::Event::ShipModuleFitted { .. }
+        ));
+    }
+
+    #[test]
+    fn fit_ship_module_wrong_slot_type_rejected() {
+        let content = content_with_hull();
+        let mut state = state_with_module_in_inventory(&content);
+        let ship_id = crate::ShipId("ship_0001".to_string());
+        let station_id = crate::StationId("station_earth_orbit".to_string());
+        let module_def_id = ModuleDefId("module_cargo_expander".to_string());
+        let mut events = vec![];
+
+        // Slot 1 is "industrial", module is compatible with "utility" only
+        let result = handle_fit_ship_module(
+            &mut state,
+            &content,
+            &ship_id,
+            1,
+            &module_def_id,
+            &station_id,
+            1,
+            &mut events,
+        );
+
+        assert!(!result);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn fit_ship_module_occupied_slot_rejected() {
+        let content = content_with_hull();
+        let mut state = state_with_module_in_inventory(&content);
+        let ship_id = crate::ShipId("ship_0001".to_string());
+        let station_id = crate::StationId("station_earth_orbit".to_string());
+        let module_def_id = ModuleDefId("module_cargo_expander".to_string());
+
+        // Pre-fit a module into slot 0
+        let ship = state.ships.get_mut(&ship_id).unwrap();
+        ship.fitted_modules.push(FittedModule {
+            slot_index: 0,
+            module_def_id: ModuleDefId("something_else".to_string()),
+        });
+
+        let mut events = vec![];
+        let result = handle_fit_ship_module(
+            &mut state,
+            &content,
+            &ship_id,
+            0,
+            &module_def_id,
+            &station_id,
+            1,
+            &mut events,
+        );
+
+        assert!(!result);
+    }
+
+    #[test]
+    fn unfit_ship_module_success() {
+        let content = content_with_hull();
+        let mut state = base_state(&content);
+        let ship_id = crate::ShipId("ship_0001".to_string());
+        let station_id = crate::StationId("station_earth_orbit".to_string());
+
+        // Pre-fit a module
+        let ship = state.ships.get_mut(&ship_id).unwrap();
+        ship.fitted_modules.push(FittedModule {
+            slot_index: 0,
+            module_def_id: ModuleDefId("module_cargo_expander".to_string()),
+        });
+        recompute_ship_stats(ship, &content);
+        assert!((ship.cargo_capacity_m3 - 65.0).abs() < 0.1);
+
+        let mut events = vec![];
+        let result = handle_unfit_ship_module(
+            &mut state,
+            &content,
+            &ship_id,
+            0,
+            &station_id,
+            1,
+            &mut events,
+        );
+
+        assert!(result);
+        let ship = state.ships.get(&ship_id).unwrap();
+        assert!(ship.fitted_modules.is_empty());
+        // Stats reverted to hull base
+        assert!((ship.cargo_capacity_m3 - 50.0).abs() < 0.1);
+        // Module returned to station
+        let station = state.stations.get(&station_id).unwrap();
+        assert!(station.inventory.iter().any(|i| matches!(i, InventoryItem::Module { module_def_id, .. } if module_def_id == "module_cargo_expander")));
+        assert_eq!(events.len(), 1);
+        assert!(matches!(
+            &events[0].event,
+            crate::Event::ShipModuleUnfitted { .. }
         ));
     }
 }
