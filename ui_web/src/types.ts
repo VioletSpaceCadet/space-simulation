@@ -331,6 +331,9 @@ export interface RecipeThermalReq {
   optimal_max_mk: number
   max_temp_mk: number
   heat_per_run_j: number
+  efficiency_floor?: number
+  quality_floor?: number
+  quality_at_max?: number
 }
 
 export interface RecipeDef {
