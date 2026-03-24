@@ -116,16 +116,16 @@ fn compute_metric_summary(name: &str, values: &[f64]) -> MetricSummary {
 /// automatically appear in the aggregated output.
 pub fn build_aggregated_metrics(snapshots: &[&MetricsSnapshot]) -> serde_json::Value {
     let descriptors = MetricsSnapshot::fixed_field_descriptors();
+    // Pre-extract field values once per snapshot to avoid O(fields * snapshots) allocations.
+    let all_values: Vec<Vec<(&str, sim_core::MetricValue)>> =
+        snapshots.iter().map(|s| s.fixed_field_values()).collect();
 
     let mut map = serde_json::Map::new();
     for (index, (name, _)) in descriptors.iter().enumerate() {
         if matches!(*name, "tick" | "metrics_version") {
             continue;
         }
-        let values: Vec<f64> = snapshots
-            .iter()
-            .map(|s| s.fixed_field_values()[index].1.as_f64())
-            .collect();
+        let values: Vec<f64> = all_values.iter().map(|fv| fv[index].1.as_f64()).collect();
         let summary = compute_metric_summary(name, &values);
         map.insert(
             name.to_string(),

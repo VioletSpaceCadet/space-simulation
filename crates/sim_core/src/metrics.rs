@@ -28,6 +28,7 @@ pub enum MetricValue {
 
 impl MetricValue {
     /// Convert any metric value to f64 for generic aggregation.
+    /// Note: U64 uses lossy `as f64` cast (only affects values > 2^53, e.g. tick at ~9 quadrillion).
     pub fn as_f64(self) -> f64 {
         match self {
             Self::U32(v) => f64::from(v),

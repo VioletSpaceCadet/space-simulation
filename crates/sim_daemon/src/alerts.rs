@@ -166,9 +166,11 @@ impl AlertEngine {
                 condition,
                 threshold,
             } => latest(history).is_some_and(|snapshot| {
-                snapshot
-                    .get_field_f64(metric)
-                    .is_some_and(|value| check_condition(value, condition, *threshold))
+                let value = snapshot.get_field_f64(metric);
+                if value.is_none() {
+                    tracing::warn!("unknown metric field in alert rule: {metric}");
+                }
+                value.is_some_and(|v| check_condition(v, condition, *threshold))
             }),
 
             AlertRuleType::ThresholdLatestElement {
