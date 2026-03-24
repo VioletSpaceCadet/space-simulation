@@ -171,8 +171,8 @@ mod tests {
         let mut content = base_content();
         // Load alert rules from content JSON so alert tests work
         let alert_rules: Vec<sim_core::AlertRuleDef> =
-            serde_json::from_str(&std::fs::read_to_string("../../content/alerts.json").unwrap())
-                .unwrap();
+            serde_json::from_str(&std::fs::read_to_string("../../content/alerts.json").expect("read alerts.json"))
+                .expect("parse alerts.json");
         content.alert_rules = alert_rules;
         let mut rng = ChaCha8Rng::seed_from_u64(0);
         let game_state = build_initial_state(&content, 0, &mut rng);
@@ -199,67 +199,71 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_meta_returns_200() {
+    async fn test_meta_returns_200() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/meta")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_meta_contains_tick() {
+    async fn test_meta_contains_tick() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/meta")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            ?;
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["tick"], 0);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_snapshot_returns_200() {
+    async fn test_snapshot_returns_200() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/snapshot")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_meta_contains_ticks_per_sec() {
+    async fn test_meta_contains_ticks_per_sec() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/meta")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            ?;
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["ticks_per_sec"], 10.0);
+        Ok(())
     }
 
     fn make_test_state_with_run_dir(run_dir: std::path::PathBuf) -> AppState {
@@ -269,8 +273,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_save_returns_200_with_run_dir() {
-        let tmp = tempfile::tempdir().unwrap();
+    async fn test_save_returns_200_with_run_dir() -> Result<(), Box<dyn std::error::Error>> {
+        let tmp = tempfile::tempdir()?;
         let app = make_router(make_test_state_with_run_dir(tmp.path().to_path_buf()));
         let response = app
             .oneshot(
@@ -278,24 +282,25 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/save")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["tick"], 0);
-        assert!(json["path"].as_str().unwrap().contains("save_0.json"));
+        assert!(json["path"].as_str().expect("should be string").contains("save_0.json"));
 
         // Verify file was actually written and contains valid GameState
-        let save_path = json["path"].as_str().unwrap();
-        let contents = std::fs::read_to_string(save_path).unwrap();
-        let _state: sim_core::GameState = serde_json::from_str(&contents).unwrap();
+        let save_path = json["path"].as_str().expect("should be string");
+        let contents = std::fs::read_to_string(save_path)?;
+        let _state: sim_core::GameState = serde_json::from_str(&contents)?;
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_save_returns_503_without_run_dir() {
+    async fn test_save_returns_503_without_run_dir() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
@@ -303,32 +308,34 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/save")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_meta_contains_paused() {
+    async fn test_meta_contains_paused() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/meta")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            ?;
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["paused"], false);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_pause_sets_flag() {
+    async fn test_pause_sets_flag() -> Result<(), Box<dyn std::error::Error>> {
         let state = make_test_state();
         let app = make_router(state.clone());
         let response = app
@@ -337,13 +344,13 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/pause")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["paused"], true);
 
         // Verify meta reflects paused state
@@ -353,22 +360,23 @@ mod tests {
                 Request::builder()
                     .uri("/api/v1/meta")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         let meta_body = meta_response
             .into_body()
             .collect()
             .await
-            .unwrap()
+            ?
             .to_bytes();
-        let meta_json: serde_json::Value = serde_json::from_slice(&meta_body).unwrap();
+        let meta_json: serde_json::Value = serde_json::from_slice(&meta_body)?;
         assert_eq!(meta_json["paused"], true);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_resume_clears_flag() {
+    async fn test_resume_clears_flag() -> Result<(), Box<dyn std::error::Error>> {
         let state = make_test_state();
         // First pause
         let app = make_router(state.clone());
@@ -377,10 +385,10 @@ mod tests {
                 .method("POST")
                 .uri("/api/v1/pause")
                 .body(Body::empty())
-                .unwrap(),
+                ?,
         )
         .await
-        .unwrap();
+        ?;
 
         // Then resume
         let app2 = make_router(state.clone());
@@ -390,13 +398,13 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/resume")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["paused"], false);
 
         // Verify meta reflects resumed state
@@ -406,57 +414,60 @@ mod tests {
                 Request::builder()
                     .uri("/api/v1/meta")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         let meta_body = meta_response
             .into_body()
             .collect()
             .await
-            .unwrap()
+            ?
             .to_bytes();
-        let meta_json: serde_json::Value = serde_json::from_slice(&meta_body).unwrap();
+        let meta_json: serde_json::Value = serde_json::from_slice(&meta_body)?;
         assert_eq!(meta_json["paused"], false);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_snapshot_is_valid_json() {
+    async fn test_snapshot_is_valid_json() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/snapshot")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
-        let body = response.into_body().collect().await.unwrap().to_bytes();
+            ?;
+        let body = response.into_body().collect().await?.to_bytes();
         let result: Result<serde_json::Value, _> = serde_json::from_slice(&body);
         assert!(result.is_ok(), "snapshot was not valid JSON: {body:?}");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_metrics_returns_200_with_empty_history() {
+    async fn test_metrics_returns_200_with_empty_history() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/metrics")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json, serde_json::json!([]));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_metrics_returns_populated_history() {
+    async fn test_metrics_returns_populated_history() -> Result<(), Box<dyn std::error::Error>> {
         let state = make_test_state();
         {
             let mut sim = state.sim.lock();
@@ -469,37 +480,39 @@ mod tests {
                 Request::builder()
                     .uri("/api/v1/metrics")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: Vec<serde_json::Value> = serde_json::from_slice(&body)?;
         assert_eq!(json.len(), 1);
         assert_eq!(json[0]["tick"], 0);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_alerts_returns_200_with_no_engine() {
+    async fn test_alerts_returns_200_with_no_engine() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/alerts")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json, serde_json::json!({"active_alerts": []}));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_alerts_returns_active_alerts() {
+    async fn test_alerts_returns_active_alerts() -> Result<(), Box<dyn std::error::Error>> {
         let state = make_test_state();
         {
             let mut sim = state.sim.lock();
@@ -524,14 +537,14 @@ mod tests {
                 Request::builder()
                     .uri("/api/v1/alerts")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let alerts = json["active_alerts"].as_array().unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+        let alerts = json["active_alerts"].as_array().expect("should be array");
         assert!(
             !alerts.is_empty(),
             "expected at least one active alert, got none"
@@ -540,25 +553,27 @@ mod tests {
             alerts.contains(&serde_json::json!("STORAGE_SATURATION")),
             "expected STORAGE_SATURATION in active alerts: {alerts:?}"
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_advisor_digest_returns_204_with_empty_history() {
+    async fn test_advisor_digest_returns_204_with_empty_history() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/advisor/digest")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_advisor_digest_returns_200_with_data() {
+    async fn test_advisor_digest_returns_200_with_data() -> Result<(), Box<dyn std::error::Error>> {
         let state = make_test_state();
         {
             let mut sim = state.sim.lock();
@@ -571,13 +586,13 @@ mod tests {
                 Request::builder()
                     .uri("/api/v1/advisor/digest")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert!(json.get("tick").is_some(), "digest should contain tick");
         assert!(json.get("trends").is_some(), "digest should contain trends");
         assert!(json.get("rates").is_some(), "digest should contain rates");
@@ -586,10 +601,11 @@ mod tests {
             "digest should contain bottleneck"
         );
         assert!(json.get("alerts").is_some(), "digest should contain alerts");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_advisor_digest_includes_active_alerts() {
+    async fn test_advisor_digest_includes_active_alerts() -> Result<(), Box<dyn std::error::Error>> {
         let state = make_test_state();
         {
             let mut sim = state.sim.lock();
@@ -616,23 +632,24 @@ mod tests {
                 Request::builder()
                     .uri("/api/v1/advisor/digest")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let alerts = json["alerts"].as_array().unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+        let alerts = json["alerts"].as_array().expect("should be array");
         assert!(!alerts.is_empty(), "digest should contain active alerts");
         assert!(
             alerts.iter().any(|a| a["id"] == "STORAGE_SATURATION"),
             "expected STORAGE_SATURATION in digest alerts: {alerts:?}"
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_command_returns_200_with_valid_import() {
+    async fn test_command_returns_200_with_valid_import() -> Result<(), Box<dyn std::error::Error>> {
         let state = make_test_state();
         let app = make_router(state.clone());
         let body = serde_json::json!({
@@ -649,24 +666,25 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/command")
                     .header("content-type", "application/json")
-                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                    .unwrap(),
+                    .body(Body::from(serde_json::to_vec(&body)?))
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let resp_body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&resp_body).unwrap();
+        let resp_body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&resp_body)?;
         assert_eq!(json["command_id"], "cmd_0");
 
         // Verify command was queued
         let queue = state.command_queue.lock();
         assert_eq!(queue.len(), 1);
         assert_eq!(queue[0].id.0, "cmd_0");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_command_returns_400_with_invalid_body() {
+    async fn test_command_returns_400_with_invalid_body() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let body = serde_json::json!({ "command": { "Bogus": {} } });
         let response = app
@@ -675,38 +693,40 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/command")
                     .header("content-type", "application/json")
-                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                    .unwrap(),
+                    .body(Body::from(serde_json::to_vec(&body)?))
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_pricing_returns_200() {
+    async fn test_pricing_returns_200() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/pricing")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert!(json.is_object(), "pricing response should be a JSON object");
         assert!(
             json.get("items").is_some(),
             "pricing response should contain 'items'"
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_speed_sets_ticks_per_sec() {
+    async fn test_speed_sets_ticks_per_sec() -> Result<(), Box<dyn std::error::Error>> {
         let state = make_test_state();
         let app = make_router(state.clone());
         let response = app
@@ -716,13 +736,13 @@ mod tests {
                     .uri("/api/v1/speed")
                     .header("content-type", "application/json")
                     .body(Body::from(r#"{"ticks_per_sec": 1000}"#))
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["ticks_per_sec"], 1000.0);
 
         // Verify atomic reflects new speed
@@ -732,23 +752,24 @@ mod tests {
                 .load(std::sync::atomic::Ordering::Relaxed),
         );
         assert!((rate - 1000.0).abs() < 0.001);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_spatial_config_returns_200() {
+    async fn test_spatial_config_returns_200() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/spatial-config")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert!(json["bodies"].is_array(), "should contain bodies array");
         assert!(
             json["body_absolutes"].is_object(),
@@ -766,52 +787,55 @@ mod tests {
             json["docking_range_au_um"].is_number(),
             "should contain docking_range_au_um"
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_spatial_config_body_absolutes_match_bodies() {
+    async fn test_spatial_config_body_absolutes_match_bodies() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/spatial-config")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let bodies = json["bodies"].as_array().unwrap();
-        let absolutes = json["body_absolutes"].as_object().unwrap();
+            ?;
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+        let bodies = json["bodies"].as_array().expect("should be array");
+        let absolutes = json["body_absolutes"].as_object().expect("should be object");
         // Every body should have an entry in body_absolutes
         for body_def in bodies {
-            let id = body_def["id"].as_str().unwrap();
+            let id = body_def["id"].as_str().expect("should be string");
             assert!(
                 absolutes.contains_key(id),
                 "body_absolutes missing entry for body '{id}'"
             );
         }
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_snapshot_includes_body_absolutes() {
+    async fn test_snapshot_includes_body_absolutes() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/snapshot")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            ?;
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert!(
             json["body_absolutes"].is_object(),
             "snapshot should include body_absolutes"
         );
+        Ok(())
     }
 
     #[test]
@@ -859,33 +883,33 @@ mod tests {
         );
         // Oldest entries should have been dropped — first remaining tick should be 10
         assert_eq!(
-            sim.metrics_history.front().unwrap().tick,
+            sim.metrics_history.front().expect("history should not be empty").tick,
             10,
             "oldest snapshot should be tick 10 after dropping first 10"
         );
     }
 
     #[tokio::test]
-    async fn test_content_returns_200_with_techs() {
+    async fn test_content_returns_200_with_techs() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/content")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert!(
             json["techs"].is_array(),
             "response should contain techs array"
         );
         assert!(
-            !json["techs"].as_array().unwrap().is_empty(),
+            !json["techs"].as_array().expect("should be array").is_empty(),
             "techs should not be empty"
         );
         assert!(
@@ -909,29 +933,31 @@ mod tests {
             tech["domain_requirements"].is_object(),
             "tech should have domain_requirements"
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_perf_returns_empty_on_no_timings() {
+    async fn test_perf_returns_empty_on_no_timings() -> Result<(), Box<dyn std::error::Error>> {
         let app = make_router(make_test_state());
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/perf")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["sample_count"], 0);
-        assert!(json["steps"].as_array().unwrap().is_empty());
+        assert!(json["steps"].as_array().expect("should be array").is_empty());
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_perf_returns_stats_after_ticks() {
+    async fn test_perf_returns_stats_after_ticks() -> Result<(), Box<dyn std::error::Error>> {
         let state = make_test_state();
         // Push some timings into the buffer.
         {
@@ -946,20 +972,21 @@ mod tests {
                 Request::builder()
                     .uri("/api/v1/perf")
                     .body(Body::empty())
-                    .unwrap(),
+                    ?,
             )
             .await
-            .unwrap();
+            ?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["sample_count"], 10);
-        let steps = json["steps"].as_array().unwrap();
+        let steps = json["steps"].as_array().expect("should be array");
         assert_eq!(steps.len(), 14, "should have 14 step entries");
         assert_eq!(steps[0]["name"], "apply_commands");
         assert!(steps[0]["mean_us"].is_f64());
         assert!(steps[0]["p50_us"].is_f64());
         assert!(steps[0]["p95_us"].is_f64());
         assert!(steps[0]["max_us"].is_f64());
+        Ok(())
     }
 }
