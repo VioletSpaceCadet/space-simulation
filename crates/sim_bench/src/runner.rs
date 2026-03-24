@@ -191,53 +191,19 @@ fn write_run_result(
 }
 
 fn compute_timing_stats(all_timings: &[TickTimings]) -> run_result::TimingStats {
-    if all_timings.is_empty() {
-        return run_result::TimingStats { steps: Vec::new() };
+    let stats = sim_core::compute_step_stats(all_timings);
+    run_result::TimingStats {
+        steps: stats
+            .into_iter()
+            .map(|s| run_result::StepTimingEntry {
+                name: s.name,
+                mean_us: s.mean_us,
+                p50_us: s.p50_us,
+                p95_us: s.p95_us,
+                max_us: s.max_us,
+            })
+            .collect(),
     }
-
-    let sample = &all_timings[0];
-    let field_names: Vec<&str> = sample.iter_fields().map(|(name, _)| name).collect();
-
-    let steps = field_names
-        .iter()
-        .enumerate()
-        .map(|(field_index, &name)| {
-            let mut values_us: Vec<f64> = all_timings
-                .iter()
-                .map(|t| {
-                    t.iter_fields()
-                        .nth(field_index)
-                        .map_or(0.0, |(_, d)| d.as_secs_f64() * 1_000_000.0)
-                })
-                .collect();
-            values_us.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-            let count = values_us.len();
-            let mean_us = values_us.iter().sum::<f64>() / count as f64;
-            let p50_us = percentile(&values_us, 50.0);
-            let p95_us = percentile(&values_us, 95.0);
-            let max_us = values_us.last().copied().unwrap_or(0.0);
-
-            run_result::StepTimingEntry {
-                name: name.to_string(),
-                mean_us,
-                p50_us,
-                p95_us,
-                max_us,
-            }
-        })
-        .collect();
-
-    run_result::TimingStats { steps }
-}
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn percentile(sorted: &[f64], pct: f64) -> f64 {
-    if sorted.is_empty() {
-        return 0.0;
-    }
-    let index = (pct / 100.0 * (sorted.len() - 1) as f64).round() as usize;
-    sorted[index.min(sorted.len() - 1)]
 }
 
 #[cfg(test)]

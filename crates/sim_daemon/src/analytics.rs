@@ -266,40 +266,18 @@ pub fn compute_digest(
 }
 
 fn compute_perf_summary(timings: &VecDeque<sim_core::TickTimings>) -> PerfSummary {
-    let sample = &timings[0];
-    let field_names: Vec<&str> = sample.iter_fields().map(|(name, _)| name).collect();
-
-    let steps = field_names
-        .iter()
-        .enumerate()
-        .map(|(field_index, &name)| {
-            let mut values_us: Vec<f64> = timings
-                .iter()
-                .map(|t| {
-                    t.iter_fields()
-                        .nth(field_index)
-                        .map_or(0.0, |(_, d)| d.as_secs_f64() * 1_000_000.0)
-                })
-                .collect();
-            values_us.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-            let count = values_us.len();
-            let mean_us = values_us.iter().sum::<f64>() / count as f64;
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let p95_index = (0.95 * (count - 1) as f64).round() as usize;
-            let p95_us = values_us[p95_index.min(count - 1)];
-
-            PerfStepEntry {
-                name: name.to_string(),
-                mean_us,
-                p95_us,
-            }
-        })
-        .collect();
-
+    let slice: Vec<_> = timings.iter().cloned().collect();
+    let stats = sim_core::compute_step_stats(&slice);
     PerfSummary {
         sample_count: timings.len(),
-        steps,
+        steps: stats
+            .into_iter()
+            .map(|s| PerfStepEntry {
+                name: s.name,
+                mean_us: s.mean_us,
+                p95_us: s.p95_us,
+            })
+            .collect(),
     }
 }
 

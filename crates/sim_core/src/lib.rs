@@ -23,7 +23,7 @@ pub mod wear;
 pub use commands::recompute_ship_stats;
 pub use engine::{tick, trade_unlock_tick};
 pub use id::generate_uuid;
-pub use instrumentation::TickTimings;
+pub use instrumentation::{compute_step_stats, StepStats, TickTimings};
 pub use metrics::{
     append_metrics_row, compute_metrics, content_element_ids, write_metrics_csv,
     write_metrics_header, MetricsFileWriter, MetricsSnapshot, OreElementStats, METRICS_VERSION,
