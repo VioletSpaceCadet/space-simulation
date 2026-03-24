@@ -1,7 +1,6 @@
 //! Inventory, trade, and pricing types.
 
 use super::AHashMap;
-use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
