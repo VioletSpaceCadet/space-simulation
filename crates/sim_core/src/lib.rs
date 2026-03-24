@@ -36,7 +36,55 @@ pub use spatial::{
     Position, RadiusAuMicro, ResourceClass, FULL_CIRCLE, METERS_PER_AU, METERS_PER_MICRO_AU,
 };
 pub use tasks::{inventory_volume_m3, mine_duration};
-pub use types::*;
+// -- types: ID newtypes --
+pub use types::{
+    AsteroidId, BodyId, CommandId, ComponentId, EventId, HullId, LotId, ModuleDefId,
+    ModuleInstanceId, ModuleItemId, NodeId, PrincipalId, RecipeId, ShipId, SiteId, SlotType,
+    StationId, TechId,
+};
+// -- types: type aliases & constants --
+pub use types::{
+    CompositionVec, ElementId, ThermalGroupId, COMPONENT_REPAIR_KIT, COMPONENT_THRUSTER,
+    CURRENT_SCHEMA_VERSION, DEFAULT_AMBIENT_TEMP_MK, ELEMENT_FE, ELEMENT_ORE, ELEMENT_SLAG,
+    TAG_IRON_RICH, TAG_VOLATILE_RICH,
+};
+// -- types: core enums --
+pub use types::{
+    AlertSeverity, AnomalyTag, BehaviorType, DataKind, DomainProgress, EventLevel, ItemKind,
+    OverheatZone, Phase, ResearchDomain,
+};
+// -- types: game state --
+pub use types::{
+    AsteroidKnowledge, AsteroidState, Counters, GameState, MetaState, PowerState, ResearchState,
+    ScanSite, StationState, TaskState,
+};
+// -- types: ship state --
+pub use types::{FittedModule, ShipState, TaskKind};
+// -- types: module state --
+pub use types::{
+    AssemblerState, BatteryState, LabState, MaintenanceState, ModuleKindState, ModuleState,
+    ProcessorState, RadiatorState, SensorArrayState, SolarArrayState, WearState,
+};
+// -- types: thermal state --
+pub use types::{MaterialThermalProps, ThermalState};
+// -- types: content definitions --
+pub use types::{
+    AlertRuleDef, AlertRuleType, AsteroidTemplateDef, BodyType, ComponentDef, ElementDef,
+    GameContent, HullDef, NodeDef, OrbitalBodyDef, SlotDef, SolarSystemDef, TechDef, TechEffect,
+    ThermalDef, ZoneDef,
+};
+// -- types: module & recipe definitions --
+pub use types::{
+    AssemblerDef, BatteryDef, InputAmount, InputFilter, LabDef, MaintenanceDef, ModuleBehaviorDef,
+    ModuleDef, OutputSpec, ProcessorDef, QualityFormula, RadiatorDef, RecipeDef, RecipeInput,
+    RecipeThermalReq, SensorArrayDef, SolarArrayDef, YieldFormula,
+};
+// -- types: commands & events --
+pub use types::{Command, CommandEnvelope, Event, EventEnvelope};
+// -- types: inventory & trade --
+pub use types::{InventoryItem, PricingEntry, PricingTable, TradeItemSpec};
+// -- types: constants & functions --
+pub use types::{boiloff_rate_per_tick, derive_module_tick_values, Constants};
 pub use wear::wear_efficiency;
 
 pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnvelope {
