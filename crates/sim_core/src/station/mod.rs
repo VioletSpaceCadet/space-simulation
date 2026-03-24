@@ -116,7 +116,7 @@ fn apply_battery_buffering(
 
     if raw_deficit > 0.0 {
         let mut remaining = raw_deficit;
-        for (idx, battery_def, current_charge, _efficiency) in batteries {
+        for (module_index, battery_def, current_charge, _efficiency) in batteries {
             if remaining <= 0.0 {
                 break;
             }
@@ -128,13 +128,15 @@ fn apply_battery_buffering(
             let Some(station) = state.stations.get_mut(station_id) else {
                 continue;
             };
-            if let crate::ModuleKindState::Battery(ref mut bs) = station.modules[*idx].kind_state {
-                bs.charge_kwh -= discharge;
+            if let crate::ModuleKindState::Battery(ref mut battery_state) =
+                station.modules[*module_index].kind_state
+            {
+                battery_state.charge_kwh -= discharge;
             }
         }
     } else if raw_surplus > 0.0 {
         let mut remaining = raw_surplus;
-        for (idx, battery_def, current_charge, efficiency) in batteries {
+        for (module_index, battery_def, current_charge, efficiency) in batteries {
             if remaining <= 0.0 {
                 break;
             }
@@ -147,8 +149,10 @@ fn apply_battery_buffering(
             let Some(station) = state.stations.get_mut(station_id) else {
                 continue;
             };
-            if let crate::ModuleKindState::Battery(ref mut bs) = station.modules[*idx].kind_state {
-                bs.charge_kwh += charge;
+            if let crate::ModuleKindState::Battery(ref mut battery_state) =
+                station.modules[*module_index].kind_state
+            {
+                battery_state.charge_kwh += charge;
             }
         }
     }
@@ -159,8 +163,8 @@ fn apply_battery_buffering(
         return (discharge_kw, charge_kw, stored_kwh);
     };
     for module in &station.modules {
-        if let crate::ModuleKindState::Battery(ref bs) = module.kind_state {
-            stored_kwh += bs.charge_kwh;
+        if let crate::ModuleKindState::Battery(ref battery_state) = module.kind_state {
+            stored_kwh += battery_state.charge_kwh;
         }
     }
 
@@ -204,7 +208,7 @@ fn compute_power_budget(
     let mut batteries: Vec<(usize, crate::BatteryDef, f32, f32)> = Vec::new();
     let mut wear_targets: Vec<(usize, f32)> = Vec::new();
 
-    for (idx, module) in station.modules.iter().enumerate() {
+    for (module_index, module) in station.modules.iter().enumerate() {
         if !module.enabled {
             continue;
         }
@@ -236,7 +240,7 @@ fn compute_power_budget(
                 );
                 consumed_kw += def.power_consumption_per_run;
                 if def.wear_per_run > 0.0 {
-                    wear_targets.push((idx, def.wear_per_run));
+                    wear_targets.push((module_index, def.wear_per_run));
                 }
             }
             crate::ModuleBehaviorDef::Battery(battery_def) => {
@@ -256,18 +260,23 @@ fn compute_power_budget(
                     &state.modifiers,
                 );
                 let current_charge =
-                    if let crate::ModuleKindState::Battery(ref bs) = module.kind_state {
-                        bs.charge_kwh
+                    if let crate::ModuleKindState::Battery(ref battery_state) = module.kind_state {
+                        battery_state.charge_kwh
                     } else {
                         0.0
                     };
-                batteries.push((idx, battery_def.clone(), current_charge, efficiency));
+                batteries.push((
+                    module_index,
+                    battery_def.clone(),
+                    current_charge,
+                    efficiency,
+                ));
                 consumed_kw += def.power_consumption_per_run;
             }
             _ => {
                 consumed_kw += def.power_consumption_per_run;
                 if let Some(priority) = power_priority(&def.behavior) {
-                    consumers.push((idx, priority, def.power_consumption_per_run));
+                    consumers.push((module_index, priority, def.power_consumption_per_run));
                 }
             }
         }
@@ -293,11 +302,11 @@ fn compute_power_budget(
     if deficit_kw > 0.0 && has_power_infrastructure {
         consumers.sort_by_key(|&(_, priority, _)| priority);
         let mut remaining_deficit = deficit_kw;
-        for (idx, _, consumption) in &consumers {
+        for (module_index, _, consumption) in &consumers {
             if remaining_deficit <= 0.0 {
                 break;
             }
-            station.modules[*idx].power_stalled = true;
+            station.modules[*module_index].power_stalled = true;
             remaining_deficit -= consumption;
         }
     }

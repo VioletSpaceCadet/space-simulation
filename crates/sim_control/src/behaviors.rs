@@ -342,8 +342,8 @@ impl AutopilotBehavior for StationModuleManager {
                         },
                     ));
                 }
-                if let ModuleKindState::Processor(ps) = &module.kind_state {
-                    if ps.threshold_kg == 0.0 {
+                if let ModuleKindState::Processor(processor_state) = &module.kind_state {
+                    if processor_state.threshold_kg == 0.0 {
                         commands.push(make_cmd(
                             owner,
                             state.meta.tick,
@@ -477,7 +477,7 @@ impl AutopilotBehavior for ThrusterImport {
             .module_defs
             .get("module_shipyard")
             .and_then(|def| match &def.behavior {
-                ModuleBehaviorDef::Assembler(asm) => asm
+                ModuleBehaviorDef::Assembler(assembler_def) => assembler_def
                     .recipes
                     .first()
                     .and_then(|recipe_id| content.recipes.get(recipe_id)),

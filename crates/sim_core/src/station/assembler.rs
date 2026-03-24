@@ -19,11 +19,11 @@ pub(super) fn tick_assembler_modules(
 
     // Collect assembler module indices, sorted by priority (desc) then id (asc)
     let mut assembler_indices: Vec<usize> = (0..module_count)
-        .filter(|&idx| {
+        .filter(|&module_index| {
             state
                 .stations
                 .get(station_id)
-                .and_then(|s| s.modules.get(idx))
+                .and_then(|s| s.modules.get(module_index))
                 .and_then(|m| content.module_defs.get(&m.def_id))
                 .is_some_and(|d| matches!(d.behavior, ModuleBehaviorDef::Assembler(_)))
         })
