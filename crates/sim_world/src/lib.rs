@@ -630,6 +630,48 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
                 quality: 0.7,
                 thermal: None,
             },
+            InventoryItem::Material {
+                element: "H2O".to_string(),
+                kg: 5000.0,
+                quality: 1.0,
+                thermal: None,
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0022".to_string()),
+                module_def_id: "module_mining_laser".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0023".to_string()),
+                module_def_id: "module_cargo_expander".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0024".to_string()),
+                module_def_id: "module_propellant_tank".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0025".to_string()),
+                module_def_id: "module_mining_laser".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0026".to_string()),
+                module_def_id: "module_cargo_expander".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0027".to_string()),
+                module_def_id: "module_propellant_tank".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0028".to_string()),
+                module_def_id: "module_mining_laser".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0029".to_string()),
+                module_def_id: "module_cargo_expander".to_string(),
+            },
+            InventoryItem::Module {
+                item_id: ModuleItemId("module_item_0030".to_string()),
+                module_def_id: "module_propellant_tank".to_string(),
+            },
         ],
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
@@ -641,6 +683,11 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     let ship_id = ShipId("ship_0001".to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
     let hull_id = sim_core::HullId("hull_general_purpose".to_string());
+    let fitted_modules = content
+        .fitting_templates
+        .get(&hull_id)
+        .cloned()
+        .unwrap_or_default();
     let mut ship = ShipState {
         id: ship_id.clone(),
         position: earth_orbit_pos.clone(),
@@ -651,12 +698,13 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         speed_ticks_per_au: None,
         modifiers: sim_core::modifiers::ModifierSet::default(),
         hull_id: hull_id.clone(),
-        fitted_modules: vec![],
+        fitted_modules,
         propellant_kg: 0.0,
         propellant_capacity_kg: 0.0,
     };
     if content.hulls.contains_key(&hull_id) {
         sim_core::recompute_ship_stats(&mut ship, content);
+        ship.propellant_kg = ship.propellant_capacity_kg;
     }
     // Place scan sites in zone bodies using weighted picking + area-sampled positions.
     let zone_bodies: Vec<&sim_core::OrbitalBodyDef> = content

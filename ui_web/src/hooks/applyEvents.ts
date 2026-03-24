@@ -527,7 +527,7 @@ function handleShipConstructed(state: SimState, event: EventPayload<'ShipConstru
         cargo_capacity_m3: event.cargo_capacity_m3,
         task: null,
         hull_id: event.hull_id,
-        fitted_modules: [],
+        fitted_modules: event.fitted_modules ?? [],
       },
     },
   };

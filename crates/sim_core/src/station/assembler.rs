@@ -183,6 +183,17 @@ fn execute(
                         .sum();
                     available >= *required
                 }
+                #[allow(clippy::cast_possible_truncation)]
+                (InputFilter::Module(def_id), InputAmount::Count(required)) => {
+                    let available = station
+                        .inventory
+                        .iter()
+                        .filter(|item| {
+                            matches!(item, InventoryItem::Module { module_def_id, .. } if *module_def_id == *def_id)
+                        })
+                        .count() as u32;
+                    available >= *required
+                }
                 _ => false,
             })
     };
@@ -289,15 +300,20 @@ fn execute(
         }
         let mut consumed_volume = 0.0_f32;
         for input in &recipe.inputs {
-            if let (InputFilter::Component(cid), InputAmount::Count(count)) =
-                (&input.filter, &input.amount)
-            {
-                let comp_volume = content
-                    .component_defs
-                    .iter()
-                    .find(|c| c.id == cid.0)
-                    .map_or(0.0, |c| c.volume_m3);
-                consumed_volume += comp_volume * *count as f32;
+            match (&input.filter, &input.amount) {
+                (InputFilter::Component(cid), InputAmount::Count(count)) => {
+                    let comp_volume = content
+                        .component_defs
+                        .iter()
+                        .find(|c| c.id == cid.0)
+                        .map_or(0.0, |c| c.volume_m3);
+                    consumed_volume += comp_volume * *count as f32;
+                }
+                (InputFilter::Module(def_id), InputAmount::Count(count)) => {
+                    let mod_volume = content.module_defs.get(def_id).map_or(0.0, |d| d.volume_m3);
+                    consumed_volume += mod_volume * *count as f32;
+                }
+                _ => {}
             }
         }
         (produced_volume - consumed_volume).max(0.0)
@@ -398,6 +414,28 @@ fn resolve_assembler_run(
                     consumed_any = true;
                 }
             }
+            (InputFilter::Module(def_id), InputAmount::Count(required)) => {
+                let mut remaining = *required;
+                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
+                    let mut indices_to_remove = Vec::new();
+                    for (index, item) in station.inventory.iter().enumerate() {
+                        if remaining == 0 {
+                            break;
+                        }
+                        if matches!(item, InventoryItem::Module { module_def_id, .. } if *module_def_id == *def_id)
+                        {
+                            indices_to_remove.push(index);
+                            remaining -= 1;
+                        }
+                    }
+                    for index in indices_to_remove.into_iter().rev() {
+                        station.inventory.remove(index);
+                    }
+                }
+                if remaining == 0 {
+                    consumed_any = true;
+                }
+            }
             _ => {}
         }
     }
@@ -471,11 +509,18 @@ fn resolve_assembler_run(
                     speed_ticks_per_au: Some(hull.base_speed_ticks_per_au),
                     modifiers: crate::modifiers::ModifierSet::default(),
                     hull_id: hull_id.clone(),
-                    fitted_modules: vec![],
+                    fitted_modules: content
+                        .fitting_templates
+                        .get(hull_id)
+                        .cloned()
+                        .unwrap_or_default(),
                     propellant_kg: hull.base_propellant_capacity_kg,
                     propellant_capacity_kg: hull.base_propellant_capacity_kg,
                 };
                 crate::commands::recompute_ship_stats(&mut ship, content);
+                ship.propellant_kg = ship.propellant_capacity_kg;
+                let actual_cargo = ship.cargo_capacity_m3;
+                let event_fitted = ship.fitted_modules.clone();
                 state.ships.insert(ship_id.clone(), ship);
                 events.push(crate::emit(
                     &mut state.counters,
@@ -484,8 +529,9 @@ fn resolve_assembler_run(
                         station_id: ctx.station_id.clone(),
                         ship_id,
                         position: ship_position,
-                        cargo_capacity_m3: f64::from(hull.cargo_capacity_m3),
+                        cargo_capacity_m3: f64::from(actual_cargo),
                         hull_id: hull_id.clone(),
+                        fitted_modules: event_fitted,
                     },
                 ));
             }

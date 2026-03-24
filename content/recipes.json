@@ -105,6 +105,18 @@
       {
         "filter": { "Component": "thruster" },
         "amount": { "Count": 8 }
+      },
+      {
+        "filter": { "Module": "module_cargo_expander" },
+        "amount": { "Count": 1 }
+      },
+      {
+        "filter": { "Module": "module_propellant_tank" },
+        "amount": { "Count": 1 }
+      },
+      {
+        "filter": { "Module": "module_mining_laser" },
+        "amount": { "Count": 1 }
       }
     ],
     "outputs": [
