@@ -12,7 +12,7 @@ use sim_core::{
     QualityFormula, ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId,
     StationState, TechDef, TechId, YieldFormula,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 #[derive(Deserialize)]

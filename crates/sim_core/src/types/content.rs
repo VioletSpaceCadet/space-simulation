@@ -648,6 +648,7 @@ pub enum QualityFormula {
 /// Must be called once after deserialization / after overrides.
 ///
 /// Reuses `Constants::game_minutes_to_ticks` for the conversion.
+#[allow(clippy::implicit_hasher)]
 pub fn derive_module_tick_values(
     module_defs: &mut AHashMap<String, ModuleDef>,
     constants: &Constants,
