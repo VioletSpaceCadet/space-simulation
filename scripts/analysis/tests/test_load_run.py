@@ -50,9 +50,9 @@ def _write_seed_dir(
             "fleet_transiting": pa.array([1] * len(ticks), type=pa.uint32()),
             "fleet_surveying": pa.array([0] * len(ticks), type=pa.uint32()),
             "fleet_depositing": pa.array([0] * len(ticks), type=pa.uint32()),
-            "refinery_active_count": pa.array([2] * len(ticks), type=pa.uint32()),
-            "refinery_starved_count": pa.array([0] * len(ticks), type=pa.uint32()),
-            "refinery_stalled_count": pa.array([1] * len(ticks), type=pa.uint32()),
+            "processor_active": pa.array([2] * len(ticks), type=pa.uint32()),
+            "processor_starved": pa.array([0] * len(ticks), type=pa.uint32()),
+            "processor_stalled": pa.array([1] * len(ticks), type=pa.uint32()),
             "power_generated_kw": pa.array([100.0] * len(ticks), type=pa.float32()),
             "power_consumed_kw": pa.array([75.0] * len(ticks), type=pa.float32()),
         }

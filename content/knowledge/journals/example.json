@@ -18,7 +18,7 @@
       "interpretation": "Slag accumulation driving storage toward saturation; jettison or export needed"
     },
     {
-      "metric": "refinery_starved_count",
+      "metric": "processor_starved",
       "value": 2,
       "trend": "stable",
       "interpretation": "2 of 3 refineries consistently starved — fleet cannot keep up with processing capacity"

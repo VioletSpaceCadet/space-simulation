@@ -14,8 +14,8 @@ use std::collections::BTreeMap;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-/// v10: Move dynamic per-element columns to end; add field iterator API.
-pub const METRICS_VERSION: u32 = 10;
+/// v11: Replace per-module-type fields with dynamic `per_module_metrics` `BTreeMap`.
+pub const METRICS_VERSION: u32 = 11;
 
 /// A typed metric value extracted from a [`MetricsSnapshot`] field.
 #[derive(Clone, Copy, Debug)]
@@ -76,6 +76,16 @@ pub struct OreElementStats {
     pub max_fraction: f32,
 }
 
+/// Per-module-type status counters (active, stalled, starved).
+/// Keyed by behavior type name (e.g., `"processor"`, `"assembler"`) in
+/// [`MetricsSnapshot::per_module_metrics`].
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+pub struct ModuleStatusMetrics {
+    pub active: u32,
+    pub stalled: u32,
+    pub starved: u32,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
     pub tick: u64,
@@ -101,14 +111,9 @@ pub struct MetricsSnapshot {
     // Material quality
     pub avg_material_quality: f32,
 
-    // Refinery
-    pub refinery_active_count: u32,
-    pub refinery_starved_count: u32,
-    pub refinery_stalled_count: u32,
-
-    // Assembler
-    pub assembler_active_count: u32,
-    pub assembler_stalled_count: u32,
+    /// Per-module-type status metrics, keyed by behavior type name
+    /// (e.g., `"processor"`, `"assembler"`). See [`ModuleStatusMetrics`].
+    pub per_module_metrics: BTreeMap<String, ModuleStatusMetrics>,
 
     // Fleet
     pub fleet_total: u32,
@@ -200,11 +205,6 @@ impl MetricsSnapshot {
     fn module_field_values(&self) -> Vec<(&'static str, MetricValue)> {
         use MetricValue::{F32, U32};
         vec![
-            ("refinery_active_count", U32(self.refinery_active_count)),
-            ("refinery_starved_count", U32(self.refinery_starved_count)),
-            ("refinery_stalled_count", U32(self.refinery_stalled_count)),
-            ("assembler_active_count", U32(self.assembler_active_count)),
-            ("assembler_stalled_count", U32(self.assembler_stalled_count)),
             ("avg_module_wear", F32(self.avg_module_wear)),
             ("max_module_wear", F32(self.max_module_wear)),
             ("repair_kits_remaining", U32(self.repair_kits_remaining)),
@@ -271,12 +271,7 @@ impl MetricsSnapshot {
             ("ship_cargo_used_pct", F32),
             ("ore_lot_count", U32),
             ("avg_material_quality", F32),
-            // Modules
-            ("refinery_active_count", U32),
-            ("refinery_starved_count", U32),
-            ("refinery_stalled_count", U32),
-            ("assembler_active_count", U32),
-            ("assembler_stalled_count", U32),
+            // Modules (per-type counts are in per_module_metrics map)
             ("avg_module_wear", F32),
             ("max_module_wear", F32),
             ("repair_kits_remaining", U32),
@@ -316,10 +311,29 @@ impl MetricsSnapshot {
     /// Look up a fixed scalar field by name and return its value as f64.
     /// Returns `None` for unknown field names.
     pub fn get_field_f64(&self, name: &str) -> Option<f64> {
-        self.fixed_field_values()
+        // Check fixed scalar fields first.
+        if let Some(val) = self
+            .fixed_field_values()
             .into_iter()
             .find(|(n, _)| *n == name)
             .map(|(_, v)| v.as_f64())
+        {
+            return Some(val);
+        }
+        // Check per-module metrics: e.g., "processor_starved" → per_module_metrics["processor"].starved
+        if let Some(suffix_start) = name.rfind('_') {
+            let type_name = &name[..suffix_start];
+            let metric_name = &name[suffix_start + 1..];
+            if let Some(metrics) = self.per_module_metrics.get(type_name) {
+                return match metric_name {
+                    "active" => Some(f64::from(metrics.active)),
+                    "stalled" => Some(f64::from(metrics.stalled)),
+                    "starved" => Some(f64::from(metrics.starved)),
+                    _ => None,
+                };
+            }
+        }
+        None
     }
 }
 
@@ -399,6 +413,17 @@ pub fn content_element_ids(content: &GameContent) -> Vec<String> {
     content.elements.iter().map(|e| e.id.clone()).collect()
 }
 
+/// Extract unique behavior type names from content for dynamic CSV/Parquet columns.
+/// Returns sorted, deduplicated lowercase type names (e.g., `["assembler", "processor"]`).
+pub fn content_behavior_types(content: &GameContent) -> Vec<String> {
+    let types: std::collections::BTreeSet<String> = content
+        .module_defs
+        .values()
+        .map(|def| def.behavior.type_name().to_string())
+        .collect();
+    types.into_iter().collect()
+}
+
 pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnapshot {
     let mut acc = MetricsAccumulator::new();
     for station in state.stations.values() {
@@ -421,12 +446,7 @@ struct MetricsAccumulator {
     station_storage_sum: f32,
     station_count: u32,
 
-    refinery_active_count: u32,
-    refinery_starved_count: u32,
-    refinery_stalled_count: u32,
-
-    assembler_active_count: u32,
-    assembler_stalled_count: u32,
+    per_module_metrics: BTreeMap<String, ModuleStatusMetrics>,
 
     wear_sum: f32,
     wear_count: u32,
@@ -558,27 +578,19 @@ impl MetricsAccumulator {
             return;
         }
 
-        match &def.behavior {
-            ModuleBehaviorDef::Processor(_) => {
-                self.refinery_active_count += 1;
-                if let ModuleKindState::Processor(ps) = &module.kind_state {
-                    if ps.stalled {
-                        self.refinery_stalled_count += 1;
-                    }
-                    if total_ore_at_station < ps.threshold_kg {
-                        self.refinery_starved_count += 1;
-                    }
-                }
+        let entry = self
+            .per_module_metrics
+            .entry(def.behavior.type_name().to_string())
+            .or_default();
+        entry.active += 1;
+        if module.kind_state.is_stalled() {
+            entry.stalled += 1;
+        }
+        // Starved is Processor-specific: ore supply below threshold.
+        if let ModuleKindState::Processor(ps) = &module.kind_state {
+            if total_ore_at_station < ps.threshold_kg {
+                entry.starved += 1;
             }
-            ModuleBehaviorDef::Assembler(_) => {
-                self.assembler_active_count += 1;
-                if let ModuleKindState::Assembler(asmb) = &module.kind_state {
-                    if asmb.stalled {
-                        self.assembler_stalled_count += 1;
-                    }
-                }
-            }
-            _ => {}
         }
     }
 
@@ -700,11 +712,7 @@ impl MetricsAccumulator {
             per_element_ore_stats: avgs.per_element_ore_stats,
             ore_lot_count: self.inv.ore_lot_count,
             avg_material_quality: avgs.avg_material_quality,
-            refinery_active_count: self.refinery_active_count,
-            refinery_starved_count: self.refinery_starved_count,
-            refinery_stalled_count: self.refinery_stalled_count,
-            assembler_active_count: self.assembler_active_count,
-            assembler_stalled_count: self.assembler_stalled_count,
+            per_module_metrics: self.per_module_metrics,
             fleet_total: self.fleet_total,
             fleet_idle: self.fleet_idle,
             fleet_mining: self.fleet_mining,
@@ -760,10 +768,12 @@ struct Averages {
 /// Write the CSV header row for metrics. `element_ids` defines the dynamic
 /// per-element columns (`material_kg_X`, `ore_avg_X`, `ore_min_X`, `ore_max_X`).
 ///
-/// Column order (v10): all fixed scalar fields first, then dynamic per-element columns.
+/// Column order (v11): fixed scalar fields, then per-element columns,
+/// then per-module-type columns (`{type}_active`, `{type}_stalled`, `{type}_starved`).
 pub fn write_metrics_header(
     writer: &mut impl std::io::Write,
     element_ids: &[String],
+    behavior_types: &[String],
 ) -> std::io::Result<()> {
     let descriptors = MetricsSnapshot::fixed_field_descriptors();
     for (index, (name, _)) in descriptors.iter().enumerate() {
@@ -778,17 +788,21 @@ pub fn write_metrics_header(
     for eid in element_ids {
         write!(writer, ",ore_avg_{eid},ore_min_{eid},ore_max_{eid}")?;
     }
+    for bt in behavior_types {
+        write!(writer, ",{bt}_active,{bt}_stalled,{bt}_starved")?;
+    }
     writeln!(writer)
 }
 
 /// Append a single metrics snapshot as a CSV row.
 ///
 /// Uses [`MetricsSnapshot::fixed_field_values`] to iterate scalar fields,
-/// then appends dynamic per-element columns.
+/// then appends dynamic per-element and per-module-type columns.
 pub fn append_metrics_row(
     writer: &mut impl std::io::Write,
     snapshot: &MetricsSnapshot,
     element_ids: &[String],
+    behavior_types: &[String],
 ) -> std::io::Result<()> {
     let values = snapshot.fixed_field_values();
     for (index, (_, value)) in values.iter().enumerate() {
@@ -817,6 +831,13 @@ pub fn append_metrics_row(
             stats.avg_fraction, stats.min_fraction, stats.max_fraction
         )?;
     }
+    for bt in behavior_types {
+        let metrics = snapshot.per_module_metrics.get(bt);
+        let active = metrics.map_or(0, |m| m.active);
+        let stalled = metrics.map_or(0, |m| m.stalled);
+        let starved = metrics.map_or(0, |m| m.starved);
+        write!(writer, ",{active},{stalled},{starved}")?;
+    }
     writeln!(writer)
 }
 
@@ -825,11 +846,12 @@ pub fn write_metrics_csv(
     path: &str,
     snapshots: &[MetricsSnapshot],
     element_ids: &[String],
+    behavior_types: &[String],
 ) -> std::io::Result<()> {
     let mut file = std::fs::File::create(path)?;
-    write_metrics_header(&mut file, element_ids)?;
+    write_metrics_header(&mut file, element_ids, behavior_types)?;
     for snapshot in snapshots {
-        append_metrics_row(&mut file, snapshot, element_ids)?;
+        append_metrics_row(&mut file, snapshot, element_ids, behavior_types)?;
     }
     Ok(())
 }
@@ -845,19 +867,24 @@ pub struct MetricsFileWriter {
     rows_in_current_file: usize,
     writer: std::io::BufWriter<std::fs::File>,
     element_ids: Vec<String>,
+    behavior_types: Vec<String>,
 }
 
 impl MetricsFileWriter {
     /// Create a new writer, opening the first CSV file with a header row.
-    /// `element_ids` defines the dynamic per-element columns.
-    pub fn new(run_dir: std::path::PathBuf, element_ids: Vec<String>) -> std::io::Result<Self> {
-        let (writer, _) = open_csv_file(&run_dir, 0, &element_ids)?;
+    pub fn new(
+        run_dir: std::path::PathBuf,
+        element_ids: Vec<String>,
+        behavior_types: Vec<String>,
+    ) -> std::io::Result<Self> {
+        let (writer, _) = open_csv_file(&run_dir, 0, &element_ids, &behavior_types)?;
         Ok(Self {
             run_dir,
             file_index: 0,
             rows_in_current_file: 0,
             writer,
             element_ids,
+            behavior_types,
         })
     }
 
@@ -866,11 +893,21 @@ impl MetricsFileWriter {
         if self.rows_in_current_file >= MAX_ROWS_PER_FILE {
             self.writer.flush()?;
             self.file_index += 1;
-            let (new_writer, _) = open_csv_file(&self.run_dir, self.file_index, &self.element_ids)?;
+            let (new_writer, _) = open_csv_file(
+                &self.run_dir,
+                self.file_index,
+                &self.element_ids,
+                &self.behavior_types,
+            )?;
             self.writer = new_writer;
             self.rows_in_current_file = 0;
         }
-        append_metrics_row(&mut self.writer, snapshot, &self.element_ids)?;
+        append_metrics_row(
+            &mut self.writer,
+            snapshot,
+            &self.element_ids,
+            &self.behavior_types,
+        )?;
         self.writer.flush()?;
         self.rows_in_current_file += 1;
         Ok(())
@@ -885,12 +922,13 @@ fn open_csv_file(
     run_dir: &std::path::Path,
     index: u32,
     element_ids: &[String],
+    behavior_types: &[String],
 ) -> std::io::Result<(std::io::BufWriter<std::fs::File>, std::path::PathBuf)> {
     let name = format!("metrics_{index:03}.csv");
     let path = run_dir.join(&name);
     let file = std::fs::File::create(&path)?;
     let mut writer = std::io::BufWriter::new(file);
-    write_metrics_header(&mut writer, element_ids)?;
+    write_metrics_header(&mut writer, element_ids, behavior_types)?;
     Ok((writer, path))
 }
 
@@ -1005,9 +1043,7 @@ mod tests {
         assert!(snapshot.per_element_ore_stats.is_empty());
         assert_eq!(snapshot.ore_lot_count, 0);
         assert_eq!(snapshot.avg_material_quality, 0.0);
-        assert_eq!(snapshot.refinery_active_count, 0);
-        assert_eq!(snapshot.refinery_starved_count, 0);
-        assert_eq!(snapshot.refinery_stalled_count, 0);
+        assert!(snapshot.per_module_metrics.get("processor").is_none());
         assert_eq!(snapshot.fleet_total, 0);
         assert_eq!(snapshot.fleet_idle, 0);
         assert_eq!(snapshot.scan_sites_remaining, 0);
@@ -1221,8 +1257,9 @@ mod tests {
 
         let snapshot = compute_metrics(&state, &content);
 
-        assert_eq!(snapshot.refinery_active_count, 1);
-        assert_eq!(snapshot.refinery_starved_count, 1);
+        let proc = snapshot.per_module_metrics.get("processor").unwrap();
+        assert_eq!(proc.active, 1);
+        assert_eq!(proc.starved, 1);
     }
 
     #[test]
@@ -1391,10 +1428,11 @@ mod tests {
 
         let snapshot = compute_metrics(&state, &content);
 
-        assert_eq!(snapshot.refinery_active_count, 1);
-        assert_eq!(snapshot.refinery_stalled_count, 1);
+        let proc = snapshot.per_module_metrics.get("processor").unwrap();
+        assert_eq!(proc.active, 1);
+        assert_eq!(proc.stalled, 1);
         // Not starved (1000kg ore > 500kg threshold)
-        assert_eq!(snapshot.refinery_starved_count, 0);
+        assert_eq!(proc.starved, 0);
     }
 
     #[test]
@@ -1764,8 +1802,11 @@ mod tests {
         let value = serde_json::to_value(&snapshot).unwrap();
         let obj = value.as_object().unwrap();
 
-        // Count scalar fields (exclude per_element_* maps).
-        let scalar_count = obj.keys().filter(|k| !k.starts_with("per_element")).count();
+        // Count scalar fields (exclude dynamic map fields).
+        let scalar_count = obj
+            .keys()
+            .filter(|k| !k.starts_with("per_element") && *k != "per_module_metrics")
+            .count();
         let descriptor_count = MetricsSnapshot::fixed_field_descriptors().len();
 
         assert_eq!(
@@ -1796,5 +1837,38 @@ mod tests {
         assert!(snapshot.get_field_f64("balance").is_some());
         assert!(snapshot.get_field_f64("heat_wear_multiplier_avg").is_some());
         assert!(snapshot.get_field_f64("nonexistent_field").is_none());
+    }
+
+    #[test]
+    fn get_field_f64_resolves_dynamic_module_metrics() {
+        let mut snapshot = compute_metrics(&empty_state(), &empty_content());
+        snapshot.per_module_metrics.insert(
+            "processor".to_string(),
+            ModuleStatusMetrics {
+                active: 3,
+                stalled: 1,
+                starved: 2,
+            },
+        );
+        // Normal resolution
+        assert_eq!(snapshot.get_field_f64("processor_active"), Some(3.0));
+        assert_eq!(snapshot.get_field_f64("processor_stalled"), Some(1.0));
+        assert_eq!(snapshot.get_field_f64("processor_starved"), Some(2.0));
+
+        // Underscore-containing type name (e.g., sensor_array)
+        snapshot.per_module_metrics.insert(
+            "sensor_array".to_string(),
+            ModuleStatusMetrics {
+                active: 5,
+                stalled: 0,
+                starved: 0,
+            },
+        );
+        assert_eq!(snapshot.get_field_f64("sensor_array_active"), Some(5.0));
+
+        // Unknown suffix
+        assert!(snapshot.get_field_f64("processor_unknown").is_none());
+        // Nonexistent type
+        assert!(snapshot.get_field_f64("nonexistent_active").is_none());
     }
 }

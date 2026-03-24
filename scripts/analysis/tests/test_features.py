@@ -27,7 +27,7 @@ def _make_test_relation() -> duckdb.DuckDBPyRelation:
         ) AS t(
             seed, tick, total_ore_kg, total_material_kg, total_slag_kg,
             station_storage_used_pct, fleet_total, fleet_idle, fleet_mining,
-            refinery_active_count, refinery_starved_count, refinery_stalled_count,
+            processor_active, processor_starved, processor_stalled,
             power_generated_kw, power_consumed_kw
         )
         """

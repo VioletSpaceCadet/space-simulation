@@ -506,8 +506,8 @@ mod tests {
             let mut engine =
                 alerts::AlertEngine::new(&sim.content.alert_rules, sim.content.techs.len());
             let snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
-            // ORE_STARVATION fires when 3+ consecutive snapshots have refinery_starved_count > 0.
-            // The test state has no refineries, so starved_count is 0. Instead use STORAGE_SATURATION
+            // ORE_STARVATION fires when 3+ consecutive snapshots have processor_starved > 0.
+            // The test state has no processors, so starved is 0. Instead use STORAGE_SATURATION
             // which only needs the latest snapshot to have storage > 95%.
             // But compute_metrics on base state has 0 storage used. So manually create a snapshot.
             let mut history = VecDeque::new();

@@ -26,6 +26,7 @@ pub struct ParquetMetricsWriter {
     writer: ArrowWriter<std::fs::File>,
     schema: Arc<Schema>,
     element_ids: Vec<String>,
+    behavior_types: Vec<String>,
     buffer: RowBuffer,
 }
 
@@ -76,11 +77,15 @@ struct RowBuffer {
     ore_avg_cols: Vec<Float32Builder>,
     ore_min_cols: Vec<Float32Builder>,
     ore_max_cols: Vec<Float32Builder>,
+    /// Dynamic per-module-type columns: 3 builders (active, stalled, starved) per type.
+    module_active_cols: Vec<UInt32Builder>,
+    module_stalled_cols: Vec<UInt32Builder>,
+    module_starved_cols: Vec<UInt32Builder>,
     row_count: usize,
 }
 
 impl RowBuffer {
-    fn new(element_count: usize) -> Self {
+    fn new(element_count: usize, behavior_type_count: usize) -> Self {
         let fixed_columns = MetricsSnapshot::fixed_field_descriptors()
             .iter()
             .map(|(_, metric_type)| ColumnBuilder::from_type(*metric_type))
@@ -97,12 +102,24 @@ impl RowBuffer {
             ore_max_cols.push(Float32Builder::new());
         }
 
+        let mut module_active_cols = Vec::with_capacity(behavior_type_count);
+        let mut module_stalled_cols = Vec::with_capacity(behavior_type_count);
+        let mut module_starved_cols = Vec::with_capacity(behavior_type_count);
+        for _ in 0..behavior_type_count {
+            module_active_cols.push(UInt32Builder::new());
+            module_stalled_cols.push(UInt32Builder::new());
+            module_starved_cols.push(UInt32Builder::new());
+        }
+
         Self {
             fixed_columns,
             material_kg_cols,
             ore_avg_cols,
             ore_min_cols,
             ore_max_cols,
+            module_active_cols,
+            module_stalled_cols,
+            module_starved_cols,
             row_count: 0,
         }
     }
@@ -113,8 +130,8 @@ impl ParquetMetricsWriter {
     ///
     /// `element_ids` determines the dynamic per-element columns, matching
     /// the same order as the CSV writer.
-    pub fn new(path: &Path, element_ids: Vec<String>) -> Result<Self> {
-        let schema = Arc::new(build_schema(&element_ids));
+    pub fn new(path: &Path, element_ids: Vec<String>, behavior_types: Vec<String>) -> Result<Self> {
+        let schema = Arc::new(build_schema(&element_ids, &behavior_types));
         let file = std::fs::File::create(path)
             .with_context(|| format!("creating parquet file: {}", path.display()))?;
 
@@ -130,17 +147,24 @@ impl ParquetMetricsWriter {
             .context("initializing parquet writer")?;
 
         let element_count = element_ids.len();
+        let behavior_type_count = behavior_types.len();
         Ok(Self {
             writer,
             schema,
             element_ids,
-            buffer: RowBuffer::new(element_count),
+            behavior_types,
+            buffer: RowBuffer::new(element_count, behavior_type_count),
         })
     }
 
     /// Append a metrics snapshot. Flushes to disk when the batch buffer is full.
     pub fn write_row(&mut self, snapshot: &MetricsSnapshot) -> Result<()> {
-        append_to_buffer(&mut self.buffer, snapshot, &self.element_ids);
+        append_to_buffer(
+            &mut self.buffer,
+            snapshot,
+            &self.element_ids,
+            &self.behavior_types,
+        );
         self.buffer.row_count += 1;
 
         if self.buffer.row_count >= BATCH_SIZE {
@@ -159,19 +183,22 @@ impl ParquetMetricsWriter {
     }
 
     fn flush_buffer(&mut self) -> Result<()> {
-        let batch = build_record_batch(&mut self.buffer, &self.schema, &self.element_ids)?;
+        let batch = build_record_batch(
+            &mut self.buffer,
+            &self.schema,
+            &self.element_ids,
+            &self.behavior_types,
+        )?;
         self.writer.write(&batch).context("writing parquet batch")?;
-        let element_count = self.element_ids.len();
-        self.buffer = RowBuffer::new(element_count);
+        self.buffer = RowBuffer::new(self.element_ids.len(), self.behavior_types.len());
         Ok(())
     }
 }
 
-/// Build the Arrow schema with fixed + dynamic element columns.
+/// Build the Arrow schema with fixed + dynamic columns.
 ///
-/// Column order (v10): all fixed scalar fields first (from `fixed_field_descriptors`),
-/// then dynamic per-element columns at the end.
-pub(crate) fn build_schema(element_ids: &[String]) -> Schema {
+/// Column order (v11): fixed scalar fields, per-element columns, per-module-type columns.
+pub(crate) fn build_schema(element_ids: &[String], behavior_types: &[String]) -> Schema {
     let mut fields: Vec<Field> = MetricsSnapshot::fixed_field_descriptors()
         .iter()
         .map(|(name, metric_type)| {
@@ -213,11 +240,23 @@ pub(crate) fn build_schema(element_ids: &[String]) -> Schema {
         ));
     }
 
+    // Dynamic per-module-type columns
+    for bt in behavior_types {
+        fields.push(Field::new(format!("{bt}_active"), DataType::UInt32, false));
+        fields.push(Field::new(format!("{bt}_stalled"), DataType::UInt32, false));
+        fields.push(Field::new(format!("{bt}_starved"), DataType::UInt32, false));
+    }
+
     Schema::new(fields)
 }
 
 /// Append a single snapshot's values to the row buffer.
-fn append_to_buffer(buf: &mut RowBuffer, snap: &MetricsSnapshot, element_ids: &[String]) {
+fn append_to_buffer(
+    buf: &mut RowBuffer,
+    snap: &MetricsSnapshot,
+    element_ids: &[String],
+    behavior_types: &[String],
+) {
     // Fixed scalar columns — iterate field values in lockstep with builders.
     for (builder, (_, value)) in buf.fixed_columns.iter_mut().zip(snap.fixed_field_values()) {
         builder.append(value);
@@ -240,6 +279,14 @@ fn append_to_buffer(buf: &mut RowBuffer, snap: &MetricsSnapshot, element_ids: &[
         buf.ore_min_cols[index].append_value(stats.map_or(0.0, |s| s.min_fraction));
         buf.ore_max_cols[index].append_value(stats.map_or(0.0, |s| s.max_fraction));
     }
+
+    // Dynamic per-module-type columns
+    for (index, bt) in behavior_types.iter().enumerate() {
+        let metrics = snap.per_module_metrics.get(bt);
+        buf.module_active_cols[index].append_value(metrics.map_or(0, |m| m.active));
+        buf.module_stalled_cols[index].append_value(metrics.map_or(0, |m| m.stalled));
+        buf.module_starved_cols[index].append_value(metrics.map_or(0, |m| m.starved));
+    }
 }
 
 /// Build a `RecordBatch` from the accumulated buffer, consuming builder state.
@@ -247,6 +294,7 @@ fn build_record_batch(
     buf: &mut RowBuffer,
     schema: &Arc<Schema>,
     element_ids: &[String],
+    behavior_types: &[String],
 ) -> Result<RecordBatch> {
     // Fixed scalar columns
     let mut columns: Vec<Arc<dyn arrow::array::Array>> = buf
@@ -263,6 +311,13 @@ fn build_record_batch(
         columns.push(Arc::new(buf.ore_avg_cols[index].finish()));
         columns.push(Arc::new(buf.ore_min_cols[index].finish()));
         columns.push(Arc::new(buf.ore_max_cols[index].finish()));
+    }
+
+    // Dynamic per-module-type columns
+    for index in 0..behavior_types.len() {
+        columns.push(Arc::new(buf.module_active_cols[index].finish()));
+        columns.push(Arc::new(buf.module_stalled_cols[index].finish()));
+        columns.push(Arc::new(buf.module_starved_cols[index].finish()));
     }
 
     RecordBatch::try_new(Arc::clone(schema), columns).context("building record batch")
@@ -313,11 +368,26 @@ mod tests {
             per_element_ore_stats,
             ore_lot_count: 5 + index as u32,
             avg_material_quality: 0.85,
-            refinery_active_count: 2,
-            refinery_starved_count: 0,
-            refinery_stalled_count: 1,
-            assembler_active_count: 1,
-            assembler_stalled_count: 0,
+            per_module_metrics: {
+                let mut m = std::collections::BTreeMap::new();
+                m.insert(
+                    "processor".to_string(),
+                    sim_core::ModuleStatusMetrics {
+                        active: 2,
+                        stalled: 1,
+                        starved: 0,
+                    },
+                );
+                m.insert(
+                    "assembler".to_string(),
+                    sim_core::ModuleStatusMetrics {
+                        active: 1,
+                        stalled: 0,
+                        starved: 0,
+                    },
+                );
+                m
+            },
             fleet_total: 3,
             fleet_idle: 1,
             fleet_mining: 1,
@@ -356,7 +426,12 @@ mod tests {
         let element_ids = vec!["Fe".to_string(), "H2O".to_string()];
 
         // Write 100 rows
-        let mut writer = ParquetMetricsWriter::new(&path, element_ids.clone()).unwrap();
+        let mut writer = ParquetMetricsWriter::new(
+            &path,
+            element_ids.clone(),
+            vec!["processor".to_string(), "assembler".to_string()],
+        )
+        .unwrap();
         let snapshots: Vec<MetricsSnapshot> = (0..100).map(make_snapshot).collect();
         for snap in &snapshots {
             writer.write_row(snap).unwrap();
@@ -450,7 +525,8 @@ mod tests {
         let path = dir.path().join("metrics.parquet");
         let element_ids = vec!["Fe".to_string()];
 
-        let mut writer = ParquetMetricsWriter::new(&path, element_ids).unwrap();
+        let bt = vec!["processor".to_string(), "assembler".to_string()];
+        let mut writer = ParquetMetricsWriter::new(&path, element_ids, bt).unwrap();
         writer.write_row(&make_snapshot(0)).unwrap();
         writer.finish().unwrap();
 
@@ -481,7 +557,12 @@ mod tests {
         let element_ids = vec!["Fe".to_string(), "H2O".to_string()];
 
         // Write 0 rows
-        let writer = ParquetMetricsWriter::new(&path, element_ids.clone()).unwrap();
+        let writer = ParquetMetricsWriter::new(
+            &path,
+            element_ids.clone(),
+            vec!["processor".to_string(), "assembler".to_string()],
+        )
+        .unwrap();
         writer.finish().unwrap();
 
         // Verify the file exists and is valid Parquet
@@ -501,7 +582,8 @@ mod tests {
         let file2 = std::fs::File::open(&path).unwrap();
         let reader2 = ParquetRecordBatchReaderBuilder::try_new(file2).unwrap();
         let schema = reader2.schema();
-        let expected_schema = build_schema(&element_ids);
+        let bt = vec!["processor".to_string(), "assembler".to_string()];
+        let expected_schema = build_schema(&element_ids, &bt);
         assert_eq!(
             schema.fields().len(),
             expected_schema.fields().len(),
