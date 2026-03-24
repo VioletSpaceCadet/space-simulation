@@ -158,7 +158,7 @@ impl MetricsSnapshot {
     /// Returns all fixed scalar field (name, value) pairs in column order.
     /// Excludes dynamic per-element maps (`per_element_material_kg`, `per_element_ore_stats`).
     pub fn fixed_field_values(&self) -> Vec<(&'static str, MetricValue)> {
-        use MetricValue::{F32, F64, U32, U64};
+        use MetricValue::{F32, U32};
         let mut fields = self.inventory_field_values();
         fields.extend(self.module_field_values());
         fields.extend(self.fleet_field_values());
