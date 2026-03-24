@@ -11,7 +11,7 @@ tickets: [VIO-81, VIO-74, VIO-75, VIO-76, VIO-77, VIO-78, VIO-79]
 
 ## Problem
 
-When new `Event` variants were added to the Rust backend (`sim_core/src/types.rs`), the React frontend silently ignored them. SSE events were emitted but never applied to UI state. Over time, this caused:
+When new `Event` variants were added to the Rust backend (`sim_core/src/types/events.rs`), the React frontend silently ignored them. SSE events were emitted but never applied to UI state. Over time, this caused:
 
 - Economy events (ItemImported, ItemExported) not updating balance or inventory
 - Lab module events (LabRan, LabStarved) not reflected in UI
@@ -31,7 +31,7 @@ Additionally, `ModuleInstalled` handler used fragile string matching on `module_
 ### 1. CI event sync script (`scripts/ci_event_sync.sh`)
 
 A shell script that:
-1. Parses all `Event` variant names from `pub enum Event` in `types.rs`
+1. Parses all `Event` variant names from `pub enum Event` in `types/events.rs`
 2. Extracts handler keys from the handler map in `applyEvents.ts`
 3. Uses `comm -23` to find variants with no FE handler
 4. Fails CI if any are missing
