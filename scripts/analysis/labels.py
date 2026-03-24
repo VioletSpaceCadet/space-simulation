@@ -255,7 +255,7 @@ def bottleneck_timeline(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation
                     WHEN total_slag_kg > 100
                         AND total_slag_kg / (total_material_kg + 1) > 0.5
                         THEN 'SlagBackpressure'
-                    WHEN refinery_starved_count > refinery_active_count
+                    WHEN processor_starved > processor_active
                         THEN 'OreSupply'
                     WHEN fleet_total > 0 AND fleet_idle * 2 > fleet_total
                         THEN 'FleetIdle'

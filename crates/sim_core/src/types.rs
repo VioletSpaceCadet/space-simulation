@@ -349,6 +349,16 @@ pub enum ModuleKindState {
 }
 
 impl ModuleKindState {
+    /// Returns `true` if this module's kind state indicates it is stalled.
+    /// Only Processor and Assembler have a stalled concept; all others return `false`.
+    pub fn is_stalled(&self) -> bool {
+        match self {
+            Self::Processor(s) => s.stalled,
+            Self::Assembler(s) => s.stalled,
+            _ => false,
+        }
+    }
+
     /// Returns a mutable reference to the tick timer, or `None` for non-ticking modules.
     pub fn ticks_since_last_run_mut(&mut self) -> Option<&mut u64> {
         match self {
@@ -1364,6 +1374,23 @@ pub enum ModuleBehaviorDef {
 }
 
 impl ModuleBehaviorDef {
+    /// Returns a stable lowercase name for the behavior type, used as the key
+    /// in `per_module_metrics` and as a column name prefix in CSV/Parquet.
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Self::Processor(_) => "processor",
+            Self::Storage { .. } => "storage",
+            Self::Maintenance(_) => "maintenance",
+            Self::Assembler(_) => "assembler",
+            Self::Lab(_) => "lab",
+            Self::SensorArray(_) => "sensor_array",
+            Self::SolarArray(_) => "solar_array",
+            Self::Battery(_) => "battery",
+            Self::Radiator(_) => "radiator",
+            Self::Equipment => "equipment",
+        }
+    }
+
     /// Returns the tick interval for ticking module types, or `None` for passive modules.
     pub fn interval_ticks(&self) -> Option<u64> {
         match self {

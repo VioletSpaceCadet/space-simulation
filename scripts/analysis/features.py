@@ -81,9 +81,9 @@ def add_storage_pressure(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelatio
     return rel.select(
         """*,
         CASE WHEN station_storage_used_pct > 0.95 THEN 1 ELSE 0 END AS storage_critical,
-        CASE WHEN (refinery_active_count + refinery_starved_count + refinery_stalled_count) > 0
-            THEN CAST(refinery_active_count AS FLOAT)
-                / (refinery_active_count + refinery_starved_count + refinery_stalled_count)
+        CASE WHEN (processor_active + processor_starved + processor_stalled) > 0
+            THEN CAST(processor_active AS FLOAT)
+                / (processor_active + processor_starved + processor_stalled)
             ELSE 0.0
         END AS refinery_efficiency
         """

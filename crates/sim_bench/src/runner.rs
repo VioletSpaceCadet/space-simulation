@@ -60,12 +60,19 @@ pub fn run_seed(
     )?;
 
     let element_ids = sim_core::content_element_ids(content);
-    let mut metrics_writer =
-        sim_core::MetricsFileWriter::new(seed_dir.to_path_buf(), element_ids.clone())
-            .with_context(|| format!("opening metrics CSV in {}", seed_dir.display()))?;
-    let mut parquet_writer =
-        ParquetMetricsWriter::new(&seed_dir.join("metrics.parquet"), element_ids)
-            .with_context(|| format!("opening metrics Parquet in {}", seed_dir.display()))?;
+    let behavior_types = sim_core::content_behavior_types(content);
+    let mut metrics_writer = sim_core::MetricsFileWriter::new(
+        seed_dir.to_path_buf(),
+        element_ids.clone(),
+        behavior_types.clone(),
+    )
+    .with_context(|| format!("opening metrics CSV in {}", seed_dir.display()))?;
+    let mut parquet_writer = ParquetMetricsWriter::new(
+        &seed_dir.join("metrics.parquet"),
+        element_ids,
+        behavior_types,
+    )
+    .with_context(|| format!("opening metrics Parquet in {}", seed_dir.display()))?;
 
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(&state, content, &mut next_command_id);

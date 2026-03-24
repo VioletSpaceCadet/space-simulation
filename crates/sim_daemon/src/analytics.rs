@@ -204,7 +204,11 @@ fn detect_bottleneck(history: &VecDeque<MetricsSnapshot>) -> Bottleneck {
         return Bottleneck::Healthy;
     };
 
-    if latest.refinery_starved_count > 0 {
+    if latest
+        .per_module_metrics
+        .get("processor")
+        .is_some_and(|m| m.starved > 0)
+    {
         return Bottleneck::OreSupply;
     }
     if latest.station_storage_used_pct > 0.95 {
@@ -263,11 +267,7 @@ mod tests {
             per_element_ore_stats: std::collections::BTreeMap::new(),
             ore_lot_count: 0,
             avg_material_quality: 0.0,
-            refinery_active_count: 0,
-            refinery_starved_count: 0,
-            refinery_stalled_count: 0,
-            assembler_active_count: 0,
-            assembler_stalled_count: 0,
+            per_module_metrics: std::collections::BTreeMap::new(),
             fleet_total: 0,
             fleet_idle: 0,
             fleet_mining: 0,
@@ -389,7 +389,10 @@ mod tests {
         let mut history = VecDeque::new();
         let mut snap = empty_snapshot(1);
         // Set multiple conditions: OreSupply + StorageFull + WearCritical
-        snap.refinery_starved_count = 2;
+        snap.per_module_metrics
+            .entry("processor".to_string())
+            .or_default()
+            .starved = 2;
         snap.station_storage_used_pct = 0.98;
         snap.max_module_wear = 0.9;
         history.push_back(snap);
@@ -414,7 +417,10 @@ mod tests {
         // OreSupply
         let mut history = VecDeque::new();
         let mut snap = empty_snapshot(1);
-        snap.refinery_starved_count = 1;
+        snap.per_module_metrics
+            .entry("processor".to_string())
+            .or_default()
+            .starved = 1;
         snap.total_scan_data = 10.0;
         snap.techs_unlocked = 1;
         history.push_back(snap);

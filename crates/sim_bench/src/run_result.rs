@@ -40,11 +40,7 @@ pub struct SummaryMetrics {
     pub station_storage_used_pct: f64,
     pub fleet_total: u32,
     pub fleet_idle: u32,
-    pub refinery_active_count: u32,
-    pub refinery_starved_count: u32,
-    pub refinery_stalled_count: u32,
-    pub assembler_active_count: u32,
-    pub assembler_stalled_count: u32,
+    pub per_module_metrics: std::collections::BTreeMap<String, sim_core::ModuleStatusMetrics>,
     pub avg_module_wear: f64,
     pub max_module_wear: f64,
     pub repair_kits_remaining: u32,
@@ -76,11 +72,7 @@ impl SummaryMetrics {
             station_storage_used_pct: f64::from(snapshot.station_storage_used_pct),
             fleet_total: snapshot.fleet_total,
             fleet_idle: snapshot.fleet_idle,
-            refinery_active_count: snapshot.refinery_active_count,
-            refinery_starved_count: snapshot.refinery_starved_count,
-            refinery_stalled_count: snapshot.refinery_stalled_count,
-            assembler_active_count: snapshot.assembler_active_count,
-            assembler_stalled_count: snapshot.assembler_stalled_count,
+            per_module_metrics: snapshot.per_module_metrics.clone(),
             avg_module_wear: f64::from(snapshot.avg_module_wear),
             max_module_wear: f64::from(snapshot.max_module_wear),
             repair_kits_remaining: snapshot.repair_kits_remaining,
@@ -118,10 +110,13 @@ impl RunResult {
     }
 }
 
-/// Detect collapse: `refinery_starved` > 0 AND `fleet_idle` == `fleet_total`.
+/// Detect collapse: processor starved > 0 AND `fleet_idle` == `fleet_total`.
 pub fn detect_collapse(snapshot: &MetricsSnapshot) -> (bool, Option<String>) {
-    let collapsed =
-        snapshot.refinery_starved_count > 0 && snapshot.fleet_idle == snapshot.fleet_total;
+    let processor_starved = snapshot
+        .per_module_metrics
+        .get("processor")
+        .map_or(0, |m| m.starved);
+    let collapsed = processor_starved > 0 && snapshot.fleet_idle == snapshot.fleet_total;
     if collapsed {
         (true, Some("refinery_starved + fleet_idle".to_string()))
     } else {
@@ -154,11 +149,26 @@ mod tests {
             per_element_ore_stats: std::collections::BTreeMap::new(),
             ore_lot_count: 5,
             avg_material_quality: 0.75,
-            refinery_active_count: 2,
-            refinery_starved_count: 0,
-            refinery_stalled_count: 0,
-            assembler_active_count: 1,
-            assembler_stalled_count: 0,
+            per_module_metrics: {
+                let mut m = std::collections::BTreeMap::new();
+                m.insert(
+                    "processor".to_string(),
+                    sim_core::ModuleStatusMetrics {
+                        active: 2,
+                        stalled: 0,
+                        starved: 0,
+                    },
+                );
+                m.insert(
+                    "assembler".to_string(),
+                    sim_core::ModuleStatusMetrics {
+                        active: 1,
+                        stalled: 0,
+                        starved: 0,
+                    },
+                );
+                m
+            },
             fleet_total: 3,
             fleet_idle: 1,
             fleet_mining: 1,
@@ -290,7 +300,11 @@ mod tests {
     #[test]
     fn test_collapse_detection_collapsed() {
         let mut snapshot = sample_snapshot();
-        snapshot.refinery_starved_count = 2;
+        snapshot
+            .per_module_metrics
+            .entry("processor".to_string())
+            .or_default()
+            .starved = 2;
         snapshot.fleet_idle = 3;
         snapshot.fleet_total = 3;
         let (collapsed, reason) = detect_collapse(&snapshot);

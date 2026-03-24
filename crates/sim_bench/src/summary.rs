@@ -20,17 +20,23 @@ pub struct MetricSummary {
 pub fn compute_summary(snapshots: &[(u64, &MetricsSnapshot)]) -> SummaryStats {
     let seed_count = snapshots.len();
 
-    // A seed is "collapsed" if final snapshot has refinery_starved_count > 0 AND fleet_idle == fleet_total
+    // A seed is "collapsed" if processor starved > 0 AND fleet_idle == fleet_total
     let collapsed_count = snapshots
         .iter()
-        .filter(|(_, s)| s.refinery_starved_count > 0 && s.fleet_idle == s.fleet_total)
+        .filter(|(_, s)| {
+            let starved = s
+                .per_module_metrics
+                .get("processor")
+                .map_or(0, |m| m.starved);
+            starved > 0 && s.fleet_idle == s.fleet_total
+        })
         .count();
 
     // Curated summary fields — a subset of MetricsSnapshot meaningful for seed comparison.
     // Uses get_field_f64() for direct field lookups instead of per-field closures.
     let direct_fields: &[&str] = &[
         "station_storage_used_pct",
-        "refinery_starved_count",
+        "processor_starved",
         "techs_unlocked",
         "avg_module_wear",
         "repair_kits_remaining",
@@ -194,11 +200,20 @@ mod tests {
             per_element_ore_stats: std::collections::BTreeMap::new(),
             ore_lot_count: 0,
             avg_material_quality: 0.0,
-            refinery_active_count: 0,
-            refinery_starved_count: refinery_starved,
-            refinery_stalled_count: 0,
-            assembler_active_count: 0,
-            assembler_stalled_count: 0,
+            per_module_metrics: {
+                let mut m = std::collections::BTreeMap::new();
+                if refinery_starved > 0 {
+                    m.insert(
+                        "processor".to_string(),
+                        sim_core::ModuleStatusMetrics {
+                            active: 0,
+                            stalled: 0,
+                            starved: refinery_starved,
+                        },
+                    );
+                }
+                m
+            },
             fleet_total,
             fleet_idle,
             fleet_mining: 0,

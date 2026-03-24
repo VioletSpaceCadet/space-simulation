@@ -294,11 +294,7 @@ mod tests {
             per_element_ore_stats: std::collections::BTreeMap::new(),
             ore_lot_count: 0,
             avg_material_quality: 0.0,
-            refinery_active_count: 0,
-            refinery_starved_count: 0,
-            refinery_stalled_count: 0,
-            assembler_active_count: 0,
-            assembler_stalled_count: 0,
+            per_module_metrics: std::collections::BTreeMap::new(),
             fleet_total: 0,
             fleet_idle: 0,
             fleet_mining: 0,
@@ -457,7 +453,10 @@ mod tests {
 
         // Only one stalled sample — should not fire
         let mut snap = empty_snapshot(1);
-        snap.refinery_stalled_count = 1;
+        snap.per_module_metrics
+            .entry("processor".to_string())
+            .or_default()
+            .stalled = 1;
         history.push_back(snap);
 
         let events = engine.evaluate(&history, 1, &mut counters);
@@ -468,7 +467,11 @@ mod tests {
 
         // Second consecutive stalled sample — should fire
         let mut snap2 = empty_snapshot(2);
-        snap2.refinery_stalled_count = 1;
+        snap2
+            .per_module_metrics
+            .entry("processor".to_string())
+            .or_default()
+            .stalled = 1;
         history.push_back(snap2);
 
         let events = engine.evaluate(&history, 2, &mut counters);

@@ -278,8 +278,8 @@ def test_bottleneck_classification() -> None:
             (0, 5, 0.5, 0.3, 10.0, 100.0, 2, 0, 3, 2),
             (0, 6, 0.5, 0.3, 10.0, 100.0, 2, 0, 3, 1)
         ) AS t(seed, tick, station_storage_used_pct, max_module_wear,
-               total_slag_kg, total_material_kg, refinery_active_count,
-               refinery_starved_count, fleet_total, fleet_idle)
+               total_slag_kg, total_material_kg, processor_active,
+               processor_starved, fleet_total, fleet_idle)
     """)
     result = bottleneck_timeline(rel)
     rows = result.order("tick_start").fetchall()
@@ -303,8 +303,8 @@ def test_bottleneck_consecutive_merge() -> None:
             0.3 AS max_module_wear,
             10.0 AS total_slag_kg,
             100.0 AS total_material_kg,
-            2 AS refinery_active_count,
-            0 AS refinery_starved_count,
+            2 AS processor_active,
+            0 AS processor_starved,
             3 AS fleet_total,
             1 AS fleet_idle
         FROM generate_series(1, 50) AS t(tick)
@@ -328,8 +328,8 @@ def test_bottleneck_spans_cover_range() -> None:
             0.3 AS max_module_wear,
             10.0 AS total_slag_kg,
             100.0 AS total_material_kg,
-            2 AS refinery_active_count,
-            0 AS refinery_starved_count,
+            2 AS processor_active,
+            0 AS processor_starved,
             3 AS fleet_total,
             1 AS fleet_idle
         FROM generate_series(1, 100) AS t(tick)
@@ -355,8 +355,8 @@ def test_bottleneck_priority_order() -> None:
         SELECT * FROM (VALUES
             (0, 1, 0.97, 0.9, 10.0, 100.0, 2, 0, 3, 1)
         ) AS t(seed, tick, station_storage_used_pct, max_module_wear,
-               total_slag_kg, total_material_kg, refinery_active_count,
-               refinery_starved_count, fleet_total, fleet_idle)
+               total_slag_kg, total_material_kg, processor_active,
+               processor_starved, fleet_total, fleet_idle)
     """)
     result = bottleneck_timeline(rel)
     rows = result.fetchall()
