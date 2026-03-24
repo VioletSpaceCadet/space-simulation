@@ -1,30 +1,32 @@
 use crate::{
-    boiloff_rate_per_tick, Event, EventEnvelope, GameContent, GameState, InventoryItem, StationId,
+    boiloff_rate_per_tick, BoiloffCurveDef, Event, EventEnvelope, GameContent, GameState,
+    InventoryItem, StationId,
 };
 
 /// Piecewise linear temperature multiplier for boiloff.
-/// - At or below boiling point: 0.1x (minimal loss)
-/// - Boiling point → ambient: linear 0.1x → 1.0x
-/// - Ambient → ambient + `hot_offset`: linear 1.0x → 3.0x
-/// - Above ambient + `hot_offset`: clamped at 3.0x
+/// - At or below boiling point: `cold_multiplier` (default 0.1x)
+/// - Boiling point → ambient: linear ramp `cold_multiplier` → `ambient_multiplier`
+/// - Ambient → ambient + `hot_offset`: linear ramp `ambient_multiplier` → `hot_multiplier`
+/// - Above ambient + `hot_offset`: clamped at `hot_multiplier`
 fn boiloff_temp_multiplier(
     temp_mk: u32,
     boiling_point_mk: u32,
     ambient_mk: u32,
     hot_offset_mk: u32,
+    curve: &BoiloffCurveDef,
 ) -> f64 {
     let t_amb = ambient_mk;
     let t_hot = t_amb + hot_offset_mk;
     if temp_mk <= boiling_point_mk {
-        0.1
+        curve.cold_multiplier
     } else if temp_mk <= t_amb {
         let frac = f64::from(temp_mk - boiling_point_mk) / f64::from(t_amb - boiling_point_mk);
-        0.1 + 0.9 * frac
+        curve.cold_multiplier + (curve.ambient_multiplier - curve.cold_multiplier) * frac
     } else if temp_mk <= t_hot {
         let frac = f64::from(temp_mk - t_amb) / f64::from(hot_offset_mk);
-        1.0 + 2.0 * frac
+        curve.ambient_multiplier + (curve.hot_multiplier - curve.ambient_multiplier) * frac
     } else {
-        3.0
+        curve.hot_multiplier
     }
 }
 
@@ -46,6 +48,7 @@ pub(super) fn apply_boiloff(
     };
 
     let mut losses: Vec<(String, f32)> = Vec::new();
+    let default_curve = BoiloffCurveDef::default();
 
     for item in &mut station.inventory {
         let InventoryItem::Material {
@@ -70,12 +73,18 @@ pub(super) fn apply_boiloff(
             thermal.as_ref(),
             element_def.and_then(|e| e.boiling_point_mk),
         ) {
-            (Some(mat_thermal), Some(bp_mk)) => boiloff_temp_multiplier(
-                mat_thermal.temp_mk,
-                bp_mk,
-                content.constants.thermal_sink_temp_mk,
-                content.constants.boiloff_hot_offset_mk,
-            ),
+            (Some(mat_thermal), Some(bp_mk)) => {
+                let curve = element_def
+                    .and_then(|e| e.boiloff_curve.as_ref())
+                    .unwrap_or(&default_curve);
+                boiloff_temp_multiplier(
+                    mat_thermal.temp_mk,
+                    bp_mk,
+                    content.constants.thermal_sink_temp_mk,
+                    content.constants.boiloff_hot_offset_mk,
+                    curve,
+                )
+            }
             _ => 1.0,
         };
 
@@ -131,6 +140,7 @@ mod tests {
             specific_heat_j_per_kg_k: None,
             boiloff_rate_per_day_at_293k: Some(0.014),
             boiling_point_mk: Some(20_300),
+            boiloff_curve: None,
         });
         content.elements.push(ElementDef {
             id: "LOX".to_string(),
@@ -143,6 +153,7 @@ mod tests {
             specific_heat_j_per_kg_k: None,
             boiloff_rate_per_day_at_293k: Some(0.003),
             boiling_point_mk: Some(90_200),
+            boiloff_curve: None,
         });
         content
     }
@@ -322,19 +333,64 @@ mod tests {
     fn test_temp_multiplier_piecewise() {
         let amb = 293_000;
         let hot_off = 100_000;
+        let curve = BoiloffCurveDef::default();
         // At boiling point: 0.1x
-        assert!((boiloff_temp_multiplier(20_300, 20_300, amb, hot_off) - 0.1).abs() < 0.001);
+        assert!(
+            (boiloff_temp_multiplier(20_300, 20_300, amb, hot_off, &curve) - 0.1).abs() < 0.001
+        );
         // Below boiling point: 0.1x
-        assert!((boiloff_temp_multiplier(10_000, 20_300, amb, hot_off) - 0.1).abs() < 0.001);
+        assert!(
+            (boiloff_temp_multiplier(10_000, 20_300, amb, hot_off, &curve) - 0.1).abs() < 0.001
+        );
         // At ambient (293K): 1.0x
-        assert!((boiloff_temp_multiplier(293_000, 20_300, amb, hot_off) - 1.0).abs() < 0.01);
+        assert!(
+            (boiloff_temp_multiplier(293_000, 20_300, amb, hot_off, &curve) - 1.0).abs() < 0.01
+        );
         // At ambient+100K (393K): 3.0x
-        assert!((boiloff_temp_multiplier(393_000, 20_300, amb, hot_off) - 3.0).abs() < 0.01);
+        assert!(
+            (boiloff_temp_multiplier(393_000, 20_300, amb, hot_off, &curve) - 3.0).abs() < 0.01
+        );
         // Above ambient+100K: clamped at 3.0x
-        assert!((boiloff_temp_multiplier(500_000, 20_300, amb, hot_off) - 3.0).abs() < 0.001);
+        assert!(
+            (boiloff_temp_multiplier(500_000, 20_300, amb, hot_off, &curve) - 3.0).abs() < 0.001
+        );
         // Midway between boiling and ambient: ~0.55x
         let midpoint = (20_300 + 293_000) / 2;
-        let mid_val = boiloff_temp_multiplier(midpoint, 20_300, amb, hot_off);
+        let mid_val = boiloff_temp_multiplier(midpoint, 20_300, amb, hot_off, &curve);
         assert!(mid_val > 0.4 && mid_val < 0.7, "midpoint value: {mid_val}");
+    }
+
+    #[test]
+    fn test_custom_boiloff_curve() {
+        let amb = 293_000;
+        let hot_off = 100_000;
+        let curve = BoiloffCurveDef {
+            cold_multiplier: 0.05,
+            ambient_multiplier: 0.5,
+            hot_multiplier: 2.0,
+        };
+        // At boiling point: cold_multiplier
+        assert!(
+            (boiloff_temp_multiplier(20_300, 20_300, amb, hot_off, &curve) - 0.05).abs() < 0.001
+        );
+        // At ambient: ambient_multiplier
+        assert!(
+            (boiloff_temp_multiplier(293_000, 20_300, amb, hot_off, &curve) - 0.5).abs() < 0.01
+        );
+        // Above hot: hot_multiplier
+        assert!(
+            (boiloff_temp_multiplier(500_000, 20_300, amb, hot_off, &curve) - 2.0).abs() < 0.001
+        );
+        // At hot threshold: hot_multiplier
+        assert!(
+            (boiloff_temp_multiplier(393_000, 20_300, amb, hot_off, &curve) - 2.0).abs() < 0.01
+        );
+        // Midpoint between boiling and ambient: (0.05 + 0.5) / 2 = 0.275
+        let midpoint = (20_300 + 293_000) / 2;
+        let mid_val = boiloff_temp_multiplier(midpoint, 20_300, amb, hot_off, &curve);
+        assert!(
+            (mid_val - 0.275).abs() < 0.01,
+            "midpoint with custom curve: {mid_val}"
+        );
     }
 }

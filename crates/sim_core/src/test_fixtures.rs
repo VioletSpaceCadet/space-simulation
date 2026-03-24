@@ -134,6 +134,7 @@ pub fn base_content() -> GameContent {
                 specific_heat_j_per_kg_k: None,
                 boiloff_rate_per_day_at_293k: None,
                 boiling_point_mk: None,
+                boiloff_curve: None,
             },
             ElementDef {
                 id: "Fe".to_string(),
@@ -146,6 +147,7 @@ pub fn base_content() -> GameContent {
                 specific_heat_j_per_kg_k: Some(449),
                 boiloff_rate_per_day_at_293k: None,
                 boiling_point_mk: None,
+                boiloff_curve: None,
             },
             ElementDef {
                 id: "Si".to_string(),
@@ -158,6 +160,7 @@ pub fn base_content() -> GameContent {
                 specific_heat_j_per_kg_k: Some(710),
                 boiloff_rate_per_day_at_293k: None,
                 boiling_point_mk: None,
+                boiloff_curve: None,
             },
             ElementDef {
                 id: "slag".to_string(),
@@ -170,6 +173,7 @@ pub fn base_content() -> GameContent {
                 specific_heat_j_per_kg_k: None,
                 boiloff_rate_per_day_at_293k: None,
                 boiling_point_mk: None,
+                boiloff_curve: None,
             },
             ElementDef {
                 id: "H2O".to_string(),
@@ -182,6 +186,7 @@ pub fn base_content() -> GameContent {
                 specific_heat_j_per_kg_k: None,
                 boiloff_rate_per_day_at_293k: None,
                 boiling_point_mk: None,
+                boiloff_curve: None,
             },
         ],
         module_defs: AHashMap::default(),
@@ -368,6 +373,7 @@ pub fn minimal_content() -> GameContent {
                 specific_heat_j_per_kg_k: None,
                 boiloff_rate_per_day_at_293k: None,
                 boiling_point_mk: None,
+                boiloff_curve: None,
             },
             ElementDef {
                 id: "Fe".to_string(),
@@ -380,6 +386,7 @@ pub fn minimal_content() -> GameContent {
                 specific_heat_j_per_kg_k: Some(449),
                 boiloff_rate_per_day_at_293k: None,
                 boiling_point_mk: None,
+                boiloff_curve: None,
             },
             ElementDef {
                 id: "slag".to_string(),
@@ -392,6 +399,7 @@ pub fn minimal_content() -> GameContent {
                 specific_heat_j_per_kg_k: None,
                 boiloff_rate_per_day_at_293k: None,
                 boiling_point_mk: None,
+                boiloff_curve: None,
             },
             ElementDef {
                 id: "H2O".to_string(),
@@ -404,6 +412,7 @@ pub fn minimal_content() -> GameContent {
                 specific_heat_j_per_kg_k: None,
                 boiloff_rate_per_day_at_293k: None,
                 boiling_point_mk: None,
+                boiloff_curve: None,
             },
         ],
         module_defs: AHashMap::default(),

@@ -247,6 +247,43 @@ pub struct ElementDef {
     /// Boiling point in milli-Kelvin, for temperature-dependent boiloff scaling.
     #[serde(default)]
     pub boiling_point_mk: Option<u32>,
+    /// Per-element boiloff temperature curve parameters. If absent, uses defaults.
+    #[serde(default)]
+    pub boiloff_curve: Option<BoiloffCurveDef>,
+}
+
+/// Per-element boiloff temperature multiplier curve parameters.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BoiloffCurveDef {
+    /// Multiplier at or below boiling point.
+    #[serde(default = "default_boiloff_cold_multiplier")]
+    pub cold_multiplier: f64,
+    /// Multiplier at ambient temperature.
+    #[serde(default = "default_boiloff_ambient_multiplier")]
+    pub ambient_multiplier: f64,
+    /// Multiplier above hot threshold (capped).
+    #[serde(default = "default_boiloff_hot_multiplier")]
+    pub hot_multiplier: f64,
+}
+
+impl Default for BoiloffCurveDef {
+    fn default() -> Self {
+        Self {
+            cold_multiplier: 0.1,
+            ambient_multiplier: 1.0,
+            hot_multiplier: 3.0,
+        }
+    }
+}
+
+fn default_boiloff_cold_multiplier() -> f64 {
+    0.1
+}
+fn default_boiloff_ambient_multiplier() -> f64 {
+    1.0
+}
+fn default_boiloff_hot_multiplier() -> f64 {
+    3.0
 }
 
 fn default_element_category() -> String {
