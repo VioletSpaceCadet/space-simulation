@@ -1359,6 +1359,37 @@ fn thermal_recipe_requirements_are_consistent() {
                         req.max_temp_mk
                     );
 
+                    // Validate curve parameters are in [0.0, 1.0]
+                    assert!(
+                        (0.0..=1.0).contains(&req.efficiency_floor),
+                        "module '{}' recipe '{}': efficiency_floor ({}) must be in [0.0, 1.0]",
+                        module_def.id,
+                        recipe_id,
+                        req.efficiency_floor
+                    );
+                    assert!(
+                        (0.0..=1.0).contains(&req.quality_floor),
+                        "module '{}' recipe '{}': quality_floor ({}) must be in [0.0, 1.0]",
+                        module_def.id,
+                        recipe_id,
+                        req.quality_floor
+                    );
+                    assert!(
+                        (0.0..=1.0).contains(&req.quality_at_max),
+                        "module '{}' recipe '{}': quality_at_max ({}) must be in [0.0, 1.0]",
+                        module_def.id,
+                        recipe_id,
+                        req.quality_at_max
+                    );
+                    assert!(
+                        req.quality_floor <= req.quality_at_max,
+                        "module '{}' recipe '{}': quality_floor ({}) > quality_at_max ({})",
+                        module_def.id,
+                        recipe_id,
+                        req.quality_floor,
+                        req.quality_at_max
+                    );
+
                     // If module has thermal def, recipe max should be within module max
                     if let Some(thermal) = &module_def.thermal {
                         assert!(

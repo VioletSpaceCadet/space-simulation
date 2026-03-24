@@ -48,7 +48,7 @@ pub fn heat_to_temp_delta_mk(heat_j: i64, capacity_j_per_k: f32) -> i32 {
 /// Efficiency scaling based on temperature (affects material yield).
 ///
 /// - Below `min_temp_mk`: 0.0 (caller should stall instead of calling this)
-/// - `min_temp_mk` → `optimal_min_mk`: linear ramp from 0.8 to 1.0
+/// - `min_temp_mk` → `optimal_min_mk`: linear ramp from `efficiency_floor` to 1.0
 /// - `optimal_min_mk` and above: 1.0
 #[inline]
 pub fn thermal_efficiency(temp_mk: u32, req: &RecipeThermalReq) -> f32 {
@@ -58,35 +58,33 @@ pub fn thermal_efficiency(temp_mk: u32, req: &RecipeThermalReq) -> f32 {
     if temp_mk >= req.optimal_min_mk {
         return 1.0;
     }
-    // Linear interpolation: min→optimal_min maps to 0.8→1.0
     let range = req.optimal_min_mk - req.min_temp_mk;
     if range == 0 {
         return 1.0;
     }
     let progress = (temp_mk - req.min_temp_mk) as f32 / range as f32;
-    0.8 + 0.2 * progress
+    req.efficiency_floor + (1.0 - req.efficiency_floor) * progress
 }
 
 /// Quality scaling based on temperature.
 ///
 /// - Below `optimal_max_mk`: 1.0
-/// - `optimal_max_mk` → `max_temp_mk`: linear ramp from 1.0 to 0.6
-/// - Above `max_temp_mk`: 0.3
+/// - `optimal_max_mk` → `max_temp_mk`: linear ramp from 1.0 to `quality_at_max`
+/// - Above `max_temp_mk`: `quality_floor`
 #[inline]
 pub fn thermal_quality_factor(temp_mk: u32, req: &RecipeThermalReq) -> f32 {
     if temp_mk <= req.optimal_max_mk {
         return 1.0;
     }
     if temp_mk > req.max_temp_mk {
-        return 0.3;
+        return req.quality_floor;
     }
-    // Linear interpolation: optimal_max→max maps to 1.0→0.6
     let range = req.max_temp_mk - req.optimal_max_mk;
     if range == 0 {
         return 1.0;
     }
     let progress = (temp_mk - req.optimal_max_mk) as f32 / range as f32;
-    1.0 - 0.4 * progress
+    1.0 - (1.0 - req.quality_at_max) * progress
 }
 
 /// Returns the wear rate multiplier for a module's overheat zone.
@@ -176,6 +174,9 @@ mod tests {
             optimal_max_mk: 2_000_000, // 2000K
             max_temp_mk: 2_500_000,    // 2500K
             heat_per_run_j: 50_000,
+            efficiency_floor: 0.8,
+            quality_floor: 0.3,
+            quality_at_max: 0.6,
         }
     }
 
@@ -251,6 +252,9 @@ mod tests {
             optimal_max_mk: 2_000_000,
             max_temp_mk: 2_500_000,
             heat_per_run_j: 0,
+            efficiency_floor: 0.8,
+            quality_floor: 0.3,
+            quality_at_max: 0.6,
         };
         assert!((thermal_efficiency(1_000_000, &req) - 1.0).abs() < f32::EPSILON);
     }
@@ -263,8 +267,51 @@ mod tests {
             optimal_max_mk: 2_000_000,
             max_temp_mk: 2_000_000, // same as optimal_max
             heat_per_run_j: 0,
+            efficiency_floor: 0.8,
+            quality_floor: 0.3,
+            quality_at_max: 0.6,
         };
         assert!((thermal_quality_factor(2_000_000, &req) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn custom_efficiency_floor() {
+        let req = RecipeThermalReq {
+            min_temp_mk: 1_000_000,
+            optimal_min_mk: 1_500_000,
+            optimal_max_mk: 2_000_000,
+            max_temp_mk: 2_500_000,
+            heat_per_run_j: 0,
+            efficiency_floor: 0.5, // custom: 50% instead of 80%
+            quality_floor: 0.3,
+            quality_at_max: 0.6,
+        };
+        // At min_temp: should be 0.5
+        assert!((thermal_efficiency(1_000_000, &req) - 0.5).abs() < 1e-5);
+        // Midway: 0.5 + 0.5*0.5 = 0.75
+        assert!((thermal_efficiency(1_250_000, &req) - 0.75).abs() < 1e-5);
+        // At optimal_min: still 1.0
+        assert!((thermal_efficiency(1_500_000, &req) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn custom_quality_curves() {
+        let req = RecipeThermalReq {
+            min_temp_mk: 1_000_000,
+            optimal_min_mk: 1_500_000,
+            optimal_max_mk: 2_000_000,
+            max_temp_mk: 2_500_000,
+            heat_per_run_j: 0,
+            efficiency_floor: 0.8,
+            quality_floor: 0.1,  // custom: 10% above max
+            quality_at_max: 0.4, // custom: 40% at max
+        };
+        // At max_temp: should be quality_at_max = 0.4
+        assert!((thermal_quality_factor(2_500_000, &req) - 0.4).abs() < f32::EPSILON);
+        // Above max_temp: should be quality_floor = 0.1
+        assert!((thermal_quality_factor(3_000_000, &req) - 0.1).abs() < f32::EPSILON);
+        // Midway: 1.0 - (1.0 - 0.4) * 0.5 = 1.0 - 0.3 = 0.7
+        assert!((thermal_quality_factor(2_250_000, &req) - 0.7).abs() < 1e-5);
     }
 
     // ── heat_wear_multiplier tests ────────────────────────────────────

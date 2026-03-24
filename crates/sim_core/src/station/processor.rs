@@ -798,6 +798,9 @@ mod tests {
                 optimal_max_mk: 2_000_000, // 2000K
                 max_temp_mk: 2_500_000,    // 2500K
                 heat_per_run_j: 50_000,
+                efficiency_floor: 0.8,
+                quality_floor: 0.3,
+                quality_at_max: 0.6,
             }),
             required_tech: None,
             tags: vec![],
