@@ -85,6 +85,7 @@ pub(crate) fn tick_stations(
     mut timings: Option<&mut TickTimings>,
 ) {
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
+    let mut scratch_indices: Vec<usize> = Vec::new();
     for station_id in &station_ids {
         timed!(
             timings,
@@ -94,12 +95,25 @@ pub(crate) fn tick_stations(
         timed!(
             timings,
             processors,
-            processor::tick_station_modules(state, station_id, content, events)
+            processor::tick_station_modules(
+                state,
+                station_id,
+                content,
+                events,
+                &mut scratch_indices
+            )
         );
         timed!(
             timings,
             assemblers,
-            assembler::tick_assembler_modules(state, station_id, content, rng, events)
+            assembler::tick_assembler_modules(
+                state,
+                station_id,
+                content,
+                rng,
+                events,
+                &mut scratch_indices
+            )
         );
         timed!(
             timings,

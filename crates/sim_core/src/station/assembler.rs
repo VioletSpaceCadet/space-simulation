@@ -11,6 +11,7 @@ pub(super) fn tick_assembler_modules(
     content: &GameContent,
     rng: &mut impl rand::Rng,
     events: &mut Vec<EventEnvelope>,
+    scratch: &mut Vec<usize>,
 ) {
     let module_count = state
         .stations
@@ -18,19 +19,18 @@ pub(super) fn tick_assembler_modules(
         .map_or(0, |s| s.modules.len());
 
     // Collect assembler module indices, sorted by priority (desc) then id (asc)
-    let mut assembler_indices: Vec<usize> = (0..module_count)
-        .filter(|&module_index| {
-            state
-                .stations
-                .get(station_id)
-                .and_then(|s| s.modules.get(module_index))
-                .and_then(|m| content.module_defs.get(&m.def_id))
-                .is_some_and(|d| matches!(d.behavior, ModuleBehaviorDef::Assembler(_)))
-        })
-        .collect();
+    scratch.clear();
+    scratch.extend((0..module_count).filter(|&module_index| {
+        state
+            .stations
+            .get(station_id)
+            .and_then(|s| s.modules.get(module_index))
+            .and_then(|m| content.module_defs.get(&m.def_id))
+            .is_some_and(|d| matches!(d.behavior, ModuleBehaviorDef::Assembler(_)))
+    }));
 
     if let Some(station) = state.stations.get(station_id) {
-        assembler_indices.sort_by(|&a, &b| {
+        scratch.sort_by(|&a, &b| {
             let ma = &station.modules[a];
             let mb = &station.modules[b];
             mb.manufacturing_priority
@@ -39,7 +39,7 @@ pub(super) fn tick_assembler_modules(
         });
     }
 
-    for module_idx in assembler_indices {
+    for &module_idx in scratch.iter() {
         let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
             continue;
         };
@@ -655,7 +655,14 @@ mod assembler_component_tests {
 
         let mut events = Vec::new();
         let mut rng = ChaCha8Rng::seed_from_u64(42);
-        super::tick_assembler_modules(&mut state, &station_id, &content, &mut rng, &mut events);
+        super::tick_assembler_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut rng,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         let station = state.stations.get(&station_id).unwrap();
 
@@ -739,7 +746,14 @@ mod assembler_component_tests {
 
         let mut events = Vec::new();
         let mut rng = ChaCha8Rng::seed_from_u64(42);
-        super::tick_assembler_modules(&mut state, &station_id, &content, &mut rng, &mut events);
+        super::tick_assembler_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut rng,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // No AssemblerRan event
         let assembler_ran = events
@@ -789,7 +803,14 @@ mod assembler_component_tests {
 
         let mut events = Vec::new();
         let mut rng = ChaCha8Rng::seed_from_u64(42);
-        super::tick_assembler_modules(&mut state, &station_id, &content, &mut rng, &mut events);
+        super::tick_assembler_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut rng,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         let station = state.stations.get(&station_id).unwrap();
 
@@ -987,7 +1008,14 @@ mod assembler_component_tests {
         let station_id = StationId("station_test".to_string());
         let mut events = Vec::new();
         let mut rng = ChaCha8Rng::seed_from_u64(42);
-        super::tick_assembler_modules(&mut state, &station_id, &content, &mut rng, &mut events);
+        super::tick_assembler_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut rng,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // A new ship should exist
         assert_eq!(state.ships.len(), 1, "expected 1 ship constructed");
@@ -1046,7 +1074,14 @@ mod assembler_component_tests {
         let station_id = StationId("station_test".to_string());
         let mut events = Vec::new();
         let mut rng = ChaCha8Rng::seed_from_u64(42);
-        super::tick_assembler_modules(&mut state, &station_id, &content, &mut rng, &mut events);
+        super::tick_assembler_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut rng,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // No ship should be spawned
         assert!(
