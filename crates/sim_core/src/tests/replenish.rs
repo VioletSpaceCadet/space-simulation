@@ -122,6 +122,10 @@ fn replenish_test_content() -> GameContent {
             events_enabled: false,
             event_global_cooldown_ticks: 200,
             event_history_capacity: 100,
+            // Bottleneck detection
+            bottleneck_storage_threshold_pct: 0.95,
+            bottleneck_slag_ratio_threshold: 0.5,
+            bottleneck_wear_threshold: 0.8,
         },
         alert_rules: Vec::new(),
         events: Vec::new(),

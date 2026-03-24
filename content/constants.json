@@ -48,5 +48,8 @@
   "boiloff_hot_offset_mk": 100000,
   "events_enabled": true,
   "event_global_cooldown_ticks": 200,
-  "event_history_capacity": 100
+  "event_history_capacity": 100,
+  "bottleneck_storage_threshold_pct": 0.95,
+  "bottleneck_slag_ratio_threshold": 0.5,
+  "bottleneck_wear_threshold": 0.8
 }
