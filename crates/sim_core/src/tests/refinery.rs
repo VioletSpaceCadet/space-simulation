@@ -6,8 +6,22 @@ fn test_refinery_produces_material_and_slag() {
     let mut state = state_with_refinery(&content);
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
@@ -33,8 +47,22 @@ fn test_refinery_quality_equals_fe_fraction() {
     let mut state = state_with_refinery(&content);
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
@@ -93,8 +121,22 @@ fn test_refinery_skips_when_below_threshold() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = &state.stations[&station_id];
     assert!(
@@ -112,8 +154,22 @@ fn test_refinery_emits_refinery_ran_event() {
     let mut state = state_with_refinery(&content);
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         events
@@ -136,8 +192,22 @@ fn test_refinery_stalls_when_station_full() {
         .cargo_capacity_m3 = 0.34;
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = &state.stations[&station_id];
     if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
@@ -183,8 +253,22 @@ fn test_refinery_resumes_after_stall_cleared() {
         .cargo_capacity_m3 = 0.34;
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     if let ModuleKindState::Processor(ps) = &state.stations[&station_id].modules[0].kind_state {
         assert!(ps.stalled);
@@ -196,8 +280,22 @@ fn test_refinery_resumes_after_stall_cleared() {
         .unwrap()
         .cargo_capacity_m3 = 10_000.0;
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = &state.stations[&station_id];
     if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
@@ -231,8 +329,22 @@ fn test_stall_event_only_emitted_once() {
         .cargo_capacity_m3 = 0.34;
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events1 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events1 = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let stall_count_1 = events1
         .iter()
@@ -240,8 +352,22 @@ fn test_stall_event_only_emitted_once() {
         .count();
     assert_eq!(stall_count_1, 1);
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events2 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events2 = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let stall_count_2 = events2
         .iter()
@@ -267,8 +393,22 @@ fn test_storage_pressure_cascade() {
 
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events_run1 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events_run1 = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         events_run1
@@ -298,8 +438,22 @@ fn test_storage_pressure_cascade() {
             thermal: None,
         });
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events_run2 = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events_run2 = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         !events_run2

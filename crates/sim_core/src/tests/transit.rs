@@ -131,6 +131,7 @@ fn transit_moves_ship_and_starts_next_task() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
     assert_eq!(
         state.ships[&ship_id].position, pos_a,
@@ -138,14 +139,28 @@ fn transit_moves_ship_and_starts_next_task() {
     );
 
     for _ in 1..5 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
     assert_eq!(
         state.ships[&ship_id].position, pos_a,
         "ship still in transit"
     );
 
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
     assert_eq!(
         state.ships[&ship_id].position, pos_b,
         "ship arrived at destination"
@@ -166,7 +181,14 @@ fn transit_moves_ship_and_starts_next_task() {
         "Survey task should start immediately after arrival"
     );
 
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
     assert!(
         events
             .iter()
@@ -319,8 +341,16 @@ fn transit_generates_transit_data_with_diminishing_returns() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
     assert!(events
         .iter()
         .any(|e| matches!(&e.event, Event::ShipArrived { .. })));
@@ -358,8 +388,16 @@ fn transit_generates_transit_data_with_diminishing_returns() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let total_transit_data = state
         .research

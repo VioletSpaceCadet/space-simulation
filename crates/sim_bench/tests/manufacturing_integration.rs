@@ -59,7 +59,7 @@ fn run_with_autopilot(
 ) {
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(state, content, next_cmd_id);
-        sim_core::tick(state, &commands, content, rng, EventLevel::Normal);
+        sim_core::tick(state, &commands, content, rng, EventLevel::Normal, None);
     }
 }
 
@@ -258,6 +258,7 @@ fn competing_demand_with_real_content() {
             &content,
             &mut rng,
             EventLevel::Normal,
+            None,
         );
         for envelope in &events {
             if let sim_core::Event::AssemblerRan { recipe_id, .. } = &envelope.event {
@@ -318,6 +319,7 @@ fn determinism_same_seed_identical_state_with_real_content() {
                 &content,
                 &mut rng,
                 EventLevel::Normal,
+                None,
             );
         }
         state

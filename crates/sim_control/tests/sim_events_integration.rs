@@ -16,7 +16,7 @@ fn run_ticks(
 ) -> Vec<EventEnvelope> {
     let mut all_events = Vec::new();
     for _ in 0..ticks {
-        let events = sim_core::tick(state, &[], content, rng, EventLevel::Normal);
+        let events = sim_core::tick(state, &[], content, rng, EventLevel::Normal, None);
         all_events.extend(events);
     }
     all_events

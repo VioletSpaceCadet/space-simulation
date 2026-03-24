@@ -11,7 +11,14 @@ fn test_stubbed_research_does_not_panic() {
     let mut rng = make_rng();
 
     // Should not panic
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 }
 
 #[test]
@@ -20,7 +27,14 @@ fn test_stubbed_research_no_power_consumed() {
     let mut state = test_state(&content);
     let mut rng = make_rng();
 
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     // Stubbed research should not emit PowerConsumed events
     assert!(
@@ -37,7 +51,7 @@ fn test_stubbed_research_no_research_roll() {
     let mut state = test_state(&content);
     let mut rng = make_rng();
 
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Debug, None);
 
     assert!(
         !events

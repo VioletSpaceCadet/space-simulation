@@ -188,6 +188,7 @@ fn economy_full_loop() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     // Verify balance decreased
@@ -249,6 +250,7 @@ fn economy_full_loop() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     // Verify balance decreased
@@ -306,6 +308,7 @@ fn economy_full_loop() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     // Find the module item_id in inventory
@@ -333,6 +336,7 @@ fn economy_full_loop() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     // Enable the module
@@ -359,13 +363,21 @@ fn economy_full_loop() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     // Tick forward enough for the assembler interval (2 ticks) without tech
     let ships_before = state.ships.len();
     let mut saw_awaiting_tech = false;
     for _ in 0..4 {
-        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let events = tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
         if events
             .iter()
             .any(|e| matches!(&e.event, Event::ModuleAwaitingTech { .. }))
@@ -398,7 +410,14 @@ fn economy_full_loop() {
     let ships_before = state.ships.len();
     let mut all_events = Vec::new();
     for _ in 0..4 {
-        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let events = tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
         all_events.extend(events);
     }
 
@@ -470,6 +489,7 @@ fn economy_full_loop() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     // Revenue: base_price * kg - surcharge * mass = 50 * 1000 - 50 * 1000 = 0

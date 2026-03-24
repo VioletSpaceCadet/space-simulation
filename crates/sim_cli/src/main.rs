@@ -94,7 +94,7 @@ fn run(
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(&state, &content, &mut next_command_id);
 
-        let events = sim_core::tick(&mut state, &commands, &content, &mut rng, event_level);
+        let events = sim_core::tick(&mut state, &commands, &content, &mut rng, event_level, None);
 
         // Print notable events regardless of print_every.
         for event in &events {

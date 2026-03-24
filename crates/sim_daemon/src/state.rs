@@ -3,6 +3,7 @@ use rand_chacha::ChaCha8Rng;
 use sim_control::AutopilotController;
 use sim_core::{
     CommandEnvelope, EventEnvelope, GameContent, GameState, MetricsFileWriter, MetricsSnapshot,
+    TickTimings,
 };
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -12,6 +13,9 @@ use tokio::sync::broadcast;
 
 /// Maximum number of metrics snapshots kept in memory.
 pub(crate) const MAX_METRICS_HISTORY: usize = 10_000;
+
+/// Maximum number of tick timings kept in the rolling buffer.
+pub(crate) const MAX_TIMINGS_HISTORY: usize = 1_000;
 
 pub struct SimState {
     pub game_state: GameState,
@@ -23,6 +27,7 @@ pub struct SimState {
     pub metrics_history: VecDeque<MetricsSnapshot>,
     pub metrics_writer: Option<MetricsFileWriter>,
     pub alert_engine: Option<crate::alerts::AlertEngine>,
+    pub timings_history: VecDeque<TickTimings>,
 }
 
 impl SimState {
@@ -36,6 +41,13 @@ impl SimState {
             }
         }
         self.metrics_history.push_back(snapshot);
+    }
+
+    pub fn push_timings(&mut self, timings: TickTimings) {
+        if self.timings_history.len() >= MAX_TIMINGS_HISTORY {
+            self.timings_history.pop_front();
+        }
+        self.timings_history.push_back(timings);
     }
 }
 

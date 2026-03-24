@@ -1,6 +1,6 @@
 use crate::state::{CommandQueue, EventTx, SharedSim, SimState};
 use sim_control::CommandSource;
-use sim_core::EventLevel;
+use sim_core::{EventLevel, TickTimings};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -66,49 +66,7 @@ pub async fn run_tick_loop(
         }
 
         // --- Execute one tick ---
-        let (events, done) = {
-            let mut guard = sim.lock();
-            let SimState {
-                ref game_state,
-                ref content,
-                rng: _,
-                ref mut autopilot,
-                ref mut next_command_id,
-                ..
-            } = *guard;
-            let mut player_commands: Vec<sim_core::CommandEnvelope> =
-                command_queue.lock().drain(..).collect();
-            let autopilot_commands =
-                autopilot.generate_commands(game_state, content, next_command_id);
-            player_commands.extend(autopilot_commands);
-            let commands = player_commands;
-            let SimState {
-                ref mut game_state,
-                ref content,
-                ref mut rng,
-                ..
-            } = *guard;
-            let mut events =
-                sim_core::tick(game_state, &commands, content, rng, EventLevel::Normal);
-
-            let metrics_every = guard.metrics_every;
-            if metrics_every > 0 && guard.game_state.meta.tick.is_multiple_of(metrics_every) {
-                let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
-                guard.push_metrics(snapshot);
-
-                let state = &mut *guard;
-                let history_clone = state.metrics_history.clone();
-                if let Some(engine) = state.alert_engine.as_mut() {
-                    let tick = state.game_state.meta.tick;
-                    let alert_events =
-                        engine.evaluate(&history_clone, tick, &mut state.game_state.counters);
-                    events.extend(alert_events);
-                }
-            }
-
-            let done = max_ticks.is_some_and(|max| guard.game_state.meta.tick >= max);
-            (events, done)
-        };
+        let (events, done) = execute_tick(&sim, &command_queue, max_ticks);
 
         let _ = event_tx.send(events);
 
@@ -130,6 +88,61 @@ pub async fn run_tick_loop(
             break;
         }
     }
+}
+
+fn execute_tick(
+    sim: &SharedSim,
+    command_queue: &CommandQueue,
+    max_ticks: Option<u64>,
+) -> (Vec<sim_core::EventEnvelope>, bool) {
+    let mut guard = sim.lock();
+    let SimState {
+        ref game_state,
+        ref content,
+        rng: _,
+        ref mut autopilot,
+        ref mut next_command_id,
+        ..
+    } = *guard;
+    let mut player_commands: Vec<sim_core::CommandEnvelope> =
+        command_queue.lock().drain(..).collect();
+    let autopilot_commands = autopilot.generate_commands(game_state, content, next_command_id);
+    player_commands.extend(autopilot_commands);
+    let commands = player_commands;
+    let SimState {
+        ref mut game_state,
+        ref content,
+        ref mut rng,
+        ..
+    } = *guard;
+    let mut timings = TickTimings::default();
+    let mut events = sim_core::tick(
+        game_state,
+        &commands,
+        content,
+        rng,
+        EventLevel::Normal,
+        Some(&mut timings),
+    );
+    guard.push_timings(timings);
+
+    let metrics_every = guard.metrics_every;
+    if metrics_every > 0 && guard.game_state.meta.tick.is_multiple_of(metrics_every) {
+        let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
+        guard.push_metrics(snapshot);
+
+        let state = &mut *guard;
+        let history_clone = state.metrics_history.clone();
+        if let Some(engine) = state.alert_engine.as_mut() {
+            let tick = state.game_state.meta.tick;
+            let alert_events =
+                engine.evaluate(&history_clone, tick, &mut state.game_state.counters);
+            events.extend(alert_events);
+        }
+    }
+
+    let done = max_ticks.is_some_and(|max| guard.game_state.meta.tick >= max);
+    (events, done)
 }
 
 #[cfg(test)]
@@ -160,6 +173,7 @@ mod tests {
             metrics_history: VecDeque::new(),
             metrics_writer: None,
             alert_engine: None,
+            timings_history: VecDeque::new(),
         }));
         let command_queue = Arc::new(Mutex::new(Vec::new()));
         let paused = Arc::new(AtomicBool::new(false));

@@ -16,7 +16,14 @@ fn test_identical_seeds_produce_identical_event_logs() {
             } else {
                 &[]
             };
-            let events = tick(&mut state, commands, &content, &mut rng, EventLevel::Debug);
+            let events = tick(
+                &mut state,
+                commands,
+                &content,
+                &mut rng,
+                EventLevel::Debug,
+                None,
+            );
             for event in events {
                 log.push((event.id.0.clone(), event.tick));
             }
@@ -48,8 +55,15 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
 
     // --- Phase 1: Survey ---
     let cmd = survey_command(&state);
-    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Debug);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+    tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Debug,
+        None,
+    );
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Debug, None);
 
     assert_eq!(
         state.asteroids.len(),
@@ -105,8 +119,9 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
         &content,
         &mut rng,
         EventLevel::Debug,
+        None,
     );
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Debug, None);
 
     let composition = state.asteroids[&asteroid_id].knowledge.composition.as_ref();
     assert!(
@@ -147,10 +162,11 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
         &content,
         &mut rng,
         EventLevel::Debug,
+        None,
     );
 
     for _ in 0..duration_ticks {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+        tick(&mut state, &[], &content, &mut rng, EventLevel::Debug, None);
     }
 
     let ship_ore_kg: f32 = state.ships[&ship_id]
@@ -194,8 +210,9 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
         &content,
         &mut rng,
         EventLevel::Debug,
+        None,
     );
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Debug);
+    tick(&mut state, &[], &content, &mut rng, EventLevel::Debug, None);
 
     assert!(
         state.ships[&ship_id].inventory.is_empty(),
