@@ -48,6 +48,7 @@ pub(super) fn apply_boiloff(
     };
 
     let mut losses: Vec<(String, f32)> = Vec::new();
+    let default_curve = BoiloffCurveDef::default();
 
     for item in &mut station.inventory {
         let InventoryItem::Material {
@@ -68,7 +69,6 @@ pub(super) fn apply_boiloff(
         let base_rate = boiloff_rate_per_tick(rate_per_day, minutes_per_tick);
 
         // Temperature scaling: use material thermal state if available, else ambient (1.0x)
-        let default_curve = BoiloffCurveDef::default();
         let multiplier = match (
             thermal.as_ref(),
             element_def.and_then(|e| e.boiling_point_mk),
@@ -384,6 +384,13 @@ mod tests {
         // At hot threshold: hot_multiplier
         assert!(
             (boiloff_temp_multiplier(393_000, 20_300, amb, hot_off, &curve) - 2.0).abs() < 0.01
+        );
+        // Midpoint between boiling and ambient: (0.05 + 0.5) / 2 = 0.275
+        let midpoint = (20_300 + 293_000) / 2;
+        let mid_val = boiloff_temp_multiplier(midpoint, 20_300, amb, hot_off, &curve);
+        assert!(
+            (mid_val - 0.275).abs() < 0.01,
+            "midpoint with custom curve: {mid_val}"
         );
     }
 }
