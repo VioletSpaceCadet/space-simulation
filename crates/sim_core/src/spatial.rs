@@ -256,7 +256,8 @@ impl EntityCache {
 /// Children accumulate: `child_abs = parent_abs + polar_to_cart(child.radius, child.angle)`.
 /// All bodies start at epoch 1.
 pub fn build_body_cache(bodies: &[OrbitalBodyDef]) -> AHashMap<BodyId, BodyCache> {
-    let mut cache: AHashMap<BodyId, BodyCache> = Default::default();
+    let mut cache: AHashMap<BodyId, BodyCache> =
+        HashMap::with_capacity_and_hasher(bodies.len(), ahash::RandomState::default());
 
     // Index bodies by id for parent lookup.
     let by_id: HashMap<&BodyId, &OrbitalBodyDef> = bodies.iter().map(|b| (&b.id, b)).collect();
