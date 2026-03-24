@@ -14,8 +14,58 @@ use std::collections::BTreeMap;
 use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
-/// v9: Replace element-specific fields with dynamic per-element maps.
-pub const METRICS_VERSION: u32 = 9;
+/// v10: Move dynamic per-element columns to end; add field iterator API.
+pub const METRICS_VERSION: u32 = 10;
+
+/// A typed metric value extracted from a [`MetricsSnapshot`] field.
+#[derive(Clone, Copy, Debug)]
+pub enum MetricValue {
+    U32(u32),
+    U64(u64),
+    F32(f32),
+    F64(f64),
+}
+
+impl MetricValue {
+    /// Convert any metric value to f64 for generic aggregation.
+    pub fn as_f64(self) -> f64 {
+        match self {
+            Self::U32(v) => f64::from(v),
+            Self::U64(v) => v as f64,
+            Self::F32(v) => f64::from(v),
+            Self::F64(v) => v,
+        }
+    }
+
+    /// Write the value to a CSV cell.
+    pub fn write_csv(self, writer: &mut impl std::io::Write) -> std::io::Result<()> {
+        match self {
+            Self::U32(v) => write!(writer, "{v}"),
+            Self::U64(v) => write!(writer, "{v}"),
+            Self::F32(v) => write!(writer, "{v}"),
+            Self::F64(v) => write!(writer, "{v}"),
+        }
+    }
+
+    /// Return the type descriptor for this value.
+    pub fn metric_type(self) -> MetricType {
+        match self {
+            Self::U32(_) => MetricType::U32,
+            Self::U64(_) => MetricType::U64,
+            Self::F32(_) => MetricType::F32,
+            Self::F64(_) => MetricType::F64,
+        }
+    }
+}
+
+/// Field type descriptor for schema generation (Arrow, Parquet, etc.).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetricType {
+    U32,
+    U64,
+    F32,
+    F64,
+}
 
 /// Per-element ore composition statistics (avg/min/max fraction across all ore lots).
 #[derive(Debug, Clone, Serialize, Default, PartialEq)]
@@ -102,6 +152,174 @@ pub struct MetricsSnapshot {
     pub overheat_warning_count: u32,
     pub overheat_critical_count: u32,
     pub heat_wear_multiplier_avg: f32,
+}
+
+impl MetricsSnapshot {
+    /// Returns all fixed scalar field (name, value) pairs in column order.
+    /// Excludes dynamic per-element maps (`per_element_material_kg`, `per_element_ore_stats`).
+    pub fn fixed_field_values(&self) -> Vec<(&'static str, MetricValue)> {
+        use MetricValue::{F32, F64, U32, U64};
+        let mut fields = self.inventory_field_values();
+        fields.extend(self.module_field_values());
+        fields.extend(self.fleet_field_values());
+        fields.extend(self.exploration_field_values());
+        fields.extend(self.economy_field_values());
+        fields.extend(self.power_field_values());
+        fields.extend([
+            ("station_max_temp_mk", U32(self.station_max_temp_mk)),
+            ("station_avg_temp_mk", U32(self.station_avg_temp_mk)),
+            ("overheat_warning_count", U32(self.overheat_warning_count)),
+            ("overheat_critical_count", U32(self.overheat_critical_count)),
+            (
+                "heat_wear_multiplier_avg",
+                F32(self.heat_wear_multiplier_avg),
+            ),
+        ]);
+        fields
+    }
+
+    fn inventory_field_values(&self) -> Vec<(&'static str, MetricValue)> {
+        use MetricValue::{F32, U32, U64};
+        vec![
+            ("tick", U64(self.tick)),
+            ("metrics_version", U32(self.metrics_version)),
+            ("total_ore_kg", F32(self.total_ore_kg)),
+            ("total_material_kg", F32(self.total_material_kg)),
+            ("total_slag_kg", F32(self.total_slag_kg)),
+            (
+                "station_storage_used_pct",
+                F32(self.station_storage_used_pct),
+            ),
+            ("ship_cargo_used_pct", F32(self.ship_cargo_used_pct)),
+            ("ore_lot_count", U32(self.ore_lot_count)),
+            ("avg_material_quality", F32(self.avg_material_quality)),
+        ]
+    }
+
+    fn module_field_values(&self) -> Vec<(&'static str, MetricValue)> {
+        use MetricValue::{F32, U32};
+        vec![
+            ("refinery_active_count", U32(self.refinery_active_count)),
+            ("refinery_starved_count", U32(self.refinery_starved_count)),
+            ("refinery_stalled_count", U32(self.refinery_stalled_count)),
+            ("assembler_active_count", U32(self.assembler_active_count)),
+            ("assembler_stalled_count", U32(self.assembler_stalled_count)),
+            ("avg_module_wear", F32(self.avg_module_wear)),
+            ("max_module_wear", F32(self.max_module_wear)),
+            ("repair_kits_remaining", U32(self.repair_kits_remaining)),
+        ]
+    }
+
+    fn fleet_field_values(&self) -> Vec<(&'static str, MetricValue)> {
+        use MetricValue::U32;
+        vec![
+            ("fleet_total", U32(self.fleet_total)),
+            ("fleet_idle", U32(self.fleet_idle)),
+            ("fleet_mining", U32(self.fleet_mining)),
+            ("fleet_transiting", U32(self.fleet_transiting)),
+            ("fleet_surveying", U32(self.fleet_surveying)),
+            ("fleet_depositing", U32(self.fleet_depositing)),
+        ]
+    }
+
+    fn exploration_field_values(&self) -> Vec<(&'static str, MetricValue)> {
+        use MetricValue::{F32, U32};
+        vec![
+            ("scan_sites_remaining", U32(self.scan_sites_remaining)),
+            ("asteroids_discovered", U32(self.asteroids_discovered)),
+            ("asteroids_depleted", U32(self.asteroids_depleted)),
+            ("techs_unlocked", U32(self.techs_unlocked)),
+            ("total_scan_data", F32(self.total_scan_data)),
+            ("max_tech_evidence", F32(self.max_tech_evidence)),
+        ]
+    }
+
+    fn economy_field_values(&self) -> Vec<(&'static str, MetricValue)> {
+        use MetricValue::{F64, U32};
+        vec![
+            ("balance", F64(self.balance)),
+            ("thruster_count", U32(self.thruster_count)),
+            ("export_revenue_total", F64(self.export_revenue_total)),
+            ("export_count", U32(self.export_count)),
+        ]
+    }
+
+    fn power_field_values(&self) -> Vec<(&'static str, MetricValue)> {
+        use MetricValue::F32;
+        vec![
+            ("power_generated_kw", F32(self.power_generated_kw)),
+            ("power_consumed_kw", F32(self.power_consumed_kw)),
+            ("power_deficit_kw", F32(self.power_deficit_kw)),
+            ("battery_charge_pct", F32(self.battery_charge_pct)),
+        ]
+    }
+
+    /// Returns fixed scalar field descriptors (name, type) in column order.
+    /// Same order as [`fixed_field_values`](Self::fixed_field_values):
+    /// inventory → modules → fleet → exploration → economy → power → thermal.
+    pub fn fixed_field_descriptors() -> Vec<(&'static str, MetricType)> {
+        use MetricType::{F32, F64, U32, U64};
+        vec![
+            // Inventory
+            ("tick", U64),
+            ("metrics_version", U32),
+            ("total_ore_kg", F32),
+            ("total_material_kg", F32),
+            ("total_slag_kg", F32),
+            ("station_storage_used_pct", F32),
+            ("ship_cargo_used_pct", F32),
+            ("ore_lot_count", U32),
+            ("avg_material_quality", F32),
+            // Modules
+            ("refinery_active_count", U32),
+            ("refinery_starved_count", U32),
+            ("refinery_stalled_count", U32),
+            ("assembler_active_count", U32),
+            ("assembler_stalled_count", U32),
+            ("avg_module_wear", F32),
+            ("max_module_wear", F32),
+            ("repair_kits_remaining", U32),
+            // Fleet
+            ("fleet_total", U32),
+            ("fleet_idle", U32),
+            ("fleet_mining", U32),
+            ("fleet_transiting", U32),
+            ("fleet_surveying", U32),
+            ("fleet_depositing", U32),
+            // Exploration & Research
+            ("scan_sites_remaining", U32),
+            ("asteroids_discovered", U32),
+            ("asteroids_depleted", U32),
+            ("techs_unlocked", U32),
+            ("total_scan_data", F32),
+            ("max_tech_evidence", F32),
+            // Economy
+            ("balance", F64),
+            ("thruster_count", U32),
+            ("export_revenue_total", F64),
+            ("export_count", U32),
+            // Power
+            ("power_generated_kw", F32),
+            ("power_consumed_kw", F32),
+            ("power_deficit_kw", F32),
+            ("battery_charge_pct", F32),
+            // Thermal
+            ("station_max_temp_mk", U32),
+            ("station_avg_temp_mk", U32),
+            ("overheat_warning_count", U32),
+            ("overheat_critical_count", U32),
+            ("heat_wear_multiplier_avg", F32),
+        ]
+    }
+
+    /// Look up a fixed scalar field by name and return its value as f64.
+    /// Returns `None` for unknown field names.
+    pub fn get_field_f64(&self, name: &str) -> Option<f64> {
+        self.fixed_field_values()
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, v)| v.as_f64())
+    }
 }
 
 #[derive(Default)]
@@ -540,54 +758,44 @@ struct Averages {
 
 /// Write the CSV header row for metrics. `element_ids` defines the dynamic
 /// per-element columns (`material_kg_X`, `ore_avg_X`, `ore_min_X`, `ore_max_X`).
+///
+/// Column order (v10): all fixed scalar fields first, then dynamic per-element columns.
 pub fn write_metrics_header(
     writer: &mut impl std::io::Write,
     element_ids: &[String],
 ) -> std::io::Result<()> {
-    write!(
-        writer,
-        "tick,metrics_version,\
-         total_ore_kg,total_material_kg,total_slag_kg"
-    )?;
+    let descriptors = MetricsSnapshot::fixed_field_descriptors();
+    for (index, (name, _)) in descriptors.iter().enumerate() {
+        if index > 0 {
+            write!(writer, ",")?;
+        }
+        write!(writer, "{name}")?;
+    }
     for eid in element_ids {
         write!(writer, ",material_kg_{eid}")?;
     }
-    write!(writer, ",station_storage_used_pct,ship_cargo_used_pct")?;
     for eid in element_ids {
         write!(writer, ",ore_avg_{eid},ore_min_{eid},ore_max_{eid}")?;
     }
-    writeln!(
-        writer,
-        ",ore_lot_count,\
-         avg_material_quality,\
-         refinery_active_count,refinery_starved_count,refinery_stalled_count,\
-         assembler_active_count,assembler_stalled_count,\
-         fleet_total,fleet_idle,fleet_mining,fleet_transiting,fleet_surveying,fleet_depositing,\
-         scan_sites_remaining,asteroids_discovered,asteroids_depleted,\
-         techs_unlocked,total_scan_data,max_tech_evidence,\
-         avg_module_wear,max_module_wear,repair_kits_remaining,\
-         balance,thruster_count,export_revenue_total,export_count,\
-         power_generated_kw,power_consumed_kw,power_deficit_kw,battery_charge_pct,\
-         station_max_temp_mk,station_avg_temp_mk,overheat_warning_count,overheat_critical_count,\
-         heat_wear_multiplier_avg"
-    )
+    writeln!(writer)
 }
 
 /// Append a single metrics snapshot as a CSV row.
+///
+/// Uses [`MetricsSnapshot::fixed_field_values`] to iterate scalar fields,
+/// then appends dynamic per-element columns.
 pub fn append_metrics_row(
     writer: &mut impl std::io::Write,
     snapshot: &MetricsSnapshot,
     element_ids: &[String],
 ) -> std::io::Result<()> {
-    write!(
-        writer,
-        "{},{},{},{},{}",
-        snapshot.tick,
-        snapshot.metrics_version,
-        snapshot.total_ore_kg,
-        snapshot.total_material_kg,
-        snapshot.total_slag_kg,
-    )?;
+    let values = snapshot.fixed_field_values();
+    for (index, (_, value)) in values.iter().enumerate() {
+        if index > 0 {
+            write!(writer, ",")?;
+        }
+        value.write_csv(writer)?;
+    }
     for eid in element_ids {
         let val = snapshot
             .per_element_material_kg
@@ -596,11 +804,6 @@ pub fn append_metrics_row(
             .unwrap_or(0.0);
         write!(writer, ",{val}")?;
     }
-    write!(
-        writer,
-        ",{},{}",
-        snapshot.station_storage_used_pct, snapshot.ship_cargo_used_pct,
-    )?;
     for eid in element_ids {
         let stats = snapshot
             .per_element_ore_stats
@@ -613,46 +816,7 @@ pub fn append_metrics_row(
             stats.avg_fraction, stats.min_fraction, stats.max_fraction
         )?;
     }
-    writeln!(
-        writer,
-        ",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-        snapshot.ore_lot_count,
-        snapshot.avg_material_quality,
-        snapshot.refinery_active_count,
-        snapshot.refinery_starved_count,
-        snapshot.refinery_stalled_count,
-        snapshot.assembler_active_count,
-        snapshot.assembler_stalled_count,
-        snapshot.fleet_total,
-        snapshot.fleet_idle,
-        snapshot.fleet_mining,
-        snapshot.fleet_transiting,
-        snapshot.fleet_surveying,
-        snapshot.fleet_depositing,
-        snapshot.scan_sites_remaining,
-        snapshot.asteroids_discovered,
-        snapshot.asteroids_depleted,
-        snapshot.techs_unlocked,
-        snapshot.total_scan_data,
-        snapshot.max_tech_evidence,
-        snapshot.avg_module_wear,
-        snapshot.max_module_wear,
-        snapshot.repair_kits_remaining,
-        snapshot.balance,
-        snapshot.thruster_count,
-        snapshot.export_revenue_total,
-        snapshot.export_count,
-        snapshot.power_generated_kw,
-        snapshot.power_consumed_kw,
-        snapshot.power_deficit_kw,
-        snapshot.battery_charge_pct,
-        snapshot.station_max_temp_mk,
-        snapshot.station_avg_temp_mk,
-        snapshot.overheat_warning_count,
-        snapshot.overheat_critical_count,
-        snapshot.heat_wear_multiplier_avg,
-    )?;
-    Ok(())
+    writeln!(writer)
 }
 
 /// Write a collection of snapshots to a CSV file.
@@ -1590,5 +1754,46 @@ mod tests {
         assert_eq!(snapshot.overheat_warning_count, 0);
         assert_eq!(snapshot.overheat_critical_count, 0);
         assert!((snapshot.heat_wear_multiplier_avg - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn fixed_field_descriptors_covers_all_scalar_fields() {
+        // Serialize a snapshot to JSON to count fields via serde.
+        let snapshot = compute_metrics(&empty_state(), &empty_content());
+        let value = serde_json::to_value(&snapshot).unwrap();
+        let obj = value.as_object().unwrap();
+
+        // Count scalar fields (exclude per_element_* maps).
+        let scalar_count = obj.keys().filter(|k| !k.starts_with("per_element")).count();
+        let descriptor_count = MetricsSnapshot::fixed_field_descriptors().len();
+
+        assert_eq!(
+            descriptor_count, scalar_count,
+            "fixed_field_descriptors() has {descriptor_count} entries but MetricsSnapshot \
+             has {scalar_count} scalar fields. Did you add a field to the struct but forget \
+             to add it to fixed_field_values()?"
+        );
+    }
+
+    #[test]
+    fn fixed_field_values_names_match_descriptors() {
+        let snapshot = compute_metrics(&empty_state(), &empty_content());
+        let values = snapshot.fixed_field_values();
+        let descriptors = MetricsSnapshot::fixed_field_descriptors();
+
+        assert_eq!(values.len(), descriptors.len());
+        for ((vname, val), (dname, dtype)) in values.iter().zip(descriptors.iter()) {
+            assert_eq!(vname, dname, "name mismatch at field");
+            assert_eq!(val.metric_type(), *dtype, "type mismatch at field {vname}");
+        }
+    }
+
+    #[test]
+    fn get_field_f64_known_fields() {
+        let snapshot = compute_metrics(&empty_state(), &empty_content());
+        assert!(snapshot.get_field_f64("tick").is_some());
+        assert!(snapshot.get_field_f64("balance").is_some());
+        assert!(snapshot.get_field_f64("heat_wear_multiplier_avg").is_some());
+        assert!(snapshot.get_field_f64("nonexistent_field").is_none());
     }
 }

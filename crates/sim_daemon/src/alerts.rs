@@ -10,58 +10,8 @@ pub struct AlertDetail {
     pub suggested_action: String,
 }
 
-// --- Metric field accessors ---
-
-/// Extract an f64-compatible value from a `MetricsSnapshot` by field name.
-fn get_metric_f64(snapshot: &MetricsSnapshot, name: &str) -> Option<f64> {
-    match name {
-        "total_ore_kg" => Some(f64::from(snapshot.total_ore_kg)),
-        "total_material_kg" => Some(f64::from(snapshot.total_material_kg)),
-        "total_slag_kg" => Some(f64::from(snapshot.total_slag_kg)),
-        "station_storage_used_pct" => Some(f64::from(snapshot.station_storage_used_pct)),
-        "ship_cargo_used_pct" => Some(f64::from(snapshot.ship_cargo_used_pct)),
-        "avg_material_quality" => Some(f64::from(snapshot.avg_material_quality)),
-        "avg_module_wear" => Some(f64::from(snapshot.avg_module_wear)),
-        "max_module_wear" => Some(f64::from(snapshot.max_module_wear)),
-        "max_tech_evidence" => Some(f64::from(snapshot.max_tech_evidence)),
-        "total_scan_data" => Some(f64::from(snapshot.total_scan_data)),
-        "balance" => Some(snapshot.balance),
-        "export_revenue_total" => Some(snapshot.export_revenue_total),
-        "power_generated_kw" => Some(f64::from(snapshot.power_generated_kw)),
-        "power_consumed_kw" => Some(f64::from(snapshot.power_consumed_kw)),
-        "power_deficit_kw" => Some(f64::from(snapshot.power_deficit_kw)),
-        "battery_charge_pct" => Some(f64::from(snapshot.battery_charge_pct)),
-        "heat_wear_multiplier_avg" => Some(f64::from(snapshot.heat_wear_multiplier_avg)),
-        // u32 fields
-        "refinery_active_count" => Some(f64::from(snapshot.refinery_active_count)),
-        "refinery_starved_count" => Some(f64::from(snapshot.refinery_starved_count)),
-        "refinery_stalled_count" => Some(f64::from(snapshot.refinery_stalled_count)),
-        "assembler_active_count" => Some(f64::from(snapshot.assembler_active_count)),
-        "assembler_stalled_count" => Some(f64::from(snapshot.assembler_stalled_count)),
-        "fleet_total" => Some(f64::from(snapshot.fleet_total)),
-        "fleet_idle" => Some(f64::from(snapshot.fleet_idle)),
-        "fleet_mining" => Some(f64::from(snapshot.fleet_mining)),
-        "fleet_transiting" => Some(f64::from(snapshot.fleet_transiting)),
-        "fleet_surveying" => Some(f64::from(snapshot.fleet_surveying)),
-        "fleet_depositing" => Some(f64::from(snapshot.fleet_depositing)),
-        "scan_sites_remaining" => Some(f64::from(snapshot.scan_sites_remaining)),
-        "asteroids_discovered" => Some(f64::from(snapshot.asteroids_discovered)),
-        "asteroids_depleted" => Some(f64::from(snapshot.asteroids_depleted)),
-        "techs_unlocked" => Some(f64::from(snapshot.techs_unlocked)),
-        "ore_lot_count" => Some(f64::from(snapshot.ore_lot_count)),
-        "repair_kits_remaining" => Some(f64::from(snapshot.repair_kits_remaining)),
-        "thruster_count" => Some(f64::from(snapshot.thruster_count)),
-        "export_count" => Some(f64::from(snapshot.export_count)),
-        "station_max_temp_mk" => Some(f64::from(snapshot.station_max_temp_mk)),
-        "station_avg_temp_mk" => Some(f64::from(snapshot.station_avg_temp_mk)),
-        "overheat_warning_count" => Some(f64::from(snapshot.overheat_warning_count)),
-        "overheat_critical_count" => Some(f64::from(snapshot.overheat_critical_count)),
-        other => {
-            tracing::warn!("unknown metric field in alert rule: {other}");
-            None
-        }
-    }
-}
+// Metric field accessors use `MetricsSnapshot::get_field_f64()` directly —
+// no per-field match arm needed here.
 
 fn check_condition(value: f64, condition: &str, threshold: f64) -> bool {
     match condition {
@@ -216,7 +166,8 @@ impl AlertEngine {
                 condition,
                 threshold,
             } => latest(history).is_some_and(|snapshot| {
-                get_metric_f64(snapshot, metric)
+                snapshot
+                    .get_field_f64(metric)
                     .is_some_and(|value| check_condition(value, condition, *threshold))
             }),
 
@@ -251,7 +202,7 @@ impl AlertEngine {
                 recent.len() >= n
                     && recent
                         .iter()
-                        .all(|snapshot| get_metric_f64(snapshot, metric).is_some_and(|v| v > 0.0))
+                        .all(|snapshot| snapshot.get_field_f64(metric).is_some_and(|v| v > 0.0))
             }
 
             AlertRuleType::Builtin { name } => match name.as_str() {

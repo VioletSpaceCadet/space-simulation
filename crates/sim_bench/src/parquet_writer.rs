@@ -1,7 +1,8 @@
 //! Columnar Parquet writer for [`MetricsSnapshot`] rows.
 //!
-//! Mirrors the CSV writer in `sim_core::metrics` but outputs a single
-//! `.parquet` file with Zstd compression and schema metadata.
+//! Uses [`MetricsSnapshot::fixed_field_descriptors`] and [`MetricsSnapshot::fixed_field_values`]
+//! to iterate fields generically, eliminating per-field boilerplate. Dynamic per-element
+//! columns are appended after all fixed scalar columns.
 
 use anyhow::{Context, Result};
 use arrow::array::{Float32Builder, Float64Builder, RecordBatch, UInt32Builder, UInt64Builder};
@@ -9,7 +10,7 @@ use arrow::datatypes::{DataType, Field, Schema};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
-use sim_core::MetricsSnapshot;
+use sim_core::{MetricType, MetricValue, MetricsSnapshot};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -28,63 +29,63 @@ pub struct ParquetMetricsWriter {
     buffer: RowBuffer,
 }
 
+/// Type-erased column builder matching [`MetricType`] variants.
+enum ColumnBuilder {
+    U32(UInt32Builder),
+    U64(UInt64Builder),
+    F32(Float32Builder),
+    F64(Float64Builder),
+}
+
+impl ColumnBuilder {
+    fn from_type(metric_type: MetricType) -> Self {
+        match metric_type {
+            MetricType::U32 => Self::U32(UInt32Builder::new()),
+            MetricType::U64 => Self::U64(UInt64Builder::new()),
+            MetricType::F32 => Self::F32(Float32Builder::new()),
+            MetricType::F64 => Self::F64(Float64Builder::new()),
+        }
+    }
+
+    fn append(&mut self, value: MetricValue) {
+        match (self, value) {
+            (Self::U32(b), MetricValue::U32(v)) => b.append_value(v),
+            (Self::U64(b), MetricValue::U64(v)) => b.append_value(v),
+            (Self::F32(b), MetricValue::F32(v)) => b.append_value(v),
+            (Self::F64(b), MetricValue::F64(v)) => b.append_value(v),
+            _ => unreachable!("type mismatch between ColumnBuilder and MetricValue"),
+        }
+    }
+
+    fn finish(&mut self) -> Arc<dyn arrow::array::Array> {
+        match self {
+            Self::U32(b) => Arc::new(b.finish()),
+            Self::U64(b) => Arc::new(b.finish()),
+            Self::F32(b) => Arc::new(b.finish()),
+            Self::F64(b) => Arc::new(b.finish()),
+        }
+    }
+}
+
 /// Accumulates typed column data before writing a `RecordBatch`.
 struct RowBuffer {
-    // Fixed columns
-    tick: UInt64Builder,
-    metrics_version: UInt32Builder,
-    total_ore_kg: Float32Builder,
-    total_material_kg: Float32Builder,
-    total_slag_kg: Float32Builder,
-    station_storage_used_pct: Float32Builder,
-    ship_cargo_used_pct: Float32Builder,
-    ore_lot_count: UInt32Builder,
-    avg_material_quality: Float32Builder,
-    refinery_active_count: UInt32Builder,
-    refinery_starved_count: UInt32Builder,
-    refinery_stalled_count: UInt32Builder,
-    assembler_active_count: UInt32Builder,
-    assembler_stalled_count: UInt32Builder,
-    fleet_total: UInt32Builder,
-    fleet_idle: UInt32Builder,
-    fleet_mining: UInt32Builder,
-    fleet_transiting: UInt32Builder,
-    fleet_surveying: UInt32Builder,
-    fleet_depositing: UInt32Builder,
-    scan_sites_remaining: UInt32Builder,
-    asteroids_discovered: UInt32Builder,
-    asteroids_depleted: UInt32Builder,
-    techs_unlocked: UInt32Builder,
-    total_scan_data: Float32Builder,
-    max_tech_evidence: Float32Builder,
-    avg_module_wear: Float32Builder,
-    max_module_wear: Float32Builder,
-    repair_kits_remaining: UInt32Builder,
-    balance: Float64Builder,
-    thruster_count: UInt32Builder,
-    export_revenue_total: Float64Builder,
-    export_count: UInt32Builder,
-    power_generated_kw: Float32Builder,
-    power_consumed_kw: Float32Builder,
-    power_deficit_kw: Float32Builder,
-    battery_charge_pct: Float32Builder,
-    station_max_temp_mk: UInt32Builder,
-    station_avg_temp_mk: UInt32Builder,
-    overheat_warning_count: UInt32Builder,
-    overheat_critical_count: UInt32Builder,
-    heat_wear_multiplier_avg: Float32Builder,
-
-    // Dynamic per-element columns (one builder per element per metric)
+    /// One builder per fixed scalar field, same order as `fixed_field_descriptors()`.
+    fixed_columns: Vec<ColumnBuilder>,
+    /// Dynamic per-element columns (one builder per element per metric).
     material_kg_cols: Vec<Float32Builder>,
     ore_avg_cols: Vec<Float32Builder>,
     ore_min_cols: Vec<Float32Builder>,
     ore_max_cols: Vec<Float32Builder>,
-
     row_count: usize,
 }
 
 impl RowBuffer {
     fn new(element_count: usize) -> Self {
+        let fixed_columns = MetricsSnapshot::fixed_field_descriptors()
+            .iter()
+            .map(|(_, metric_type)| ColumnBuilder::from_type(*metric_type))
+            .collect();
+
         let mut material_kg_cols = Vec::with_capacity(element_count);
         let mut ore_avg_cols = Vec::with_capacity(element_count);
         let mut ore_min_cols = Vec::with_capacity(element_count);
@@ -95,49 +96,9 @@ impl RowBuffer {
             ore_min_cols.push(Float32Builder::new());
             ore_max_cols.push(Float32Builder::new());
         }
+
         Self {
-            tick: UInt64Builder::new(),
-            metrics_version: UInt32Builder::new(),
-            total_ore_kg: Float32Builder::new(),
-            total_material_kg: Float32Builder::new(),
-            total_slag_kg: Float32Builder::new(),
-            station_storage_used_pct: Float32Builder::new(),
-            ship_cargo_used_pct: Float32Builder::new(),
-            ore_lot_count: UInt32Builder::new(),
-            avg_material_quality: Float32Builder::new(),
-            refinery_active_count: UInt32Builder::new(),
-            refinery_starved_count: UInt32Builder::new(),
-            refinery_stalled_count: UInt32Builder::new(),
-            assembler_active_count: UInt32Builder::new(),
-            assembler_stalled_count: UInt32Builder::new(),
-            fleet_total: UInt32Builder::new(),
-            fleet_idle: UInt32Builder::new(),
-            fleet_mining: UInt32Builder::new(),
-            fleet_transiting: UInt32Builder::new(),
-            fleet_surveying: UInt32Builder::new(),
-            fleet_depositing: UInt32Builder::new(),
-            scan_sites_remaining: UInt32Builder::new(),
-            asteroids_discovered: UInt32Builder::new(),
-            asteroids_depleted: UInt32Builder::new(),
-            techs_unlocked: UInt32Builder::new(),
-            total_scan_data: Float32Builder::new(),
-            max_tech_evidence: Float32Builder::new(),
-            avg_module_wear: Float32Builder::new(),
-            max_module_wear: Float32Builder::new(),
-            repair_kits_remaining: UInt32Builder::new(),
-            balance: Float64Builder::new(),
-            thruster_count: UInt32Builder::new(),
-            export_revenue_total: Float64Builder::new(),
-            export_count: UInt32Builder::new(),
-            power_generated_kw: Float32Builder::new(),
-            power_consumed_kw: Float32Builder::new(),
-            power_deficit_kw: Float32Builder::new(),
-            battery_charge_pct: Float32Builder::new(),
-            station_max_temp_mk: UInt32Builder::new(),
-            station_avg_temp_mk: UInt32Builder::new(),
-            overheat_warning_count: UInt32Builder::new(),
-            overheat_critical_count: UInt32Builder::new(),
-            heat_wear_multiplier_avg: Float32Builder::new(),
+            fixed_columns,
             material_kg_cols,
             ore_avg_cols,
             ore_min_cols,
@@ -207,14 +168,22 @@ impl ParquetMetricsWriter {
 }
 
 /// Build the Arrow schema with fixed + dynamic element columns.
+///
+/// Column order (v10): all fixed scalar fields first (from `fixed_field_descriptors`),
+/// then dynamic per-element columns at the end.
 pub(crate) fn build_schema(element_ids: &[String]) -> Schema {
-    let mut fields = vec![
-        Field::new("tick", DataType::UInt64, false),
-        Field::new("metrics_version", DataType::UInt32, false),
-        Field::new("total_ore_kg", DataType::Float32, false),
-        Field::new("total_material_kg", DataType::Float32, false),
-        Field::new("total_slag_kg", DataType::Float32, false),
-    ];
+    let mut fields: Vec<Field> = MetricsSnapshot::fixed_field_descriptors()
+        .iter()
+        .map(|(name, metric_type)| {
+            let data_type = match metric_type {
+                MetricType::U32 => DataType::UInt32,
+                MetricType::U64 => DataType::UInt64,
+                MetricType::F32 => DataType::Float32,
+                MetricType::F64 => DataType::Float64,
+            };
+            Field::new(*name, data_type, false)
+        })
+        .collect();
 
     // Dynamic per-element material columns
     for element_id in element_ids {
@@ -224,11 +193,6 @@ pub(crate) fn build_schema(element_ids: &[String]) -> Schema {
             false,
         ));
     }
-
-    fields.extend([
-        Field::new("station_storage_used_pct", DataType::Float32, false),
-        Field::new("ship_cargo_used_pct", DataType::Float32, false),
-    ]);
 
     // Dynamic per-element ore stats columns
     for element_id in element_ids {
@@ -249,54 +213,15 @@ pub(crate) fn build_schema(element_ids: &[String]) -> Schema {
         ));
     }
 
-    fields.extend([
-        Field::new("ore_lot_count", DataType::UInt32, false),
-        Field::new("avg_material_quality", DataType::Float32, false),
-        Field::new("refinery_active_count", DataType::UInt32, false),
-        Field::new("refinery_starved_count", DataType::UInt32, false),
-        Field::new("refinery_stalled_count", DataType::UInt32, false),
-        Field::new("assembler_active_count", DataType::UInt32, false),
-        Field::new("assembler_stalled_count", DataType::UInt32, false),
-        Field::new("fleet_total", DataType::UInt32, false),
-        Field::new("fleet_idle", DataType::UInt32, false),
-        Field::new("fleet_mining", DataType::UInt32, false),
-        Field::new("fleet_transiting", DataType::UInt32, false),
-        Field::new("fleet_surveying", DataType::UInt32, false),
-        Field::new("fleet_depositing", DataType::UInt32, false),
-        Field::new("scan_sites_remaining", DataType::UInt32, false),
-        Field::new("asteroids_discovered", DataType::UInt32, false),
-        Field::new("asteroids_depleted", DataType::UInt32, false),
-        Field::new("techs_unlocked", DataType::UInt32, false),
-        Field::new("total_scan_data", DataType::Float32, false),
-        Field::new("max_tech_evidence", DataType::Float32, false),
-        Field::new("avg_module_wear", DataType::Float32, false),
-        Field::new("max_module_wear", DataType::Float32, false),
-        Field::new("repair_kits_remaining", DataType::UInt32, false),
-        Field::new("balance", DataType::Float64, false),
-        Field::new("thruster_count", DataType::UInt32, false),
-        Field::new("export_revenue_total", DataType::Float64, false),
-        Field::new("export_count", DataType::UInt32, false),
-        Field::new("power_generated_kw", DataType::Float32, false),
-        Field::new("power_consumed_kw", DataType::Float32, false),
-        Field::new("power_deficit_kw", DataType::Float32, false),
-        Field::new("battery_charge_pct", DataType::Float32, false),
-        Field::new("station_max_temp_mk", DataType::UInt32, false),
-        Field::new("station_avg_temp_mk", DataType::UInt32, false),
-        Field::new("overheat_warning_count", DataType::UInt32, false),
-        Field::new("overheat_critical_count", DataType::UInt32, false),
-        Field::new("heat_wear_multiplier_avg", DataType::Float32, false),
-    ]);
-
     Schema::new(fields)
 }
 
 /// Append a single snapshot's values to the row buffer.
 fn append_to_buffer(buf: &mut RowBuffer, snap: &MetricsSnapshot, element_ids: &[String]) {
-    buf.tick.append_value(snap.tick);
-    buf.metrics_version.append_value(snap.metrics_version);
-    buf.total_ore_kg.append_value(snap.total_ore_kg);
-    buf.total_material_kg.append_value(snap.total_material_kg);
-    buf.total_slag_kg.append_value(snap.total_slag_kg);
+    // Fixed scalar columns — iterate field values in lockstep with builders.
+    for (builder, (_, value)) in buf.fixed_columns.iter_mut().zip(snap.fixed_field_values()) {
+        builder.append(value);
+    }
 
     // Dynamic per-element material columns
     for (index, element_id) in element_ids.iter().enumerate() {
@@ -308,11 +233,6 @@ fn append_to_buffer(buf: &mut RowBuffer, snap: &MetricsSnapshot, element_ids: &[
         buf.material_kg_cols[index].append_value(value);
     }
 
-    buf.station_storage_used_pct
-        .append_value(snap.station_storage_used_pct);
-    buf.ship_cargo_used_pct
-        .append_value(snap.ship_cargo_used_pct);
-
     // Dynamic per-element ore stats columns
     for (index, element_id) in element_ids.iter().enumerate() {
         let stats = snap.per_element_ore_stats.get(element_id);
@@ -320,57 +240,6 @@ fn append_to_buffer(buf: &mut RowBuffer, snap: &MetricsSnapshot, element_ids: &[
         buf.ore_min_cols[index].append_value(stats.map_or(0.0, |s| s.min_fraction));
         buf.ore_max_cols[index].append_value(stats.map_or(0.0, |s| s.max_fraction));
     }
-
-    buf.ore_lot_count.append_value(snap.ore_lot_count);
-    buf.avg_material_quality
-        .append_value(snap.avg_material_quality);
-    buf.refinery_active_count
-        .append_value(snap.refinery_active_count);
-    buf.refinery_starved_count
-        .append_value(snap.refinery_starved_count);
-    buf.refinery_stalled_count
-        .append_value(snap.refinery_stalled_count);
-    buf.assembler_active_count
-        .append_value(snap.assembler_active_count);
-    buf.assembler_stalled_count
-        .append_value(snap.assembler_stalled_count);
-    buf.fleet_total.append_value(snap.fleet_total);
-    buf.fleet_idle.append_value(snap.fleet_idle);
-    buf.fleet_mining.append_value(snap.fleet_mining);
-    buf.fleet_transiting.append_value(snap.fleet_transiting);
-    buf.fleet_surveying.append_value(snap.fleet_surveying);
-    buf.fleet_depositing.append_value(snap.fleet_depositing);
-    buf.scan_sites_remaining
-        .append_value(snap.scan_sites_remaining);
-    buf.asteroids_discovered
-        .append_value(snap.asteroids_discovered);
-    buf.asteroids_depleted.append_value(snap.asteroids_depleted);
-    buf.techs_unlocked.append_value(snap.techs_unlocked);
-    buf.total_scan_data.append_value(snap.total_scan_data);
-    buf.max_tech_evidence.append_value(snap.max_tech_evidence);
-    buf.avg_module_wear.append_value(snap.avg_module_wear);
-    buf.max_module_wear.append_value(snap.max_module_wear);
-    buf.repair_kits_remaining
-        .append_value(snap.repair_kits_remaining);
-    buf.balance.append_value(snap.balance);
-    buf.thruster_count.append_value(snap.thruster_count);
-    buf.export_revenue_total
-        .append_value(snap.export_revenue_total);
-    buf.export_count.append_value(snap.export_count);
-    buf.power_generated_kw.append_value(snap.power_generated_kw);
-    buf.power_consumed_kw.append_value(snap.power_consumed_kw);
-    buf.power_deficit_kw.append_value(snap.power_deficit_kw);
-    buf.battery_charge_pct.append_value(snap.battery_charge_pct);
-    buf.station_max_temp_mk
-        .append_value(snap.station_max_temp_mk);
-    buf.station_avg_temp_mk
-        .append_value(snap.station_avg_temp_mk);
-    buf.overheat_warning_count
-        .append_value(snap.overheat_warning_count);
-    buf.overheat_critical_count
-        .append_value(snap.overheat_critical_count);
-    buf.heat_wear_multiplier_avg
-        .append_value(snap.heat_wear_multiplier_avg);
 }
 
 /// Build a `RecordBatch` from the accumulated buffer, consuming builder state.
@@ -379,64 +248,22 @@ fn build_record_batch(
     schema: &Arc<Schema>,
     element_ids: &[String],
 ) -> Result<RecordBatch> {
-    let mut columns: Vec<Arc<dyn arrow::array::Array>> = vec![
-        Arc::new(buf.tick.finish()),
-        Arc::new(buf.metrics_version.finish()),
-        Arc::new(buf.total_ore_kg.finish()),
-        Arc::new(buf.total_material_kg.finish()),
-        Arc::new(buf.total_slag_kg.finish()),
-    ];
+    // Fixed scalar columns
+    let mut columns: Vec<Arc<dyn arrow::array::Array>> = buf
+        .fixed_columns
+        .iter_mut()
+        .map(ColumnBuilder::finish)
+        .collect();
 
+    // Dynamic per-element columns
     for col in &mut buf.material_kg_cols {
         columns.push(Arc::new(col.finish()));
     }
-
-    columns.push(Arc::new(buf.station_storage_used_pct.finish()));
-    columns.push(Arc::new(buf.ship_cargo_used_pct.finish()));
-
     for index in 0..element_ids.len() {
         columns.push(Arc::new(buf.ore_avg_cols[index].finish()));
         columns.push(Arc::new(buf.ore_min_cols[index].finish()));
         columns.push(Arc::new(buf.ore_max_cols[index].finish()));
     }
-
-    columns.extend([
-        Arc::new(buf.ore_lot_count.finish()) as Arc<dyn arrow::array::Array>,
-        Arc::new(buf.avg_material_quality.finish()),
-        Arc::new(buf.refinery_active_count.finish()),
-        Arc::new(buf.refinery_starved_count.finish()),
-        Arc::new(buf.refinery_stalled_count.finish()),
-        Arc::new(buf.assembler_active_count.finish()),
-        Arc::new(buf.assembler_stalled_count.finish()),
-        Arc::new(buf.fleet_total.finish()),
-        Arc::new(buf.fleet_idle.finish()),
-        Arc::new(buf.fleet_mining.finish()),
-        Arc::new(buf.fleet_transiting.finish()),
-        Arc::new(buf.fleet_surveying.finish()),
-        Arc::new(buf.fleet_depositing.finish()),
-        Arc::new(buf.scan_sites_remaining.finish()),
-        Arc::new(buf.asteroids_discovered.finish()),
-        Arc::new(buf.asteroids_depleted.finish()),
-        Arc::new(buf.techs_unlocked.finish()),
-        Arc::new(buf.total_scan_data.finish()),
-        Arc::new(buf.max_tech_evidence.finish()),
-        Arc::new(buf.avg_module_wear.finish()),
-        Arc::new(buf.max_module_wear.finish()),
-        Arc::new(buf.repair_kits_remaining.finish()),
-        Arc::new(buf.balance.finish()),
-        Arc::new(buf.thruster_count.finish()),
-        Arc::new(buf.export_revenue_total.finish()),
-        Arc::new(buf.export_count.finish()),
-        Arc::new(buf.power_generated_kw.finish()),
-        Arc::new(buf.power_consumed_kw.finish()),
-        Arc::new(buf.power_deficit_kw.finish()),
-        Arc::new(buf.battery_charge_pct.finish()),
-        Arc::new(buf.station_max_temp_mk.finish()),
-        Arc::new(buf.station_avg_temp_mk.finish()),
-        Arc::new(buf.overheat_warning_count.finish()),
-        Arc::new(buf.overheat_critical_count.finish()),
-        Arc::new(buf.heat_wear_multiplier_avg.finish()),
-    ]);
 
     RecordBatch::try_new(Arc::clone(schema), columns).context("building record batch")
 }

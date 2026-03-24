@@ -1,8 +1,6 @@
 use serde::Serialize;
 use sim_core::MetricsSnapshot;
 
-type Extractor = (&'static str, Box<dyn Fn(&MetricsSnapshot) -> f64>);
-
 #[derive(Debug, Serialize)]
 pub struct SummaryStats {
     pub seed_count: usize,
@@ -28,83 +26,63 @@ pub fn compute_summary(snapshots: &[(u64, &MetricsSnapshot)]) -> SummaryStats {
         .filter(|(_, s)| s.refinery_starved_count > 0 && s.fleet_idle == s.fleet_total)
         .count();
 
-    let extractors: Vec<Extractor> = vec![
-        (
-            "storage_saturation_pct",
-            Box::new(|s| f64::from(s.station_storage_used_pct)),
-        ),
-        (
-            "fleet_idle_pct",
-            Box::new(|s| {
+    // Curated summary fields — a subset of MetricsSnapshot meaningful for seed comparison.
+    // Uses get_field_f64() for direct field lookups instead of per-field closures.
+    let direct_fields: &[&str] = &[
+        "station_storage_used_pct",
+        "refinery_starved_count",
+        "techs_unlocked",
+        "avg_module_wear",
+        "repair_kits_remaining",
+        "balance",
+        "thruster_count",
+        "export_revenue_total",
+        "export_count",
+        "power_generated_kw",
+        "power_consumed_kw",
+        "power_deficit_kw",
+        "battery_charge_pct",
+        "station_max_temp_mk",
+        "station_avg_temp_mk",
+        "overheat_warning_count",
+        "overheat_critical_count",
+        "heat_wear_multiplier_avg",
+    ];
+
+    let mut metrics: Vec<MetricSummary> = Vec::new();
+
+    // Renamed alias: storage_saturation_pct → station_storage_used_pct
+    metrics.push({
+        let values: Vec<f64> = snapshots
+            .iter()
+            .map(|(_, s)| s.get_field_f64("station_storage_used_pct").unwrap_or(0.0))
+            .collect();
+        compute_metric_summary("storage_saturation_pct", &values)
+    });
+
+    // Composite: fleet_idle_pct = fleet_idle / fleet_total
+    metrics.push({
+        let values: Vec<f64> = snapshots
+            .iter()
+            .map(|(_, s)| {
                 if s.fleet_total == 0 {
                     0.0
                 } else {
                     f64::from(s.fleet_idle) / f64::from(s.fleet_total)
                 }
-            }),
-        ),
-        (
-            "refinery_starved_count",
-            Box::new(|s| f64::from(s.refinery_starved_count)),
-        ),
-        ("techs_unlocked", Box::new(|s| f64::from(s.techs_unlocked))),
-        (
-            "avg_module_wear",
-            Box::new(|s| f64::from(s.avg_module_wear)),
-        ),
-        (
-            "repair_kits_remaining",
-            Box::new(|s| f64::from(s.repair_kits_remaining)),
-        ),
-        ("balance", Box::new(|s| s.balance)),
-        ("thruster_count", Box::new(|s| f64::from(s.thruster_count))),
-        ("export_revenue_total", Box::new(|s| s.export_revenue_total)),
-        ("export_count", Box::new(|s| f64::from(s.export_count))),
-        (
-            "power_generated_kw",
-            Box::new(|s| f64::from(s.power_generated_kw)),
-        ),
-        (
-            "power_consumed_kw",
-            Box::new(|s| f64::from(s.power_consumed_kw)),
-        ),
-        (
-            "power_deficit_kw",
-            Box::new(|s| f64::from(s.power_deficit_kw)),
-        ),
-        (
-            "battery_charge_pct",
-            Box::new(|s| f64::from(s.battery_charge_pct)),
-        ),
-        (
-            "station_max_temp_mk",
-            Box::new(|s| f64::from(s.station_max_temp_mk)),
-        ),
-        (
-            "station_avg_temp_mk",
-            Box::new(|s| f64::from(s.station_avg_temp_mk)),
-        ),
-        (
-            "overheat_warning_count",
-            Box::new(|s| f64::from(s.overheat_warning_count)),
-        ),
-        (
-            "overheat_critical_count",
-            Box::new(|s| f64::from(s.overheat_critical_count)),
-        ),
-        (
-            "heat_wear_multiplier_avg",
-            Box::new(|s| f64::from(s.heat_wear_multiplier_avg)),
-        ),
-    ];
+            })
+            .collect();
+        compute_metric_summary("fleet_idle_pct", &values)
+    });
 
-    let metrics = extractors
-        .iter()
-        .map(|(name, extract)| {
-            let values: Vec<f64> = snapshots.iter().map(|(_, s)| extract(s)).collect();
-            compute_metric_summary(name, &values)
-        })
-        .collect();
+    // Direct field extractions (skip storage_saturation_pct — already added above as alias)
+    for field_name in &direct_fields[1..] {
+        let values: Vec<f64> = snapshots
+            .iter()
+            .map(|(_, s)| s.get_field_f64(field_name).unwrap_or(0.0))
+            .collect();
+        metrics.push(compute_metric_summary(field_name, &values));
+    }
 
     SummaryStats {
         seed_count,
@@ -132,112 +110,22 @@ fn compute_metric_summary(name: &str, values: &[f64]) -> MetricSummary {
 
 /// Build aggregated metrics in the contract format:
 /// `{ "key": { "mean": ..., "min": ..., "max": ..., "stddev": ... }, ... }`
-/// Covers all `SummaryMetrics` keys.
-#[allow(clippy::too_many_lines)]
+///
+/// Auto-generates entries for all fixed scalar fields (except `tick` and `metrics_version`)
+/// using [`MetricsSnapshot::fixed_field_values`]. New fields added to `MetricsSnapshot`
+/// automatically appear in the aggregated output.
 pub fn build_aggregated_metrics(snapshots: &[&MetricsSnapshot]) -> serde_json::Value {
-    let contract_extractors: Vec<Extractor> = vec![
-        ("total_ore_kg", Box::new(|s| f64::from(s.total_ore_kg))),
-        (
-            "total_material_kg",
-            Box::new(|s| f64::from(s.total_material_kg)),
-        ),
-        ("total_slag_kg", Box::new(|s| f64::from(s.total_slag_kg))),
-        (
-            "station_storage_used_pct",
-            Box::new(|s| f64::from(s.station_storage_used_pct)),
-        ),
-        ("fleet_total", Box::new(|s| f64::from(s.fleet_total))),
-        ("fleet_idle", Box::new(|s| f64::from(s.fleet_idle))),
-        (
-            "refinery_active_count",
-            Box::new(|s| f64::from(s.refinery_active_count)),
-        ),
-        (
-            "refinery_starved_count",
-            Box::new(|s| f64::from(s.refinery_starved_count)),
-        ),
-        (
-            "refinery_stalled_count",
-            Box::new(|s| f64::from(s.refinery_stalled_count)),
-        ),
-        (
-            "assembler_active_count",
-            Box::new(|s| f64::from(s.assembler_active_count)),
-        ),
-        (
-            "assembler_stalled_count",
-            Box::new(|s| f64::from(s.assembler_stalled_count)),
-        ),
-        (
-            "avg_module_wear",
-            Box::new(|s| f64::from(s.avg_module_wear)),
-        ),
-        (
-            "max_module_wear",
-            Box::new(|s| f64::from(s.max_module_wear)),
-        ),
-        (
-            "repair_kits_remaining",
-            Box::new(|s| f64::from(s.repair_kits_remaining)),
-        ),
-        ("techs_unlocked", Box::new(|s| f64::from(s.techs_unlocked))),
-        (
-            "asteroids_discovered",
-            Box::new(|s| f64::from(s.asteroids_discovered)),
-        ),
-        (
-            "asteroids_depleted",
-            Box::new(|s| f64::from(s.asteroids_depleted)),
-        ),
-        (
-            "scan_sites_remaining",
-            Box::new(|s| f64::from(s.scan_sites_remaining)),
-        ),
-        ("balance", Box::new(|s| s.balance)),
-        ("thruster_count", Box::new(|s| f64::from(s.thruster_count))),
-        ("export_revenue_total", Box::new(|s| s.export_revenue_total)),
-        ("export_count", Box::new(|s| f64::from(s.export_count))),
-        (
-            "power_generated_kw",
-            Box::new(|s| f64::from(s.power_generated_kw)),
-        ),
-        (
-            "power_consumed_kw",
-            Box::new(|s| f64::from(s.power_consumed_kw)),
-        ),
-        (
-            "power_deficit_kw",
-            Box::new(|s| f64::from(s.power_deficit_kw)),
-        ),
-        (
-            "battery_charge_pct",
-            Box::new(|s| f64::from(s.battery_charge_pct)),
-        ),
-        (
-            "station_max_temp_mk",
-            Box::new(|s| f64::from(s.station_max_temp_mk)),
-        ),
-        (
-            "station_avg_temp_mk",
-            Box::new(|s| f64::from(s.station_avg_temp_mk)),
-        ),
-        (
-            "overheat_warning_count",
-            Box::new(|s| f64::from(s.overheat_warning_count)),
-        ),
-        (
-            "overheat_critical_count",
-            Box::new(|s| f64::from(s.overheat_critical_count)),
-        ),
-        (
-            "heat_wear_multiplier_avg",
-            Box::new(|s| f64::from(s.heat_wear_multiplier_avg)),
-        ),
-    ];
+    let descriptors = MetricsSnapshot::fixed_field_descriptors();
 
     let mut map = serde_json::Map::new();
-    for (name, extract) in &contract_extractors {
-        let values: Vec<f64> = snapshots.iter().map(|s| extract(s)).collect();
+    for (index, (name, _)) in descriptors.iter().enumerate() {
+        if matches!(*name, "tick" | "metrics_version") {
+            continue;
+        }
+        let values: Vec<f64> = snapshots
+            .iter()
+            .map(|s| s.fixed_field_values()[index].1.as_f64())
+            .collect();
         let summary = compute_metric_summary(name, &values);
         map.insert(
             name.to_string(),
@@ -395,40 +283,13 @@ mod tests {
         let agg = build_aggregated_metrics(&snapshots);
 
         let obj = agg.as_object().unwrap();
-        let expected_keys = [
-            "total_ore_kg",
-            "total_material_kg",
-            "total_slag_kg",
-            "station_storage_used_pct",
-            "fleet_total",
-            "fleet_idle",
-            "refinery_active_count",
-            "refinery_starved_count",
-            "refinery_stalled_count",
-            "assembler_active_count",
-            "assembler_stalled_count",
-            "avg_module_wear",
-            "max_module_wear",
-            "repair_kits_remaining",
-            "techs_unlocked",
-            "asteroids_discovered",
-            "asteroids_depleted",
-            "scan_sites_remaining",
-            "balance",
-            "thruster_count",
-            "export_revenue_total",
-            "export_count",
-            "power_generated_kw",
-            "power_consumed_kw",
-            "power_deficit_kw",
-            "battery_charge_pct",
-            "station_max_temp_mk",
-            "station_avg_temp_mk",
-            "overheat_warning_count",
-            "overheat_critical_count",
-            "heat_wear_multiplier_avg",
-        ];
-        assert_eq!(obj.len(), 31);
+        // Dynamically derive expected keys from fixed_field_descriptors, minus tick/metrics_version
+        let expected_keys: Vec<&str> = MetricsSnapshot::fixed_field_descriptors()
+            .iter()
+            .map(|(name, _)| *name)
+            .filter(|name| !matches!(*name, "tick" | "metrics_version"))
+            .collect();
+        assert_eq!(obj.len(), expected_keys.len());
         for key in &expected_keys {
             let entry = obj
                 .get(*key)
