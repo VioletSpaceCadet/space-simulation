@@ -325,7 +325,7 @@ pub(crate) fn handle_import(
             current_tick,
             crate::Event::InsufficientFunds {
                 station_id: station_id.clone(),
-                action: format!("import {}", trade::pricing_key(item_spec)),
+                action: format!("import {}", item_spec.pricing_key()),
                 required: cost,
                 available: state.balance,
             },
