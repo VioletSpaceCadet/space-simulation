@@ -840,7 +840,6 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   InsufficientFunds: noOp,
   AlertRaised: noOp,
   AlertCleared: noOp,
-  ResearchRoll: noOp,
   PowerConsumed: noOp,
   TaskStarted: handleTaskStarted,
   TaskCompleted: handleTaskCompleted,

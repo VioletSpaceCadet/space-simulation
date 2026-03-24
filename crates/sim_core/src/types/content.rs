@@ -124,7 +124,6 @@ pub struct TechDef {
     #[serde(default)]
     pub domain_requirements: HashMap<ResearchDomain, f32>,
     pub accepted_data: Vec<DataKind>,
-    pub difficulty: f32,
     pub effects: Vec<TechEffect>,
 }
 

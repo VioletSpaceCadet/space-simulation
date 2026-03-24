@@ -7,27 +7,13 @@ fn test_survey_creates_asteroid_on_completion() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
     assert!(
         state.asteroids.is_empty(),
         "asteroid should not exist before task completes"
     );
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
     assert_eq!(
         state.asteroids.len(),
         1,
@@ -46,22 +32,8 @@ fn test_survey_emits_expected_events() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let completion_events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    let completion_events = tick(&mut state, &[], &content, &mut rng, None);
 
     let event_kinds: Vec<&str> = completion_events
         .iter()
@@ -87,22 +59,8 @@ fn test_survey_detects_tags_with_prob_one() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
     let tags = events
         .iter()
@@ -125,22 +83,8 @@ fn test_survey_accumulates_scan_data() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let scan_data = state
         .research
@@ -161,22 +105,8 @@ fn test_ship_returns_to_idle_after_survey() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let ship = &state.ships[&ShipId("ship_0001".to_string())];
     assert!(
@@ -192,22 +122,8 @@ fn test_asteroid_has_mass_after_survey() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let asteroid = state.asteroids.values().next().unwrap();
     assert!(
@@ -223,22 +139,8 @@ fn test_asteroid_mass_within_range() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let asteroid = state.asteroids.values().next().unwrap();
     assert!(

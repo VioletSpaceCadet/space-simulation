@@ -14,7 +14,6 @@
   "autopilot_volatile_confidence_threshold": 0.7,
   "autopilot_volatile_threshold_kg": 500.0,
   "autopilot_refinery_threshold_kg": 2000.0,
-  "research_roll_interval_minutes": 60,
   "data_generation_peak": 100.0,
   "data_generation_floor": 5.0,
   "data_generation_decay_rate": 0.7,

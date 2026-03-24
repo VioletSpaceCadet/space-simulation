@@ -158,22 +158,8 @@ fn test_electrolysis_produces_lh2_and_lox() {
     let mut state = state_with_electrolysis(&content);
     let mut rng = make_rng();
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
@@ -212,22 +198,8 @@ fn test_electrolysis_stoichiometric_ratio() {
     let mut state = state_with_electrolysis(&content);
     let mut rng = make_rng();
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
@@ -277,22 +249,8 @@ fn test_electrolysis_consumes_h2o() {
         })
         .sum();
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let remaining_h2o: f32 = state.stations[&station_id]
         .inventory
@@ -315,22 +273,8 @@ fn test_electrolysis_accumulates_wear() {
     let mut state = state_with_electrolysis(&content);
     let mut rng = make_rng();
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
@@ -364,22 +308,8 @@ fn test_electrolysis_skips_without_h2o() {
         .inventory
         .retain(|i| !matches!(i, InventoryItem::Material { element, .. } if element == "H2O"));
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
 
@@ -425,22 +355,8 @@ fn test_electrolysis_skips_without_power() {
         .unwrap()
         .power_available_per_tick = 0.0;
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
 
@@ -479,14 +395,7 @@ fn test_electrolysis_continuous_production() {
 
     // Run 10 ticks
     for _ in 0..10 {
-        tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        tick(&mut state, &[], &content, &mut rng, None);
     }
 
     let station_id = StationId("station_earth_orbit".to_string());
@@ -640,14 +549,7 @@ fn test_full_chain_ore_to_propellant() {
 
     // Run enough ticks for the full pipeline: ore → H2O → LH2 + LOX
     for _ in 0..20 {
-        tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        tick(&mut state, &[], &content, &mut rng, None);
     }
 
     let station = &state.stations[&station_id];

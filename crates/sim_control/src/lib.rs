@@ -517,7 +517,6 @@ mod tests {
             prereqs: vec![],
             domain_requirements: HashMap::from([(sim_core::ResearchDomain::Materials, 100.0)]),
             accepted_data: vec![sim_core::DataKind::AssayData],
-            difficulty: 10.0,
             effects: vec![],
         });
         // Add lab module def
@@ -666,7 +665,6 @@ mod tests {
             prereqs: vec![TechId("tech_materials_v1".to_string())],
             domain_requirements: HashMap::from([(sim_core::ResearchDomain::Materials, 200.0)]),
             accepted_data: vec![sim_core::DataKind::AssayData],
-            difficulty: 10.0,
             effects: vec![],
         });
 
@@ -726,7 +724,6 @@ mod tests {
             prereqs: vec![],
             domain_requirements: HashMap::from([(sim_core::ResearchDomain::Manufacturing, 200.0)]),
             accepted_data: vec![sim_core::DataKind::ManufacturingData],
-            difficulty: 500.0,
             effects: vec![],
         });
         content.module_defs.insert(

@@ -20,22 +20,8 @@ fn test_refinery_output_reduced_by_wear() {
         .wear = 0.6;
 
     let mut rng = make_rng();
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
     let material_kg = station
@@ -67,22 +53,8 @@ fn test_refinery_accumulates_wear() {
     let station_id = StationId("station_earth_orbit".to_string());
     let mut rng = make_rng();
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let wear = state.stations[&station_id].modules[0].wear.wear;
     let expected_wear = content
@@ -107,22 +79,8 @@ fn test_refinery_auto_disables_at_max_wear() {
         .wear = 0.995;
 
     let mut rng = make_rng();
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
     assert!(
@@ -143,22 +101,8 @@ fn test_wear_accumulated_event_emitted() {
     let mut state = state_with_refinery(&content);
     let mut rng = make_rng();
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
     assert!(
         events
@@ -179,22 +123,8 @@ fn test_maintenance_repairs_most_worn_module() {
         .wear = 0.6;
 
     let mut rng = make_rng();
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
     assert!(
@@ -221,22 +151,8 @@ fn test_maintenance_consumes_repair_kit() {
         .wear = 0.6;
 
     let mut rng = make_rng();
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
     let kits = station
@@ -284,22 +200,8 @@ fn test_maintenance_skips_when_no_repair_kits() {
         });
 
     let mut rng = make_rng();
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
     assert!(
@@ -322,22 +224,8 @@ fn test_maintenance_skips_when_no_worn_modules() {
         .retain(|i| !matches!(i, InventoryItem::Ore { .. }));
 
     let mut rng = make_rng();
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
     let kits = station
@@ -375,14 +263,7 @@ fn test_wear_maintenance_full_cycle() {
 
     let mut all_events = Vec::new();
     for _ in 0..20 {
-        let events = tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        let events = tick(&mut state, &[], &content, &mut rng, None);
         all_events.extend(events);
     }
 
@@ -448,14 +329,7 @@ fn test_maintenance_skips_below_repair_threshold() {
     let mut rng = make_rng();
     // Tick enough for maintenance to fire (interval=2)
     for _ in 0..4 {
-        tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        tick(&mut state, &[], &content, &mut rng, None);
     }
 
     let station = &state.stations[&station_id];
@@ -507,14 +381,7 @@ fn test_maintenance_repairs_above_threshold() {
 
     let mut rng = make_rng();
     for _ in 0..4 {
-        tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        tick(&mut state, &[], &content, &mut rng, None);
     }
 
     let station = &state.stations[&station_id];

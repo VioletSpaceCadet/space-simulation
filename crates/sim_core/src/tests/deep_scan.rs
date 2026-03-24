@@ -3,27 +3,15 @@ use super::*;
 #[test]
 fn test_deep_scan_blocked_without_tech() {
     let mut content = test_content();
-    content.techs[0].difficulty = 1_000_000.0;
+    // Set unmet domain requirements to prevent unlock
+    content.techs[0].domain_requirements =
+        std::collections::HashMap::from([(ResearchDomain::Survey, 1_000_000.0)]);
     let mut state = test_state(&content);
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let asteroid_id = state.asteroids.keys().next().unwrap().clone();
     let ship_id = ShipId("ship_0001".to_string());
@@ -42,14 +30,7 @@ fn test_deep_scan_blocked_without_tech() {
         },
     };
 
-    tick(
-        &mut state,
-        &[deep_cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[deep_cmd], &content, &mut rng, None);
 
     let ship = &state.ships[&ship_id];
     assert!(
@@ -70,22 +51,8 @@ fn test_deep_scan_maps_composition() {
         .insert(TechId("tech_deep_scan_v1".to_string()));
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let asteroid_id = state.asteroids.keys().next().unwrap().clone();
     assert!(
@@ -111,22 +78,8 @@ fn test_deep_scan_maps_composition() {
         },
     };
 
-    tick(
-        &mut state,
-        &[deep_cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[deep_cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let composition = state.asteroids[&asteroid_id].knowledge.composition.as_ref();
     assert!(
@@ -147,22 +100,8 @@ fn test_deep_scan_composition_matches_truth_with_zero_sigma() {
         .insert(TechId("tech_deep_scan_v1".to_string()));
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let asteroid_id = state.asteroids.keys().next().unwrap().clone();
     let ship_id = ShipId("ship_0001".to_string());
@@ -179,22 +118,8 @@ fn test_deep_scan_composition_matches_truth_with_zero_sigma() {
             },
         },
     };
-    tick(
-        &mut state,
-        &[deep_cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[deep_cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let asteroid = &state.asteroids[&asteroid_id];
     let mapped = asteroid.knowledge.composition.as_ref().unwrap();

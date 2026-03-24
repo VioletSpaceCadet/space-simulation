@@ -318,13 +318,6 @@ export const eventSchemas = {
     alert_id: z.string(),
   }),
 
-  ResearchRoll: z.object({
-    tech_id: z.string(),
-    evidence: z.number(),
-    p: z.number(),
-    rolled: z.number(),
-  }),
-
   PowerConsumed: z.object({
     station_id: z.string(),
     amount: z.number(),

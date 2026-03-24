@@ -38,14 +38,7 @@ fn run_full_sim() -> (serde_json::Value, usize) {
         } else {
             &[]
         };
-        let events = tick(
-            &mut state,
-            commands,
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        let events = tick(&mut state, commands, &content, &mut rng, None);
         total_events += events.len();
     }
 
@@ -88,14 +81,7 @@ fn full_sim_state_actually_changes() {
         } else {
             &[]
         };
-        tick(
-            &mut state,
-            commands,
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        tick(&mut state, commands, &content, &mut rng, None);
     }
 
     // Tick counter must advance
@@ -156,14 +142,7 @@ fn float_field_spot_check_deterministic() {
             } else {
                 &[]
             };
-            tick(
-                &mut state,
-                commands,
-                &content,
-                &mut rng,
-                EventLevel::Normal,
-                None,
-            );
+            tick(&mut state, commands, &content, &mut rng, None);
         }
         state
     };

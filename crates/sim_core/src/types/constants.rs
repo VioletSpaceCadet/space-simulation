@@ -34,7 +34,6 @@ pub struct Constants {
     /// Default refinery processing threshold (kg) set by autopilot on newly installed modules.
     pub autopilot_refinery_threshold_kg: f32,
     // Research system
-    pub research_roll_interval_minutes: u64,
     pub data_generation_peak: f32,
     pub data_generation_floor: f32,
     pub data_generation_decay_rate: f32,
@@ -148,8 +147,6 @@ pub struct Constants {
     pub deposit_ticks: u64,
     #[serde(skip_deserializing, default)]
     pub station_power_available_per_tick: f32,
-    #[serde(skip_deserializing, default)]
-    pub research_roll_interval_ticks: u64,
 }
 
 impl Constants {
@@ -189,8 +186,6 @@ impl Constants {
         self.survey_scan_ticks = self.game_minutes_to_ticks(self.survey_scan_minutes);
         self.deep_scan_ticks = self.game_minutes_to_ticks(self.deep_scan_minutes);
         self.deposit_ticks = self.game_minutes_to_ticks(self.deposit_minutes);
-        self.research_roll_interval_ticks =
-            self.game_minutes_to_ticks(self.research_roll_interval_minutes);
         self.mining_rate_kg_per_tick =
             self.rate_per_minute_to_per_tick(self.mining_rate_kg_per_minute);
         self.station_power_available_per_tick =
@@ -352,7 +347,6 @@ mod time_scale_tests {
         c.constants.survey_scan_minutes = 120;
         c.constants.deep_scan_minutes = 480;
         c.constants.deposit_minutes = 120;
-        c.constants.research_roll_interval_minutes = 60;
         c.constants.mining_rate_kg_per_minute = 15.0;
         c.constants.station_power_available_per_minute = 100.0;
         c.constants.derive_tick_values();
@@ -360,7 +354,6 @@ mod time_scale_tests {
         assert_eq!(c.constants.survey_scan_ticks, 2);
         assert_eq!(c.constants.deep_scan_ticks, 8);
         assert_eq!(c.constants.deposit_ticks, 2);
-        assert_eq!(c.constants.research_roll_interval_ticks, 1);
         assert!((c.constants.mining_rate_kg_per_tick - 900.0).abs() < f32::EPSILON);
         assert!((c.constants.station_power_available_per_tick - 6000.0).abs() < f32::EPSILON);
     }

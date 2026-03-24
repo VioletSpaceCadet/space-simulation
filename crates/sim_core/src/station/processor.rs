@@ -1461,7 +1461,6 @@ mod tests {
             prereqs: vec![],
             domain_requirements: HashMap::new(),
             accepted_data: vec![],
-            difficulty: 1_000_000.0,
             effects: vec![],
         });
         let recipe = crate::RecipeDef {

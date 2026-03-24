@@ -79,7 +79,7 @@ most-worn module exceeds threshold (e.g., 0.1 = 10% wear).
 | `autopilot_refinery_threshold_kg` | 500 | 2,000 | Buffer above 1,000 kg batch size |
 
 Constants kept as-is: `travel_ticks_per_hop` (2,880), `survey_scan_ticks` (120),
-`deep_scan_ticks` (480), `research_roll_interval_ticks` (60), wear thresholds (0.5/0.8).
+`deep_scan_ticks` (480), wear thresholds (0.5/0.8).
 
 ---
 

@@ -106,13 +106,6 @@ pub enum Event {
         position: crate::Position,
         template_id: String,
     },
-    /// Only emitted at `EventLevel::Debug`.
-    ResearchRoll {
-        tech_id: TechId,
-        evidence: f32,
-        p: f32,
-        rolled: f32,
-    },
     AlertRaised {
         alert_id: String,
         severity: AlertSeverity,

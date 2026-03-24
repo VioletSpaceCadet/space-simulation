@@ -143,12 +143,6 @@ pub struct DomainProgress {
     pub points: HashMap<ResearchDomain, f32>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EventLevel {
-    Normal,
-    Debug,
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AlertSeverity {
     Warning,

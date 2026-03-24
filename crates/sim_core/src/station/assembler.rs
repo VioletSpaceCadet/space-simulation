@@ -895,7 +895,6 @@ mod assembler_component_tests {
             prereqs: vec![],
             domain_requirements: HashMap::new(),
             accepted_data: vec![],
-            difficulty: 10.0,
             effects: vec![TechEffect::EnableShipConstruction],
         });
         content.component_defs.push(ComponentDef {

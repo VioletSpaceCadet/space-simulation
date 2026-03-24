@@ -5,7 +5,7 @@
 
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use sim_core::{EventEnvelope, EventLevel, GameContent, GameState};
+use sim_core::{EventEnvelope, GameContent, GameState};
 
 /// Run the simulation for N ticks and return the events produced.
 fn run_ticks(
@@ -16,7 +16,7 @@ fn run_ticks(
 ) -> Vec<EventEnvelope> {
     let mut all_events = Vec::new();
     for _ in 0..ticks {
-        let events = sim_core::tick(state, &[], content, rng, EventLevel::Normal, None);
+        let events = sim_core::tick(state, &[], content, rng, None);
         all_events.extend(events);
     }
     all_events

@@ -25,7 +25,6 @@ fn production_like_content() -> GameContent {
     content.constants.survey_scan_minutes = 120;
     content.constants.deep_scan_minutes = 480;
     content.constants.deposit_minutes = 120;
-    content.constants.research_roll_interval_minutes = 60;
     content.constants.mining_rate_kg_per_minute = 15.0;
     content.constants.station_power_available_per_minute = 100.0;
     content.constants.derive_tick_values();
@@ -43,7 +42,6 @@ fn production_like_content() -> GameContent {
             prereqs: vec![],
             domain_requirements: HashMap::from([(ResearchDomain::Survey, 100.0)]),
             accepted_data: vec![DataKind::SurveyData],
-            difficulty: 200.0,
             effects: vec![
                 TechEffect::EnableDeepScan,
                 TechEffect::DeepScanCompositionNoise { sigma: 0.02 },
@@ -58,16 +56,14 @@ fn production_like_content() -> GameContent {
                 (ResearchDomain::Manufacturing, 50.0),
             ]),
             accepted_data: vec![DataKind::AssayData, DataKind::ManufacturingData],
-            difficulty: 400.0,
             effects: vec![],
         },
         TechDef {
             id: TechId("tech_ship_construction".to_string()),
             name: "Ship Construction".to_string(),
             prereqs: vec![],
-            domain_requirements: HashMap::from([(ResearchDomain::Manufacturing, 200.0)]),
+            domain_requirements: HashMap::from([(ResearchDomain::Manufacturing, 50.0)]),
             accepted_data: vec![DataKind::ManufacturingData, DataKind::AssayData],
-            difficulty: 500.0,
             effects: vec![TechEffect::EnableShipConstruction],
         },
     ];
@@ -353,7 +349,7 @@ fn run_with_autopilot(
 
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(state, content, &mut next_cmd_id);
-        tick(state, &commands, content, rng, EventLevel::Normal, None);
+        tick(state, &commands, content, rng, None);
     }
     state.counters.next_command_id = next_cmd_id;
 }
@@ -379,10 +375,6 @@ fn derive_tick_values_produces_correct_ticks_at_mpt_60() {
     assert_eq!(
         content.constants.deposit_ticks, 2,
         "120 min / 60 mpt = 2 ticks"
-    );
-    assert_eq!(
-        content.constants.research_roll_interval_ticks, 1,
-        "60 min / 60 mpt = 1 tick"
     );
     assert!(
         (content.constants.mining_rate_kg_per_tick - 900.0).abs() < f32::EPSILON,
@@ -494,14 +486,7 @@ fn sensor_data_generation_rate_at_mpt_60() {
 
     // Run 10 ticks (no autopilot needed)
     for _ in 0..10 {
-        tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        tick(&mut state, &[], &content, &mut rng, None);
     }
 
     let scan_data = state

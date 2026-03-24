@@ -64,15 +64,8 @@ fn state_with_asteroid(content: &GameContent) -> (GameState, AsteroidId) {
     let mut state = test_state(content);
     let mut rng = make_rng();
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(&mut state, &[], content, &mut rng, EventLevel::Normal, None);
+    tick(&mut state, &[cmd], content, &mut rng, None);
+    tick(&mut state, &[], content, &mut rng, None);
     let asteroid_id = state.asteroids.keys().next().unwrap().clone();
     (state, asteroid_id)
 }

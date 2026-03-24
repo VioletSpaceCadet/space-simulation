@@ -73,19 +73,6 @@ fn tech_ids_are_non_empty() {
 }
 
 #[test]
-fn tech_difficulties_are_positive() {
-    let content = load_test_content();
-    for tech in &content.techs {
-        assert!(
-            tech.difficulty > 0.0,
-            "tech '{}' has non-positive difficulty: {}",
-            tech.id.0,
-            tech.difficulty
-        );
-    }
-}
-
-#[test]
 fn tech_domain_requirements_are_positive() {
     let content = load_test_content();
     for tech in &content.techs {
@@ -246,10 +233,6 @@ fn constants_durations_are_positive() {
     assert!(c.survey_scan_minutes > 0, "survey_scan_minutes must be > 0");
     assert!(c.deep_scan_minutes > 0, "deep_scan_minutes must be > 0");
     assert!(c.deposit_minutes > 0, "deposit_minutes must be > 0");
-    assert!(
-        c.research_roll_interval_minutes > 0,
-        "research_roll_interval_minutes must be > 0"
-    );
 }
 
 #[test]
