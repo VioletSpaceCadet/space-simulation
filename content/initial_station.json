@@ -1,0 +1,41 @@
+{
+  "modules": [
+    "module_basic_iron_refinery",
+    "module_maintenance_bay",
+    "module_basic_assembler",
+    "module_exploration_lab",
+    "module_materials_lab",
+    "module_engineering_lab",
+    "module_sensor_array",
+    "module_shipyard",
+    "module_basic_solar_array",
+    "module_basic_solar_array",
+    "module_basic_battery",
+    "module_basic_smelter",
+    "module_basic_radiator",
+    "module_basic_radiator",
+    "module_basic_solar_array",
+    "module_heating_unit",
+    "module_electrolysis_unit",
+    "module_basic_solar_array",
+    "module_propulsion_lab",
+    "module_plate_press",
+    "module_structural_assembler",
+    "module_mining_laser",
+    "module_cargo_expander",
+    "module_propellant_tank",
+    "module_mining_laser",
+    "module_cargo_expander",
+    "module_propellant_tank",
+    "module_mining_laser",
+    "module_cargo_expander",
+    "module_propellant_tank"
+  ],
+  "materials": [
+    { "element": "Fe", "kg": 500.0, "quality": 0.7 },
+    { "element": "H2O", "kg": 5000.0, "quality": 1.0 }
+  ],
+  "components": [
+    { "id": "repair_kit", "count": 10, "quality": 1.0 }
+  ]
+}

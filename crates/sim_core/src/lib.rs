@@ -70,8 +70,8 @@ pub use types::{MaterialThermalProps, ThermalState};
 // -- types: content definitions --
 pub use types::{
     AlertRuleDef, AlertRuleType, AsteroidTemplateDef, BodyType, BoiloffCurveDef, ComponentDef,
-    ElementDef, GameContent, HullDef, NodeDef, OrbitalBodyDef, SlotDef, SolarSystemDef, TechDef,
-    TechEffect, ThermalDef, ZoneDef,
+    ElementDef, GameContent, HullDef, InitialComponent, InitialMaterial, InitialStationDef,
+    NodeDef, OrbitalBodyDef, SlotDef, SolarSystemDef, TechDef, TechEffect, ThermalDef, ZoneDef,
 };
 // -- types: module & recipe definitions --
 pub use types::{

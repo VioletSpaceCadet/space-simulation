@@ -132,6 +132,7 @@ fn replenish_test_content() -> GameContent {
         events: Vec::new(),
         hulls: std::collections::BTreeMap::new(),
         fitting_templates: std::collections::BTreeMap::new(),
+        initial_station: crate::InitialStationDef::default(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
