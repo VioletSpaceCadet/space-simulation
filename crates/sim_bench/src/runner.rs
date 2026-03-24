@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use sim_control::{AutopilotController, CommandSource};
-use sim_core::{EventLevel, GameContent, GameState, MetricsSnapshot};
+use sim_core::{EventLevel, GameContent, GameState, MetricsSnapshot, TickTimings};
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
@@ -67,9 +67,21 @@ pub fn run_seed(
         ParquetMetricsWriter::new(&seed_dir.join("metrics.parquet"), element_ids)
             .with_context(|| format!("opening metrics Parquet in {}", seed_dir.display()))?;
 
+    #[allow(clippy::cast_possible_truncation)]
+    let mut all_timings: Vec<TickTimings> = Vec::with_capacity(ticks as usize);
+
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(&state, content, &mut next_command_id);
-        sim_core::tick(&mut state, &commands, content, &mut rng, EventLevel::Normal);
+        let mut timings = TickTimings::default();
+        sim_core::tick(
+            &mut state,
+            &commands,
+            content,
+            &mut rng,
+            EventLevel::Normal,
+            Some(&mut timings),
+        );
+        all_timings.push(timings);
 
         if state.meta.tick % metrics_every == 0 {
             let snapshot = sim_core::compute_metrics(&state, content);
@@ -103,6 +115,8 @@ pub fn run_seed(
         0.0
     };
 
+    let timing_stats = compute_timing_stats(&all_timings);
+
     write_run_result(
         seed_dir,
         &run_id,
@@ -113,6 +127,7 @@ pub fn run_seed(
         wall_time_ms,
         sim_ticks_per_second,
         &final_snapshot,
+        &timing_stats,
     )?;
 
     Ok(SeedResult {
@@ -134,6 +149,7 @@ fn write_run_result(
     wall_time_ms: u64,
     sim_ticks_per_second: f64,
     final_snapshot: &MetricsSnapshot,
+    timing_stats: &run_result::TimingStats,
 ) -> Result<()> {
     let (collapse_occurred, collapse_reason) = run_result::detect_collapse(final_snapshot);
 
@@ -166,11 +182,28 @@ fn write_run_result(
         alerts_path: None,
         events_path: None,
         error_message: None,
+        timing_stats: Some(timing_stats.clone()),
     };
 
     result
         .write_atomic(&seed_dir.join("run_result.json"))
         .context("writing run_result.json")
+}
+
+fn compute_timing_stats(all_timings: &[TickTimings]) -> run_result::TimingStats {
+    let stats = sim_core::compute_step_stats(all_timings);
+    run_result::TimingStats {
+        steps: stats
+            .into_iter()
+            .map(|s| run_result::StepTimingEntry {
+                name: s.name,
+                mean_us: s.mean_us,
+                p50_us: s.p50_us,
+                p95_us: s.p95_us,
+                max_us: s.max_us,
+            })
+            .collect(),
+    }
 }
 
 #[cfg(test)]
@@ -213,6 +246,19 @@ mod tests {
         assert_eq!(parsed["run_status"], "completed");
         assert_eq!(parsed["seed"], 42);
         assert!(parsed["summary_metrics"].is_object());
+
+        // Verify timing_stats are present with 14 steps
+        let timing_stats = &parsed["timing_stats"];
+        assert!(timing_stats.is_object(), "timing_stats should be present");
+        let steps = timing_stats["steps"].as_array().unwrap();
+        assert_eq!(steps.len(), 14, "should have 14 step timing entries");
+        // Verify first step has expected fields
+        let first = &steps[0];
+        assert_eq!(first["name"], "apply_commands");
+        assert!(first["mean_us"].is_f64());
+        assert!(first["p50_us"].is_f64());
+        assert!(first["p95_us"].is_f64());
+        assert!(first["max_us"].is_f64());
     }
 
     #[test]

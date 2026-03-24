@@ -75,7 +75,14 @@ fn full_research_lifecycle() {
 
     // Run enough ticks for labs to accumulate points and research to roll
     for _ in 0..120 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     // Tech should be unlocked (low difficulty, lots of data)
@@ -145,7 +152,14 @@ fn research_lifecycle_no_data_means_no_unlock() {
     let tech_id = TechId("tech_deep_scan_v1".to_string());
 
     for _ in 0..120 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     // Tech should NOT be unlocked (no data, lab starved)

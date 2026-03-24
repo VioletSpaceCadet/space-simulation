@@ -8,7 +8,7 @@ publish = false
 workspace = true
 
 [dependencies]
-sim_core = { path = "../sim_core" }
+sim_core = { path = "../sim_core", features = ["instrumentation"] }
 sim_control = { path = "../sim_control" }
 sim_world = { path = "../sim_world" }
 serde = { version = "1", features = ["derive"] }

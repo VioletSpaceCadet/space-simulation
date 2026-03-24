@@ -7,12 +7,33 @@ fn test_mine_emits_ore_mined_event() {
     let mut rng = make_rng();
 
     let cmd = mine_command(&state, &asteroid_id, &content);
-    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
     let completion_tick = state.meta.tick + 9;
     while state.meta.tick < completion_tick {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         events
@@ -32,10 +53,24 @@ fn test_mine_adds_ore_to_ship_inventory() {
     assert!(state.ships[&ship_id].inventory.is_empty());
 
     let cmd = mine_command(&state, &asteroid_id, &content);
-    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
     let completion_tick = state.meta.tick + 10;
     while state.meta.tick <= completion_tick {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     let inv = &state.ships[&ship_id].inventory;
@@ -58,10 +93,24 @@ fn test_mine_reduces_asteroid_mass() {
 
     let original_mass = state.asteroids[&asteroid_id].mass_kg;
     let cmd = mine_command(&state, &asteroid_id, &content);
-    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
     let completion_tick = state.meta.tick + 10;
     while state.meta.tick <= completion_tick {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     let remaining = state.asteroids.get(&asteroid_id).map_or(0.0, |a| a.mass_kg);
@@ -79,9 +128,23 @@ fn test_mine_removes_depleted_asteroid() {
     let mut rng = make_rng();
 
     let cmd = mine_command(&state, &asteroid_id, &content);
-    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
     for _ in 0..11 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     assert!(

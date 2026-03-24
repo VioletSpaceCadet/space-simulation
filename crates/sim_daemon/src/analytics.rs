@@ -15,6 +15,21 @@ pub struct AdvisorDigest {
     pub rates: Rates,
     pub bottleneck: Bottleneck,
     pub alerts: Vec<AlertDetail>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub perf: Option<PerfSummary>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PerfSummary {
+    pub sample_count: usize,
+    pub steps: Vec<PerfStepEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PerfStepEntry {
+    pub name: String,
+    pub mean_us: f64,
+    pub p95_us: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -229,8 +244,15 @@ fn detect_bottleneck(history: &VecDeque<MetricsSnapshot>) -> Bottleneck {
 pub fn compute_digest(
     history: &VecDeque<MetricsSnapshot>,
     alerts: Vec<AlertDetail>,
+    timings: &VecDeque<sim_core::TickTimings>,
 ) -> Option<AdvisorDigest> {
     let latest = history.back()?;
+
+    let perf = if timings.is_empty() {
+        None
+    } else {
+        Some(compute_perf_summary(timings))
+    };
 
     Some(AdvisorDigest {
         tick: latest.tick,
@@ -239,7 +261,24 @@ pub fn compute_digest(
         rates: compute_rates(history),
         bottleneck: detect_bottleneck(history),
         alerts,
+        perf,
     })
+}
+
+fn compute_perf_summary(timings: &VecDeque<sim_core::TickTimings>) -> PerfSummary {
+    let slice: Vec<_> = timings.iter().cloned().collect();
+    let stats = sim_core::compute_step_stats(&slice);
+    PerfSummary {
+        sample_count: timings.len(),
+        steps: stats
+            .into_iter()
+            .map(|s| PerfStepEntry {
+                name: s.name,
+                mean_us: s.mean_us,
+                p95_us: s.p95_us,
+            })
+            .collect(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +341,7 @@ mod tests {
     #[test]
     fn empty_history_returns_none() {
         let history = VecDeque::new();
-        assert!(compute_digest(&history, vec![]).is_none());
+        assert!(compute_digest(&history, vec![], &VecDeque::new()).is_none());
     }
 
     #[test]
@@ -310,7 +349,7 @@ mod tests {
         let mut history = VecDeque::new();
         history.push_back(empty_snapshot(1));
 
-        let digest = compute_digest(&history, vec![]).unwrap();
+        let digest = compute_digest(&history, vec![], &VecDeque::new()).unwrap();
         for trend in &digest.trends {
             assert_eq!(
                 trend.direction,

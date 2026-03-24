@@ -124,6 +124,7 @@ async fn main() -> Result<()> {
                     metrics_history: VecDeque::new(),
                     metrics_writer: setup.metrics_writer,
                     alert_engine,
+                    timings_history: VecDeque::new(),
                 })),
                 command_queue: Arc::new(Mutex::new(Vec::new())),
                 event_tx: event_tx.clone(),
@@ -187,6 +188,7 @@ mod tests {
                 metrics_history: VecDeque::new(),
                 metrics_writer: None,
                 alert_engine: None,
+                timings_history: VecDeque::new(),
             })),
             command_queue: Arc::new(Mutex::new(Vec::new())),
             event_tx,
@@ -840,6 +842,7 @@ mod tests {
             metrics_history: VecDeque::new(),
             metrics_writer: None,
             alert_engine: None,
+            timings_history: VecDeque::new(),
         };
 
         let total_pushes = MAX_METRICS_HISTORY + 10;
@@ -906,5 +909,57 @@ mod tests {
             tech["domain_requirements"].is_object(),
             "tech should have domain_requirements"
         );
+    }
+
+    #[tokio::test]
+    async fn test_perf_returns_empty_on_no_timings() {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/perf")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["sample_count"], 0);
+        assert!(json["steps"].as_array().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_perf_returns_stats_after_ticks() {
+        let state = make_test_state();
+        // Push some timings into the buffer.
+        {
+            let mut sim = state.sim.lock();
+            for _ in 0..10 {
+                sim.push_timings(sim_core::TickTimings::default());
+            }
+        }
+        let app = make_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/perf")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["sample_count"], 10);
+        let steps = json["steps"].as_array().unwrap();
+        assert_eq!(steps.len(), 14, "should have 14 step entries");
+        assert_eq!(steps[0]["name"], "apply_commands");
+        assert!(steps[0]["mean_us"].is_f64());
+        assert!(steps[0]["p50_us"].is_f64());
+        assert!(steps[0]["p95_us"].is_f64());
+        assert!(steps[0]["max_us"].is_f64());
     }
 }

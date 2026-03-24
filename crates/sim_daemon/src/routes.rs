@@ -53,6 +53,7 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> anyhow::Resu
         .route("/api/v1/pricing", get(pricing_handler))
         .route("/api/v1/spatial-config", get(spatial_config_handler))
         .route("/api/v1/content", get(content_handler))
+        .route("/api/v1/perf", get(perf_handler))
         .route("/api/v1/speed", post(speed_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -200,7 +201,9 @@ async fn advisor_digest_handler(
         .unwrap_or_default();
 
     // Safe to unwrap: we checked is_empty() above, so history.back() will return Some.
-    let digest = super::analytics::compute_digest(&sim.metrics_history, alert_details).unwrap();
+    let digest =
+        super::analytics::compute_digest(&sim.metrics_history, alert_details, &sim.timings_history)
+            .unwrap();
     drop(sim);
 
     match serde_json::to_string(&digest) {
@@ -218,6 +221,35 @@ async fn advisor_digest_handler(
             )
         }
     }
+}
+
+async fn perf_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
+    // Clone timings and drop lock before computing stats to avoid tick stutter.
+    let timings_snapshot: Vec<sim_core::TickTimings> = {
+        let sim = app_state.sim.lock();
+        sim.timings_history.iter().cloned().collect()
+    };
+
+    let sample_count = timings_snapshot.len();
+    let stats = sim_core::compute_step_stats(&timings_snapshot);
+
+    let steps: Vec<serde_json::Value> = stats
+        .into_iter()
+        .map(|s| {
+            serde_json::json!({
+                "name": s.name,
+                "mean_us": s.mean_us,
+                "p50_us": s.p50_us,
+                "p95_us": s.p95_us,
+                "max_us": s.max_us,
+            })
+        })
+        .collect();
+
+    Json(serde_json::json!({
+        "sample_count": sample_count,
+        "steps": steps,
+    }))
 }
 
 pub async fn pause_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
@@ -479,6 +511,7 @@ mod tests {
             metrics_history: VecDeque::new(),
             metrics_writer: None,
             alert_engine: None,
+            timings_history: VecDeque::new(),
         }));
         AppState {
             sim,

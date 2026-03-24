@@ -107,8 +107,22 @@ fn test_heating_produces_h2o_and_slag() {
     let mut state = state_with_heating(&content);
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
@@ -134,8 +148,22 @@ fn test_heating_h2o_yield_matches_fraction() {
     let mut state = state_with_heating(&content);
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
@@ -163,8 +191,22 @@ fn test_heating_accumulates_wear() {
     let mut state = state_with_heating(&content);
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
@@ -214,8 +256,22 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = &state.stations[&station_id];
 

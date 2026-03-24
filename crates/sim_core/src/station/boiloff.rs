@@ -169,7 +169,14 @@ mod tests {
         let station_id = crate::StationId("station_earth_orbit".to_string());
         let initial_kg = 10_000.0_f32;
 
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
 
         let remaining: f32 = state.stations[&station_id]
             .inventory
@@ -206,7 +213,14 @@ mod tests {
         });
 
         let mut rng = make_rng();
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
 
         let remaining: f32 = state.stations[&station_id]
             .inventory
@@ -231,7 +245,14 @@ mod tests {
 
         // Run several ticks — tiny amount should be removed
         for _ in 0..100 {
-            tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+            tick(
+                &mut state,
+                &[],
+                &content,
+                &mut rng,
+                EventLevel::Normal,
+                None,
+            );
         }
 
         let station_id = crate::StationId("station_earth_orbit".to_string());
@@ -256,7 +277,14 @@ mod tests {
         let mut state = state_with_lh2(&content, 10_000.0);
         let mut rng = make_rng();
 
-        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let events = tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
 
         let boiloff_events: Vec<_> = events
             .iter()
@@ -289,7 +317,14 @@ mod tests {
         });
 
         let mut rng = make_rng();
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
 
         let lh2_remaining: f32 = state.stations[&station_id]
             .inventory
