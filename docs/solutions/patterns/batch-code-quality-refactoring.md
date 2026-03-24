@@ -57,7 +57,40 @@ Every PR in this batch got a pr-reviewer dispatch. Findings that prevented bugs:
 - **VIO-416**: Test used `0.1 + 0.2 == 0.3` which doesn't actually exceed `f64::EPSILON` — would have passed with the old broken code. Fixed to use `0.3_f32 as f64` vs `0.3_f64` which genuinely demonstrates the f32→f64 conversion bug.
 - **VIO-406**: Derived fields (`skip_deserializing`) would silently accept overrides that have no effect. Added explicit rejection.
 
-## Metrics from this batch
+## Batch 2 Learnings (2026-03-24)
+
+Tickets: VIO-358, VIO-410, VIO-411, VIO-413, VIO-417, VIO-418, VIO-419
+
+### File reorganization breaks CI scripts with hardcoded paths
+
+When splitting `types.rs` (2,195 lines) into `types/` submodules (VIO-411), `scripts/ci_event_sync.sh` broke because it hardcoded `crates/sim_core/src/types.rs`. After any file move or split, **grep the repo for hardcoded paths to the moved file** — especially CI scripts, linters, and documentation.
+
+### Rust module split pattern for backward compatibility
+
+Convert `foo.rs` to `foo/mod.rs` + submodules:
+1. `mkdir foo/ && git mv foo.rs foo/mod.rs`
+2. Create submodule files (`foo/state.rs`, `foo/content.rs`, etc.)
+3. In `mod.rs`: declare `mod submod;` + `pub use submod::*;` for each
+4. Submodules use `crate::TypeName` for cross-references (works because lib.rs re-exports everything)
+5. Serde `#[serde(default = "fn_name")]` functions must stay in the same file as the struct — they resolve relative to the defining module
+
+**Gotcha:** `use super::*` from a submodule imports types re-exported from sibling submodules, which can conflict with local definitions. Use specific `crate::` imports instead.
+
+### Python scripts for mechanical Rust refactoring bypass hooks
+
+Using a Python script to transform 125 `.unwrap()` → `?` across 27 test functions (VIO-419) was efficient, but the after-edit hook (`cargo fmt` + `cargo test`) only runs on Edit/Write tool calls. **Always run `cargo fmt` manually after Python-scripted transformations.**
+
+### Curating explicit exports requires workspace-wide analysis
+
+Replacing `pub use types::*` with explicit re-exports (VIO-417) required checking all 5 downstream crates. Nearly all types were used — the explicit list was 110 items. Use `rust_analyzer_references` or grep `use crate_name::` across the workspace to build the list. The value is documentation (making the API surface intentional), not reduction.
+
+### HashMap serialization order is non-deterministic
+
+Determinism canary tests (VIO-413) initially compared serialized state as strings, which failed because `HashMap` key order varies between runs. Fix: use `serde_json::to_value()` for order-independent comparison, not string comparison.
+
+## Metrics
+
+### Batch 1 (2026-03-23)
 
 | Metric | Value |
 |--------|-------|
@@ -68,3 +101,15 @@ Every PR in this batch got a pr-reviewer dispatch. Findings that prevented bugs:
 | Safety guards added | 7 (float-to-int clamps) |
 | Bugs fixed | 1 (f64::EPSILON) |
 | Review findings fixed | 3 (all should-fix level) |
+
+### Batch 2 (2026-03-24)
+
+| Metric | Value |
+|--------|-------|
+| Tickets completed | 7 (1 closed as dup) |
+| PRs merged | 6 |
+| Largest file split | types.rs 2,195 → 7 files (mod.rs ~190, state ~450, content ~560, events ~280, commands ~90, inventory ~180, constants ~320) |
+| Constants extracted | 7 (previously hardcoded in production code) |
+| Test unwraps removed | 125 → 0 in sim_daemon |
+| Clippy suppressions removed | 2 (too_many_arguments) |
+| Review findings fixed | 4 (CI path, import consistency, docstring accuracy, debug format) |
