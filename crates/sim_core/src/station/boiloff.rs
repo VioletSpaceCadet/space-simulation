@@ -2,23 +2,26 @@ use crate::{
     boiloff_rate_per_tick, Event, EventEnvelope, GameContent, GameState, InventoryItem, StationId,
 };
 
-use super::MIN_MEANINGFUL_KG;
-
 /// Piecewise linear temperature multiplier for boiloff.
 /// - At or below boiling point: 0.1x (minimal loss)
-/// - Boiling point → ambient (293K): linear 0.1x → 1.0x
-/// - Ambient → ambient+100K: linear 1.0x → 3.0x
-/// - Above ambient+100K: clamped at 3.0x
-fn boiloff_temp_multiplier(temp_mk: u32, boiling_point_mk: u32) -> f64 {
-    let t_amb: u32 = 293_000;
-    let t_hot: u32 = t_amb + 100_000;
+/// - Boiling point → ambient: linear 0.1x → 1.0x
+/// - Ambient → ambient + `hot_offset`: linear 1.0x → 3.0x
+/// - Above ambient + `hot_offset`: clamped at 3.0x
+fn boiloff_temp_multiplier(
+    temp_mk: u32,
+    boiling_point_mk: u32,
+    ambient_mk: u32,
+    hot_offset_mk: u32,
+) -> f64 {
+    let t_amb = ambient_mk;
+    let t_hot = t_amb + hot_offset_mk;
     if temp_mk <= boiling_point_mk {
         0.1
     } else if temp_mk <= t_amb {
         let frac = f64::from(temp_mk - boiling_point_mk) / f64::from(t_amb - boiling_point_mk);
         0.1 + 0.9 * frac
     } else if temp_mk <= t_hot {
-        let frac = f64::from(temp_mk - t_amb) / 100_000.0;
+        let frac = f64::from(temp_mk - t_amb) / f64::from(hot_offset_mk);
         1.0 + 2.0 * frac
     } else {
         3.0
@@ -67,21 +70,27 @@ pub(super) fn apply_boiloff(
             thermal.as_ref(),
             element_def.and_then(|e| e.boiling_point_mk),
         ) {
-            (Some(mat_thermal), Some(bp_mk)) => boiloff_temp_multiplier(mat_thermal.temp_mk, bp_mk),
+            (Some(mat_thermal), Some(bp_mk)) => boiloff_temp_multiplier(
+                mat_thermal.temp_mk,
+                bp_mk,
+                content.constants.thermal_sink_temp_mk,
+                content.constants.boiloff_hot_offset_mk,
+            ),
             _ => 1.0,
         };
 
         #[allow(clippy::cast_possible_truncation)]
         let loss = ((f64::from(*kg) * base_rate * multiplier) as f32).min(*kg);
-        if loss > MIN_MEANINGFUL_KG {
+        if loss > content.constants.min_meaningful_kg {
             *kg -= loss;
             losses.push((element.clone(), loss));
         }
     }
 
     // Remove material items below threshold
+    let min_kg = content.constants.min_meaningful_kg;
     station.inventory.retain(|item| match item {
-        InventoryItem::Material { kg, .. } => *kg >= MIN_MEANINGFUL_KG,
+        InventoryItem::Material { kg, .. } => *kg >= min_kg,
         _ => true,
     });
 
@@ -311,19 +320,21 @@ mod tests {
 
     #[test]
     fn test_temp_multiplier_piecewise() {
+        let amb = 293_000;
+        let hot_off = 100_000;
         // At boiling point: 0.1x
-        assert!((boiloff_temp_multiplier(20_300, 20_300) - 0.1).abs() < 0.001);
+        assert!((boiloff_temp_multiplier(20_300, 20_300, amb, hot_off) - 0.1).abs() < 0.001);
         // Below boiling point: 0.1x
-        assert!((boiloff_temp_multiplier(10_000, 20_300) - 0.1).abs() < 0.001);
+        assert!((boiloff_temp_multiplier(10_000, 20_300, amb, hot_off) - 0.1).abs() < 0.001);
         // At ambient (293K): 1.0x
-        assert!((boiloff_temp_multiplier(293_000, 20_300) - 1.0).abs() < 0.01);
+        assert!((boiloff_temp_multiplier(293_000, 20_300, amb, hot_off) - 1.0).abs() < 0.01);
         // At ambient+100K (393K): 3.0x
-        assert!((boiloff_temp_multiplier(393_000, 20_300) - 3.0).abs() < 0.01);
+        assert!((boiloff_temp_multiplier(393_000, 20_300, amb, hot_off) - 3.0).abs() < 0.01);
         // Above ambient+100K: clamped at 3.0x
-        assert!((boiloff_temp_multiplier(500_000, 20_300) - 3.0).abs() < 0.001);
+        assert!((boiloff_temp_multiplier(500_000, 20_300, amb, hot_off) - 3.0).abs() < 0.001);
         // Midway between boiling and ambient: ~0.55x
         let midpoint = (20_300 + 293_000) / 2;
-        let mid_val = boiloff_temp_multiplier(midpoint, 20_300);
+        let mid_val = boiloff_temp_multiplier(midpoint, 20_300, amb, hot_off);
         assert!(mid_val > 0.4 && mid_val < 0.7, "midpoint value: {mid_val}");
     }
 }

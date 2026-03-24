@@ -1,4 +1,3 @@
-use super::MIN_MEANINGFUL_KG;
 use crate::tasks::{ship_construction_enabled, ship_construction_tech_id};
 use crate::{
     Event, EventEnvelope, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
@@ -333,6 +332,7 @@ fn resolve_assembler_run(
     events: &mut Vec<EventEnvelope>,
 ) {
     let current_tick = state.meta.tick;
+    let min_kg = content.constants.min_meaningful_kg;
 
     // Consume inputs
     let mut consumed_element = String::new();
@@ -362,10 +362,10 @@ fn resolve_assembler_run(
                     }
                     // Remove empty material lots
                     station.inventory.retain(
-                        |i| !matches!(i, InventoryItem::Material { kg, .. } if *kg < MIN_MEANINGFUL_KG),
+                        |i| !matches!(i, InventoryItem::Material { kg, .. } if *kg < min_kg),
                     );
                 }
-                if consumed_kg >= MIN_MEANINGFUL_KG {
+                if consumed_kg >= min_kg {
                     consumed_any = true;
                 }
             }

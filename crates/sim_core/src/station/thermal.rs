@@ -8,10 +8,6 @@ use std::collections::BTreeMap;
 
 use crate::{thermal, EventEnvelope, GameContent, GameState, OverheatZone, StationId};
 
-/// Maximum absolute temperature in milli-Kelvin (10 000 K).
-/// Hard ceiling to prevent unbounded growth from numerical errors.
-const T_MAX_ABSOLUTE_MK: u32 = 10_000_000;
-
 /// Tick the thermal system for a single station.
 ///
 /// For every module that has a `ThermalDef`, apply passive cooling toward the
@@ -193,7 +189,7 @@ fn apply_idle_heat(
         );
         #[allow(clippy::cast_sign_loss)] // .max(0) guarantees non-negative
         let new_temp = thermal.temp_mk.saturating_add(delta_mk.max(0) as u32);
-        thermal.temp_mk = new_temp.min(T_MAX_ABSOLUTE_MK);
+        thermal.temp_mk = new_temp.min(content.constants.t_max_absolute_mk);
     }
 }
 
@@ -251,14 +247,14 @@ fn apply_passive_cooling(
         "passive cooling delta must be <= 0, got {delta_mk}"
     );
 
-    // Apply delta, clamping to [sink_temp, T_MAX_ABSOLUTE].
+    // Apply delta, clamping to [sink_temp, t_max_absolute_mk].
     let new_temp = if delta_mk < 0 {
         current_temp_mk.saturating_sub(delta_mk.unsigned_abs())
     } else {
         #[allow(clippy::cast_sign_loss)] // guarded by delta_mk >= 0 check
         current_temp_mk.saturating_add(delta_mk.cast_unsigned())
     };
-    let clamped_temp = new_temp.clamp(sink_temp_mk, T_MAX_ABSOLUTE_MK);
+    let clamped_temp = new_temp.clamp(sink_temp_mk, content.constants.t_max_absolute_mk);
 
     // Write the updated temperature.
     let Some(station) = state.stations.get_mut(station_id) else {
@@ -314,7 +310,7 @@ fn apply_radiator_cooling(
         #[allow(clippy::cast_sign_loss)]
         current_temp_mk.saturating_add(delta_mk.cast_unsigned())
     };
-    let clamped_temp = new_temp.clamp(sink_temp_mk, T_MAX_ABSOLUTE_MK);
+    let clamped_temp = new_temp.clamp(sink_temp_mk, content.constants.t_max_absolute_mk);
 
     let Some(station) = state.stations.get_mut(station_id) else {
         return;

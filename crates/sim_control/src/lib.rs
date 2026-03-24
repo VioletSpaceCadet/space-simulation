@@ -932,7 +932,7 @@ mod tests {
 
         // Set high balance and advance past trade unlock
         state.balance = 10_000_000.0;
-        state.meta.tick = sim_core::trade_unlock_tick(content.constants.minutes_per_tick);
+        state.meta.tick = sim_core::trade_unlock_tick(&content.constants);
 
         (content, state)
     }

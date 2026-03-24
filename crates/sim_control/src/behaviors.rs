@@ -8,9 +8,6 @@ use sim_core::{
 
 pub(crate) const AUTOPILOT_OWNER: &str = "principal_autopilot";
 
-/// Autopilot won't spend more than this fraction of balance on a single thruster import.
-const AUTOPILOT_BUDGET_CAP_FRACTION: f64 = 0.05;
-
 /// A single autopilot behavior that generates commands for one concern.
 #[allow(dead_code)]
 pub(crate) trait AutopilotBehavior: Send {
@@ -459,7 +456,7 @@ impl AutopilotBehavior for ThrusterImport {
         let mut commands = Vec::new();
 
         // Gate 1: Trade unlock
-        if state.meta.tick < sim_core::trade_unlock_tick(content.constants.minutes_per_tick) {
+        if state.meta.tick < sim_core::trade_unlock_tick(&content.constants) {
             return commands;
         }
 
@@ -539,7 +536,7 @@ impl AutopilotBehavior for ThrusterImport {
             else {
                 continue;
             };
-            if cost > state.balance * AUTOPILOT_BUDGET_CAP_FRACTION {
+            if cost > state.balance * content.constants.autopilot_budget_cap_fraction {
                 continue;
             }
 
@@ -617,7 +614,7 @@ impl AutopilotBehavior for MaterialExport {
         let mut commands = Vec::new();
 
         // Gate: Trade unlock
-        if state.meta.tick < sim_core::trade_unlock_tick(content.constants.minutes_per_tick) {
+        if state.meta.tick < sim_core::trade_unlock_tick(&content.constants) {
             return commands;
         }
 
@@ -688,7 +685,7 @@ impl AutopilotBehavior for PropellantPipeline {
                 continue;
             }
 
-            if lh2_kg > threshold * 2.0 {
+            if lh2_kg > threshold * content.constants.autopilot_lh2_abundant_multiplier {
                 // LH2 abundant — disable electrolysis to save power
                 for module in &station.modules {
                     if module.def_id == "module_electrolysis_unit"
