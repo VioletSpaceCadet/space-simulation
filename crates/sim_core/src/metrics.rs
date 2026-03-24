@@ -1838,4 +1838,37 @@ mod tests {
         assert!(snapshot.get_field_f64("heat_wear_multiplier_avg").is_some());
         assert!(snapshot.get_field_f64("nonexistent_field").is_none());
     }
+
+    #[test]
+    fn get_field_f64_resolves_dynamic_module_metrics() {
+        let mut snapshot = compute_metrics(&empty_state(), &empty_content());
+        snapshot.per_module_metrics.insert(
+            "processor".to_string(),
+            ModuleStatusMetrics {
+                active: 3,
+                stalled: 1,
+                starved: 2,
+            },
+        );
+        // Normal resolution
+        assert_eq!(snapshot.get_field_f64("processor_active"), Some(3.0));
+        assert_eq!(snapshot.get_field_f64("processor_stalled"), Some(1.0));
+        assert_eq!(snapshot.get_field_f64("processor_starved"), Some(2.0));
+
+        // Underscore-containing type name (e.g., sensor_array)
+        snapshot.per_module_metrics.insert(
+            "sensor_array".to_string(),
+            ModuleStatusMetrics {
+                active: 5,
+                stalled: 0,
+                starved: 0,
+            },
+        );
+        assert_eq!(snapshot.get_field_f64("sensor_array_active"), Some(5.0));
+
+        // Unknown suffix
+        assert!(snapshot.get_field_f64("processor_unknown").is_none());
+        // Nonexistent type
+        assert!(snapshot.get_field_f64("nonexistent_active").is_none());
+    }
 }

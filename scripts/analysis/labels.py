@@ -236,7 +236,7 @@ def bottleneck_timeline(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation
     1. StorageFull: station_storage_used_pct > 0.95
     2. WearCritical: max_module_wear > 0.8
     3. SlagBackpressure: slag > 100 AND slag/(material+1) > 0.5
-    4. OreSupply: refinery_starved > refinery_active
+    4. OreSupply: processor_starved > processor_active
     5. FleetIdle: fleet_idle > fleet_total/2
     6. Healthy: default
 

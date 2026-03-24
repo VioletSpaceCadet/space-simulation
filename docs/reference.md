@@ -131,7 +131,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 
 **Events:** `AssemblerRan`, `AssemblerCapped`, `AssemblerUncapped`.
 
-**Metrics:** `assembler_active_count`, `assembler_stalled_count` (MetricsSnapshot v3).
+**Metrics:** `assembler_active`, `assembler_stalled` (via `per_module_metrics` BTreeMap, MetricsSnapshot v11).
 
 ## Sensor Array
 
@@ -144,7 +144,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 **Storage enforcement:** Modules and ships respect station cargo capacity.
 - **Processor stall:** Before running, a processor estimates its output volume. If the output would exceed the station's remaining capacity, the processor sets `stalled = true` and emits `ModuleStalled { station_id, module_id, shortfall_m3 }`. On the next tick where space is available, it clears the stall and emits `ModuleResumed { station_id, module_id }`. Stall events are emitted only on transition (not every tick).
 - **Deposit blocking:** When a ship with a `Deposit` task arrives and there is not enough station capacity for its cargo, the task sets `blocked = true` and emits `DepositBlocked { ship_id, station_id, shortfall_m3 }`. If partial space is available, a partial deposit occurs (FIFO by inventory order). When full space opens, the remaining cargo is deposited and `DepositUnblocked { ship_id, station_id }` is emitted.
-- **Metric:** `refinery_stalled_count` — number of processor modules currently in `stalled = true` state.
+- **Metric:** `processor_stalled` (via `per_module_metrics`) — number of processor modules currently in `stalled = true` state.
 
 ## Economy & Trade
 
@@ -281,9 +281,9 @@ runs/<name>_<timestamp>/
     ...
 ```
 
-**Summary metrics:** `storage_saturation_pct`, `fleet_idle_pct`, `refinery_starved_count`, `techs_unlocked`, `avg_module_wear`, `repair_kits_remaining`, `export_revenue_total`, `export_count`. Each reports mean, min, max, stddev across seeds.
+**Summary metrics:** `storage_saturation_pct`, `fleet_idle_pct`, `processor_starved`, `techs_unlocked`, `avg_module_wear`, `repair_kits_remaining`, `export_revenue_total`, `export_count`. Each reports mean, min, max, stddev across seeds.
 
-**Collapse detection:** A seed is "collapsed" if the final snapshot has `refinery_starved_count > 0` AND `fleet_idle == fleet_total`.
+**Collapse detection:** A seed is "collapsed" if the final snapshot has `processor_starved > 0` AND `fleet_idle == fleet_total`.
 
 **Example scenario:** `scenarios/cargo_sweep.json` — 5 seeds × 10k ticks with storage capacity and wear threshold overrides.
 
