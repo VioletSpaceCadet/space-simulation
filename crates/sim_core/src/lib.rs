@@ -44,7 +44,7 @@ pub use types::{
 };
 // -- types: type aliases & constants --
 pub use types::{
-    CompositionVec, ElementId, ThermalGroupId, COMPONENT_REPAIR_KIT, COMPONENT_THRUSTER,
+    AHashMap, CompositionVec, ElementId, ThermalGroupId, COMPONENT_REPAIR_KIT, COMPONENT_THRUSTER,
     CURRENT_SCHEMA_VERSION, DEFAULT_AMBIENT_TEMP_MK, ELEMENT_FE, ELEMENT_ORE, ELEMENT_SLAG,
     TAG_IRON_RICH, TAG_VOLATILE_RICH,
 };

@@ -941,7 +941,7 @@ mod tests {
     use super::*;
     use crate::{
         test_fixtures::{base_content, test_position},
-        AsteroidId, AsteroidKnowledge, AsteroidState, Counters, DataKind, DomainProgress,
+        AHashMap, AsteroidId, AsteroidKnowledge, AsteroidState, Counters, DataKind, DomainProgress,
         GameState, HullId, LotId, MetaState, ModuleInstanceId, ModuleState, PrincipalId,
         ProcessorState, ResearchDomain, ResearchState, ShipId, ShipState, StationId, StationState,
         TaskState, TechId,
@@ -961,14 +961,14 @@ mod tests {
                 content_version: "test".to_string(),
             },
             scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::new(),
-            stations: HashMap::new(),
+            asteroids: AHashMap::default(),
+            ships: AHashMap::default(),
+            stations: AHashMap::default(),
             research: ResearchState {
                 unlocked: HashSet::new(),
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-                action_counts: HashMap::new(),
+                data_pool: AHashMap::default(),
+                evidence: AHashMap::default(),
+                action_counts: AHashMap::default(),
             },
             balance: 0.0,
             export_revenue_total: 0.0,
@@ -982,7 +982,7 @@ mod tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
-            body_cache: std::collections::HashMap::new(),
+            body_cache: AHashMap::default(),
         }
     }
 
@@ -1208,7 +1208,7 @@ mod tests {
     #[test]
     fn test_refinery_starved_detection() {
         let mut content = empty_content();
-        content.module_defs = HashMap::from([(
+        content.module_defs = [(
             "module_basic_iron_refinery".to_string(),
             crate::ModuleDef {
                 id: "module_basic_iron_refinery".to_string(),
@@ -1226,7 +1226,9 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
             },
-        )]);
+        )]
+        .into_iter()
+        .collect();
 
         let mut state = empty_state();
         // Station with 100kg ore but threshold is 500kg → starved
@@ -1380,7 +1382,7 @@ mod tests {
     #[test]
     fn test_refinery_stalled_metric() {
         let mut content = empty_content();
-        content.module_defs = HashMap::from([(
+        content.module_defs = [(
             "module_basic_iron_refinery".to_string(),
             crate::ModuleDef {
                 id: "module_basic_iron_refinery".to_string(),
@@ -1398,7 +1400,9 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
             },
-        )]);
+        )]
+        .into_iter()
+        .collect();
 
         let mut state = empty_state();
         let station = make_station(
@@ -1491,7 +1495,7 @@ mod tests {
     #[test]
     fn test_wear_metrics() {
         let mut content = empty_content();
-        content.module_defs = HashMap::from([(
+        content.module_defs = [(
             "module_basic_iron_refinery".to_string(),
             crate::ModuleDef {
                 id: "module_basic_iron_refinery".to_string(),
@@ -1509,7 +1513,9 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
             },
-        )]);
+        )]
+        .into_iter()
+        .collect();
 
         let mut state = empty_state();
         let station = make_station(

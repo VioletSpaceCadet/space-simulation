@@ -1527,6 +1527,7 @@ dependencies = [
 name = "sim_core"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "rand",
  "rand_chacha",
  "serde",

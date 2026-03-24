@@ -12,6 +12,7 @@ pub(super) fn tick_station_modules(
     station_id: &StationId,
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
+    scratch: &mut Vec<usize>,
 ) {
     let module_count = state
         .stations
@@ -19,19 +20,18 @@ pub(super) fn tick_station_modules(
         .map_or(0, |s| s.modules.len());
 
     // Collect processor module indices, sorted by priority (desc) then id (asc)
-    let mut processor_indices: Vec<usize> = (0..module_count)
-        .filter(|&module_index| {
-            state
-                .stations
-                .get(station_id)
-                .and_then(|s| s.modules.get(module_index))
-                .and_then(|m| content.module_defs.get(&m.def_id))
-                .is_some_and(|d| matches!(d.behavior, ModuleBehaviorDef::Processor(_)))
-        })
-        .collect();
+    scratch.clear();
+    scratch.extend((0..module_count).filter(|&module_index| {
+        state
+            .stations
+            .get(station_id)
+            .and_then(|s| s.modules.get(module_index))
+            .and_then(|m| content.module_defs.get(&m.def_id))
+            .is_some_and(|d| matches!(d.behavior, ModuleBehaviorDef::Processor(_)))
+    }));
 
     if let Some(station) = state.stations.get(station_id) {
-        processor_indices.sort_by(|&a, &b| {
+        scratch.sort_by(|&a, &b| {
             let ma = &station.modules[a];
             let mb = &station.modules[b];
             mb.manufacturing_priority
@@ -40,7 +40,7 @@ pub(super) fn tick_station_modules(
         });
     }
 
-    for module_idx in processor_indices {
+    for &module_idx in scratch.iter() {
         let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
             continue;
         };
@@ -709,6 +709,7 @@ fn slag_composition_from_avg(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::AHashMap;
     use crate::{AsteroidId, InventoryItem, LotId};
 
     #[test]
@@ -843,9 +844,9 @@ mod tests {
                 content_version: content.content_version.clone(),
             },
             scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::new(),
-            stations: HashMap::from([(
+            asteroids: AHashMap::default(),
+            ships: AHashMap::default(),
+            stations: [(
                 station_id.clone(),
                 StationState {
                     id: station_id,
@@ -884,12 +885,14 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
-            )]),
+            )]
+            .into_iter()
+            .collect(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(),
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-                action_counts: HashMap::new(),
+                data_pool: AHashMap::default(),
+                evidence: AHashMap::default(),
+                action_counts: AHashMap::default(),
             },
             balance: 0.0,
             export_revenue_total: 0.0,
@@ -903,7 +906,7 @@ mod tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
-            body_cache: std::collections::HashMap::new(),
+            body_cache: AHashMap::default(),
         }
     }
 
@@ -914,7 +917,13 @@ mod tests {
         let station_id = StationId("station_test".to_string());
         let mut events = Vec::new();
 
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // Should have emitted ProcessorTooCold
         assert!(
@@ -951,7 +960,13 @@ mod tests {
         let station_id = StationId("station_test".to_string());
         let mut events = Vec::new();
 
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // Should have run
         let refinery_event = events.iter().find_map(|e| {
@@ -989,7 +1004,13 @@ mod tests {
         let station_id = StationId("station_test".to_string());
         let mut events = Vec::new();
 
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         let material_kg = events.iter().find_map(|e| {
             if let Event::RefineryRan {
@@ -1019,7 +1040,13 @@ mod tests {
         let station_id = StationId("station_test".to_string());
         let mut events = Vec::new();
 
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         let quality = events.iter().find_map(|e| {
             if let Event::RefineryRan {
@@ -1047,7 +1074,13 @@ mod tests {
         let station_id = StationId("station_test".to_string());
         let mut events = Vec::new();
 
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // Verify temp increased (heat_per_run_j = 50_000, capacity = 500 J/K → +100K = +100_000 mK)
         let temp_after = state.stations.get(&station_id).unwrap().modules[0]
@@ -1079,7 +1112,13 @@ mod tests {
         let station_id = StationId("station_test".to_string());
         let mut events = Vec::new();
 
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         assert!(
             events
@@ -1100,7 +1139,13 @@ mod tests {
         state.stations.get_mut(&station_id).unwrap().modules[0].thermal = None;
 
         let mut events = Vec::new();
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         assert!(
             events
@@ -1168,9 +1213,9 @@ mod tests {
                 content_version: content.content_version.clone(),
             },
             scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::new(),
-            stations: HashMap::from([(
+            asteroids: AHashMap::default(),
+            ships: AHashMap::default(),
+            stations: [(
                 station_id.clone(),
                 crate::StationState {
                     id: station_id.clone(),
@@ -1225,12 +1270,14 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
-            )]),
+            )]
+            .into_iter()
+            .collect(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(),
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-                action_counts: HashMap::new(),
+                data_pool: AHashMap::default(),
+                evidence: AHashMap::default(),
+                action_counts: AHashMap::default(),
             },
             balance: 0.0,
             export_revenue_total: 0.0,
@@ -1244,11 +1291,17 @@ mod tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
-            body_cache: std::collections::HashMap::new(),
+            body_cache: AHashMap::default(),
         };
 
         let mut events = Vec::new();
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // The high-priority processor (proc_bbb) should run first and consume the ore
         let ran_events: Vec<_> = events
@@ -1295,9 +1348,9 @@ mod tests {
                 content_version: content.content_version.clone(),
             },
             scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::new(),
-            stations: HashMap::from([(
+            asteroids: AHashMap::default(),
+            ships: AHashMap::default(),
+            stations: [(
                 station_id.clone(),
                 crate::StationState {
                     id: station_id.clone(),
@@ -1333,12 +1386,14 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
-            )]),
+            )]
+            .into_iter()
+            .collect(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(),
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-                action_counts: HashMap::new(),
+                data_pool: AHashMap::default(),
+                evidence: AHashMap::default(),
+                action_counts: AHashMap::default(),
             },
             balance: 0.0,
             export_revenue_total: 0.0,
@@ -1352,11 +1407,17 @@ mod tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
-            body_cache: std::collections::HashMap::new(),
+            body_cache: AHashMap::default(),
         };
 
         let mut events = Vec::new();
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // Should emit RecipeSelectionReset
         let reset_event = events.iter().find(|e| {
@@ -1451,9 +1512,9 @@ mod tests {
                 content_version: content.content_version.clone(),
             },
             scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::new(),
-            stations: HashMap::from([(
+            asteroids: AHashMap::default(),
+            ships: AHashMap::default(),
+            stations: [(
                 station_id.clone(),
                 crate::StationState {
                     id: station_id.clone(),
@@ -1488,12 +1549,14 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
-            )]),
+            )]
+            .into_iter()
+            .collect(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(), // tech NOT unlocked
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-                action_counts: HashMap::new(),
+                data_pool: AHashMap::default(),
+                evidence: AHashMap::default(),
+                action_counts: AHashMap::default(),
             },
             balance: 0.0,
             export_revenue_total: 0.0,
@@ -1507,11 +1570,17 @@ mod tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
-            body_cache: std::collections::HashMap::new(),
+            body_cache: AHashMap::default(),
         };
 
         let mut events = Vec::new();
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // Should NOT run
         let ran = events
@@ -1528,7 +1597,13 @@ mod tests {
         // Now unlock the tech and run again
         state.research.unlocked.insert(tech_id);
         let mut events2 = Vec::new();
-        tick_station_modules(&mut state, &station_id, &content, &mut events2);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events2,
+            &mut Vec::new(),
+        );
 
         let ran2 = events2
             .iter()
@@ -1592,9 +1667,9 @@ mod tests {
                 content_version: content.content_version.clone(),
             },
             scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::new(),
-            stations: HashMap::from([(
+            asteroids: AHashMap::default(),
+            ships: AHashMap::default(),
+            stations: [(
                 station_id.clone(),
                 crate::StationState {
                     id: station_id.clone(),
@@ -1629,12 +1704,14 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
-            )]),
+            )]
+            .into_iter()
+            .collect(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(),
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-                action_counts: HashMap::new(),
+                data_pool: AHashMap::default(),
+                evidence: AHashMap::default(),
+                action_counts: AHashMap::default(),
             },
             balance: 0.0,
             export_revenue_total: 0.0,
@@ -1648,11 +1725,17 @@ mod tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
-            body_cache: std::collections::HashMap::new(),
+            body_cache: AHashMap::default(),
         };
 
         let mut events = Vec::new();
-        tick_station_modules(&mut state, &station_id, &content, &mut events);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events,
+            &mut Vec::new(),
+        );
 
         // Should have run
         let ran = events
@@ -1692,7 +1775,13 @@ mod tests {
 
         // Run again — components should merge by quality
         let mut events2 = Vec::new();
-        tick_station_modules(&mut state, &station_id, &content, &mut events2);
+        tick_station_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut events2,
+            &mut Vec::new(),
+        );
 
         let station = state.stations.get(&station_id).unwrap();
         let ingot_count2: u32 = station

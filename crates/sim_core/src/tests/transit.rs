@@ -53,8 +53,8 @@ fn transit_moves_ship_and_starts_next_task() {
             position: pos_b.clone(),
             template_id: "tmpl_iron_rich".to_string(),
         }],
-        asteroids: HashMap::new(),
-        ships: HashMap::from([(
+        asteroids: AHashMap::default(),
+        ships: [(
             ship_id.clone(),
             ShipState {
                 id: ship_id.clone(),
@@ -70,8 +70,10 @@ fn transit_moves_ship_and_starts_next_task() {
                 propellant_kg: 0.0,
                 propellant_capacity_kg: 0.0,
             },
-        )]),
-        stations: HashMap::from([(
+        )]
+        .into_iter()
+        .collect(),
+        stations: [(
             station_id.clone(),
             StationState {
                 id: station_id,
@@ -84,12 +86,14 @@ fn transit_moves_ship_and_starts_next_task() {
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
-        )]),
+        )]
+        .into_iter()
+        .collect(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
-            data_pool: HashMap::new(),
-            evidence: HashMap::new(),
-            action_counts: HashMap::new(),
+            data_pool: AHashMap::default(),
+            evidence: AHashMap::default(),
+            action_counts: AHashMap::default(),
         },
         balance: 0.0,
         export_revenue_total: 0.0,
@@ -103,7 +107,7 @@ fn transit_moves_ship_and_starts_next_task() {
         },
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
-        body_cache: std::collections::HashMap::new(),
+        body_cache: AHashMap::default(),
     };
 
     let mut rng = ChaCha8Rng::seed_from_u64(0);
@@ -264,8 +268,8 @@ fn transit_generates_transit_data_with_diminishing_returns() {
             content_version: "test".to_string(),
         },
         scan_sites: vec![],
-        asteroids: HashMap::new(),
-        ships: HashMap::from([(
+        asteroids: AHashMap::default(),
+        ships: [(
             ship_id.clone(),
             ShipState {
                 id: ship_id.clone(),
@@ -281,8 +285,10 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 propellant_kg: 0.0,
                 propellant_capacity_kg: 0.0,
             },
-        )]),
-        stations: HashMap::from([(
+        )]
+        .into_iter()
+        .collect(),
+        stations: [(
             station_id.clone(),
             StationState {
                 id: station_id,
@@ -295,12 +301,14 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
-        )]),
+        )]
+        .into_iter()
+        .collect(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
-            data_pool: HashMap::new(),
-            evidence: HashMap::new(),
-            action_counts: HashMap::new(),
+            data_pool: AHashMap::default(),
+            evidence: AHashMap::default(),
+            action_counts: AHashMap::default(),
         },
         balance: 0.0,
         export_revenue_total: 0.0,
@@ -314,7 +322,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
         },
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
-        body_cache: std::collections::HashMap::new(),
+        body_cache: AHashMap::default(),
     };
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);

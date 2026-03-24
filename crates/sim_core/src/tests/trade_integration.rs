@@ -23,7 +23,7 @@ fn economy_content() -> GameContent {
     content.pricing = PricingTable {
         import_surcharge_per_kg: 100.0,
         export_surcharge_per_kg: 50.0,
-        items: HashMap::from([
+        items: [
             (
                 "Fe".to_string(),
                 PricingEntry {
@@ -51,7 +51,9 @@ fn economy_content() -> GameContent {
                     ..Default::default()
                 },
             ),
-        ]),
+        ]
+        .into_iter()
+        .collect(),
     };
 
     // Component definition for thrusters
@@ -102,7 +104,7 @@ fn economy_content() -> GameContent {
         tags: vec![],
     };
     let recipe_id = insert_recipe(&mut content, ship_recipe);
-    content.module_defs = HashMap::from([(
+    content.module_defs = [(
         "module_shipyard".to_string(),
         ModuleDef {
             id: "module_shipyard".to_string(),
@@ -121,7 +123,9 @@ fn economy_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
         },
-    )]);
+    )]
+    .into_iter()
+    .collect();
 
     content
 }

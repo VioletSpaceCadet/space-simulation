@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::{AsteroidTemplateDef, BodyId, OrbitalBodyDef};
+use crate::{AHashMap, AsteroidTemplateDef, BodyId, OrbitalBodyDef};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -255,8 +255,9 @@ impl EntityCache {
 /// Bodies with no parent (roots) get their position from `polar_to_cart(radius, angle)`.
 /// Children accumulate: `child_abs = parent_abs + polar_to_cart(child.radius, child.angle)`.
 /// All bodies start at epoch 1.
-pub fn build_body_cache(bodies: &[OrbitalBodyDef]) -> HashMap<BodyId, BodyCache> {
-    let mut cache: HashMap<BodyId, BodyCache> = HashMap::with_capacity(bodies.len());
+pub fn build_body_cache(bodies: &[OrbitalBodyDef]) -> AHashMap<BodyId, BodyCache> {
+    let mut cache: AHashMap<BodyId, BodyCache> =
+        HashMap::with_capacity_and_hasher(bodies.len(), ahash::RandomState::default());
 
     // Index bodies by id for parent lookup.
     let by_id: HashMap<&BodyId, &OrbitalBodyDef> = bodies.iter().map(|b| (&b.id, b)).collect();

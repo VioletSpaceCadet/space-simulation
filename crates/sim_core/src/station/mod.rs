@@ -85,6 +85,7 @@ pub(crate) fn tick_stations(
     mut timings: Option<&mut TickTimings>,
 ) {
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
+    let mut scratch_indices: Vec<usize> = Vec::new();
     for station_id in &station_ids {
         timed!(
             timings,
@@ -94,12 +95,25 @@ pub(crate) fn tick_stations(
         timed!(
             timings,
             processors,
-            processor::tick_station_modules(state, station_id, content, events)
+            processor::tick_station_modules(
+                state,
+                station_id,
+                content,
+                events,
+                &mut scratch_indices
+            )
         );
         timed!(
             timings,
             assemblers,
-            assembler::tick_assembler_modules(state, station_id, content, rng, events)
+            assembler::tick_assembler_modules(
+                state,
+                station_id,
+                content,
+                rng,
+                events,
+                &mut scratch_indices
+            )
         );
         timed!(
             timings,
@@ -764,6 +778,7 @@ fn apply_run_result(
 #[cfg(test)]
 mod framework_tests {
     use super::*;
+    use crate::AHashMap;
     use crate::*;
     use std::collections::{HashMap, HashSet};
 
@@ -801,9 +816,9 @@ mod framework_tests {
                 content_version: content.content_version.clone(),
             },
             scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::new(),
-            stations: HashMap::from([(
+            asteroids: AHashMap::default(),
+            ships: AHashMap::default(),
+            stations: [(
                 station_id.clone(),
                 StationState {
                     id: station_id,
@@ -825,12 +840,14 @@ mod framework_tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
-            )]),
+            )]
+            .into_iter()
+            .collect(),
             research: ResearchState {
                 unlocked: HashSet::new(),
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-                action_counts: HashMap::new(),
+                data_pool: AHashMap::default(),
+                evidence: AHashMap::default(),
+                action_counts: AHashMap::default(),
             },
             balance: 0.0,
             export_revenue_total: 0.0,
@@ -844,7 +861,7 @@ mod framework_tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
-            body_cache: std::collections::HashMap::new(),
+            body_cache: AHashMap::default(),
         }
     }
 

@@ -43,7 +43,7 @@ fn heating_content() -> GameContent {
         tags: vec![],
     };
     let recipe_id = insert_recipe(&mut content, water_recipe);
-    content.module_defs = HashMap::from([(
+    content.module_defs = [(
         "module_heating_unit".to_string(),
         ModuleDef {
             id: "module_heating_unit".to_string(),
@@ -61,7 +61,9 @@ fn heating_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
         },
-    )]);
+    )]
+    .into_iter()
+    .collect();
     content
 }
 

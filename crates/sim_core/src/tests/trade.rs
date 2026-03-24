@@ -9,7 +9,7 @@ fn trade_content() -> GameContent {
     content.pricing = PricingTable {
         import_surcharge_per_kg: 100.0,
         export_surcharge_per_kg: 50.0,
-        items: HashMap::from([
+        items: [
             (
                 "Fe".to_string(),
                 PricingEntry {
@@ -64,7 +64,9 @@ fn trade_content() -> GameContent {
                     ..Default::default()
                 },
             ),
-        ]),
+        ]
+        .into_iter()
+        .collect(),
     };
     content.component_defs = vec![
         ComponentDef {
@@ -80,7 +82,7 @@ fn trade_content() -> GameContent {
             volume_m3: 0.5,
         },
     ];
-    content.module_defs = HashMap::from([(
+    content.module_defs = [(
         "module_basic_iron_refinery".to_string(),
         ModuleDef {
             id: "module_basic_iron_refinery".to_string(),
@@ -98,7 +100,9 @@ fn trade_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
         },
-    )]);
+    )]
+    .into_iter()
+    .collect();
     content
 }
 
