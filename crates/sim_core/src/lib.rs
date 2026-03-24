@@ -37,6 +37,8 @@ pub use spatial::{
 };
 pub use tasks::{inventory_volume_m3, mine_duration};
 pub use types::*;
+// Explicit re-export — glob re-export of type aliases can be unreliable across Rust versions
+pub use types::AHashMap;
 pub use wear::wear_efficiency;
 
 pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnvelope {
