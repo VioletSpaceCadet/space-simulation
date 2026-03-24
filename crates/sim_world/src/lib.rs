@@ -527,19 +527,9 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     Ok(content)
 }
 
-pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
-    // Station is in Earth orbit zone (~3000 µAU from Earth, i.e. ~450km altitude)
-    let earth_orbit_pos = sim_core::Position {
-        parent_body: sim_core::BodyId("earth_orbit_zone".to_string()),
-        radius_au_um: sim_core::RadiusAuMicro(3_000),
-        angle_mdeg: sim_core::AngleMilliDeg(0),
-    };
-    let c = &content.constants;
-    let station_id = StationId("station_earth_orbit".to_string());
-
-    // Build station inventory from content definition
-    let init = &content.initial_station;
-    let mut inventory: Vec<InventoryItem> = Vec::new();
+/// Build inventory items from an `InitialStationDef`.
+fn build_initial_inventory(init: &sim_core::InitialStationDef) -> Vec<InventoryItem> {
+    let mut inventory = Vec::new();
     for (index, module_def_id) in init.modules.iter().enumerate() {
         inventory.push(InventoryItem::Module {
             item_id: ModuleItemId(format!("module_item_{:04}", index + 1)),
@@ -561,11 +551,23 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             quality: comp.quality,
         });
     }
+    inventory
+}
+
+pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
+    // Station is in Earth orbit zone (~3000 µAU from Earth, i.e. ~450km altitude)
+    let earth_orbit_pos = sim_core::Position {
+        parent_body: sim_core::BodyId("earth_orbit_zone".to_string()),
+        radius_au_um: sim_core::RadiusAuMicro(3_000),
+        angle_mdeg: sim_core::AngleMilliDeg(0),
+    };
+    let c = &content.constants;
+    let station_id = StationId("station_earth_orbit".to_string());
 
     let station = StationState {
         id: station_id.clone(),
         position: earth_orbit_pos.clone(),
-        inventory,
+        inventory: build_initial_inventory(&content.initial_station),
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         modules: vec![],
