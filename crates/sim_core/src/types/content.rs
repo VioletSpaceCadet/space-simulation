@@ -561,14 +561,33 @@ pub struct ProcessorDef {
 pub struct RecipeThermalReq {
     /// Below this temperature the processor stalls (`TooCold`).
     pub min_temp_mk: u32,
-    /// Between `min_temp_mk` and `optimal_min_mk`: efficiency ramps 80%->100%.
+    /// Between `min_temp_mk` and `optimal_min_mk`: efficiency ramps from `efficiency_floor` to 1.0.
     pub optimal_min_mk: u32,
     /// Between `optimal_min_mk` and `optimal_max_mk`: 100% efficiency, 100% quality.
     pub optimal_max_mk: u32,
-    /// Between `optimal_max_mk` and `max_temp_mk`: quality degrades 100%->60%.
+    /// Between `optimal_max_mk` and `max_temp_mk`: quality degrades from 1.0 to `quality_at_max`.
     pub max_temp_mk: u32,
     /// Heat generated (positive = exothermic) or absorbed (negative = endothermic) per run, in Joules.
     pub heat_per_run_j: i64,
+    /// Efficiency at `min_temp_mk`, ramps linearly to 1.0 at `optimal_min_mk`.
+    #[serde(default = "default_efficiency_floor")]
+    pub efficiency_floor: f32,
+    /// Quality above `max_temp_mk` (hard floor).
+    #[serde(default = "default_quality_floor")]
+    pub quality_floor: f32,
+    /// Quality at exactly `max_temp_mk`, ramped from 1.0 at `optimal_max_mk`.
+    #[serde(default = "default_quality_at_max")]
+    pub quality_at_max: f32,
+}
+
+fn default_efficiency_floor() -> f32 {
+    0.8
+}
+fn default_quality_floor() -> f32 {
+    0.3
+}
+fn default_quality_at_max() -> f32 {
+    0.6
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
