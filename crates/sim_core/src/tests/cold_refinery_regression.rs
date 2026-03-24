@@ -50,8 +50,22 @@ fn cold_refinery_produces_material_and_slag() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     // Tick twice: first tick sets the interval timer, second tick processes.
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = &state.stations[&station_id];
 
@@ -100,8 +114,22 @@ fn cold_refinery_consumes_ore() {
         })
         .sum();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let final_ore_kg: f32 = state.stations[&station_id]
         .inventory
@@ -129,8 +157,22 @@ fn cold_refinery_emits_refinery_ran_event() {
     let mut state = state_with_refinery(&content);
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let has_refinery_ran = events
         .iter()
@@ -149,7 +191,14 @@ fn cold_refinery_does_not_emit_thermal_events() {
 
     let mut all_events = Vec::new();
     for _ in 0..10 {
-        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let events = tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
         all_events.extend(events);
     }
 
@@ -178,8 +227,22 @@ fn cold_refinery_wear_accumulates_at_base_rate() {
         .wear_per_run;
 
     // Two ticks: timer starts at 0, interval is 2, so second tick triggers run.
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let wear = state.stations[&station_id].modules[0].wear.wear;
 
@@ -199,7 +262,14 @@ fn cold_refinery_thermal_none_preserved_across_ticks() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     for _ in 0..10 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     let station = &state.stations[&station_id];
@@ -383,7 +453,14 @@ fn thermal_tick_noop_for_cold_modules() {
 
     // Run several ticks
     for _ in 0..5 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     let module_after = &state.stations[&station_id].modules[0];
@@ -464,7 +541,14 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
 
     let mut rng = make_rng();
     for _ in 0..5 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     let station = &state.stations[&station_id];

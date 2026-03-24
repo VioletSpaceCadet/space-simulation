@@ -6,6 +6,7 @@ mod processor;
 mod sensor;
 pub(crate) mod thermal;
 
+use crate::instrumentation::{timed, TickTimings};
 use crate::{
     tasks::element_density, Event, EventEnvelope, GameContent, GameState, InputFilter,
     InventoryItem, ItemKind, OutputSpec, RecipeDef, StationId, YieldFormula,
@@ -84,18 +85,51 @@ pub(crate) fn tick_stations(
     content: &GameContent,
     rng: &mut impl rand::Rng,
     events: &mut Vec<EventEnvelope>,
+    mut timings: Option<&mut TickTimings>,
 ) {
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
     for station_id in &station_ids {
-        compute_power_budget(state, station_id, content, events);
-        processor::tick_station_modules(state, station_id, content, events);
-        assembler::tick_assembler_modules(state, station_id, content, rng, events);
-        sensor::tick_sensor_array_modules(state, station_id, content, events);
-        lab::tick_lab_modules(state, station_id, content, events);
-        maintenance::tick_maintenance_modules(state, station_id, content, events);
-        thermal::tick_thermal(state, station_id, content, events);
+        timed!(
+            timings,
+            power_budget,
+            compute_power_budget(state, station_id, content, events)
+        );
+        timed!(
+            timings,
+            processors,
+            processor::tick_station_modules(state, station_id, content, events)
+        );
+        timed!(
+            timings,
+            assemblers,
+            assembler::tick_assembler_modules(state, station_id, content, rng, events)
+        );
+        timed!(
+            timings,
+            sensors,
+            sensor::tick_sensor_array_modules(state, station_id, content, events)
+        );
+        timed!(
+            timings,
+            labs,
+            lab::tick_lab_modules(state, station_id, content, events)
+        );
+        timed!(
+            timings,
+            maintenance,
+            maintenance::tick_maintenance_modules(state, station_id, content, events)
+        );
+        timed!(
+            timings,
+            thermal,
+            thermal::tick_thermal(state, station_id, content, events)
+        );
         // Step 3.7: Boiloff — uses post-thermal temperatures (Contract A)
-        boiloff::apply_boiloff(state, station_id, content, events);
+        timed!(
+            timings,
+            boiloff,
+            boiloff::apply_boiloff(state, station_id, content, events)
+        );
     }
 }
 

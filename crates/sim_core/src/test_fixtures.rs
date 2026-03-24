@@ -709,6 +709,7 @@ mod thermal_fixture_tests {
                 &content,
                 &mut rng,
                 crate::EventLevel::Normal,
+                None,
             );
         }
     }
@@ -725,6 +726,7 @@ mod thermal_fixture_tests {
                 &content,
                 &mut rng,
                 crate::EventLevel::Normal,
+                None,
             );
         }
     }
@@ -741,6 +743,7 @@ mod thermal_fixture_tests {
                 &content,
                 &mut rng,
                 crate::EventLevel::Normal,
+                None,
             );
         }
     }
@@ -756,6 +759,7 @@ mod thermal_fixture_tests {
             &content,
             &mut rng,
             crate::EventLevel::Normal,
+            None,
         );
 
         // Smelter at 293K should stall (requires 1800K min)
@@ -776,6 +780,7 @@ mod thermal_fixture_tests {
             &content,
             &mut rng,
             crate::EventLevel::Normal,
+            None,
         );
 
         let has_produced = events

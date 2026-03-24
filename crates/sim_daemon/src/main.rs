@@ -124,6 +124,7 @@ async fn main() -> Result<()> {
                     metrics_history: VecDeque::new(),
                     metrics_writer: setup.metrics_writer,
                     alert_engine,
+                    timings_history: VecDeque::new(),
                 })),
                 command_queue: Arc::new(Mutex::new(Vec::new())),
                 event_tx: event_tx.clone(),
@@ -187,6 +188,7 @@ mod tests {
                 metrics_history: VecDeque::new(),
                 metrics_writer: None,
                 alert_engine: None,
+                timings_history: VecDeque::new(),
             })),
             command_queue: Arc::new(Mutex::new(Vec::new())),
             event_tx,
@@ -840,6 +842,7 @@ mod tests {
             metrics_history: VecDeque::new(),
             metrics_writer: None,
             alert_engine: None,
+            timings_history: VecDeque::new(),
         };
 
         let total_pushes = MAX_METRICS_HISTORY + 10;

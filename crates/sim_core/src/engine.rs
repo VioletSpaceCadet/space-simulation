@@ -1,3 +1,4 @@
+use crate::instrumentation::{timed, TickTimings};
 use crate::research::advance_research;
 use crate::station::tick_stations;
 use crate::tasks::resolve_task;
@@ -34,15 +35,40 @@ pub fn tick(
     content: &GameContent,
     rng: &mut impl Rng,
     event_level: EventLevel,
+    mut timings: Option<&mut TickTimings>,
 ) -> Vec<crate::EventEnvelope> {
     let mut events = Vec::new();
 
-    apply_commands(state, commands, content, rng, &mut events);
-    resolve_ship_tasks(state, content, rng, &mut events);
-    tick_stations(state, content, rng, &mut events);
-    advance_research(state, content, rng, event_level, &mut events);
-    crate::sim_events::evaluate_events(state, content, rng, &mut events);
-    replenish_scan_sites(state, content, rng, &mut events);
+    timed!(
+        timings,
+        apply_commands,
+        apply_commands(state, commands, content, rng, &mut events)
+    );
+    timed!(
+        timings,
+        resolve_ship_tasks,
+        resolve_ship_tasks(state, content, rng, &mut events)
+    );
+    timed!(
+        timings,
+        tick_stations,
+        tick_stations(state, content, rng, &mut events, timings.as_deref_mut())
+    );
+    timed!(
+        timings,
+        advance_research,
+        advance_research(state, content, rng, event_level, &mut events)
+    );
+    timed!(
+        timings,
+        evaluate_events,
+        crate::sim_events::evaluate_events(state, content, rng, &mut events)
+    );
+    timed!(
+        timings,
+        replenish_scan_sites,
+        replenish_scan_sites(state, content, rng, &mut events)
+    );
 
     // Debug-only: verify cached ship stats match fresh recomputation.
     #[cfg(debug_assertions)]

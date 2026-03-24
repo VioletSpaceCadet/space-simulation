@@ -15,6 +15,21 @@ pub struct AdvisorDigest {
     pub rates: Rates,
     pub bottleneck: Bottleneck,
     pub alerts: Vec<AlertDetail>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub perf: Option<PerfSummary>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PerfSummary {
+    pub sample_count: usize,
+    pub steps: Vec<PerfStepEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PerfStepEntry {
+    pub name: String,
+    pub mean_us: f64,
+    pub p95_us: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -229,8 +244,15 @@ fn detect_bottleneck(history: &VecDeque<MetricsSnapshot>) -> Bottleneck {
 pub fn compute_digest(
     history: &VecDeque<MetricsSnapshot>,
     alerts: Vec<AlertDetail>,
+    timings: &VecDeque<sim_core::TickTimings>,
 ) -> Option<AdvisorDigest> {
     let latest = history.back()?;
+
+    let perf = if timings.is_empty() {
+        None
+    } else {
+        Some(compute_perf_summary(timings))
+    };
 
     Some(AdvisorDigest {
         tick: latest.tick,
@@ -239,7 +261,46 @@ pub fn compute_digest(
         rates: compute_rates(history),
         bottleneck: detect_bottleneck(history),
         alerts,
+        perf,
     })
+}
+
+fn compute_perf_summary(timings: &VecDeque<sim_core::TickTimings>) -> PerfSummary {
+    let sample = &timings[0];
+    let field_names: Vec<&str> = sample.iter_fields().map(|(name, _)| name).collect();
+
+    let steps = field_names
+        .iter()
+        .enumerate()
+        .map(|(field_index, &name)| {
+            let mut values_us: Vec<f64> = timings
+                .iter()
+                .map(|t| {
+                    t.iter_fields()
+                        .nth(field_index)
+                        .map_or(0.0, |(_, d)| d.as_secs_f64() * 1_000_000.0)
+                })
+                .collect();
+            values_us.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+            let count = values_us.len();
+            let mean_us = values_us.iter().sum::<f64>() / count as f64;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let p95_index = (0.95 * (count - 1) as f64).round() as usize;
+            let p95_us = values_us[p95_index.min(count - 1)];
+
+            PerfStepEntry {
+                name: name.to_string(),
+                mean_us,
+                p95_us,
+            }
+        })
+        .collect();
+
+    PerfSummary {
+        sample_count: timings.len(),
+        steps,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +363,7 @@ mod tests {
     #[test]
     fn empty_history_returns_none() {
         let history = VecDeque::new();
-        assert!(compute_digest(&history, vec![]).is_none());
+        assert!(compute_digest(&history, vec![], &VecDeque::new()).is_none());
     }
 
     #[test]
@@ -310,7 +371,7 @@ mod tests {
         let mut history = VecDeque::new();
         history.push_back(empty_snapshot(1));
 
-        let digest = compute_digest(&history, vec![]).unwrap();
+        let digest = compute_digest(&history, vec![], &VecDeque::new()).unwrap();
         for trend in &digest.trends {
             assert_eq!(
                 trend.direction,

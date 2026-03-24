@@ -70,7 +70,14 @@ fn run_thermal_simulation() -> (String, String) {
 
     let mut all_events = Vec::new();
     for _ in 0..TICK_COUNT {
-        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let events = tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
         all_events.extend(events);
     }
 
@@ -116,7 +123,14 @@ fn thermal_state_actually_changes() {
     );
 
     for _ in 0..TICK_COUNT {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     let final_smelter_temp = state.stations[&station_id].modules[0]
@@ -142,7 +156,14 @@ fn thermal_events_emitted_during_simulation() {
 
     let mut all_events = Vec::new();
     for _ in 0..TICK_COUNT {
-        let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let events = tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
         all_events.extend(events);
     }
 

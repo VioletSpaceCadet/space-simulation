@@ -7,7 +7,14 @@ fn test_assign_survey_sets_task() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let ship = &state.ships[&ShipId("ship_0001".to_string())];
     assert!(
@@ -23,7 +30,14 @@ fn test_assign_command_emits_task_started() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         events
@@ -59,6 +73,7 @@ fn test_wrong_owner_command_is_dropped() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     let ship = &state.ships[&ship_id];
@@ -94,6 +109,7 @@ fn test_future_command_not_applied_early() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     let ship = &state.ships[&ship_id];
@@ -139,6 +155,7 @@ fn test_install_module_initializes_thermal_state_for_thermal_modules() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     let station = state.stations.get(&station_id).unwrap();
@@ -209,6 +226,7 @@ fn test_install_module_no_thermal_state_for_non_thermal_modules() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     let station = state.stations.get(&station_id).unwrap();
@@ -268,6 +286,7 @@ fn test_select_recipe_updates_processor_state() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     let station = state.stations.get(&station_id).unwrap();
@@ -326,6 +345,7 @@ fn test_select_recipe_out_of_bounds_rejected() {
         &content,
         &mut rng,
         EventLevel::Normal,
+        None,
     );
 
     // selected_recipe should still be None (unchanged — command was rejected).

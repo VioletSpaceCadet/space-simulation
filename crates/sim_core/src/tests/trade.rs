@@ -149,7 +149,14 @@ fn import_material_deducts_balance_and_adds_inventory() {
     // Expected cost: 50.0 * 100 + 100.0 * 100.0 = 5000 + 10000 = 15000
     let expected_cost = 50.0 * 100.0 + 100.0 * 100.0;
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         (state.balance - (10_000_000.0 - expected_cost)).abs() < 0.01,
@@ -196,7 +203,14 @@ fn import_component_deducts_balance_and_adds_inventory() {
     // cost: 500_000 * 2 + (200 * 2) * 100 = 1_000_000 + 40_000 = 1_040_000
     let expected_cost = 500_000.0 * 2.0 + (200.0 * 2.0) * 100.0;
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         (state.balance - (10_000_000.0 - expected_cost)).abs() < 0.01,
@@ -242,7 +256,14 @@ fn import_module_deducts_balance_and_adds_with_unique_id() {
     // cost: 2_000_000 * 1 + 1000 * 100 = 2_000_000 + 100_000 = 2_100_000
     let expected_cost = 2_000_000.0 + 1000.0 * 100.0;
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         (state.balance - (10_000_000.0 - expected_cost)).abs() < 0.01,
@@ -292,7 +313,14 @@ fn import_insufficient_funds_emits_event_no_change() {
         },
     });
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         (state.balance - 100.0).abs() < 0.01,
@@ -327,7 +355,14 @@ fn import_non_importable_is_rejected() {
         },
     });
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         (state.balance - 10_000_000.0).abs() < 0.01,
@@ -370,7 +405,14 @@ fn export_material_removes_from_inventory_and_adds_revenue() {
     // Actually: base_price * quantity - mass * surcharge = 50 * 50 - 50 * 50 = 0
     let expected_revenue = (50.0_f64 * 50.0 - 50.0 * 50.0).max(0.0);
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         (state.balance - (10_000_000.0 + expected_revenue)).abs() < 0.01,
@@ -423,7 +465,14 @@ fn export_component_removes_and_adds_revenue() {
     // revenue: 8000 * 2 - (50 * 2) * 50 = 16000 - 5000 = 11000
     let expected_revenue = 8000.0 * 2.0 - (50.0 * 2.0) * 50.0;
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         (state.balance - (10_000_000.0 + expected_revenue)).abs() < 0.01,
@@ -473,7 +522,14 @@ fn export_non_exportable_is_rejected() {
         },
     });
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         (state.balance - 10_000_000.0).abs() < 0.01,
@@ -509,7 +565,14 @@ fn export_more_than_available_is_rejected() {
         },
     });
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         (state.balance - 10_000_000.0).abs() < 0.01,
@@ -560,7 +623,14 @@ fn import_merges_material_with_existing() {
         },
     });
 
-    tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     // Should merge into single entry
@@ -606,7 +676,14 @@ fn import_rejected_before_trade_unlock_tick() {
         },
     };
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
     assert!(
         (state.balance - balance_before).abs() < 0.01,
         "balance should be unchanged before trade unlock"
@@ -651,7 +728,14 @@ fn export_rejected_before_trade_unlock_tick() {
         },
     };
 
-    let events = tick(&mut state, &[cmd], &content, &mut rng, EventLevel::Normal);
+    let events = tick(
+        &mut state,
+        &[cmd],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
     assert!(
         (state.balance - balance_before).abs() < 0.01,
         "balance should be unchanged before trade unlock"

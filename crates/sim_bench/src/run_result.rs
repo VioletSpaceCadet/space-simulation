@@ -30,6 +30,8 @@ pub struct RunResult {
     pub alerts_path: Option<String>,
     pub events_path: Option<String>,
     pub error_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timing_stats: Option<TimingStats>,
 }
 
 #[derive(Debug, Serialize)]
@@ -103,6 +105,22 @@ impl SummaryMetrics {
             heat_wear_multiplier_avg: f64::from(snapshot.heat_wear_multiplier_avg),
         }
     }
+}
+
+/// Per-step timing summary stats across all ticks in a run.
+#[derive(Debug, Clone, Serialize)]
+pub struct TimingStats {
+    pub steps: Vec<StepTimingEntry>,
+}
+
+/// Timing stats for a single tick step.
+#[derive(Debug, Clone, Serialize)]
+pub struct StepTimingEntry {
+    pub name: String,
+    pub mean_us: f64,
+    pub p50_us: f64,
+    pub p95_us: f64,
+    pub max_us: f64,
 }
 
 impl RunResult {
@@ -228,6 +246,7 @@ mod tests {
             alerts_path: None,
             events_path: None,
             error_message: None,
+            timing_stats: None,
         };
 
         let json = serde_json::to_string_pretty(&result).unwrap();
@@ -267,6 +286,7 @@ mod tests {
             alerts_path: None,
             events_path: None,
             error_message: None,
+            timing_stats: None,
         };
 
         result.write_atomic(&path).unwrap();

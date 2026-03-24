@@ -7,8 +7,22 @@ fn test_assembler_produces_component() {
     let mut rng = make_rng();
 
     // Tick past the interval (2 ticks)
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
@@ -77,8 +91,22 @@ fn test_assembler_skips_insufficient_material() {
         });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         !events
@@ -111,8 +139,22 @@ fn test_assembler_stalls_on_capacity() {
         .cargo_capacity_m3 = 0.001;
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = &state.stations[&station_id];
     if let ModuleKindState::Assembler(asmb) = &station.modules[0].kind_state {
@@ -139,8 +181,22 @@ fn test_assembler_accumulates_wear() {
     let station_id = StationId("station_earth_orbit".to_string());
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let wear = state.stations[&station_id].modules[0].wear.wear;
     assert!(
@@ -168,8 +224,22 @@ fn test_assembler_auto_disables_at_max_wear() {
         .wear = 0.995;
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = &state.stations[&station_id];
     assert!(
@@ -193,8 +263,22 @@ fn test_assembler_skips_when_disabled() {
     state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         !events
@@ -223,8 +307,22 @@ fn test_assembler_merges_component_stacks() {
         });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = &state.stations[&station_id];
     let kit_count: u32 = station
@@ -292,8 +390,22 @@ fn test_assembler_stops_at_max_stock() {
         });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         !events
@@ -357,8 +469,22 @@ fn test_assembler_resumes_below_max_stock() {
     }
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         events
@@ -408,8 +534,22 @@ fn test_assembler_cap_override_takes_priority() {
         });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
+    let events = tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     assert!(
         !events

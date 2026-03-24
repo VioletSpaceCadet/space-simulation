@@ -64,7 +64,14 @@ fn power_budget_solar_only() {
     let mut state = state_with_solar_array(&content);
     let mut rng = make_rng();
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state
         .stations
@@ -113,7 +120,14 @@ fn power_budget_with_consumer() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
@@ -177,7 +191,14 @@ fn power_budget_deficit_when_insufficient() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
@@ -213,7 +234,14 @@ fn power_budget_solar_intensity_affects_output() {
 
     let mut state = state_with_solar_array(&content);
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state
         .stations
@@ -238,7 +266,14 @@ fn power_budget_wear_reduces_output() {
     station.modules[0].wear.wear = content.constants.wear_band_degraded_threshold;
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     let expected = 50.0 * content.constants.wear_band_degraded_efficiency;
@@ -260,7 +295,14 @@ fn power_budget_disabled_modules_excluded() {
     station.modules[0].enabled = false;
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
@@ -355,7 +397,14 @@ fn power_stall_lowest_priority_first() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     // Solar array (idx 0) should not be stalled
@@ -401,7 +450,14 @@ fn power_stall_no_stalling_without_solar_arrays() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
@@ -446,7 +502,14 @@ fn power_stall_clears_when_power_restored() {
 
     // Phase 1: tick with deficit — sensor should be stalled
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
@@ -458,7 +521,14 @@ fn power_stall_clears_when_power_restored() {
     let station = state.stations.get_mut(&station_id).unwrap();
     station.modules[2].enabled = false;
 
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
@@ -517,7 +587,14 @@ fn battery_charges_from_surplus() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     // Charge rate is 20 kW, surplus is 50 kW, so should charge at 20 kW
@@ -593,7 +670,14 @@ fn battery_discharges_to_cover_deficit() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     // Deficit = 80 - 50 = 30 kW, discharge rate = 30 kW, battery has 50 kWh
@@ -681,7 +765,14 @@ fn battery_partial_discharge_then_stall() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     // Battery discharges 10 kW (limited by stored charge), deficit = 30 - 10 = 20 kW
@@ -722,7 +813,14 @@ fn battery_charge_limited_by_capacity() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     // Charge limited by headroom (5 kWh), not charge_rate (20 kW)
@@ -757,7 +855,14 @@ fn battery_wear_reduces_effective_capacity() {
     let mut rng = make_rng();
     // Run multiple ticks to charge up
     for _ in 0..10 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     let station = state.stations.get(&station_id).unwrap();
@@ -793,7 +898,14 @@ fn battery_not_stalled_by_power_system() {
     });
 
     let mut rng = make_rng();
-    tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+    tick(
+        &mut state,
+        &[],
+        &content,
+        &mut rng,
+        EventLevel::Normal,
+        None,
+    );
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(

@@ -353,7 +353,7 @@ fn run_with_autopilot(
 
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(state, content, &mut next_cmd_id);
-        tick(state, &commands, content, rng, EventLevel::Normal);
+        tick(state, &commands, content, rng, EventLevel::Normal, None);
     }
     state.counters.next_command_id = next_cmd_id;
 }
@@ -494,7 +494,14 @@ fn sensor_data_generation_rate_at_mpt_60() {
 
     // Run 10 ticks (no autopilot needed)
     for _ in 0..10 {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
 
     let scan_data = state

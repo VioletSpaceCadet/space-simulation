@@ -298,7 +298,14 @@ fn competing_demand_priority_determines_consumption_order() {
     // After 8 ticks: 4 fe_plates total produced, structural consumed 3, 1 remains + new.
     let mut all_events = Vec::new();
     for _ in 0..20 {
-        let tick_events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let tick_events = tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
         all_events.extend(tick_events);
     }
 
@@ -348,7 +355,14 @@ fn competing_demand_reversed_priority() {
     let mut rng = make_rng();
     let mut all_events = Vec::new();
     for _ in 0..20 {
-        let tick_events = tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        let tick_events = tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
         all_events.extend(tick_events);
     }
 
@@ -376,7 +390,14 @@ fn determinism_fixture_based() {
         let mut state = state_with_competing_assemblers(&content);
         let mut rng = ChaCha8Rng::seed_from_u64(42);
         for _ in 0..50 {
-            tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+            tick(
+                &mut state,
+                &[],
+                &content,
+                &mut rng,
+                EventLevel::Normal,
+                None,
+            );
         }
         state
     };

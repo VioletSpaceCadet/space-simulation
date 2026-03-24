@@ -10,7 +10,14 @@ fn tick_throughput_exceeds_100k_per_second() {
 
     let start = std::time::Instant::now();
     for _ in 0..tick_count {
-        tick(&mut state, &[], &content, &mut rng, EventLevel::Normal);
+        tick(
+            &mut state,
+            &[],
+            &content,
+            &mut rng,
+            EventLevel::Normal,
+            None,
+        );
     }
     let elapsed = start.elapsed();
 

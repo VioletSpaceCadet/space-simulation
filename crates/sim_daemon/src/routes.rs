@@ -53,6 +53,7 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> anyhow::Resu
         .route("/api/v1/pricing", get(pricing_handler))
         .route("/api/v1/spatial-config", get(spatial_config_handler))
         .route("/api/v1/content", get(content_handler))
+        .route("/api/v1/perf", get(perf_handler))
         .route("/api/v1/speed", post(speed_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -200,7 +201,9 @@ async fn advisor_digest_handler(
         .unwrap_or_default();
 
     // Safe to unwrap: we checked is_empty() above, so history.back() will return Some.
-    let digest = super::analytics::compute_digest(&sim.metrics_history, alert_details).unwrap();
+    let digest =
+        super::analytics::compute_digest(&sim.metrics_history, alert_details, &sim.timings_history)
+            .unwrap();
     drop(sim);
 
     match serde_json::to_string(&digest) {
@@ -218,6 +221,65 @@ async fn advisor_digest_handler(
             )
         }
     }
+}
+
+async fn perf_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
+    let sim = app_state.sim.lock();
+    let timings = &sim.timings_history;
+
+    if timings.is_empty() {
+        return Json(serde_json::json!({
+            "sample_count": 0,
+            "steps": []
+        }));
+    }
+
+    let sample = &timings[0];
+    let field_names: Vec<&str> = sample.iter_fields().map(|(name, _)| name).collect();
+
+    let steps: Vec<serde_json::Value> = field_names
+        .iter()
+        .enumerate()
+        .map(|(field_index, &name)| {
+            let mut values_us: Vec<f64> = timings
+                .iter()
+                .map(|t| {
+                    t.iter_fields()
+                        .nth(field_index)
+                        .map_or(0.0, |(_, d)| d.as_secs_f64() * 1_000_000.0)
+                })
+                .collect();
+            values_us.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+            let count = values_us.len();
+            let mean = values_us.iter().sum::<f64>() / count as f64;
+            let p50 = percentile(&values_us, 50.0);
+            let p95 = percentile(&values_us, 95.0);
+            let max = values_us.last().copied().unwrap_or(0.0);
+
+            serde_json::json!({
+                "name": name,
+                "mean_us": mean,
+                "p50_us": p50,
+                "p95_us": p95,
+                "max_us": max,
+            })
+        })
+        .collect();
+
+    Json(serde_json::json!({
+        "sample_count": timings.len(),
+        "steps": steps,
+    }))
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn percentile(sorted: &[f64], pct: f64) -> f64 {
+    if sorted.is_empty() {
+        return 0.0;
+    }
+    let index = (pct / 100.0 * (sorted.len() - 1) as f64).round() as usize;
+    sorted[index.min(sorted.len() - 1)]
 }
 
 pub async fn pause_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
@@ -479,6 +541,7 @@ mod tests {
             metrics_history: VecDeque::new(),
             metrics_writer: None,
             alert_engine: None,
+            timings_history: VecDeque::new(),
         }));
         AppState {
             sim,
