@@ -18,6 +18,54 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::{BTreeMap, HashMap};
 
+/// Standard station ID used across test fixtures.
+pub const TEST_STATION: &str = "station_earth_orbit";
+
+/// Standard ship ID used across test fixtures.
+pub const TEST_SHIP: &str = "ship_0001";
+
+/// Convenience: create a `StationId` from the standard test station ID.
+pub fn test_station_id() -> StationId {
+    StationId(TEST_STATION.to_string())
+}
+
+/// Convenience: create a `ShipId` from the standard test ship ID.
+pub fn test_ship_id() -> ShipId {
+    ShipId(TEST_SHIP.to_string())
+}
+
+/// Build a `ModuleState` with sensible defaults.
+/// Instance ID is `{def_id}_instance` — use unique def_ids per module in a test.
+pub fn test_module(def_id: &str, kind_state: ModuleKindState) -> ModuleState {
+    ModuleState {
+        id: ModuleInstanceId(format!("{def_id}_instance")),
+        def_id: def_id.to_string(),
+        enabled: true,
+        kind_state,
+        wear: WearState::default(),
+        thermal: None,
+        power_stalled: false,
+        manufacturing_priority: 0,
+    }
+}
+
+/// Build a `ModuleState` with a thermal state at the given temperature.
+pub fn test_module_thermal(
+    def_id: &str,
+    kind_state: ModuleKindState,
+    temp_mk: u32,
+    thermal_group: &str,
+) -> ModuleState {
+    ModuleState {
+        thermal: Some(ThermalState {
+            temp_mk,
+            thermal_group: Some(thermal_group.to_string()),
+            ..Default::default()
+        }),
+        ..test_module(def_id, kind_state)
+    }
+}
+
 /// Standard test position used across fixtures.
 pub fn test_position() -> Position {
     Position {
@@ -397,8 +445,8 @@ pub fn minimal_content() -> GameContent {
 
 /// Standard game state: 1 ship, 1 station, 1 scan site at `test_body`.
 pub fn base_state(content: &GameContent) -> GameState {
-    let ship_id = ShipId("ship_0001".to_string());
-    let station_id = StationId("station_earth_orbit".to_string());
+    let ship_id = test_ship_id();
+    let station_id = test_station_id();
     let owner = PrincipalId("principal_autopilot".to_string());
 
     GameState {
