@@ -136,13 +136,13 @@ pub struct Constants {
     #[serde(default = "default_event_history_capacity")]
     pub event_history_capacity: usize,
     // Bottleneck detection (used by daemon analytics)
-    /// Station storage usage fraction above which bottleneck detection flags StorageFull.
+    /// Station storage usage fraction above which bottleneck detection flags `StorageFull`.
     #[serde(default = "default_bottleneck_storage_threshold_pct")]
     pub bottleneck_storage_threshold_pct: f32,
-    /// Slag-to-material ratio above which bottleneck detection flags SlagBackpressure.
+    /// Slag-to-material ratio above which bottleneck detection flags `SlagBackpressure`.
     #[serde(default = "default_bottleneck_slag_ratio_threshold")]
     pub bottleneck_slag_ratio_threshold: f32,
-    /// Max module wear above which bottleneck detection flags WearCritical.
+    /// Max module wear above which bottleneck detection flags `WearCritical`.
     #[serde(default = "default_bottleneck_wear_threshold")]
     pub bottleneck_wear_threshold: f32,
 
