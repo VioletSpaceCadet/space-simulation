@@ -230,6 +230,7 @@ export const eventSchemas = {
     position: positionSchema,
     cargo_capacity_m3: z.number(),
     hull_id: z.string(),
+    fitted_modules: z.array(z.object({ slot_index: z.number(), module_def_id: z.string() })).optional(),
   }),
 
   ShipModuleFitted: z.object({
