@@ -590,4 +590,22 @@ mod tests {
         history.push_back(snap);
         assert_eq!(detect_bottleneck(&history, &constants), Bottleneck::Healthy);
     }
+
+    #[test]
+    fn exact_threshold_values_do_not_trigger() {
+        let constants = test_constants();
+
+        // Value exactly at threshold should NOT trigger (strict > comparison)
+        let mut history = VecDeque::new();
+        let mut snap = empty_snapshot(1);
+        snap.station_storage_used_pct = constants.bottleneck_storage_threshold_pct; // exactly 0.95
+        snap.total_slag_kg = constants.bottleneck_slag_ratio_threshold * 100.0; // exactly at ratio
+        snap.total_material_kg = 100.0;
+        snap.max_module_wear = constants.bottleneck_wear_threshold; // exactly 0.8
+        snap.total_scan_data = 10.0;
+        snap.techs_unlocked = 1;
+        history.push_back(snap);
+
+        assert_eq!(detect_bottleneck(&history, &constants), Bottleneck::Healthy);
+    }
 }
