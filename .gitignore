@@ -71,3 +71,6 @@ data/training/
 
 # Superpowers brainstorm mockups
 .superpowers/
+
+# Profiling artifacts
+profile.json.gz
