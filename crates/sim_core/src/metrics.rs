@@ -613,9 +613,10 @@ pub fn append_metrics_row(
             stats.avg_fraction, stats.min_fraction, stats.max_fraction
         )?;
     }
-    writeln!(
+    // Production metrics
+    write!(
         writer,
-        ",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+        ",{},{},{},{},{},{},{}",
         snapshot.ore_lot_count,
         snapshot.avg_material_quality,
         snapshot.refinery_active_count,
@@ -623,18 +624,33 @@ pub fn append_metrics_row(
         snapshot.refinery_stalled_count,
         snapshot.assembler_active_count,
         snapshot.assembler_stalled_count,
+    )?;
+    // Fleet metrics
+    write!(
+        writer,
+        ",{},{},{},{},{},{}",
         snapshot.fleet_total,
         snapshot.fleet_idle,
         snapshot.fleet_mining,
         snapshot.fleet_transiting,
         snapshot.fleet_surveying,
         snapshot.fleet_depositing,
+    )?;
+    // Discovery & research metrics
+    write!(
+        writer,
+        ",{},{},{},{},{},{}",
         snapshot.scan_sites_remaining,
         snapshot.asteroids_discovered,
         snapshot.asteroids_depleted,
         snapshot.techs_unlocked,
         snapshot.total_scan_data,
         snapshot.max_tech_evidence,
+    )?;
+    // Wear & economy metrics
+    write!(
+        writer,
+        ",{},{},{},{},{},{},{}",
         snapshot.avg_module_wear,
         snapshot.max_module_wear,
         snapshot.repair_kits_remaining,
@@ -642,6 +658,11 @@ pub fn append_metrics_row(
         snapshot.thruster_count,
         snapshot.export_revenue_total,
         snapshot.export_count,
+    )?;
+    // Power & thermal metrics
+    writeln!(
+        writer,
+        ",{},{},{},{},{},{},{},{},{}",
         snapshot.power_generated_kw,
         snapshot.power_consumed_kw,
         snapshot.power_deficit_kw,

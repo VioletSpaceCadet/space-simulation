@@ -60,11 +60,11 @@ fn execute(
             .filter(|(_, m)| {
                 m.id != *self_id && m.wear.wear >= repair_threshold && m.wear.wear > 0.0
             })
-            .map(|(idx, m)| (idx, m.wear.wear, m.id.0.clone()))
+            .map(|(module_index, m)| (module_index, m.wear.wear, m.id.0.clone()))
             .collect();
         candidates.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
         match candidates.first() {
-            Some((idx, _, _)) => *idx,
+            Some((module_index, _, _)) => *module_index,
             None => return super::RunOutcome::Skipped { reset_timer: true },
         }
     };
