@@ -8,8 +8,8 @@ use crate::{
 use rand::Rng;
 
 /// Trade (import/export) unlocks after `trade_unlock_delay_minutes` game-minutes.
-pub fn trade_unlock_tick(trade_unlock_delay_minutes: u64, minutes_per_tick: u32) -> u64 {
-    trade_unlock_delay_minutes.div_ceil(u64::from(minutes_per_tick))
+pub fn trade_unlock_tick(constants: &crate::Constants) -> u64 {
+    constants.game_minutes_to_ticks(constants.trade_unlock_delay_minutes)
 }
 
 /// Advance the simulation by one tick.

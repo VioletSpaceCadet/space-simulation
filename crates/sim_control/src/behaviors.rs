@@ -456,12 +456,7 @@ impl AutopilotBehavior for ThrusterImport {
         let mut commands = Vec::new();
 
         // Gate 1: Trade unlock
-        if state.meta.tick
-            < sim_core::trade_unlock_tick(
-                content.constants.trade_unlock_delay_minutes,
-                content.constants.minutes_per_tick,
-            )
-        {
+        if state.meta.tick < sim_core::trade_unlock_tick(&content.constants) {
             return commands;
         }
 
@@ -619,12 +614,7 @@ impl AutopilotBehavior for MaterialExport {
         let mut commands = Vec::new();
 
         // Gate: Trade unlock
-        if state.meta.tick
-            < sim_core::trade_unlock_tick(
-                content.constants.trade_unlock_delay_minutes,
-                content.constants.minutes_per_tick,
-            )
-        {
+        if state.meta.tick < sim_core::trade_unlock_tick(&content.constants) {
             return commands;
         }
 

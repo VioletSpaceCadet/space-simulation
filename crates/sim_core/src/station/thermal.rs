@@ -247,7 +247,7 @@ fn apply_passive_cooling(
         "passive cooling delta must be <= 0, got {delta_mk}"
     );
 
-    // Apply delta, clamping to [sink_temp, T_MAX_ABSOLUTE].
+    // Apply delta, clamping to [sink_temp, t_max_absolute_mk].
     let new_temp = if delta_mk < 0 {
         current_temp_mk.saturating_sub(delta_mk.unsigned_abs())
     } else {

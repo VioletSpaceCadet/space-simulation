@@ -21,7 +21,7 @@ fn boiloff_temp_multiplier(
         let frac = f64::from(temp_mk - boiling_point_mk) / f64::from(t_amb - boiling_point_mk);
         0.1 + 0.9 * frac
     } else if temp_mk <= t_hot {
-        let frac = f64::from(temp_mk - t_amb) / 100_000.0;
+        let frac = f64::from(temp_mk - t_amb) / f64::from(hot_offset_mk);
         1.0 + 2.0 * frac
     } else {
         3.0

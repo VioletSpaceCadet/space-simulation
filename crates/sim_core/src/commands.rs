@@ -306,12 +306,7 @@ pub(crate) fn handle_import(
     rng: &mut impl Rng,
     events: &mut Vec<EventEnvelope>,
 ) -> bool {
-    if current_tick
-        < trade_unlock_tick(
-            content.constants.trade_unlock_delay_minutes,
-            content.constants.minutes_per_tick,
-        )
-    {
+    if current_tick < trade_unlock_tick(&content.constants) {
         return false;
     }
     if !state.stations.contains_key(station_id) {
@@ -380,12 +375,7 @@ pub(crate) fn handle_export(
     current_tick: u64,
     events: &mut Vec<EventEnvelope>,
 ) -> bool {
-    if current_tick
-        < trade_unlock_tick(
-            content.constants.trade_unlock_delay_minutes,
-            content.constants.minutes_per_tick,
-        )
-    {
+    if current_tick < trade_unlock_tick(&content.constants) {
         return false;
     }
     let Some(station) = state.stations.get(station_id) else {
