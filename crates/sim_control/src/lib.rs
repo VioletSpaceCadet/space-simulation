@@ -880,7 +880,7 @@ mod tests {
         content.pricing = sim_core::PricingTable {
             import_surcharge_per_kg: 100.0,
             export_surcharge_per_kg: 50.0,
-            items: HashMap::from([(
+            items: [(
                 "thruster".to_string(),
                 sim_core::PricingEntry {
                     base_price_per_unit: 50_000.0,
@@ -888,7 +888,9 @@ mod tests {
                     exportable: true,
                     ..Default::default()
                 },
-            )]),
+            )]
+            .into_iter()
+            .collect(),
         };
 
         let mut state = base_state(&content);

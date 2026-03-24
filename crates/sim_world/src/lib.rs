@@ -6,11 +6,11 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde::Deserialize;
 use sim_core::{
-    AlertRuleDef, AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef, GameContent,
-    GameState, InputFilter, InventoryItem, MetaState, MetricsFileWriter, ModuleBehaviorDef,
-    ModuleDef, ModuleItemId, OutputSpec, PowerState, PricingTable, PrincipalId, QualityFormula,
-    ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState,
-    TechDef, TechId, YieldFormula,
+    AHashMap, AlertRuleDef, AsteroidTemplateDef, ComponentId, Constants, Counters, ElementDef,
+    GameContent, GameState, InputFilter, InventoryItem, MetaState, MetricsFileWriter,
+    ModuleBehaviorDef, ModuleDef, ModuleItemId, OutputSpec, PowerState, PricingTable, PrincipalId,
+    QualityFormula, ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId,
+    StationState, TechDef, TechId, YieldFormula,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -450,7 +450,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         &std::fs::read_to_string(dir.join("elements.json")).context("reading elements.json")?,
     )
     .context("parsing elements.json")?;
-    let module_defs: HashMap<String, ModuleDef> = {
+    let module_defs: AHashMap<String, ModuleDef> = {
         let defs: Vec<ModuleDef> = serde_json::from_str(
             &std::fs::read_to_string(dir.join("module_defs.json"))
                 .context("reading module_defs.json")?,
@@ -511,7 +511,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         events: sim_events,
         hulls,
         fitting_templates,
-        density_map: std::collections::HashMap::new(),
+        density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
     sim_core::derive_module_tick_values(&mut content.module_defs, &content.constants);
@@ -691,14 +691,14 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             content_version: content.content_version.clone(),
         },
         scan_sites,
-        asteroids: std::collections::HashMap::new(),
-        ships: std::collections::HashMap::from([(ship_id, ship)]),
-        stations: std::collections::HashMap::from([(station_id, station)]),
+        asteroids: AHashMap::default(),
+        ships: [(ship_id, ship)].into_iter().collect(),
+        stations: [(station_id, station)].into_iter().collect(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
-            data_pool: std::collections::HashMap::new(),
-            evidence: std::collections::HashMap::new(),
-            action_counts: std::collections::HashMap::new(),
+            data_pool: AHashMap::default(),
+            evidence: AHashMap::default(),
+            action_counts: AHashMap::default(),
         },
         balance: 1_000_000_000.0,
         export_revenue_total: 0.0,
@@ -910,7 +910,7 @@ mod tests {
     use super::*;
     use sim_core::{
         test_fixtures::{base_content, minimal_content, test_position},
-        AssemblerDef, AsteroidTemplateDef, Counters, GameState, InputAmount, InputFilter,
+        AHashMap, AssemblerDef, AsteroidTemplateDef, Counters, GameState, InputAmount, InputFilter,
         InventoryItem, ItemKind, MetaState, ModuleBehaviorDef, ModuleDef, NodeDef, NodeId,
         OutputSpec, ProcessorDef, QualityFormula, RecipeDef, RecipeInput, ResearchState, StationId,
         StationState, TechDef, TechId, YieldFormula,
@@ -1239,9 +1239,9 @@ mod tests {
                 content_version: "test".to_string(),
             },
             scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::new(),
-            stations: HashMap::from([(
+            asteroids: AHashMap::default(),
+            ships: AHashMap::default(),
+            stations: [(
                 station_id.clone(),
                 StationState {
                     id: station_id,
@@ -1259,12 +1259,14 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
-            )]),
+            )]
+            .into_iter()
+            .collect(),
             research: ResearchState {
                 unlocked: std::collections::HashSet::new(),
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-                action_counts: HashMap::new(),
+                data_pool: AHashMap::default(),
+                evidence: AHashMap::default(),
+                action_counts: AHashMap::default(),
             },
             balance: 0.0,
             export_revenue_total: 0.0,
@@ -1278,7 +1280,7 @@ mod tests {
             },
             modifiers: sim_core::modifiers::ModifierSet::default(),
             events: sim_core::sim_events::SimEventState::default(),
-            body_cache: std::collections::HashMap::new(),
+            body_cache: AHashMap::default(),
         };
         validate_state(&state, &content);
     }

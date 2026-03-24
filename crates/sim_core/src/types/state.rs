@@ -1,5 +1,6 @@
 //! Runtime state types: `GameState`, ships, stations, asteroids, modules, tasks.
 
+use super::AHashMap;
 use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
@@ -21,9 +22,9 @@ pub struct GameState {
     /// Unscanned potential asteroid locations. Populated at world-gen; entries
     /// are removed when surveyed and replaced by a real `AsteroidState`.
     pub scan_sites: Vec<ScanSite>,
-    pub asteroids: HashMap<AsteroidId, AsteroidState>,
-    pub ships: HashMap<ShipId, ShipState>,
-    pub stations: HashMap<StationId, StationState>,
+    pub asteroids: AHashMap<AsteroidId, AsteroidState>,
+    pub ships: AHashMap<ShipId, ShipState>,
+    pub stations: AHashMap<StationId, StationState>,
     pub research: ResearchState,
     #[serde(default)]
     pub balance: f64,
@@ -42,7 +43,7 @@ pub struct GameState {
     pub events: crate::sim_events::SimEventState,
     /// Cached absolute positions for orbital bodies. Not serialized -- recomputed on load.
     #[serde(skip, default)]
-    pub body_cache: std::collections::HashMap<BodyId, crate::spatial::BodyCache>,
+    pub body_cache: AHashMap<BodyId, crate::spatial::BodyCache>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -323,10 +324,10 @@ impl StationState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResearchState {
     pub unlocked: HashSet<TechId>,
-    pub data_pool: HashMap<DataKind, f32>,
-    pub evidence: HashMap<TechId, DomainProgress>,
+    pub data_pool: AHashMap<DataKind, f32>,
+    pub evidence: AHashMap<TechId, DomainProgress>,
     #[serde(default)]
-    pub action_counts: HashMap<String, u64>,
+    pub action_counts: AHashMap<String, u64>,
 }
 
 // ---------------------------------------------------------------------------

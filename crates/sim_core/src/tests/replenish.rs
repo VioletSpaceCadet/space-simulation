@@ -54,13 +54,13 @@ fn replenish_test_content() -> GameContent {
             boiloff_rate_per_day_at_293k: None,
             boiling_point_mk: None,
         }],
-        module_defs: HashMap::new(),
+        module_defs: AHashMap::default(),
         component_defs: vec![],
         recipes: std::collections::BTreeMap::new(),
         pricing: PricingTable {
             import_surcharge_per_kg: 100.0,
             export_surcharge_per_kg: 50.0,
-            items: HashMap::new(),
+            items: AHashMap::default(),
         },
         constants: Constants {
             survey_scan_minutes: 1,
@@ -129,7 +129,7 @@ fn replenish_test_content() -> GameContent {
         events: Vec::new(),
         hulls: std::collections::BTreeMap::new(),
         fitting_templates: std::collections::BTreeMap::new(),
-        density_map: HashMap::new(),
+        density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
     content.init_caches();
@@ -145,9 +145,9 @@ fn empty_sites_state(content: &GameContent) -> GameState {
             content_version: content.content_version.clone(),
         },
         scan_sites: vec![],
-        asteroids: HashMap::new(),
-        ships: HashMap::new(),
-        stations: HashMap::from([(
+        asteroids: AHashMap::default(),
+        ships: AHashMap::default(),
+        stations: [(
             StationId("station_test".to_string()),
             StationState {
                 id: StationId("station_test".to_string()),
@@ -160,12 +160,14 @@ fn empty_sites_state(content: &GameContent) -> GameState {
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
-        )]),
+        )]
+        .into_iter()
+        .collect(),
         research: ResearchState {
             unlocked: HashSet::new(),
-            data_pool: HashMap::new(),
-            evidence: HashMap::new(),
-            action_counts: HashMap::new(),
+            data_pool: AHashMap::default(),
+            evidence: AHashMap::default(),
+            action_counts: AHashMap::default(),
         },
         balance: 0.0,
         export_revenue_total: 0.0,
@@ -179,7 +181,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
         },
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
-        body_cache: std::collections::HashMap::new(),
+        body_cache: AHashMap::default(),
     }
 }
 

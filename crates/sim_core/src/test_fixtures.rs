@@ -4,6 +4,7 @@
 //! integration-level tests (techs, templates, all elements, compressed durations).
 //! `minimal_content()` provides the bare minimum for content-validation tests.
 
+use crate::AHashMap;
 use crate::{AngleMilliDeg, BodyId, Position, RadiusAuMicro};
 use crate::{
     AnomalyTag, AsteroidId, AsteroidTemplateDef, BodyType, Constants, Counters, DataKind,
@@ -172,13 +173,13 @@ pub fn base_content() -> GameContent {
                 boiling_point_mk: None,
             },
         ],
-        module_defs: HashMap::new(),
+        module_defs: AHashMap::default(),
         component_defs: vec![],
         recipes: BTreeMap::new(),
         pricing: PricingTable {
             import_surcharge_per_kg: 100.0,
             export_surcharge_per_kg: 50.0,
-            items: HashMap::new(),
+            items: AHashMap::default(),
         },
         constants: Constants {
             survey_scan_minutes: 1,
@@ -248,7 +249,7 @@ pub fn base_content() -> GameContent {
         events: Vec::new(),
         hulls: BTreeMap::new(),
         fitting_templates: BTreeMap::new(),
-        density_map: HashMap::new(),
+        density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
     content.init_caches();
@@ -377,13 +378,13 @@ pub fn minimal_content() -> GameContent {
                 boiling_point_mk: None,
             },
         ],
-        module_defs: HashMap::new(),
+        module_defs: AHashMap::default(),
         component_defs: vec![],
         recipes: BTreeMap::new(),
         pricing: PricingTable {
             import_surcharge_per_kg: 100.0,
             export_surcharge_per_kg: 50.0,
-            items: HashMap::new(),
+            items: AHashMap::default(),
         },
         constants: Constants {
             survey_scan_minutes: 1,
@@ -452,7 +453,7 @@ pub fn minimal_content() -> GameContent {
         events: Vec::new(),
         hulls: BTreeMap::new(),
         fitting_templates: BTreeMap::new(),
-        density_map: HashMap::new(),
+        density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
     content.init_caches();
@@ -477,8 +478,8 @@ pub fn base_state(content: &GameContent) -> GameState {
             position: test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         }],
-        asteroids: std::collections::HashMap::new(),
-        ships: std::collections::HashMap::from([(
+        asteroids: AHashMap::default(),
+        ships: [(
             ship_id.clone(),
             ShipState {
                 id: ship_id,
@@ -494,8 +495,10 @@ pub fn base_state(content: &GameContent) -> GameState {
                 propellant_kg: 0.0,
                 propellant_capacity_kg: 0.0,
             },
-        )]),
-        stations: std::collections::HashMap::from([(
+        )]
+        .into_iter()
+        .collect(),
+        stations: [(
             station_id.clone(),
             StationState {
                 id: station_id,
@@ -508,12 +511,14 @@ pub fn base_state(content: &GameContent) -> GameState {
                 power: crate::PowerState::default(),
                 cached_inventory_volume_m3: None,
             },
-        )]),
+        )]
+        .into_iter()
+        .collect(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
-            data_pool: std::collections::HashMap::new(),
-            evidence: std::collections::HashMap::new(),
-            action_counts: std::collections::HashMap::new(),
+            data_pool: AHashMap::default(),
+            evidence: AHashMap::default(),
+            action_counts: AHashMap::default(),
         },
         balance: 0.0,
         export_revenue_total: 0.0,

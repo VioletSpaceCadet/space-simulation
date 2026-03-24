@@ -1,5 +1,6 @@
 //! Content definition types: `GameContent`, modules, recipes, techs, solar system.
 
+use super::AHashMap;
 use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
@@ -64,7 +65,7 @@ pub struct GameContent {
     pub solar_system: SolarSystemDef,
     pub asteroid_templates: Vec<AsteroidTemplateDef>,
     pub elements: Vec<ElementDef>,
-    pub module_defs: HashMap<String, ModuleDef>,
+    pub module_defs: AHashMap<String, ModuleDef>,
     pub component_defs: Vec<ComponentDef>,
     /// Recipe catalog loaded from `content/recipes.json`.
     #[serde(default)]
@@ -85,7 +86,7 @@ pub struct GameContent {
     pub fitting_templates: BTreeMap<HullId, Vec<FittedModule>>,
     /// Pre-computed element id -> density (kg/m3) lookup. Populated by `init_caches()`.
     #[serde(skip)]
-    pub density_map: HashMap<String, f32>,
+    pub density_map: AHashMap<String, f32>,
 }
 
 impl GameContent {
@@ -647,9 +648,8 @@ pub enum QualityFormula {
 /// Must be called once after deserialization / after overrides.
 ///
 /// Reuses `Constants::game_minutes_to_ticks` for the conversion.
-#[allow(clippy::implicit_hasher)]
 pub fn derive_module_tick_values(
-    module_defs: &mut HashMap<String, ModuleDef>,
+    module_defs: &mut AHashMap<String, ModuleDef>,
     constants: &Constants,
 ) {
     for def in module_defs.values_mut() {

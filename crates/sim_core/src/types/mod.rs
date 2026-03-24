@@ -26,6 +26,10 @@ use serde::{Deserialize, Serialize};
 // Type aliases
 // ---------------------------------------------------------------------------
 
+/// Fast non-cryptographic HashMap for hot-path lookups. Uses ahash instead of
+/// SipHash — safe for game sim internals where DoS resistance is unnecessary.
+pub type AHashMap<K, V> = HashMap<K, V, ahash::RandomState>;
+
 pub type ElementId = String;
 pub type CompositionVec = HashMap<ElementId, f32>;
 

@@ -148,7 +148,7 @@ fn refinery_content() -> GameContent {
         tags: vec![],
     };
     let recipe_id = insert_recipe(&mut content, iron_recipe);
-    content.module_defs = HashMap::from([(
+    content.module_defs = [(
         "module_basic_iron_refinery".to_string(),
         ModuleDef {
             id: "module_basic_iron_refinery".to_string(),
@@ -166,7 +166,9 @@ fn refinery_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
         },
-    )]);
+    )]
+    .into_iter()
+    .collect();
     content
 }
 
@@ -216,7 +218,7 @@ fn assembler_content() -> GameContent {
         tags: vec![],
     };
     let recipe_id = insert_recipe(&mut content, repair_kit_recipe);
-    content.module_defs = HashMap::from([(
+    content.module_defs = [(
         "module_basic_assembler".to_string(),
         ModuleDef {
             id: "module_basic_assembler".to_string(),
@@ -235,7 +237,9 @@ fn assembler_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
         },
-    )]);
+    )]
+    .into_iter()
+    .collect();
     content.component_defs = vec![crate::ComponentDef {
         id: "repair_kit".to_string(),
         name: "Repair Kit".to_string(),

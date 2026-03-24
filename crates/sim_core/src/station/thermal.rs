@@ -490,6 +490,7 @@ fn overheat_zone_event(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::AHashMap;
     use crate::*;
     use std::collections::{HashMap, HashSet};
 
@@ -537,9 +538,9 @@ mod tests {
                 content_version: content.content_version.clone(),
             },
             scan_sites: vec![],
-            asteroids: HashMap::new(),
-            ships: HashMap::new(),
-            stations: HashMap::from([(
+            asteroids: AHashMap::default(),
+            ships: AHashMap::default(),
+            stations: [(
                 station_id.clone(),
                 StationState {
                     id: station_id,
@@ -570,12 +571,14 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                 },
-            )]),
+            )]
+            .into_iter()
+            .collect(),
             research: ResearchState {
                 unlocked: HashSet::new(),
-                data_pool: HashMap::new(),
-                evidence: HashMap::new(),
-                action_counts: HashMap::new(),
+                data_pool: AHashMap::default(),
+                evidence: AHashMap::default(),
+                action_counts: AHashMap::default(),
             },
             balance: 0.0,
             export_revenue_total: 0.0,
@@ -589,7 +592,7 @@ mod tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
-            body_cache: std::collections::HashMap::new(),
+            body_cache: AHashMap::default(),
         }
     }
 

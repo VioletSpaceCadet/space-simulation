@@ -23,7 +23,7 @@ pub fn apply_overrides(
 }
 
 fn apply_module_override(
-    module_defs: &mut HashMap<String, sim_core::ModuleDef>,
+    module_defs: &mut sim_core::AHashMap<String, sim_core::ModuleDef>,
     dotted: &str,
     full_key: &str,
     value: &serde_json::Value,

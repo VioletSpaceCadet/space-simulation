@@ -143,6 +143,7 @@ pub(crate) fn advance_research(
 mod data_generation_tests {
     use super::*;
     use crate::test_fixtures::base_content;
+    use crate::AHashMap;
     use std::collections::{HashMap, HashSet};
 
     #[test]
@@ -171,9 +172,9 @@ mod data_generation_tests {
     fn generate_data_adds_to_pool_and_increments_counter() {
         let mut research = crate::ResearchState {
             unlocked: HashSet::new(),
-            data_pool: HashMap::new(),
-            evidence: HashMap::new(),
-            action_counts: HashMap::new(),
+            data_pool: AHashMap::default(),
+            evidence: AHashMap::default(),
+            action_counts: AHashMap::default(),
         };
         let constants = base_content().constants;
 
@@ -208,6 +209,7 @@ mod data_generation_tests {
 mod research_roll_tests {
     use super::*;
     use crate::test_fixtures::base_content;
+    use crate::AHashMap;
     use crate::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;

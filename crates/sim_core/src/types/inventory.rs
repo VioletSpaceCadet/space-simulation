@@ -1,5 +1,6 @@
 //! Inventory, trade, and pricing types.
 
+use super::AHashMap;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -177,7 +178,7 @@ pub struct PricingEntry {
 pub struct PricingTable {
     pub import_surcharge_per_kg: f64,
     pub export_surcharge_per_kg: f64,
-    pub items: HashMap<String, PricingEntry>,
+    pub items: AHashMap<String, PricingEntry>,
 }
 
 impl Default for PricingTable {
@@ -185,7 +186,7 @@ impl Default for PricingTable {
         Self {
             import_surcharge_per_kg: 0.0,
             export_surcharge_per_kg: 0.0,
-            items: HashMap::new(),
+            items: AHashMap::default(),
         }
     }
 }
