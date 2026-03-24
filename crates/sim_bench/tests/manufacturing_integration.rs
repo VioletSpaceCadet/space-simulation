@@ -9,8 +9,8 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use sim_control::{AutopilotController, CommandSource};
 use sim_core::{
-    AsteroidId, ComponentId, EventLevel, GameState, InventoryItem, LotId, ModuleKindState,
-    RecipeId, StationId, TechId,
+    AsteroidId, ComponentId, GameState, InventoryItem, LotId, ModuleKindState, RecipeId, StationId,
+    TechId,
 };
 use std::collections::HashMap;
 
@@ -59,7 +59,7 @@ fn run_with_autopilot(
 ) {
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(state, content, next_cmd_id);
-        sim_core::tick(state, &commands, content, rng, EventLevel::Normal, None);
+        sim_core::tick(state, &commands, content, rng, None);
     }
 }
 
@@ -252,14 +252,7 @@ fn competing_demand_with_real_content() {
     let mut structural_beam_runs = 0_usize;
     for _ in 0..60 {
         let commands = autopilot.generate_commands(&state, &content, &mut next_cmd_id);
-        let events = sim_core::tick(
-            &mut state,
-            &commands,
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        let events = sim_core::tick(&mut state, &commands, &content, &mut rng, None);
         for envelope in &events {
             if let sim_core::Event::AssemblerRan { recipe_id, .. } = &envelope.event {
                 if recipe_id.0 == "recipe_structural_beam" {
@@ -313,14 +306,7 @@ fn determinism_same_seed_identical_state_with_real_content() {
 
         for _ in 0..tick_count {
             let commands = autopilot.generate_commands(&state, &content, &mut next_cmd_id);
-            sim_core::tick(
-                &mut state,
-                &commands,
-                &content,
-                &mut rng,
-                EventLevel::Normal,
-                None,
-            );
+            sim_core::tick(&mut state, &commands, &content, &mut rng, None);
         }
         state
     };

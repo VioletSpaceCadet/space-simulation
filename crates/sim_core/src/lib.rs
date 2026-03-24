@@ -50,8 +50,8 @@ pub use types::{
 };
 // -- types: core enums --
 pub use types::{
-    AlertSeverity, AnomalyTag, BehaviorType, DataKind, DomainProgress, EventLevel, ItemKind,
-    OverheatZone, Phase, ResearchDomain,
+    AlertSeverity, AnomalyTag, BehaviorType, DataKind, DomainProgress, ItemKind, OverheatZone,
+    Phase, ResearchDomain,
 };
 // -- types: game state --
 pub use types::{

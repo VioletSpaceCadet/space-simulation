@@ -45,10 +45,10 @@ Use `rust_analyzer_*` MCP tools for Rust navigation — they understand semantic
 
 ## Pitfalls
 - `matches!(x, None | Some(t) if ...)` doesn't bind `t` for the None arm — use `.map_or(true, |t| ...)`
-- Test content uses `difficulty=10`; tests asserting tech NOT unlocked need high difficulty (`1_000_000`)
+- Base test content has empty `domain_requirements`; tests asserting tech NOT unlocked need unmet requirements (e.g., `Manufacturing: 1_000_000.0`)
 - Asteroids are created on discovery (from `scan_sites`), not pre-populated
 - Raw data lives on `ResearchState` (sim-wide), not station inventory
-- Research rolls every N ticks, not every tick
+- Research unlock is deterministic: tech unlocks when all domain requirements are met
 - `DeepScan` commands silently dropped if no unlocked tech has `EnableDeepScan` effect
 - `AnomalyTag`, `DataKind`, `ResearchDomain` are data-driven (String/newtype), not compile-time enums — don't add variants, add content JSON entries
 - Adding a new `ModuleBehaviorDef` variant? Use common fields/trait, don't add 5 match arms to dispatcher functions

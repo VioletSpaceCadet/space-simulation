@@ -68,21 +68,12 @@ Note: `FacilitiesState` has been removed. Research state is fully contained in `
 
 **Raw data generation:** Tasks generate raw data via `generate_data(research, kind, action_key, constants)` with diminishing returns (yield = `base_yield × (1 / (1 + 0.1 × count))`). Data is sim-wide — not stored in ship or station inventory.
 
-**Research roll:** Occurs every `research_roll_interval_ticks` ticks (not every tick). For each tech with an assigned lab:
-1. Lab consumes data from `data_pool` (up to `throughput_per_tick × interval`).
-2. Domain points accumulate in `DomainProgress` for that tech.
-3. Unlock probability: `p = 1 - e^(-effective / difficulty)` where `effective = sufficiency × total_points` and `sufficiency = geometric_mean(per-domain ratios)`.
-4. If roll succeeds, tech is added to `ResearchState.unlocked`.
-
-**Domain sufficiency:** `geometric_mean` of the per-domain ratios (actual / required). Techs that require only one domain have sufficiency = that domain's ratio (clamped to 1.0 max).
-
-**`geometric_mean(values: &[f64]) -> f64`:** Product of values raised to `1/n`. Returns 0.0 for empty slice.
+**Research unlock:** Checked every tick. For each eligible tech (prereqs met, not yet unlocked), if all `domain_requirements` are met (`evidence[tech].points[domain] >= requirement` for every domain), the tech unlocks immediately. Techs with no domain requirements unlock as soon as prereqs are met. Processing order is sorted by tech ID for determinism.
 
 **Constants (in `constants.json`):**
 
 | Constant | Purpose |
 |---|---|
-| `research_roll_interval_ticks` | How many ticks between research unlock rolls |
 | `data_generation_peak` | Peak raw data yield per ship task |
 | `data_generation_floor` | Minimum raw data yield per ship task |
 | `data_generation_decay_rate` | Exponential decay rate for data yield over repeated tasks |
@@ -267,7 +258,7 @@ Automated scenario runner for testing simulation behavior across multiple seeds.
 | `content_dir` | string | `"./content"` | Path to content directory |
 | `overrides` | object | `{}` | Constants overrides (key → value) |
 
-**Override keys:** All fields on `Constants` struct — `survey_scan_ticks`, `deep_scan_ticks`, `travel_ticks_per_hop`, `survey_tag_detection_probability`, `asteroid_count_per_template`, `asteroid_mass_min_kg`, `asteroid_mass_max_kg`, `ship_cargo_capacity_m3`, `station_cargo_capacity_m3`, `mining_rate_kg_per_tick`, `deposit_ticks`, `station_power_available_per_tick`, `autopilot_iron_rich_confidence_threshold`, `autopilot_refinery_threshold_kg`, `autopilot_slag_jettison_pct`, `research_roll_interval_ticks`, `data_generation_peak`, `data_generation_floor`, `data_generation_decay_rate`, `wear_band_degraded_threshold`, `wear_band_critical_threshold`, `wear_band_degraded_efficiency`, `wear_band_critical_efficiency`.
+**Override keys:** All fields on `Constants` struct — `survey_scan_ticks`, `deep_scan_ticks`, `travel_ticks_per_hop`, `survey_tag_detection_probability`, `asteroid_count_per_template`, `asteroid_mass_min_kg`, `asteroid_mass_max_kg`, `ship_cargo_capacity_m3`, `station_cargo_capacity_m3`, `mining_rate_kg_per_tick`, `deposit_ticks`, `station_power_available_per_tick`, `autopilot_iron_rich_confidence_threshold`, `autopilot_refinery_threshold_kg`, `autopilot_slag_jettison_pct`, `data_generation_peak`, `data_generation_floor`, `data_generation_decay_rate`, `wear_band_degraded_threshold`, `wear_band_critical_threshold`, `wear_band_degraded_efficiency`, `wear_band_critical_efficiency`.
 
 **Output structure:**
 

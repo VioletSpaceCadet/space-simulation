@@ -1,62 +1,65 @@
 use super::*;
 
-// NOTE: advance_research is currently stubbed (returns early, does nothing).
-// These tests will be rewritten when the domain-sufficiency model is implemented in Task 4.
-// For now, we just verify the stub doesn't panic and doesn't produce events.
+// Tests for deterministic threshold-based research unlock via the full tick() path.
 
 #[test]
-fn test_stubbed_research_does_not_panic() {
+fn test_research_does_not_panic() {
     let content = test_content();
     let mut state = test_state(&content);
     let mut rng = make_rng();
 
     // Should not panic
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
+    tick(&mut state, &[], &content, &mut rng, None);
+}
+
+#[test]
+fn test_research_unlocks_when_requirements_met_via_tick() {
+    let mut content = test_content();
+    // No domain requirements = unlocks immediately
+    content.techs[0].domain_requirements = std::collections::HashMap::new();
+
+    let mut state = test_state(&content);
+    let mut rng = make_rng();
+
+    let events = tick(&mut state, &[], &content, &mut rng, None);
+
+    assert!(
+        state
+            .research
+            .unlocked
+            .contains(&TechId("tech_deep_scan_v1".to_string())),
+        "tech with no domain requirements should unlock on first tick"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(&e.event, Event::TechUnlocked { .. })),
+        "should emit TechUnlocked event"
     );
 }
 
 #[test]
-fn test_stubbed_research_no_power_consumed() {
-    let content = test_content();
+fn test_research_no_unlock_when_requirements_unmet() {
+    let mut content = test_content();
+    content.techs[0].domain_requirements =
+        std::collections::HashMap::from([(ResearchDomain::Survey, 1_000_000.0)]);
+
     let mut state = test_state(&content);
     let mut rng = make_rng();
 
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
-    // Stubbed research should not emit PowerConsumed events
+    assert!(
+        !state
+            .research
+            .unlocked
+            .contains(&TechId("tech_deep_scan_v1".to_string())),
+        "tech should NOT unlock when requirements are not met"
+    );
     assert!(
         !events
             .iter()
-            .any(|e| matches!(e.event, Event::PowerConsumed { .. })),
-        "stubbed advance_research should not emit PowerConsumed"
-    );
-}
-
-#[test]
-fn test_stubbed_research_no_research_roll() {
-    let content = test_content();
-    let mut state = test_state(&content);
-    let mut rng = make_rng();
-
-    let events = tick(&mut state, &[], &content, &mut rng, EventLevel::Debug, None);
-
-    assert!(
-        !events
-            .iter()
-            .any(|e| matches!(e.event, Event::ResearchRoll { .. })),
-        "stubbed advance_research should not emit ResearchRoll"
+            .any(|e| matches!(&e.event, Event::TechUnlocked { .. })),
+        "should not emit TechUnlocked event"
     );
 }

@@ -24,22 +24,8 @@ fn test_deposit_moves_inventory_to_station() {
         });
 
     let cmd = deposit_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station_has_ore = state.stations[&station_id]
@@ -72,22 +58,8 @@ fn test_deposit_clears_ship_inventory() {
         });
 
     let cmd = deposit_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     assert!(
         state.ships[&ship_id].inventory.is_empty(),
@@ -115,22 +87,8 @@ fn test_deposit_emits_ore_deposited_event() {
         });
 
     let cmd = deposit_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
     assert!(
         events
@@ -198,22 +156,8 @@ fn test_deposit_respects_station_capacity() {
 
     let mut rng = make_rng();
     let cmd = deposit_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     assert!(
         state.stations[&station_id].inventory.is_empty(),
@@ -260,22 +204,8 @@ fn test_deposit_partial_when_station_partially_full() {
 
     let mut rng = make_rng();
     let cmd = deposit_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let station_ore_kg: f32 = state.stations[&station_id]
         .inventory
@@ -337,22 +267,8 @@ fn test_deposit_ship_waits_when_station_full() {
 
     let mut rng = make_rng();
     let cmd = deposit_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
     let ship = &state.ships[&ship_id];
     assert!(
@@ -399,36 +315,15 @@ fn test_deposit_unblocks_when_space_opens() {
 
     let mut rng = make_rng();
     let cmd = deposit_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     state
         .stations
         .get_mut(&station_id)
         .unwrap()
         .cargo_capacity_m3 = 10_000.0;
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
     assert!(
         state.ships[&ship_id].inventory.is_empty(),
@@ -469,30 +364,9 @@ fn test_deposit_blocked_event_only_emitted_once() {
 
     let mut rng = make_rng();
     let cmd = deposit_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let events1 = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let events2 = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    let events1 = tick(&mut state, &[], &content, &mut rng, None);
+    let events2 = tick(&mut state, &[], &content, &mut rng, None);
 
     let count1 = events1
         .iter()

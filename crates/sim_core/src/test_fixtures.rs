@@ -88,7 +88,6 @@ pub fn base_content() -> GameContent {
             prereqs: vec![],
             domain_requirements: HashMap::new(),
             accepted_data: vec![DataKind::SurveyData],
-            difficulty: 10.0,
             effects: vec![
                 TechEffect::EnableDeepScan,
                 // sigma=0: mapped composition matches true composition exactly
@@ -198,7 +197,6 @@ pub fn base_content() -> GameContent {
             autopilot_volatile_confidence_threshold: 0.7,
             autopilot_volatile_threshold_kg: 500.0,
             autopilot_refinery_threshold_kg: 500.0,
-            research_roll_interval_minutes: 60,
             data_generation_peak: 100.0,
             data_generation_floor: 5.0,
             data_generation_decay_rate: 0.7,
@@ -240,7 +238,6 @@ pub fn base_content() -> GameContent {
             mining_rate_kg_per_tick: 0.0,
             deposit_ticks: 0,
             station_power_available_per_tick: 0.0,
-            research_roll_interval_ticks: 0,
             events_enabled: false,
             event_global_cooldown_ticks: 200,
             event_history_capacity: 100,
@@ -402,7 +399,6 @@ pub fn minimal_content() -> GameContent {
             autopilot_volatile_confidence_threshold: 0.7,
             autopilot_volatile_threshold_kg: 500.0,
             autopilot_refinery_threshold_kg: 500.0,
-            research_roll_interval_minutes: 60,
             data_generation_peak: 100.0,
             data_generation_floor: 5.0,
             data_generation_decay_rate: 0.7,
@@ -444,7 +440,6 @@ pub fn minimal_content() -> GameContent {
             mining_rate_kg_per_tick: 0.0,
             deposit_ticks: 0,
             station_power_available_per_tick: 0.0,
-            research_roll_interval_ticks: 0,
             events_enabled: false,
             event_global_cooldown_ticks: 200,
             event_history_capacity: 100,
@@ -724,14 +719,7 @@ mod thermal_fixture_tests {
         let mut state = state_with_smelter(&content);
         let mut rng = make_rng();
         for _ in 0..10 {
-            crate::tick(
-                &mut state,
-                &[],
-                &content,
-                &mut rng,
-                crate::EventLevel::Normal,
-                None,
-            );
+            crate::tick(&mut state, &[], &content, &mut rng, None);
         }
     }
 
@@ -741,14 +729,7 @@ mod thermal_fixture_tests {
         let mut state = state_with_radiator(&content);
         let mut rng = make_rng();
         for _ in 0..10 {
-            crate::tick(
-                &mut state,
-                &[],
-                &content,
-                &mut rng,
-                crate::EventLevel::Normal,
-                None,
-            );
+            crate::tick(&mut state, &[], &content, &mut rng, None);
         }
     }
 
@@ -758,14 +739,7 @@ mod thermal_fixture_tests {
         let mut state = state_with_smelter_and_radiators(&content);
         let mut rng = make_rng();
         for _ in 0..10 {
-            crate::tick(
-                &mut state,
-                &[],
-                &content,
-                &mut rng,
-                crate::EventLevel::Normal,
-                None,
-            );
+            crate::tick(&mut state, &[], &content, &mut rng, None);
         }
     }
 
@@ -774,14 +748,7 @@ mod thermal_fixture_tests {
         let content = thermal_content();
         let mut state = state_with_smelter(&content);
         let mut rng = make_rng();
-        let events = crate::tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            crate::EventLevel::Normal,
-            None,
-        );
+        let events = crate::tick(&mut state, &[], &content, &mut rng, None);
 
         // Smelter at 293K should stall (requires 1800K min)
         let has_too_cold = events
@@ -795,14 +762,7 @@ mod thermal_fixture_tests {
         let content = thermal_content();
         let mut state = state_with_smelter_at_temp(&content, 1_900_000);
         let mut rng = make_rng();
-        let events = crate::tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            crate::EventLevel::Normal,
-            None,
-        );
+        let events = crate::tick(&mut state, &[], &content, &mut rng, None);
 
         let has_produced = events
             .iter()

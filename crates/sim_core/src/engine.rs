@@ -2,10 +2,7 @@ use crate::instrumentation::{timed, TickTimings};
 use crate::research::advance_research;
 use crate::station::tick_stations;
 use crate::tasks::resolve_task;
-use crate::{
-    Command, CommandEnvelope, EventLevel, GameContent, GameState, ScanSite, ShipId, SiteId,
-    TaskKind,
-};
+use crate::{Command, CommandEnvelope, GameContent, GameState, ScanSite, ShipId, SiteId, TaskKind};
 use rand::Rng;
 
 /// Trade (import/export) unlocks after `trade_unlock_delay_minutes` game-minutes.
@@ -30,7 +27,6 @@ pub fn tick(
     commands: &[CommandEnvelope],
     content: &GameContent,
     rng: &mut impl Rng,
-    event_level: EventLevel,
     mut timings: Option<&mut TickTimings>,
 ) -> Vec<crate::EventEnvelope> {
     let mut events = Vec::new();
@@ -53,7 +49,7 @@ pub fn tick(
     timed!(
         timings,
         advance_research,
-        advance_research(state, content, rng, event_level, &mut events)
+        advance_research(state, content, &mut events)
     );
     timed!(
         timings,

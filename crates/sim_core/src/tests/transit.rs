@@ -129,42 +129,21 @@ fn transit_moves_ship_and_starts_next_task() {
         },
     };
 
-    tick(
-        &mut state,
-        &[transit_cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[transit_cmd], &content, &mut rng, None);
     assert_eq!(
         state.ships[&ship_id].position, pos_a,
         "ship still at origin during transit"
     );
 
     for _ in 1..5 {
-        tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        tick(&mut state, &[], &content, &mut rng, None);
     }
     assert_eq!(
         state.ships[&ship_id].position, pos_a,
         "ship still in transit"
     );
 
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[], &content, &mut rng, None);
     assert_eq!(
         state.ships[&ship_id].position, pos_b,
         "ship arrived at destination"
@@ -185,14 +164,7 @@ fn transit_moves_ship_and_starts_next_task() {
         "Survey task should start immediately after arrival"
     );
 
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[], &content, &mut rng, None);
     assert!(
         events
             .iter()
@@ -343,22 +315,8 @@ fn transit_generates_transit_data_with_diminishing_returns() {
         },
     };
 
-    tick(
-        &mut state,
-        &[transit_cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[transit_cmd], &content, &mut rng, None);
+    let events = tick(&mut state, &[], &content, &mut rng, None);
     assert!(events
         .iter()
         .any(|e| matches!(&e.event, Event::ShipArrived { .. })));
@@ -390,22 +348,8 @@ fn transit_generates_transit_data_with_diminishing_returns() {
         },
     };
 
-    tick(
-        &mut state,
-        &[transit_back],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[transit_back], &content, &mut rng, None);
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let total_transit_data = state
         .research

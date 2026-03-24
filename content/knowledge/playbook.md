@@ -51,7 +51,7 @@ A living document of strategy patterns, bottleneck resolutions, and parameter re
 ## Research
 
 - **Lab throughput:** Labs consume raw data from the sim-wide `data_pool` each tick and produce domain-specific research points. More labs = faster research, but diminishing returns as data pool depletes.
-- **Research roll interval:** Tech unlock rolls happen every `research_roll_interval_minutes` (60) game minutes = 1 tick at default `minutes_per_tick`. Probabilistic — high-evidence techs unlock faster.
+- **Deterministic unlock:** Techs unlock immediately when all `domain_requirements` are met. No RNG, no interval — checked every tick.
 - **Domain specialization:** Each lab type (exploration, materials, engineering) processes one `DataKind` and produces points in one `ResearchDomain`. Multi-domain research requires multiple lab types.
 - **Deep scan gating:** `DeepScan` commands require at least one unlocked tech with `EnableDeepScan` effect. Without this tech, deep scan attempts are silently dropped.
 

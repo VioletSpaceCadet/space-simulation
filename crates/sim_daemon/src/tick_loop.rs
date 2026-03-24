@@ -1,6 +1,6 @@
 use crate::state::{CommandQueue, EventTx, SharedSim, SimState};
 use sim_control::CommandSource;
-use sim_core::{EventLevel, TickTimings};
+use sim_core::TickTimings;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -116,14 +116,7 @@ fn execute_tick(
         ..
     } = *guard;
     let mut timings = TickTimings::default();
-    let mut events = sim_core::tick(
-        game_state,
-        &commands,
-        content,
-        rng,
-        EventLevel::Normal,
-        Some(&mut timings),
-    );
+    let mut events = sim_core::tick(game_state, &commands, content, rng, Some(&mut timings));
     guard.push_timings(timings);
 
     let metrics_every = guard.metrics_every;

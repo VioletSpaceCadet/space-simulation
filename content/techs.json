@@ -7,7 +7,6 @@
       "prereqs": [],
       "domain_requirements": { "Survey": 100.0 },
       "accepted_data": ["SurveyData"],
-      "difficulty": 200.0,
       "effects": [
         { "type": "EnableDeepScan" },
         { "type": "DeepScanCompositionNoise", "sigma": 0.02 }
@@ -19,7 +18,6 @@
       "prereqs": [],
       "domain_requirements": { "Materials": 150.0, "Manufacturing": 50.0 },
       "accepted_data": ["AssayData", "ManufacturingData"],
-      "difficulty": 400.0,
       "effects": [
         { "type": "StatModifier", "stat": "processing_yield", "op": "pct_additive", "value": 0.15 }
       ]
@@ -30,7 +28,6 @@
       "prereqs": [],
       "domain_requirements": { "Manufacturing": 200.0 },
       "accepted_data": ["ManufacturingData", "AssayData"],
-      "difficulty": 500.0,
       "effects": [
         { "type": "EnableShipConstruction" }
       ]
@@ -41,7 +38,6 @@
       "prereqs": ["tech_ship_construction"],
       "domain_requirements": { "Propulsion": 150.0 },
       "accepted_data": ["TransitData"],
-      "difficulty": 300.0,
       "effects": [
         { "type": "StatModifier", "stat": "ship_speed", "op": "pct_additive", "value": 0.10 }
       ]
@@ -52,7 +48,6 @@
       "prereqs": [],
       "domain_requirements": { "Manufacturing": 200.0 },
       "accepted_data": ["ManufacturingData"],
-      "difficulty": 500.0,
       "effects": []
     }
   ]

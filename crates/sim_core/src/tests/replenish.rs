@@ -78,7 +78,6 @@ fn replenish_test_content() -> GameContent {
             autopilot_volatile_confidence_threshold: 0.7,
             autopilot_volatile_threshold_kg: 500.0,
             autopilot_refinery_threshold_kg: 500.0,
-            research_roll_interval_minutes: 60,
             data_generation_peak: 100.0,
             data_generation_floor: 5.0,
             data_generation_decay_rate: 0.7,
@@ -120,7 +119,6 @@ fn replenish_test_content() -> GameContent {
             mining_rate_kg_per_tick: 0.0,
             deposit_ticks: 0,
             station_power_available_per_tick: 0.0,
-            research_roll_interval_ticks: 0,
             events_enabled: false,
             event_global_cooldown_ticks: 200,
             event_history_capacity: 100,
@@ -190,14 +188,7 @@ fn replenish_spawns_sites_when_below_threshold() {
     let content = replenish_test_content();
     let mut state = empty_sites_state(&content);
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
     assert_eq!(state.scan_sites.len(), 5); // replenish_batch_size
     let spawned_events: Vec<_> = events
@@ -220,14 +211,7 @@ fn replenish_does_not_spawn_when_at_threshold() {
         });
     }
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[], &content, &mut rng, None);
 
     let spawned_events: Vec<_> = events
         .iter()
@@ -242,14 +226,7 @@ fn replenish_site_ids_are_unique_uuids() {
     let content = replenish_test_content();
     let mut state = empty_sites_state(&content);
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
 
     let ids: Vec<_> = state.scan_sites.iter().map(|s| s.id.0.clone()).collect();
     // All start with "site_"
@@ -302,14 +279,7 @@ fn jettison_slag_removes_all_slag_and_emits_event() {
     };
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let events = tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
 
     // Slag should be gone, material should remain
     let station = &state.stations[&station_id];
@@ -361,14 +331,7 @@ fn jettison_slag_no_event_when_no_slag() {
     };
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let events = tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
 
     assert!(
         !events
@@ -384,25 +347,11 @@ fn replenish_is_deterministic() {
 
     let mut state1 = empty_sites_state(&content);
     let mut rng1 = ChaCha8Rng::seed_from_u64(42);
-    tick(
-        &mut state1,
-        &[],
-        &content,
-        &mut rng1,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state1, &[], &content, &mut rng1, None);
 
     let mut state2 = empty_sites_state(&content);
     let mut rng2 = ChaCha8Rng::seed_from_u64(42);
-    tick(
-        &mut state2,
-        &[],
-        &content,
-        &mut rng2,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state2, &[], &content, &mut rng2, None);
 
     let ids1: Vec<_> = state1.scan_sites.iter().map(|s| s.id.0.clone()).collect();
     let ids2: Vec<_> = state2.scan_sites.iter().map(|s| s.id.0.clone()).collect();
@@ -419,42 +368,21 @@ fn replenish_interval_gating_skips_off_ticks() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
     // Tick 0 is a multiple of 10 — should spawn
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
     assert_eq!(state.scan_sites.len(), 5);
 
     // Consume all sites to trigger replenish again
     state.scan_sites.clear();
 
     // Tick 1 is NOT a multiple of 10 — should NOT spawn
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
     assert_eq!(state.scan_sites.len(), 0, "tick 1 should skip replenish");
 
     // Advance to tick 10: replenish checks happen BEFORE tick increment,
     // so we need tick() called when state.meta.tick == 10.
     // After 2 calls, tick=2. Need 9 more calls to reach tick 10 check + increment to 11.
     for _ in 0..9 {
-        tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        tick(&mut state, &[], &content, &mut rng, None);
     }
     assert_eq!(state.meta.tick, 11);
     assert_eq!(
@@ -481,14 +409,7 @@ fn replenish_target_count_controls_threshold() {
     }
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
     assert_eq!(state.scan_sites.len(), 3, "should not spawn when at target");
 }
 
@@ -509,14 +430,7 @@ fn replenish_spawns_deficit_up_to_batch() {
     }
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let events = tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[], &content, &mut rng, None);
     let spawned: Vec<_> = events
         .iter()
         .filter(|e| matches!(e.event, Event::ScanSiteSpawned { .. }))
@@ -535,14 +449,7 @@ fn replenish_uses_zone_weighted_positions() {
     let mut state = empty_sites_state(&content);
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-    tick(
-        &mut state,
-        &[],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[], &content, &mut rng, None);
 
     // All sites should be in the test_body zone (radius 1000-2000)
     for site in &state.scan_sites {

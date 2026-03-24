@@ -67,8 +67,8 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 
 **Key design rules:**
 - Asteroids created on discovery (scan_sites → AsteroidState), not pre-populated.
-- Research uses lab-based domain system. Labs consume raw data, produce domain-specific points. Tech unlock is probabilistic.
-- Raw data is sim-wide (on ResearchState), not station inventory. Rolls every N ticks, not every tick.
+- Research uses lab-based domain system. Labs consume raw data, produce domain-specific points. Tech unlocks deterministically when all domain requirements are met.
+- Raw data is sim-wide (on ResearchState), not station inventory.
 - DeepScan commands dropped if no unlocked tech has EnableDeepScan effect.
 - All collection iteration sorted by ID before RNG use for determinism.
 - sim_core takes `&mut impl rand::Rng` — concrete ChaCha8Rng in sim_cli/sim_daemon.

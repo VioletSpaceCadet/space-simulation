@@ -7,14 +7,7 @@ fn test_assign_survey_sets_task() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd], &content, &mut rng, None);
 
     let ship = &state.ships[&ShipId("ship_0001".to_string())];
     assert!(
@@ -30,14 +23,7 @@ fn test_assign_command_emits_task_started() {
     let mut rng = make_rng();
 
     let cmd = survey_command(&state);
-    let events = tick(
-        &mut state,
-        &[cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
 
     assert!(
         events
@@ -67,14 +53,7 @@ fn test_wrong_owner_command_is_dropped() {
         },
     };
 
-    tick(
-        &mut state,
-        &[bad_command],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[bad_command], &content, &mut rng, None);
 
     let ship = &state.ships[&ship_id];
     assert!(
@@ -103,14 +82,7 @@ fn test_future_command_not_applied_early() {
         },
     };
 
-    tick(
-        &mut state,
-        &[future_command],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[future_command], &content, &mut rng, None);
 
     let ship = &state.ships[&ship_id];
     assert!(
@@ -149,14 +121,7 @@ fn test_install_module_initializes_thermal_state_for_thermal_modules() {
         },
     };
 
-    tick(
-        &mut state,
-        &[install_cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[install_cmd], &content, &mut rng, None);
 
     let station = state.stations.get(&station_id).unwrap();
     let smelter = station
@@ -220,14 +185,7 @@ fn test_install_module_no_thermal_state_for_non_thermal_modules() {
         },
     };
 
-    tick(
-        &mut state,
-        &[install_cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[install_cmd], &content, &mut rng, None);
 
     let station = state.stations.get(&station_id).unwrap();
     let refinery = station
@@ -280,14 +238,7 @@ fn test_select_recipe_updates_processor_state() {
             recipe_id: RecipeId("recipe_basic_iron".to_string()),
         },
     };
-    tick(
-        &mut state,
-        &[select_cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[select_cmd], &content, &mut rng, None);
 
     let station = state.stations.get(&station_id).unwrap();
     let module = station.modules.iter().find(|m| m.id == module_id).unwrap();
@@ -339,14 +290,7 @@ fn test_select_recipe_out_of_bounds_rejected() {
             recipe_id: RecipeId("recipe_nonexistent".to_string()),
         },
     };
-    tick(
-        &mut state,
-        &[select_cmd],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[select_cmd], &content, &mut rng, None);
 
     // selected_recipe should still be None (unchanged — command was rejected).
     let station = state.stations.get(&station_id).unwrap();

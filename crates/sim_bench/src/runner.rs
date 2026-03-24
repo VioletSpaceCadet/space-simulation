@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use sim_control::{AutopilotController, CommandSource};
-use sim_core::{EventLevel, GameContent, GameState, MetricsSnapshot, TickTimings};
+use sim_core::{GameContent, GameState, MetricsSnapshot, TickTimings};
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
@@ -80,14 +80,7 @@ pub fn run_seed(
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(&state, content, &mut next_command_id);
         let mut timings = TickTimings::default();
-        sim_core::tick(
-            &mut state,
-            &commands,
-            content,
-            &mut rng,
-            EventLevel::Normal,
-            Some(&mut timings),
-        );
+        sim_core::tick(&mut state, &commands, content, &mut rng, Some(&mut timings));
         all_timings.push(timings);
 
         if state.meta.tick % metrics_every == 0 {

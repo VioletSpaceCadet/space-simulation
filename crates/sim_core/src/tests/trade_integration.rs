@@ -8,14 +8,13 @@ use std::collections::HashMap;
 fn economy_content() -> GameContent {
     let mut content = test_fixtures::base_content();
 
-    // Tech that gates ship construction via effect system
+    // Tech that gates ship construction — high requirement prevents auto-unlock
     content.techs.push(TechDef {
         id: TechId("tech_ship_construction".to_string()),
         name: "Ship Construction".to_string(),
         prereqs: vec![],
-        domain_requirements: HashMap::new(),
+        domain_requirements: HashMap::from([(ResearchDomain::Manufacturing, 1_000_000.0)]),
         accepted_data: vec![],
-        difficulty: 10.0,
         effects: vec![TechEffect::EnableShipConstruction],
     });
 
@@ -186,14 +185,7 @@ fn economy_full_loop() {
             },
         },
     );
-    let events = tick(
-        &mut state,
-        &[cmd_thrusters],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[cmd_thrusters], &content, &mut rng, None);
 
     // Verify balance decreased
     assert!(
@@ -248,14 +240,7 @@ fn economy_full_loop() {
             },
         },
     );
-    let events = tick(
-        &mut state,
-        &[cmd_fe],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[cmd_fe], &content, &mut rng, None);
 
     // Verify balance decreased
     assert!(
@@ -306,14 +291,7 @@ fn economy_full_loop() {
             },
         },
     );
-    tick(
-        &mut state,
-        &[cmd_import_shipyard],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd_import_shipyard], &content, &mut rng, None);
 
     // Find the module item_id in inventory
     let station = state.stations.get(&station_id).unwrap();
@@ -334,14 +312,7 @@ fn economy_full_loop() {
             module_item_id,
         },
     );
-    tick(
-        &mut state,
-        &[cmd_install],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd_install], &content, &mut rng, None);
 
     // Enable the module
     let station = state.stations.get(&station_id).unwrap();
@@ -361,27 +332,13 @@ fn economy_full_loop() {
             enabled: true,
         },
     );
-    tick(
-        &mut state,
-        &[cmd_enable],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    tick(&mut state, &[cmd_enable], &content, &mut rng, None);
 
     // Tick forward enough for the assembler interval (2 ticks) without tech
     let ships_before = state.ships.len();
     let mut saw_awaiting_tech = false;
     for _ in 0..4 {
-        let events = tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        let events = tick(&mut state, &[], &content, &mut rng, None);
         if events
             .iter()
             .any(|e| matches!(&e.event, Event::ModuleAwaitingTech { .. }))
@@ -414,14 +371,7 @@ fn economy_full_loop() {
     let ships_before = state.ships.len();
     let mut all_events = Vec::new();
     for _ in 0..4 {
-        let events = tick(
-            &mut state,
-            &[],
-            &content,
-            &mut rng,
-            EventLevel::Normal,
-            None,
-        );
+        let events = tick(&mut state, &[], &content, &mut rng, None);
         all_events.extend(events);
     }
 
@@ -487,14 +437,7 @@ fn economy_full_loop() {
             },
         },
     );
-    let events = tick(
-        &mut state,
-        &[cmd_export],
-        &content,
-        &mut rng,
-        EventLevel::Normal,
-        None,
-    );
+    let events = tick(&mut state, &[cmd_export], &content, &mut rng, None);
 
     // Revenue: base_price * kg - surcharge * mass = 50 * 1000 - 50 * 1000 = 0
     // (Fe export revenue is 0 because surcharge equals price -- that's fine, we

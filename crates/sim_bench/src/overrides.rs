@@ -144,7 +144,6 @@ const DERIVED_CONSTANT_FIELDS: &[&str] = &[
     "mining_rate_kg_per_tick",
     "deposit_ticks",
     "station_power_available_per_tick",
-    "research_roll_interval_ticks",
 ];
 
 /// Apply constant overrides via serde: serialize current values, patch, deserialize back.
@@ -228,17 +227,6 @@ mod tests {
         let overrides = HashMap::from([("survey_scan_minutes".to_string(), serde_json::json!(99))]);
         apply_overrides(&mut content, &overrides).unwrap();
         assert_eq!(content.constants.survey_scan_minutes, 99);
-    }
-
-    #[test]
-    fn test_apply_research_override() {
-        let mut content = test_content();
-        let overrides = HashMap::from([(
-            "research_roll_interval_minutes".to_string(),
-            serde_json::json!(120),
-        )]);
-        apply_overrides(&mut content, &overrides).unwrap();
-        assert_eq!(content.constants.research_roll_interval_minutes, 120);
     }
 
     #[test]

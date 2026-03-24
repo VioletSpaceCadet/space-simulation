@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use sim_control::{AutopilotController, CommandSource};
-use sim_core::{EventLevel, GameState};
+use sim_core::GameState;
 use sim_world::RunSetupBuilder;
 
 // ---------------------------------------------------------------------------
@@ -31,8 +31,6 @@ enum Commands {
         content_dir: String,
         #[arg(long, default_value_t = 100)]
         print_every: u64,
-        #[arg(long, default_value = "normal", value_parser = ["normal", "debug"])]
-        event_level: String,
         /// Sample metrics every N ticks (default 60).
         #[arg(long, default_value_t = 60)]
         metrics_every: u64,
@@ -53,7 +51,6 @@ fn run(
     state_file: Option<String>,
     content_dir: &str,
     print_every: u64,
-    event_level: EventLevel,
     metrics_every: u64,
     no_metrics: bool,
 ) -> Result<()> {
@@ -94,7 +91,7 @@ fn run(
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(&state, &content, &mut next_command_id);
 
-        let events = sim_core::tick(&mut state, &commands, &content, &mut rng, event_level, None);
+        let events = sim_core::tick(&mut state, &commands, &content, &mut rng, None);
 
         // Print notable events regardless of print_every.
         for event in &events {
@@ -183,21 +180,15 @@ fn main() -> Result<()> {
             state_file,
             content_dir,
             print_every,
-            event_level,
             metrics_every,
             no_metrics,
         } => {
-            let level = match event_level.as_str() {
-                "debug" => EventLevel::Debug,
-                _ => EventLevel::Normal,
-            };
             run(
                 ticks,
                 seed,
                 state_file,
                 &content_dir,
                 print_every,
-                level,
                 metrics_every,
                 no_metrics,
             )?;

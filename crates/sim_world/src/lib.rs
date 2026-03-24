@@ -933,7 +933,6 @@ mod tests {
             prereqs: vec![TechId("tech_nonexistent".to_string())],
             domain_requirements: HashMap::new(),
             accepted_data: vec![],
-            difficulty: 1.0,
             effects: vec![],
         });
         validate_content(&content);
