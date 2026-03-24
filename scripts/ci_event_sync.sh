@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Verifies that every Event variant in sim_core/src/types.rs is either
+# Verifies that every Event variant in sim_core/src/types/events.rs is either
 # handled in ui_web/src/hooks/applyEvents.ts or explicitly allow-listed.
 #
 # Usage: ./scripts/ci_event_sync.sh
 # Exit 0 = all events accounted for, Exit 1 = missing handlers.
 set -euo pipefail
 
-TYPES_RS="crates/sim_core/src/types.rs"
+TYPES_RS="crates/sim_core/src/types/events.rs"
 APPLY_EVENTS_TS="ui_web/src/hooks/applyEvents.ts"
 
 # --- Extract Event variants from Rust enum ---
