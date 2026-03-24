@@ -49,7 +49,7 @@ pytest scripts/analysis/tests/                            # Python tests
 
 Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus `sim_world` (content loading + world gen) and `ui_web/` (React).
 
-- **sim_core** — Pure deterministic sim. No IO. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, etc.
+- **sim_core** — Pure deterministic sim. No IO. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, `TickTimings`, `compute_step_stats()`, etc.
 - **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management).
 - **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json`.
 - **sim_bench** — Scenario runner. JSON overrides (constants + `module.*` dotted keys). Parallel seeds via rayon. Outputs Parquet + CSV metrics.
@@ -75,6 +75,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **Event sync:** When adding a new `Event` variant to `sim_core/src/types.rs`, you MUST also add a handler in `ui_web/src/hooks/applyEvents.ts` (or add to the allow-list in `scripts/ci_event_sync.sh` if intentionally skipped). CI enforces this.
 - **Time scale:** `minutes_per_tick` in constants.json (default 60 = 1 tick per hour). Test fixtures use 1. Helpers: `Constants::game_minutes_to_ticks()`, `Constants::rate_per_minute_to_per_tick()`. `trade_unlock_tick()` derives from this constant.
 - **Content-driven types:** `AnomalyTag`, `DataKind`, `ResearchDomain` are loaded from content JSON. Adding a new type = adding a JSON entry, not a Rust enum variant. Enums are reserved for engine mechanics (Command, Event, TaskKind), not content categories.
+- **Instrumentation:** `TickTimings` struct (14 `Duration` fields: 6 top-level tick steps + 8 station sub-steps). `timed!` macro wraps each step — active in debug builds via `debug_assertions`, compiled away in release unless `instrumentation` feature enabled. `tick()` takes `Option<&mut TickTimings>` — pass `None` for zero-cost, `Some(&mut timings)` to collect. `compute_step_stats(&[TickTimings])` returns per-step mean/p50/p95/max. sim_bench and sim_daemon both enable the feature and collect timings. Daemon exposes `GET /api/v1/perf` (rolling 1,000-tick buffer) and includes perf summary in advisor digest.
 
 ## Development Workflow
 
