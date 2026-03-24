@@ -15,6 +15,7 @@ fn heating_content() -> GameContent {
         specific_heat_j_per_kg_k: None,
         boiloff_rate_per_day_at_293k: None,
         boiling_point_mk: None,
+        boiloff_curve: None,
     });
     let water_recipe = RecipeDef {
         id: RecipeId("recipe_extract_water".to_string()),

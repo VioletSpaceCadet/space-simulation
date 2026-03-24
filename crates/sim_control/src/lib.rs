@@ -1086,6 +1086,7 @@ mod tests {
             specific_heat_j_per_kg_k: None,
             boiloff_rate_per_day_at_293k: None,
             boiling_point_mk: None,
+            boiloff_curve: None,
         });
         content.init_caches(); // Rebuild density_map with He
                                // Add component def for repair_kit (needed for mass calculation)
@@ -1545,6 +1546,7 @@ mod tests {
             specific_heat_j_per_kg_k: None,
             boiloff_rate_per_day_at_293k: None,
             boiling_point_mk: None,
+            boiloff_curve: None,
         });
         let mut state = autopilot_state(&content);
 

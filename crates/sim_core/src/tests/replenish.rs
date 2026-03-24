@@ -53,6 +53,7 @@ fn replenish_test_content() -> GameContent {
             specific_heat_j_per_kg_k: None,
             boiloff_rate_per_day_at_293k: None,
             boiling_point_mk: None,
+            boiloff_curve: None,
         }],
         module_defs: AHashMap::default(),
         component_defs: vec![],

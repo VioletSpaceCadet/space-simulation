@@ -15,6 +15,7 @@ fn electrolysis_content() -> GameContent {
         specific_heat_j_per_kg_k: None,
         boiloff_rate_per_day_at_293k: None,
         boiling_point_mk: None,
+        boiloff_curve: None,
     });
     content.elements.push(ElementDef {
         id: "LH2".to_string(),
@@ -27,6 +28,7 @@ fn electrolysis_content() -> GameContent {
         specific_heat_j_per_kg_k: None,
         boiloff_rate_per_day_at_293k: None,
         boiling_point_mk: None,
+        boiloff_curve: None,
     });
     content.elements.push(ElementDef {
         id: "LOX".to_string(),
@@ -39,6 +41,7 @@ fn electrolysis_content() -> GameContent {
         specific_heat_j_per_kg_k: None,
         boiloff_rate_per_day_at_293k: None,
         boiling_point_mk: None,
+        boiloff_curve: None,
     });
 
     let electrolysis_recipe = RecipeDef {
