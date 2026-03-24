@@ -668,16 +668,16 @@ fn apply_single_effect(
             op,
             value,
             duration_ticks,
-        } => apply_modifier(
-            event_def_id,
-            effect,
-            target,
-            state,
-            *stat,
-            *op,
-            *value,
-            *duration_ticks,
-        ),
+        } => {
+            let modifier = crate::modifiers::Modifier {
+                stat: *stat,
+                op: *op,
+                value: *value,
+                source: crate::modifiers::ModifierSource::Event(event_def_id.0.clone()),
+                condition: None,
+            };
+            apply_modifier(modifier, effect, target, state, *duration_ticks)
+        }
         EffectDef::TriggerAlert { severity, message } => {
             let alert_id = format!("evt_{}", event_def_id.0);
             events.push(crate::emit(
@@ -790,23 +790,16 @@ fn apply_spawn_scan_site(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn apply_modifier(
-    event_def_id: &EventDefId,
+    modifier: crate::modifiers::Modifier,
     effect: &EffectDef,
     target: &ResolvedTarget,
     state: &mut GameState,
-    stat: StatId,
-    op: ModifierOp,
-    value: f64,
     duration_ticks: u64,
 ) -> Option<AppliedEffect> {
-    let modifier = crate::modifiers::Modifier {
-        stat,
-        op,
-        value,
-        source: crate::modifiers::ModifierSource::Event(event_def_id.0.clone()),
-        condition: None,
+    let source_event_id = match &modifier.source {
+        crate::modifiers::ModifierSource::Event(id) => EventDefId(id.clone()),
+        _ => return None,
     };
     match target {
         ResolvedTarget::Global | ResolvedTarget::Zone { .. } => state.modifiers.add(modifier),
@@ -818,7 +811,7 @@ fn apply_modifier(
         }
     }
     state.events.active_effects.push(ActiveEffect {
-        source_event_id: event_def_id.clone(),
+        source_event_id,
         target: target.clone(),
         expires_at_tick: state.meta.tick + duration_ticks,
     });

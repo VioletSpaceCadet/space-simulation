@@ -527,7 +527,6 @@ pub fn recompute_ship_stats(ship: &mut crate::ShipState, content: &GameContent) 
 }
 
 /// Fit a ship module into a hull slot at the given station.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_fit_ship_module(
     state: &mut GameState,
     content: &GameContent,
@@ -535,7 +534,6 @@ pub(crate) fn handle_fit_ship_module(
     slot_index: usize,
     module_def_id: &ModuleDefId,
     station_id: &StationId,
-    current_tick: u64,
     events: &mut Vec<EventEnvelope>,
 ) -> bool {
     // Ship must exist and be at the same station location
@@ -603,7 +601,7 @@ pub(crate) fn handle_fit_ship_module(
 
     events.push(crate::emit(
         &mut state.counters,
-        current_tick,
+        state.meta.tick,
         crate::Event::ShipModuleFitted {
             ship_id: ship_id.clone(),
             slot_index,
@@ -824,7 +822,6 @@ mod tests {
             0, // utility slot
             &module_def_id,
             &station_id,
-            1,
             &mut events,
         );
 
@@ -865,7 +862,6 @@ mod tests {
             1,
             &module_def_id,
             &station_id,
-            1,
             &mut events,
         );
 
@@ -896,7 +892,6 @@ mod tests {
             0,
             &module_def_id,
             &station_id,
-            1,
             &mut events,
         );
 
@@ -1030,7 +1025,6 @@ mod tests {
             0,
             &ModuleDefId("module_mining_laser".to_string()),
             &station_id,
-            1,
             &mut events,
         );
         let ship = state.ships.get(&ship_id).unwrap();

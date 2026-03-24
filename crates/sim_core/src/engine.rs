@@ -254,7 +254,6 @@ fn apply_commands(
                     *slot_index,
                     module_def_id,
                     station_id,
-                    current_tick,
                     events,
                 );
             }
