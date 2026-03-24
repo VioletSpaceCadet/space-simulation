@@ -84,6 +84,9 @@ pub struct GameContent {
     /// Default fitting loadouts per hull from `content/fitting_templates.json`.
     #[serde(default)]
     pub fitting_templates: BTreeMap<HullId, Vec<FittedModule>>,
+    /// Initial station configuration from `content/initial_station.json`.
+    #[serde(default)]
+    pub initial_station: InitialStationDef,
     /// Pre-computed element id -> density (kg/m3) lookup. Populated by `init_caches()`.
     #[serde(skip)]
     pub density_map: AHashMap<String, f32>,
@@ -98,6 +101,54 @@ impl GameContent {
             .map(|e| (e.id.clone(), e.density_kg_per_m3))
             .collect();
     }
+}
+
+// ---------------------------------------------------------------------------
+// Initial station definition
+// ---------------------------------------------------------------------------
+
+/// Initial station configuration loaded from `content/initial_station.json`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitialStationDef {
+    /// Module def IDs to install. Item IDs auto-generated as `module_item_NNNN`.
+    #[serde(default)]
+    pub modules: Vec<String>,
+    /// Starting materials.
+    #[serde(default)]
+    pub materials: Vec<InitialMaterial>,
+    /// Starting components (e.g., repair kits).
+    #[serde(default)]
+    pub components: Vec<InitialComponent>,
+}
+
+impl Default for InitialStationDef {
+    fn default() -> Self {
+        Self {
+            modules: vec![],
+            materials: vec![],
+            components: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitialMaterial {
+    pub element: String,
+    pub kg: f32,
+    #[serde(default = "default_quality")]
+    pub quality: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitialComponent {
+    pub id: String,
+    pub count: u32,
+    #[serde(default = "default_quality")]
+    pub quality: f32,
+}
+
+fn default_quality() -> f32 {
+    1.0
 }
 
 // ---------------------------------------------------------------------------

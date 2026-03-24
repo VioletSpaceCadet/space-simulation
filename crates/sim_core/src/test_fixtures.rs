@@ -8,9 +8,9 @@ use crate::AHashMap;
 use crate::{AngleMilliDeg, BodyId, Position, RadiusAuMicro};
 use crate::{
     AnomalyTag, AsteroidId, AsteroidTemplateDef, BodyType, Constants, Counters, DataKind,
-    ElementDef, GameContent, GameState, HullId, InputAmount, InputFilter, ItemKind, LotId,
-    MetaState, ModuleDef, ModuleInstanceId, ModuleKindState, ModuleState, NodeDef, NodeId,
-    OrbitalBodyDef, OutputSpec, PricingTable, PrincipalId, ProcessorDef, ProcessorState,
+    ElementDef, GameContent, GameState, HullId, InitialStationDef, InputAmount, InputFilter,
+    ItemKind, LotId, MetaState, ModuleDef, ModuleInstanceId, ModuleKindState, ModuleState, NodeDef,
+    NodeId, OrbitalBodyDef, OutputSpec, PricingTable, PrincipalId, ProcessorDef, ProcessorState,
     QualityFormula, RadiatorDef, RadiatorState, RecipeDef, RecipeId, RecipeThermalReq,
     ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState,
     TechDef, TechEffect, TechId, ThermalDef, ThermalState, WearState, YieldFormula,
@@ -267,6 +267,7 @@ pub fn base_content() -> GameContent {
         events: Vec::new(),
         hulls: BTreeMap::new(),
         fitting_templates: BTreeMap::new(),
+        initial_station: InitialStationDef::default(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -492,6 +493,7 @@ pub fn minimal_content() -> GameContent {
         events: Vec::new(),
         hulls: BTreeMap::new(),
         fitting_templates: BTreeMap::new(),
+        initial_station: InitialStationDef::default(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();

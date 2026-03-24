@@ -481,6 +481,11 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     }
     let hulls = load_hull_defs(dir)?;
     let fitting_templates = load_fitting_templates(dir)?;
+    let initial_station: sim_core::InitialStationDef =
+        match std::fs::read_to_string(dir.join("initial_station.json")) {
+            Ok(text) => serde_json::from_str(&text).context("parsing initial_station.json")?,
+            Err(_) => sim_core::InitialStationDef::default(),
+        };
     let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
     )
@@ -511,6 +516,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         events: sim_events,
         hulls,
         fitting_templates,
+        initial_station,
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -521,7 +527,6 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     Ok(content)
 }
 
-#[allow(clippy::too_many_lines)]
 pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
     // Station is in Earth orbit zone (~3000 µAU from Earth, i.e. ~450km altitude)
     let earth_orbit_pos = sim_core::Position {
@@ -531,148 +536,36 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     };
     let c = &content.constants;
     let station_id = StationId("station_earth_orbit".to_string());
+
+    // Build station inventory from content definition
+    let init = &content.initial_station;
+    let mut inventory: Vec<InventoryItem> = Vec::new();
+    for (index, module_def_id) in init.modules.iter().enumerate() {
+        inventory.push(InventoryItem::Module {
+            item_id: ModuleItemId(format!("module_item_{:04}", index + 1)),
+            module_def_id: module_def_id.clone(),
+        });
+    }
+    for mat in &init.materials {
+        inventory.push(InventoryItem::Material {
+            element: mat.element.clone(),
+            kg: mat.kg,
+            quality: mat.quality,
+            thermal: None,
+        });
+    }
+    for comp in &init.components {
+        inventory.push(InventoryItem::Component {
+            component_id: ComponentId(comp.id.clone()),
+            count: comp.count,
+            quality: comp.quality,
+        });
+    }
+
     let station = StationState {
         id: station_id.clone(),
         position: earth_orbit_pos.clone(),
-        inventory: vec![
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0001".to_string()),
-                module_def_id: "module_basic_iron_refinery".to_string(),
-            },
-            InventoryItem::Component {
-                component_id: ComponentId("repair_kit".to_string()),
-                count: 10,
-                quality: 1.0,
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0002".to_string()),
-                module_def_id: "module_maintenance_bay".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0003".to_string()),
-                module_def_id: "module_basic_assembler".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0004".to_string()),
-                module_def_id: "module_exploration_lab".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0005".to_string()),
-                module_def_id: "module_materials_lab".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0006".to_string()),
-                module_def_id: "module_engineering_lab".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0007".to_string()),
-                module_def_id: "module_sensor_array".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0008".to_string()),
-                module_def_id: "module_shipyard".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0009".to_string()),
-                module_def_id: "module_basic_solar_array".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0010".to_string()),
-                module_def_id: "module_basic_solar_array".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0011".to_string()),
-                module_def_id: "module_basic_battery".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0012".to_string()),
-                module_def_id: "module_basic_smelter".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0013".to_string()),
-                module_def_id: "module_basic_radiator".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0014".to_string()),
-                module_def_id: "module_basic_radiator".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0015".to_string()),
-                module_def_id: "module_basic_solar_array".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0016".to_string()),
-                module_def_id: "module_heating_unit".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0017".to_string()),
-                module_def_id: "module_electrolysis_unit".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0018".to_string()),
-                module_def_id: "module_basic_solar_array".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0019".to_string()),
-                module_def_id: "module_propulsion_lab".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0020".to_string()),
-                module_def_id: "module_plate_press".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0021".to_string()),
-                module_def_id: "module_structural_assembler".to_string(),
-            },
-            InventoryItem::Material {
-                element: "Fe".to_string(),
-                kg: 500.0,
-                quality: 0.7,
-                thermal: None,
-            },
-            InventoryItem::Material {
-                element: "H2O".to_string(),
-                kg: 5000.0,
-                quality: 1.0,
-                thermal: None,
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0022".to_string()),
-                module_def_id: "module_mining_laser".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0023".to_string()),
-                module_def_id: "module_cargo_expander".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0024".to_string()),
-                module_def_id: "module_propellant_tank".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0025".to_string()),
-                module_def_id: "module_mining_laser".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0026".to_string()),
-                module_def_id: "module_cargo_expander".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0027".to_string()),
-                module_def_id: "module_propellant_tank".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0028".to_string()),
-                module_def_id: "module_mining_laser".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0029".to_string()),
-                module_def_id: "module_cargo_expander".to_string(),
-            },
-            InventoryItem::Module {
-                item_id: ModuleItemId("module_item_0030".to_string()),
-                module_def_id: "module_propellant_tank".to_string(),
-            },
-        ],
+        inventory,
         cargo_capacity_m3: c.station_cargo_capacity_m3,
         power_available_per_tick: c.station_power_available_per_tick,
         modules: vec![],
