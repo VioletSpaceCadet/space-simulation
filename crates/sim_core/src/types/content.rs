@@ -601,6 +601,8 @@ pub enum InputFilter {
         min_quality: f32,
     },
     Component(ComponentId),
+    /// Matches `InventoryItem::Module` with matching `module_def_id`.
+    Module(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

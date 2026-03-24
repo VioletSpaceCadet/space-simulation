@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AlertSeverity, AnomalyTag, AsteroidId, BehaviorType, ComponentId, CompositionVec, DataKind,
-    ElementId, EventId, HullId, InventoryItem, ModuleDefId, ModuleInstanceId, ModuleItemId,
-    PowerState, RecipeId, ResearchDomain, ShipId, SiteId, StationId, TechId, TradeItemSpec,
+    ElementId, EventId, FittedModule, HullId, InventoryItem, ModuleDefId, ModuleInstanceId,
+    ModuleItemId, PowerState, RecipeId, ResearchDomain, ShipId, SiteId, StationId, TechId,
+    TradeItemSpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -208,6 +209,7 @@ pub enum Event {
         position: crate::Position,
         cargo_capacity_m3: f64,
         hull_id: HullId,
+        fitted_modules: Vec<FittedModule>,
     },
     ShipModuleFitted {
         ship_id: ShipId,

@@ -534,6 +534,15 @@ fn processor_recipe_element_inputs_reference_known_elements() {
                             );
                         }
                         InputFilter::ItemKind(_) => {} // ItemKind is an enum, always valid
+                        InputFilter::Module(module_def_id) => {
+                            assert!(
+                                content.module_defs.contains_key(module_def_id),
+                                "module '{}' recipe '{}' input module '{}' is not a known module def",
+                                module_def.id,
+                                recipe_id,
+                                module_def_id
+                            );
+                        }
                     }
                 }
             }

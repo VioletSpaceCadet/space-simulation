@@ -24,12 +24,16 @@
       "position": { "parent_body": "earth_orbit_zone", "radius_au_um": 3000, "angle_mdeg": 0 },
       "owner": "principal_autopilot",
       "inventory": [],
-      "cargo_capacity_m3": 50.0,
+      "cargo_capacity_m3": 65.0,
       "task": null,
       "hull_id": "hull_general_purpose",
-      "fitted_modules": [],
-      "propellant_kg": 10000.0,
-      "propellant_capacity_kg": 10000.0,
+      "fitted_modules": [
+        { "slot_index": 0, "module_def_id": "module_cargo_expander" },
+        { "slot_index": 1, "module_def_id": "module_propellant_tank" },
+        { "slot_index": 2, "module_def_id": "module_mining_laser" }
+      ],
+      "propellant_kg": 15000.0,
+      "propellant_capacity_kg": 15000.0,
       "speed_ticks_per_au": 2133
     }
   },
@@ -145,6 +149,21 @@
           "kg": 500.0,
           "quality": 0.7
         },
+        {
+          "kind": "Material",
+          "element": "H2O",
+          "kg": 5000.0,
+          "quality": 1.0
+        },
+        { "kind": "Module", "item_id": "module_item_0022", "module_def_id": "module_mining_laser" },
+        { "kind": "Module", "item_id": "module_item_0023", "module_def_id": "module_cargo_expander" },
+        { "kind": "Module", "item_id": "module_item_0024", "module_def_id": "module_propellant_tank" },
+        { "kind": "Module", "item_id": "module_item_0025", "module_def_id": "module_mining_laser" },
+        { "kind": "Module", "item_id": "module_item_0026", "module_def_id": "module_cargo_expander" },
+        { "kind": "Module", "item_id": "module_item_0027", "module_def_id": "module_propellant_tank" },
+        { "kind": "Module", "item_id": "module_item_0028", "module_def_id": "module_mining_laser" },
+        { "kind": "Module", "item_id": "module_item_0029", "module_def_id": "module_cargo_expander" },
+        { "kind": "Module", "item_id": "module_item_0030", "module_def_id": "module_propellant_tank" },
         {
           "kind": "Module",
           "item_id": "module_item_0020",
