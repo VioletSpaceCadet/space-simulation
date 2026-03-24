@@ -108,7 +108,7 @@ impl GameContent {
 // ---------------------------------------------------------------------------
 
 /// Initial station configuration loaded from `content/initial_station.json`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct InitialStationDef {
     /// Module def IDs to install. Item IDs auto-generated as `module_item_NNNN`.
     #[serde(default)]
@@ -119,16 +119,6 @@ pub struct InitialStationDef {
     /// Starting components (e.g., repair kits).
     #[serde(default)]
     pub components: Vec<InitialComponent>,
-}
-
-impl Default for InitialStationDef {
-    fn default() -> Self {
-        Self {
-            modules: vec![],
-            materials: vec![],
-            components: vec![],
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
