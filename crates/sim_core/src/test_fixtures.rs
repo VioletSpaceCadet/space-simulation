@@ -35,8 +35,7 @@ pub fn test_ship_id() -> ShipId {
 }
 
 /// Build a `ModuleState` with sensible defaults.
-/// Accepts the def_id string and the `ModuleKindState` variant.
-/// Uses sequential instance IDs based on the def_id to avoid collisions.
+/// Instance ID is `{def_id}_instance` — use unique def_ids per module in a test.
 pub fn test_module(def_id: &str, kind_state: ModuleKindState) -> ModuleState {
     ModuleState {
         id: ModuleInstanceId(format!("{def_id}_instance")),
