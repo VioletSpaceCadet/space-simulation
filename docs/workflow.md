@@ -266,3 +266,30 @@ Try a trivial call in Claude Code:
 - [ ] `gh api repos/:owner/:repo` returns repo data (not 401/404)
 - [ ] Claude Code `/mcp` shows `github` as connected
 - [ ] Claude Code can run "list open PRs" without error
+
+## Performance Profiling
+
+Use [samply](https://github.com/mstange/samply) for CPU profiling. No root/Xcode required on macOS.
+
+### Setup
+
+```bash
+cargo install samply
+```
+
+### Profile a sim run
+
+```bash
+CARGO_PROFILE_RELEASE_DEBUG=true cargo build --release -p sim_cli
+samply record target/release/sim_cli run --ticks 10000 --seed 42 --no-metrics
+```
+
+This opens the Firefox Profiler in your browser automatically. Use the **Call Tree** tab to find hotspots and the **Flame Graph** tab for visual exploration.
+
+### Tips
+
+- Use `--ticks 10000` minimum for meaningful samples (250K for thorough analysis)
+- `--no-metrics` avoids metrics I/O noise in the profile
+- `--state content/dev_base_state.json` to profile with a specific game state
+- `CARGO_PROFILE_RELEASE_DEBUG=true` adds debug symbols to release builds (needed for function names in the profiler)
+- Export profiles from the Firefox Profiler UI for sharing

@@ -43,6 +43,9 @@ pytest scripts/analysis/tests/                            # Python tests
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
 ./scripts/ci_e2e.sh                                       # E2E Playwright tests
 ./scripts/ci_event_sync.sh                                # Event exhaustiveness check
+
+CARGO_PROFILE_RELEASE_DEBUG=true cargo build --release -p sim_cli  # Build with debug symbols
+samply record target/release/sim_cli run --ticks 10000 --seed 42   # CPU profile (opens browser)
 ```
 
 ## Architecture
