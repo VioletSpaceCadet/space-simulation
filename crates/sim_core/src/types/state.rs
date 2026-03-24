@@ -1,0 +1,479 @@
+//! Runtime state types: `GameState`, ships, stations, asteroids, modules, tasks.
+
+use std::collections::{HashMap, HashSet};
+
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    AnomalyTag, AsteroidId, BodyId, ComponentId, CompositionVec, Constants, DataKind,
+    DomainProgress, GameContent, HullId, InventoryItem, ModuleDefId, ModuleInstanceId,
+    OverheatZone, Phase, PrincipalId, RecipeId, ShipId, SiteId, StationId, TechId,
+    DEFAULT_AMBIENT_TEMP_MK,
+};
+
+// ---------------------------------------------------------------------------
+// Game state
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameState {
+    pub meta: MetaState,
+    /// Unscanned potential asteroid locations. Populated at world-gen; entries
+    /// are removed when surveyed and replaced by a real `AsteroidState`.
+    pub scan_sites: Vec<ScanSite>,
+    pub asteroids: HashMap<AsteroidId, AsteroidState>,
+    pub ships: HashMap<ShipId, ShipState>,
+    pub stations: HashMap<StationId, StationState>,
+    pub research: ResearchState,
+    #[serde(default)]
+    pub balance: f64,
+    /// Cumulative export revenue since simulation start.
+    #[serde(default)]
+    pub export_revenue_total: f64,
+    /// Total number of export transactions since simulation start.
+    #[serde(default)]
+    pub export_count: u32,
+    pub counters: Counters,
+    /// Global modifiers (from research, game-wide buffs).
+    #[serde(default)]
+    pub modifiers: crate::modifiers::ModifierSet,
+    /// Sim events system runtime state.
+    #[serde(default)]
+    pub events: crate::sim_events::SimEventState,
+    /// Cached absolute positions for orbital bodies. Not serialized -- recomputed on load.
+    #[serde(skip, default)]
+    pub body_cache: std::collections::HashMap<BodyId, crate::spatial::BodyCache>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetaState {
+    pub tick: u64,
+    pub seed: u64,
+    pub schema_version: u32,
+    pub content_version: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanSite {
+    pub id: SiteId,
+    pub position: crate::Position,
+    /// References an `AsteroidTemplateDef` id in `GameContent`.
+    pub template_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Counters {
+    pub next_event_id: u64,
+    pub next_command_id: u64,
+    pub next_asteroid_id: u64,
+    pub next_lot_id: u64,
+    pub next_module_instance_id: u64,
+}
+
+// ---------------------------------------------------------------------------
+// Module state
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleState {
+    pub id: ModuleInstanceId,
+    pub def_id: String,
+    pub enabled: bool,
+    pub kind_state: ModuleKindState,
+    pub wear: WearState,
+    /// Per-module thermal state. None for non-thermal modules.
+    #[serde(default)]
+    pub thermal: Option<ThermalState>,
+    /// Set each tick by power budget computation. Stalled modules skip their tick.
+    #[serde(skip, default)]
+    pub power_stalled: bool,
+    /// Manufacturing priority. Higher values run first within each behavior class.
+    /// Used to control which modules consume shared inventory first. 0 = default.
+    #[serde(default)]
+    pub manufacturing_priority: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ModuleKindState {
+    Processor(ProcessorState),
+    Storage,
+    Maintenance(MaintenanceState),
+    Assembler(AssemblerState),
+    Lab(LabState),
+    SensorArray(SensorArrayState),
+    SolarArray(SolarArrayState),
+    Battery(BatteryState),
+    Radiator(RadiatorState),
+    Equipment,
+}
+
+impl ModuleKindState {
+    /// Returns `true` if this module's kind state indicates it is stalled.
+    /// Only Processor and Assembler have a stalled concept; all others return `false`.
+    pub fn is_stalled(&self) -> bool {
+        match self {
+            Self::Processor(s) => s.stalled,
+            Self::Assembler(s) => s.stalled,
+            _ => false,
+        }
+    }
+
+    /// Returns a mutable reference to the tick timer, or `None` for non-ticking modules.
+    pub fn ticks_since_last_run_mut(&mut self) -> Option<&mut u64> {
+        match self {
+            Self::Processor(s) => Some(&mut s.ticks_since_last_run),
+            Self::Assembler(s) => Some(&mut s.ticks_since_last_run),
+            Self::SensorArray(s) => Some(&mut s.ticks_since_last_run),
+            Self::Lab(s) => Some(&mut s.ticks_since_last_run),
+            Self::Maintenance(s) => Some(&mut s.ticks_since_last_run),
+            Self::Storage
+            | Self::SolarArray(_)
+            | Self::Battery(_)
+            | Self::Radiator(_)
+            | Self::Equipment => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SensorArrayState {
+    pub ticks_since_last_run: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SolarArrayState {
+    pub ticks_since_last_run: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatteryState {
+    /// Current stored energy in kWh.
+    pub charge_kwh: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RadiatorState {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessorState {
+    pub threshold_kg: f32,
+    pub ticks_since_last_run: u64,
+    #[serde(default)]
+    pub stalled: bool,
+    #[serde(default)]
+    pub selected_recipe: Option<RecipeId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaintenanceState {
+    pub ticks_since_last_run: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssemblerState {
+    pub ticks_since_last_run: u64,
+    #[serde(default)]
+    pub stalled: bool,
+    #[serde(default)]
+    pub capped: bool,
+    #[serde(default)]
+    pub cap_override: HashMap<ComponentId, u32>,
+    #[serde(default)]
+    pub selected_recipe: Option<RecipeId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LabState {
+    pub ticks_since_last_run: u64,
+    pub assigned_tech: Option<TechId>,
+    #[serde(default)]
+    pub starved: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Asteroid state
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AsteroidState {
+    pub id: AsteroidId,
+    pub position: crate::Position,
+    /// Ground truth -- never exposed to the UI.
+    pub true_composition: CompositionVec,
+    pub anomaly_tags: Vec<AnomalyTag>,
+    pub mass_kg: f32,
+    pub knowledge: AsteroidKnowledge,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AsteroidKnowledge {
+    pub tag_beliefs: Vec<(AnomalyTag, f32)>,
+    /// Set after a deep scan. Exact composition -- no uncertainty model.
+    pub composition: Option<CompositionVec>,
+}
+
+// ---------------------------------------------------------------------------
+// Ship state
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShipState {
+    pub id: ShipId,
+    pub position: crate::Position,
+    pub owner: PrincipalId,
+    pub inventory: Vec<InventoryItem>,
+    pub cargo_capacity_m3: f32,
+    pub task: Option<TaskState>,
+    /// Per-ship travel speed. If `None`, uses the global `constants.ticks_per_au`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed_ticks_per_au: Option<u64>,
+    /// Per-ship modifiers (from equipment, buffs).
+    #[serde(default)]
+    pub modifiers: crate::modifiers::ModifierSet,
+    /// Hull class. Determines base stats, slot layout, and bonuses.
+    #[serde(default = "default_hull_id")]
+    pub hull_id: HullId,
+    /// Modules fitted into hull slots.
+    #[serde(default)]
+    pub fitted_modules: Vec<FittedModule>,
+    /// Current propellant level (kg). Consumed during transit, refueled at stations.
+    #[serde(default)]
+    pub propellant_kg: f32,
+    /// Cached propellant capacity (kg). Recomputed from hull + tank module modifiers.
+    #[serde(default)]
+    pub propellant_capacity_kg: f32,
+}
+
+fn default_hull_id() -> HullId {
+    HullId("hull_general_purpose".to_string())
+}
+
+impl ShipState {
+    /// Returns this ship's travel speed, falling back to the global default.
+    pub fn ticks_per_au(&self, global_default: u64) -> u64 {
+        self.speed_ticks_per_au.unwrap_or(global_default)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FittedModule {
+    pub slot_index: usize,
+    pub module_def_id: ModuleDefId,
+}
+
+// ---------------------------------------------------------------------------
+// Station state
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct PowerState {
+    pub generated_kw: f32,
+    pub consumed_kw: f32,
+    pub deficit_kw: f32,
+    /// Power discharged from batteries this tick (kW).
+    pub battery_discharge_kw: f32,
+    /// Power stored into batteries this tick (kW).
+    pub battery_charge_kw: f32,
+    /// Total energy stored across all batteries (kWh).
+    pub battery_stored_kwh: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StationState {
+    pub id: StationId,
+    pub position: crate::Position,
+    pub inventory: Vec<InventoryItem>,
+    pub cargo_capacity_m3: f32,
+    pub power_available_per_tick: f32,
+    pub modules: Vec<ModuleState>,
+    /// Per-station modifiers (from equipment, location).
+    #[serde(default)]
+    pub modifiers: crate::modifiers::ModifierSet,
+    /// Computed fresh each tick -- not persisted across ticks.
+    #[serde(skip_deserializing, default)]
+    pub power: PowerState,
+    /// Cached inventory volume. Set to `None` when inventory changes;
+    /// recomputed lazily via [`StationState::used_volume_m3`].
+    #[serde(skip, default)]
+    pub cached_inventory_volume_m3: Option<f32>,
+}
+
+impl StationState {
+    /// Get the cached inventory volume, computing and caching if needed.
+    pub fn used_volume_m3(&mut self, content: &GameContent) -> f32 {
+        if let Some(vol) = self.cached_inventory_volume_m3 {
+            return vol;
+        }
+        let vol = crate::tasks::inventory_volume_m3(&self.inventory, content);
+        self.cached_inventory_volume_m3 = Some(vol);
+        vol
+    }
+
+    /// Invalidate the cached volume. Call after any inventory mutation.
+    pub fn invalidate_volume_cache(&mut self) {
+        self.cached_inventory_volume_m3 = None;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Research state
+// ---------------------------------------------------------------------------
+
+/// Research distributes automatically to all eligible techs -- no player allocation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResearchState {
+    pub unlocked: HashSet<TechId>,
+    pub data_pool: HashMap<DataKind, f32>,
+    pub evidence: HashMap<TechId, DomainProgress>,
+    #[serde(default)]
+    pub action_counts: HashMap<String, u64>,
+}
+
+// ---------------------------------------------------------------------------
+// Task state
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskState {
+    pub kind: TaskKind,
+    pub started_tick: u64,
+    pub eta_tick: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TaskKind {
+    Idle,
+    /// Ship is in transit. On arrival it will immediately start `then`.
+    Transit {
+        destination: crate::Position,
+        /// Pre-computed total travel ticks.
+        total_ticks: u64,
+        then: Box<TaskKind>,
+    },
+    Survey {
+        site: SiteId,
+    },
+    DeepScan {
+        asteroid: AsteroidId,
+    },
+    Mine {
+        asteroid: AsteroidId,
+        /// Pre-computed mining duration (ticks), computed at task assignment.
+        duration_ticks: u64,
+    },
+    Deposit {
+        station: StationId,
+        #[serde(default)]
+        blocked: bool,
+    },
+}
+
+impl TaskKind {
+    /// Task duration in ticks.
+    pub fn duration(&self, constants: &Constants) -> u64 {
+        match self {
+            Self::Transit { total_ticks, .. } => *total_ticks,
+            Self::Survey { .. } => constants.survey_scan_ticks,
+            Self::DeepScan { .. } => constants.deep_scan_ticks,
+            Self::Mine { duration_ticks, .. } => *duration_ticks,
+            Self::Deposit { .. } => constants.deposit_ticks,
+            Self::Idle => 0,
+        }
+    }
+
+    /// Human-readable label for this task kind.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "Idle",
+            Self::Transit { .. } => "Transit",
+            Self::Survey { .. } => "Survey",
+            Self::DeepScan { .. } => "DeepScan",
+            Self::Mine { .. } => "Mine",
+            Self::Deposit { .. } => "Deposit",
+        }
+    }
+
+    /// Target entity ID (if any) for display/events.
+    pub fn target(&self) -> Option<String> {
+        match self {
+            Self::Idle => None,
+            Self::Transit { destination, .. } => Some(destination.parent_body.0.clone()),
+            Self::Survey { site } => Some(site.0.clone()),
+            Self::DeepScan { asteroid } | Self::Mine { asteroid, .. } => Some(asteroid.0.clone()),
+            Self::Deposit { station, .. } => Some(station.0.clone()),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Wear system
+// ---------------------------------------------------------------------------
+
+/// Standalone wear state, embedded wherever wear applies.
+/// Generic -- used by station modules now, ships later.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WearState {
+    pub wear: f32,
+}
+
+impl Default for WearState {
+    fn default() -> Self {
+        Self { wear: 0.0 }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Thermal state
+// ---------------------------------------------------------------------------
+
+/// Per-module thermal state, tracked in milli-Kelvin for deterministic integer arithmetic.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ThermalState {
+    /// Temperature in milli-Kelvin (e.g. `293_000` = 20 C ambient).
+    pub temp_mk: u32,
+    /// Which thermal group this module belongs to (shared with `ThermalDef`).
+    pub thermal_group: Option<crate::ThermalGroupId>,
+    /// Current overheat zone -- used for transition detection and wear multiplier.
+    #[serde(default)]
+    pub overheat_zone: OverheatZone,
+    /// Whether this module was auto-disabled by the overheat system.
+    /// Used to distinguish overheat-disabled from player-disabled or wear-disabled.
+    #[serde(default)]
+    pub overheat_disabled: bool,
+}
+
+impl Default for ThermalState {
+    fn default() -> Self {
+        Self {
+            temp_mk: DEFAULT_AMBIENT_TEMP_MK,
+            thermal_group: None,
+            overheat_zone: OverheatZone::default(),
+            overheat_disabled: false,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Material thermal properties
+// ---------------------------------------------------------------------------
+
+/// Thermal properties attached to a `Material` inventory item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MaterialThermalProps {
+    /// Temperature in milli-Kelvin.
+    pub temp_mk: u32,
+    /// Current phase of the material batch.
+    pub phase: Phase,
+    /// Latent heat buffer in joules (tracks energy absorbed/released during phase change).
+    pub latent_heat_buffer_j: i64,
+}
+
+impl Default for MaterialThermalProps {
+    fn default() -> Self {
+        Self {
+            temp_mk: DEFAULT_AMBIENT_TEMP_MK,
+            phase: Phase::Solid,
+            latent_heat_buffer_j: 0,
+        }
+    }
+}

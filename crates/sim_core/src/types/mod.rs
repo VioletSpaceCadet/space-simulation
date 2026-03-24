@@ -1,0 +1,203 @@
+//! Type definitions for `sim_core`.
+//!
+//! All public types, structs, enums, and ID newtypes used by the simulation.
+//! Organized into focused submodules; everything is re-exported for backward
+//! compatibility.
+
+mod commands;
+mod constants;
+mod content;
+mod events;
+mod inventory;
+mod state;
+
+pub use commands::*;
+pub use constants::*;
+pub use content::*;
+pub use events::*;
+pub use inventory::*;
+pub use state::*;
+
+use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+
+// ---------------------------------------------------------------------------
+// Type aliases
+// ---------------------------------------------------------------------------
+
+pub type ElementId = String;
+pub type CompositionVec = HashMap<ElementId, f32>;
+
+// ---------------------------------------------------------------------------
+// Well-known element IDs
+// ---------------------------------------------------------------------------
+
+pub const ELEMENT_ORE: &str = "ore";
+pub const ELEMENT_SLAG: &str = "slag";
+pub const ELEMENT_FE: &str = "Fe";
+pub const COMPONENT_REPAIR_KIT: &str = "repair_kit";
+pub const COMPONENT_THRUSTER: &str = "thruster";
+
+// ---------------------------------------------------------------------------
+// Well-known anomaly tag IDs
+// ---------------------------------------------------------------------------
+
+pub const TAG_IRON_RICH: &str = "IronRich";
+pub const TAG_VOLATILE_RICH: &str = "VolatileRich";
+
+// ---------------------------------------------------------------------------
+// Schema version
+// ---------------------------------------------------------------------------
+
+/// Current save-file schema version. Bump when state shape changes in a
+/// backward-incompatible way (new required fields, removed fields, type changes).
+pub const CURRENT_SCHEMA_VERSION: u32 = 1;
+
+// ---------------------------------------------------------------------------
+// Ambient temperature constant
+// ---------------------------------------------------------------------------
+
+/// 20 C in milli-Kelvin -- shared default for ambient/sink temperature.
+pub const DEFAULT_AMBIENT_TEMP_MK: u32 = 293_000;
+
+// ---------------------------------------------------------------------------
+// ID newtypes
+// ---------------------------------------------------------------------------
+
+macro_rules! string_id {
+    ($name:ident) => {
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+        pub struct $name(pub String);
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(&self.0)
+            }
+        }
+    };
+}
+
+string_id!(ShipId);
+string_id!(AsteroidId);
+string_id!(StationId);
+string_id!(TechId);
+string_id!(NodeId);
+string_id!(BodyId);
+string_id!(SiteId);
+string_id!(CommandId);
+string_id!(EventId);
+string_id!(PrincipalId);
+string_id!(LotId);
+string_id!(ModuleItemId);
+string_id!(ModuleInstanceId);
+string_id!(ComponentId);
+string_id!(RecipeId);
+string_id!(HullId);
+string_id!(SlotType);
+string_id!(ModuleDefId);
+
+// ---------------------------------------------------------------------------
+// Core enums
+// ---------------------------------------------------------------------------
+
+/// Data-driven anomaly tag. Values come from content JSON (`asteroid_templates`).
+/// Adding a new asteroid type = adding a JSON entry, not a code change.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AnomalyTag(pub String);
+
+impl AnomalyTag {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+}
+
+impl std::fmt::Display for AnomalyTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DataKind {
+    SurveyData,
+    AssayData,
+    ManufacturingData,
+    TransitData,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ResearchDomain {
+    Survey,
+    Materials,
+    Manufacturing,
+    Propulsion,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DomainProgress {
+    pub points: HashMap<ResearchDomain, f32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EventLevel {
+    Normal,
+    Debug,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum AlertSeverity {
+    Warning,
+    Critical,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BehaviorType {
+    Processor,
+    Storage,
+    Maintenance,
+    Assembler,
+    Lab,
+    SensorArray,
+    SolarArray,
+    Battery,
+    Radiator,
+    Equipment,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ItemKind {
+    Ore,
+    Slag,
+    Material,
+    Component,
+}
+
+// ---------------------------------------------------------------------------
+// Thermal primitives
+// ---------------------------------------------------------------------------
+
+/// String alias for grouping modules into thermal groups.
+/// Modules in the same group share radiator cooling.
+pub type ThermalGroupId = String;
+
+/// Overheat zone classification for a thermal module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum OverheatZone {
+    /// Below `max_temp_mk` -- normal operation.
+    #[default]
+    Nominal,
+    /// Above `max_temp_mk` + warning offset -- accelerated wear (2x default).
+    Warning,
+    /// Above `max_temp_mk` + critical offset -- auto-stall + accelerated wear (4x default).
+    Critical,
+    /// Above `max_temp_mk` + damage offset -- wear jumps to `wear_band_critical_threshold`, auto-disable.
+    Damage,
+}
+
+/// Phase of a material batch (solid or liquid).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Phase {
+    Solid,
+    Liquid,
+}
