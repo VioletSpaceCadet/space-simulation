@@ -6,14 +6,13 @@
 //! — whether from iteration order, HashMap traversal, or cross-platform
 //! float semantics — will cause these tests to fail.
 //!
-//! The tests exercise multiple systems simultaneously:
+//! The tests exercise the core production loop:
 //! - Survey → asteroid discovery (RNG-dependent composition generation)
-//! - Mining → ore extraction (float mass arithmetic)
 //! - Refinery → processing (composition-weighted yield, float quality)
-//! - Wear → accumulation and efficiency bands (float comparisons)
-//! - Research → data generation and tech rolls (float RNG boundaries)
-//! - Thermal → heat/cooling with milli-Kelvin integer state
-//! - Boiloff → mass loss on cryogenic materials
+//! - Wear → accumulation per processing run (float addition)
+//! - Research → data pool generation from survey (float accumulation)
+//!
+//! Not yet covered (would need extended fixtures): thermal, boiloff, labs.
 
 use super::*;
 
@@ -126,6 +125,20 @@ fn full_sim_state_actually_changes() {
         "ore inventory should change after {CANARY_TICK_COUNT} ticks \
          (initial: {initial_ore_kg}, final: {final_ore_kg})"
     );
+
+    // Wear should have accumulated on the refinery module
+    let station = &state.stations[&station_id];
+    let refinery_wear = station.modules[0].wear.wear;
+    assert!(
+        refinery_wear > 0.0,
+        "refinery module should have accumulated wear (got {refinery_wear})"
+    );
+
+    // Research data pool should have data from the survey
+    assert!(
+        !state.research.data_pool.is_empty(),
+        "research data pool should have entries from survey"
+    );
 }
 
 /// Spot-check that specific high-risk float fields are deterministic.
@@ -189,9 +202,10 @@ fn float_field_spot_check_deterministic() {
     );
 
     // Research state (float comparisons at RNG boundaries)
+    let research_a = serde_json::to_value(&state_a.research).unwrap();
+    let research_b = serde_json::to_value(&state_b.research).unwrap();
     assert_eq!(
-        format!("{:?}", state_a.research),
-        format!("{:?}", state_b.research),
-        "research state must be identical"
+        research_a, research_b,
+        "research state must be identical (serde_json::Value comparison)"
     );
 }
