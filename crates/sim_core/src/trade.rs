@@ -4,46 +4,6 @@ use crate::composition::blend_thermal;
 use crate::{GameContent, InventoryItem, ModuleItemId, PricingEntry, PricingTable, TradeItemSpec};
 use rand::Rng;
 
-/// Return the pricing lookup key for a trade item spec.
-pub fn pricing_key(item_spec: &TradeItemSpec) -> &str {
-    match item_spec {
-        TradeItemSpec::Material { element, .. } => element.as_str(),
-        TradeItemSpec::Component { component_id, .. } => component_id.0.as_str(),
-        TradeItemSpec::Module { module_def_id } => module_def_id.as_str(),
-    }
-}
-
-/// Compute total mass in kg for a trade item spec.
-/// Returns `None` if a component or module def is not found in content.
-pub fn compute_mass(item_spec: &TradeItemSpec, content: &GameContent) -> Option<f64> {
-    match item_spec {
-        TradeItemSpec::Material { kg, .. } => Some(f64::from(*kg)),
-        TradeItemSpec::Component {
-            component_id,
-            count,
-        } => {
-            let def = content
-                .component_defs
-                .iter()
-                .find(|d| d.id == component_id.0)?;
-            Some(f64::from(def.mass_kg) * f64::from(*count))
-        }
-        TradeItemSpec::Module { module_def_id } => {
-            let def = content.module_defs.get(module_def_id.as_str())?;
-            Some(f64::from(def.mass_kg))
-        }
-    }
-}
-
-/// Compute the quantity (unit count) for pricing calculation.
-fn quantity(item_spec: &TradeItemSpec) -> f64 {
-    match item_spec {
-        TradeItemSpec::Material { kg, .. } => f64::from(*kg),
-        TradeItemSpec::Component { count, .. } => f64::from(*count),
-        TradeItemSpec::Module { .. } => 1.0,
-    }
-}
-
 /// Compute the import cost for a trade item.
 /// Returns `None` if pricing entry not found, item not importable, or mass can't be computed.
 pub fn compute_import_cost(
@@ -51,14 +11,13 @@ pub fn compute_import_cost(
     pricing: &PricingTable,
     content: &GameContent,
 ) -> Option<f64> {
-    let key = pricing_key(item_spec);
-    let entry: &PricingEntry = pricing.items.get(key)?;
+    let entry: &PricingEntry = pricing.items.get(item_spec.pricing_key())?;
     if !entry.importable {
         return None;
     }
-    let mass = compute_mass(item_spec, content)?;
+    let mass = item_spec.compute_mass(content)?;
     let cost =
-        entry.base_price_per_unit * quantity(item_spec) + mass * pricing.import_surcharge_per_kg;
+        entry.base_price_per_unit * item_spec.quantity() + mass * pricing.import_surcharge_per_kg;
     Some(cost)
 }
 
@@ -69,13 +28,12 @@ pub fn compute_export_revenue(
     pricing: &PricingTable,
     content: &GameContent,
 ) -> Option<f64> {
-    let key = pricing_key(item_spec);
-    let entry: &PricingEntry = pricing.items.get(key)?;
+    let entry: &PricingEntry = pricing.items.get(item_spec.pricing_key())?;
     if !entry.exportable {
         return None;
     }
-    let mass = compute_mass(item_spec, content)?;
-    let revenue = (entry.base_price_per_unit * quantity(item_spec)
+    let mass = item_spec.compute_mass(content)?;
+    let revenue = (entry.base_price_per_unit * item_spec.quantity()
         - mass * pricing.export_surcharge_per_kg)
         .max(0.0);
     Some(revenue)

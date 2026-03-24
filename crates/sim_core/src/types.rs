@@ -629,6 +629,47 @@ pub enum TradeItemSpec {
     },
 }
 
+impl TradeItemSpec {
+    /// Return the pricing lookup key for this trade item.
+    pub fn pricing_key(&self) -> &str {
+        match self {
+            Self::Material { element, .. } => element.as_str(),
+            Self::Component { component_id, .. } => component_id.0.as_str(),
+            Self::Module { module_def_id } => module_def_id.as_str(),
+        }
+    }
+
+    /// Compute total mass in kg. Returns `None` if def not found in content.
+    pub fn compute_mass(&self, content: &GameContent) -> Option<f64> {
+        match self {
+            Self::Material { kg, .. } => Some(f64::from(*kg)),
+            Self::Component {
+                component_id,
+                count,
+            } => {
+                let def = content
+                    .component_defs
+                    .iter()
+                    .find(|d| d.id == component_id.0)?;
+                Some(f64::from(def.mass_kg) * f64::from(*count))
+            }
+            Self::Module { module_def_id } => {
+                let def = content.module_defs.get(module_def_id.as_str())?;
+                Some(f64::from(def.mass_kg))
+            }
+        }
+    }
+
+    /// Compute the quantity (unit count) for pricing calculation.
+    pub fn quantity(&self) -> f64 {
+        match self {
+            Self::Material { kg, .. } => f64::from(*kg),
+            Self::Component { count, .. } => f64::from(*count),
+            Self::Module { .. } => 1.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PricingEntry {
     pub base_price_per_unit: f64,
