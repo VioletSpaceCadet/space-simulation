@@ -214,7 +214,10 @@ fn compute_rates(history: &VecDeque<MetricsSnapshot>) -> Rates {
     }
 }
 
-fn detect_bottleneck(history: &VecDeque<MetricsSnapshot>) -> Bottleneck {
+fn detect_bottleneck(
+    history: &VecDeque<MetricsSnapshot>,
+    constants: &sim_core::Constants,
+) -> Bottleneck {
     let Some(latest) = history.back() else {
         return Bottleneck::Healthy;
     };
@@ -226,13 +229,13 @@ fn detect_bottleneck(history: &VecDeque<MetricsSnapshot>) -> Bottleneck {
     {
         return Bottleneck::OreSupply;
     }
-    if latest.station_storage_used_pct > 0.95 {
+    if latest.station_storage_used_pct > constants.bottleneck_storage_threshold_pct {
         return Bottleneck::StorageFull;
     }
-    if latest.total_slag_kg > latest.total_material_kg * 0.5 {
+    if latest.total_slag_kg > latest.total_material_kg * constants.bottleneck_slag_ratio_threshold {
         return Bottleneck::SlagBackpressure;
     }
-    if latest.max_module_wear > 0.8 {
+    if latest.max_module_wear > constants.bottleneck_wear_threshold {
         return Bottleneck::WearCritical;
     }
     if latest.fleet_idle > 0 && latest.fleet_total > 1 {
@@ -249,6 +252,7 @@ pub fn compute_digest(
     history: &VecDeque<MetricsSnapshot>,
     alerts: Vec<AlertDetail>,
     timings: &VecDeque<sim_core::TickTimings>,
+    constants: &sim_core::Constants,
 ) -> Option<AdvisorDigest> {
     let latest = history.back()?;
 
@@ -263,7 +267,7 @@ pub fn compute_digest(
         snapshot: latest.clone(),
         trends: compute_trends(history),
         rates: compute_rates(history),
-        bottleneck: detect_bottleneck(history),
+        bottleneck: detect_bottleneck(history, constants),
         alerts,
         perf,
     })
@@ -292,6 +296,11 @@ fn compute_perf_summary(timings: &VecDeque<sim_core::TickTimings>) -> PerfSummar
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sim_core::test_fixtures::base_content;
+
+    fn test_constants() -> sim_core::Constants {
+        base_content().constants
+    }
 
     fn empty_snapshot(tick: u64) -> MetricsSnapshot {
         MetricsSnapshot {
@@ -341,7 +350,7 @@ mod tests {
     #[test]
     fn empty_history_returns_none() {
         let history = VecDeque::new();
-        assert!(compute_digest(&history, vec![], &VecDeque::new()).is_none());
+        assert!(compute_digest(&history, vec![], &VecDeque::new(), &test_constants()).is_none());
     }
 
     #[test]
@@ -349,7 +358,7 @@ mod tests {
         let mut history = VecDeque::new();
         history.push_back(empty_snapshot(1));
 
-        let digest = compute_digest(&history, vec![], &VecDeque::new()).unwrap();
+        let digest = compute_digest(&history, vec![], &VecDeque::new(), &test_constants()).unwrap();
         for trend in &digest.trends {
             assert_eq!(
                 trend.direction,
@@ -436,7 +445,10 @@ mod tests {
         snap.max_module_wear = 0.9;
         history.push_back(snap);
 
-        assert_eq!(detect_bottleneck(&history), Bottleneck::OreSupply);
+        assert_eq!(
+            detect_bottleneck(&history, &test_constants()),
+            Bottleneck::OreSupply
+        );
     }
 
     #[test]
@@ -448,7 +460,10 @@ mod tests {
         snap.techs_unlocked = 1;
         history.push_back(snap);
 
-        assert_eq!(detect_bottleneck(&history), Bottleneck::Healthy);
+        assert_eq!(
+            detect_bottleneck(&history, &test_constants()),
+            Bottleneck::Healthy
+        );
     }
 
     #[test]
@@ -463,7 +478,10 @@ mod tests {
         snap.total_scan_data = 10.0;
         snap.techs_unlocked = 1;
         history.push_back(snap);
-        assert_eq!(detect_bottleneck(&history), Bottleneck::OreSupply);
+        assert_eq!(
+            detect_bottleneck(&history, &test_constants()),
+            Bottleneck::OreSupply
+        );
 
         // StorageFull
         let mut history = VecDeque::new();
@@ -472,7 +490,10 @@ mod tests {
         snap.total_scan_data = 10.0;
         snap.techs_unlocked = 1;
         history.push_back(snap);
-        assert_eq!(detect_bottleneck(&history), Bottleneck::StorageFull);
+        assert_eq!(
+            detect_bottleneck(&history, &test_constants()),
+            Bottleneck::StorageFull
+        );
 
         // SlagBackpressure
         let mut history = VecDeque::new();
@@ -482,7 +503,10 @@ mod tests {
         snap.total_scan_data = 10.0;
         snap.techs_unlocked = 1;
         history.push_back(snap);
-        assert_eq!(detect_bottleneck(&history), Bottleneck::SlagBackpressure);
+        assert_eq!(
+            detect_bottleneck(&history, &test_constants()),
+            Bottleneck::SlagBackpressure
+        );
 
         // WearCritical
         let mut history = VecDeque::new();
@@ -491,7 +515,10 @@ mod tests {
         snap.total_scan_data = 10.0;
         snap.techs_unlocked = 1;
         history.push_back(snap);
-        assert_eq!(detect_bottleneck(&history), Bottleneck::WearCritical);
+        assert_eq!(
+            detect_bottleneck(&history, &test_constants()),
+            Bottleneck::WearCritical
+        );
 
         // FleetIdle
         let mut history = VecDeque::new();
@@ -501,7 +528,10 @@ mod tests {
         snap.total_scan_data = 10.0;
         snap.techs_unlocked = 1;
         history.push_back(snap);
-        assert_eq!(detect_bottleneck(&history), Bottleneck::FleetIdle);
+        assert_eq!(
+            detect_bottleneck(&history, &test_constants()),
+            Bottleneck::FleetIdle
+        );
 
         // ResearchStalled
         let mut history = VecDeque::new();
@@ -509,6 +539,55 @@ mod tests {
         snap.total_scan_data = 0.5;
         snap.techs_unlocked = 0;
         history.push_back(snap);
-        assert_eq!(detect_bottleneck(&history), Bottleneck::ResearchStalled);
+        assert_eq!(
+            detect_bottleneck(&history, &test_constants()),
+            Bottleneck::ResearchStalled
+        );
+    }
+
+    #[test]
+    fn custom_thresholds_change_detection() {
+        let mut constants = test_constants();
+
+        // With default thresholds (0.95), 0.96 triggers StorageFull
+        let mut history = VecDeque::new();
+        let mut snap = empty_snapshot(1);
+        snap.station_storage_used_pct = 0.96;
+        snap.total_scan_data = 10.0;
+        snap.techs_unlocked = 1;
+        history.push_back(snap);
+        assert_eq!(
+            detect_bottleneck(&history, &constants),
+            Bottleneck::StorageFull
+        );
+
+        // Raise threshold to 0.99 — same value no longer triggers
+        constants.bottleneck_storage_threshold_pct = 0.99;
+        assert_eq!(detect_bottleneck(&history, &constants), Bottleneck::Healthy);
+
+        // Custom slag ratio: lower threshold triggers on less slag
+        constants.bottleneck_slag_ratio_threshold = 0.3;
+        let mut history = VecDeque::new();
+        let mut snap = empty_snapshot(1);
+        snap.total_slag_kg = 40.0;
+        snap.total_material_kg = 100.0; // 40 > 100*0.3 but 40 < 100*0.5
+        snap.total_scan_data = 10.0;
+        snap.techs_unlocked = 1;
+        history.push_back(snap);
+        assert_eq!(
+            detect_bottleneck(&history, &constants),
+            Bottleneck::SlagBackpressure
+        );
+
+        // Custom wear threshold: higher threshold avoids trigger
+        constants.bottleneck_slag_ratio_threshold = 0.5; // reset
+        constants.bottleneck_wear_threshold = 0.95;
+        let mut history = VecDeque::new();
+        let mut snap = empty_snapshot(1);
+        snap.max_module_wear = 0.9; // below 0.95
+        snap.total_scan_data = 10.0;
+        snap.techs_unlocked = 1;
+        history.push_back(snap);
+        assert_eq!(detect_bottleneck(&history, &constants), Bottleneck::Healthy);
     }
 }

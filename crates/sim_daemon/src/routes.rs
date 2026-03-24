@@ -201,9 +201,13 @@ async fn advisor_digest_handler(
         .unwrap_or_default();
 
     // Safe to unwrap: we checked is_empty() above, so history.back() will return Some.
-    let digest =
-        super::analytics::compute_digest(&sim.metrics_history, alert_details, &sim.timings_history)
-            .unwrap();
+    let digest = super::analytics::compute_digest(
+        &sim.metrics_history,
+        alert_details,
+        &sim.timings_history,
+        &sim.content.constants,
+    )
+    .unwrap();
     drop(sim);
 
     match serde_json::to_string(&digest) {
