@@ -3,9 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AlertSeverity, AnomalyTag, AsteroidId, ComponentId, CompositionVec, DataKind, ElementId,
-    EventId, HullId, InventoryItem, ModuleDefId, ModuleInstanceId, ModuleItemId, PowerState,
-    RecipeId, ResearchDomain, ShipId, SiteId, StationId, TechId, TradeItemSpec,
+    AlertSeverity, AnomalyTag, AsteroidId, BehaviorType, ComponentId, CompositionVec, DataKind,
+    ElementId, EventId, HullId, InventoryItem, ModuleDefId, ModuleInstanceId, ModuleItemId,
+    PowerState, RecipeId, ResearchDomain, ShipId, SiteId, StationId, TechId, TradeItemSpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ pub enum Event {
         module_id: ModuleInstanceId,
         module_item_id: ModuleItemId,
         module_def_id: String,
-        behavior_type: crate::BehaviorType,
+        behavior_type: BehaviorType,
     },
     ModuleUninstalled {
         station_id: StationId,

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     AnomalyTag, AsteroidId, BodyId, ComponentId, CompositionVec, Constants, DataKind,
     DomainProgress, GameContent, HullId, InventoryItem, ModuleDefId, ModuleInstanceId,
-    OverheatZone, Phase, PrincipalId, RecipeId, ShipId, SiteId, StationId, TechId,
+    OverheatZone, Phase, PrincipalId, RecipeId, ShipId, SiteId, StationId, TechId, ThermalGroupId,
     DEFAULT_AMBIENT_TEMP_MK,
 };
 
@@ -432,7 +432,7 @@ pub struct ThermalState {
     /// Temperature in milli-Kelvin (e.g. `293_000` = 20 C ambient).
     pub temp_mk: u32,
     /// Which thermal group this module belongs to (shared with `ThermalDef`).
-    pub thermal_group: Option<crate::ThermalGroupId>,
+    pub thermal_group: Option<ThermalGroupId>,
     /// Current overheat zone -- used for transition detection and wear multiplier.
     #[serde(default)]
     pub overheat_zone: OverheatZone,
