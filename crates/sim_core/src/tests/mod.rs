@@ -1,5 +1,8 @@
 use super::*;
-use crate::test_fixtures::{base_content, base_state, insert_recipe, make_rng, test_position};
+use crate::test_fixtures::{
+    base_content, base_state, insert_recipe, make_rng, test_module, test_position, test_ship_id,
+    test_station_id,
+};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
@@ -39,7 +42,7 @@ fn test_state(content: &GameContent) -> GameState {
 }
 
 fn survey_command(state: &GameState) -> CommandEnvelope {
-    let ship_id = ShipId("ship_0001".to_string());
+    let ship_id = test_ship_id();
     let owner = state.ships[&ship_id].owner.clone();
     CommandEnvelope {
         id: CommandId("cmd_000001".to_string()),
@@ -67,8 +70,8 @@ fn state_with_asteroid(content: &GameContent) -> (GameState, AsteroidId) {
 }
 
 fn deposit_command(state: &GameState) -> CommandEnvelope {
-    let ship_id = ShipId("ship_0001".to_string());
-    let station_id = StationId("station_earth_orbit".to_string());
+    let ship_id = test_ship_id();
+    let station_id = test_station_id();
     let ship = &state.ships[&ship_id];
     CommandEnvelope {
         id: CommandId("cmd_deposit_001".to_string()),
@@ -90,7 +93,7 @@ fn mine_command(
     asteroid_id: &AsteroidId,
     _content: &GameContent,
 ) -> CommandEnvelope {
-    let ship_id = ShipId("ship_0001".to_string());
+    let ship_id = test_ship_id();
     let ship = &state.ships[&ship_id];
     let duration_ticks = 10;
     CommandEnvelope {
@@ -161,24 +164,18 @@ fn refinery_content() -> GameContent {
 
 fn state_with_refinery(content: &GameContent) -> GameState {
     let mut state = test_state(content);
-    let station_id = StationId("station_earth_orbit".to_string());
+    let station_id = test_station_id();
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
-        id: ModuleInstanceId("module_inst_0001".to_string()),
-        def_id: "module_basic_iron_refinery".to_string(),
-        enabled: true,
-        kind_state: ModuleKindState::Processor(ProcessorState {
+    station.modules.push(test_module(
+        "module_basic_iron_refinery",
+        ModuleKindState::Processor(ProcessorState {
             threshold_kg: 100.0,
             ticks_since_last_run: 0,
             stalled: false,
             selected_recipe: None,
         }),
-        wear: WearState::default(),
-        power_stalled: false,
-        manufacturing_priority: 0,
-        thermal: None,
-    });
+    ));
 
     station.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_0001".to_string()),
@@ -242,25 +239,19 @@ fn assembler_content() -> GameContent {
 
 fn state_with_assembler(content: &GameContent) -> GameState {
     let mut state = test_state(content);
-    let station_id = StationId("station_earth_orbit".to_string());
+    let station_id = test_station_id();
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
-        id: ModuleInstanceId("module_inst_0001".to_string()),
-        def_id: "module_basic_assembler".to_string(),
-        enabled: true,
-        kind_state: ModuleKindState::Assembler(AssemblerState {
+    station.modules.push(test_module(
+        "module_basic_assembler",
+        ModuleKindState::Assembler(AssemblerState {
             ticks_since_last_run: 0,
             stalled: false,
             capped: false,
             cap_override: HashMap::new(),
             selected_recipe: None,
         }),
-        wear: WearState::default(),
-        power_stalled: false,
-        manufacturing_priority: 0,
-        thermal: None,
-    });
+    ));
 
     station.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
@@ -301,21 +292,15 @@ fn maintenance_content() -> GameContent {
 
 fn state_with_maintenance(content: &GameContent) -> GameState {
     let mut state = state_with_refinery(content);
-    let station_id = StationId("station_earth_orbit".to_string());
+    let station_id = test_station_id();
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
-        id: ModuleInstanceId("module_inst_0002".to_string()),
-        def_id: "module_maintenance_bay".to_string(),
-        enabled: true,
-        kind_state: ModuleKindState::Maintenance(MaintenanceState {
+    station.modules.push(test_module(
+        "module_maintenance_bay",
+        ModuleKindState::Maintenance(MaintenanceState {
             ticks_since_last_run: 0,
         }),
-        wear: WearState::default(),
-        power_stalled: false,
-        manufacturing_priority: 0,
-        thermal: None,
-    });
+    ));
 
     station.inventory.push(InventoryItem::Component {
         component_id: ComponentId("repair_kit".to_string()),
@@ -330,7 +315,7 @@ fn state_with_maintenance(content: &GameContent) -> GameState {
 fn test_station_volume_cache_invalidation() {
     let content = test_content();
     let mut state = test_state(&content);
-    let station_id = StationId("station_earth_orbit".to_string());
+    let station_id = test_station_id();
 
     let station = state.stations.get_mut(&station_id).unwrap();
     assert!(
