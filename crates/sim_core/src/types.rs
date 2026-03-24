@@ -1719,6 +1719,28 @@ pub struct Constants {
     /// Wear rate multiplier when module is in overheat critical zone.
     #[serde(default = "default_thermal_wear_multiplier_critical")]
     pub thermal_wear_multiplier_critical: f32,
+    // Misc sim_core constants (previously hardcoded)
+    /// Hard ceiling temperature in milli-Kelvin to prevent unbounded growth (10,000 K).
+    #[serde(default = "default_t_max_absolute_mk")]
+    pub t_max_absolute_mk: u32,
+    /// Minimum meaningful mass in kg; amounts below this are treated as zero.
+    #[serde(default = "default_min_meaningful_kg")]
+    pub min_meaningful_kg: f32,
+    /// Number of scan sites to spawn per replenishment batch.
+    #[serde(default = "default_replenish_batch_size")]
+    pub replenish_batch_size: usize,
+    /// Trade (import/export) unlocks after this many game-minutes (default: 1 year = 525,600).
+    #[serde(default = "default_trade_unlock_delay_minutes")]
+    pub trade_unlock_delay_minutes: u64,
+    /// Autopilot won't spend more than this fraction of balance on a single import.
+    #[serde(default = "default_autopilot_budget_cap_fraction")]
+    pub autopilot_budget_cap_fraction: f64,
+    /// Multiplier for LH2 abundance threshold (disable electrolysis when LH2 > threshold * this).
+    #[serde(default = "default_autopilot_lh2_abundant_multiplier")]
+    pub autopilot_lh2_abundant_multiplier: f32,
+    /// Temperature offset above ambient for the "hot" boiloff multiplier zone (milli-Kelvin).
+    #[serde(default = "default_boiloff_hot_offset_mk")]
+    pub boiloff_hot_offset_mk: u32,
     // Sim events system
     /// Whether the sim events system is enabled.
     #[serde(default = "default_events_enabled")]
@@ -1912,6 +1934,27 @@ fn default_replenish_check_interval_ticks() -> u64 {
 }
 fn default_replenish_target_count() -> u32 {
     5 // matches legacy MIN_UNSCANNED_SITES
+}
+fn default_t_max_absolute_mk() -> u32 {
+    10_000_000
+}
+fn default_min_meaningful_kg() -> f32 {
+    1e-3
+}
+fn default_replenish_batch_size() -> usize {
+    5
+}
+fn default_trade_unlock_delay_minutes() -> u64 {
+    365 * 24 * 60
+}
+fn default_autopilot_budget_cap_fraction() -> f64 {
+    0.05
+}
+fn default_autopilot_lh2_abundant_multiplier() -> f32 {
+    2.0
+}
+fn default_boiloff_hot_offset_mk() -> u32 {
+    100_000
 }
 fn default_events_enabled() -> bool {
     true

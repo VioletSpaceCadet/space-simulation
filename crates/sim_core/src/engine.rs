@@ -7,14 +7,10 @@ use crate::{
 };
 use rand::Rng;
 
-/// Trade (import/export) unlocks after 1 simulated year.
-/// 365 days × 24 hours × 60 minutes = 525,600 game-minutes.
-pub fn trade_unlock_tick(minutes_per_tick: u32) -> u64 {
-    const YEAR_MINUTES: u64 = 365 * 24 * 60;
-    YEAR_MINUTES.div_ceil(u64::from(minutes_per_tick))
+/// Trade (import/export) unlocks after `trade_unlock_delay_minutes` game-minutes.
+pub fn trade_unlock_tick(trade_unlock_delay_minutes: u64, minutes_per_tick: u32) -> u64 {
+    trade_unlock_delay_minutes.div_ceil(u64::from(minutes_per_tick))
 }
-
-const REPLENISH_BATCH_SIZE: usize = 5;
 
 /// Advance the simulation by one tick.
 ///
@@ -325,7 +321,7 @@ fn replenish_scan_sites(
 
     let current_tick = state.meta.tick;
     let deficit = target - state.scan_sites.len();
-    let batch = deficit.min(REPLENISH_BATCH_SIZE);
+    let batch = deficit.min(content.constants.replenish_batch_size);
 
     for _ in 0..batch {
         let body = crate::pick_zone_weighted(&zone_bodies, rng);

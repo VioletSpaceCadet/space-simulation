@@ -129,7 +129,10 @@ fn economy_content() -> GameContent {
 fn economy_state(content: &GameContent) -> GameState {
     let mut state = test_fixtures::base_state(content);
     state.balance = 1_000_000_000.0;
-    state.meta.tick = trade_unlock_tick(content.constants.minutes_per_tick);
+    state.meta.tick = trade_unlock_tick(
+        content.constants.trade_unlock_delay_minutes,
+        content.constants.minutes_per_tick,
+    );
     // Pre-fill 5 scan sites to avoid replenish noise
     for index in 0..5 {
         state.scan_sites.push(ScanSite {

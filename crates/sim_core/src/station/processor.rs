@@ -5,7 +5,7 @@ use crate::{
 };
 use std::collections::HashMap;
 
-use super::{estimate_output_volume_m3, matches_input_filter, MIN_MEANINGFUL_KG};
+use super::{estimate_output_volume_m3, matches_input_filter};
 
 pub(super) fn tick_station_modules(
     state: &mut GameState,
@@ -144,7 +144,7 @@ fn execute(
         matches_input_filter(item, input_filter.as_ref())
     });
 
-    if peeked_kg < MIN_MEANINGFUL_KG {
+    if peeked_kg < content.constants.min_meaningful_kg {
         return super::RunOutcome::Skipped { reset_timer: false };
     }
 
@@ -187,6 +187,7 @@ struct ProcessorRunCtx<'a> {
     avg_composition: &'a HashMap<String, f32>,
     consumed_kg: f32,
     proc_mods: &'a crate::modifiers::ModifierSet,
+    min_meaningful_kg: f32,
 }
 
 fn build_processor_modifiers(
@@ -231,16 +232,17 @@ fn resolve_processor_run(
         _ => return,
     };
     let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
+    let min_kg = content.constants.min_meaningful_kg;
 
     let (consumed_kg, lots) = {
         let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return;
         };
-        consume_ore_fifo_with_lots(&mut station.inventory, rate_kg, |item| {
+        consume_ore_fifo_with_lots(&mut station.inventory, rate_kg, min_kg, |item| {
             matches_input_filter(item, input_filter.as_ref())
         })
     };
-    if consumed_kg < MIN_MEANINGFUL_KG {
+    if consumed_kg < min_kg {
         return;
     }
 
@@ -261,6 +263,7 @@ fn resolve_processor_run(
         avg_composition: &avg_composition,
         consumed_kg,
         proc_mods: &proc_mods,
+        min_meaningful_kg: min_kg,
     };
 
     let mut material_kg = 0.0_f32;
@@ -343,7 +346,7 @@ fn emit_material_output(
         base_quality,
         &state.modifiers,
     );
-    if material_kg > MIN_MEANINGFUL_KG {
+    if material_kg > run.min_meaningful_kg {
         if let Some(station) = state.stations.get_mut(run.station_id) {
             merge_material_lot(
                 &mut station.inventory,
@@ -375,7 +378,7 @@ fn emit_slag_output(
     let slag_kg = (run.consumed_kg - material_kg) * yield_frac;
     let slag_composition = slag_composition_from_avg(run.avg_composition, extracted_element);
 
-    if slag_kg > MIN_MEANINGFUL_KG {
+    if slag_kg > run.min_meaningful_kg {
         if let Some(station) = state.stations.get_mut(run.station_id) {
             let existing = station.inventory.iter_mut().find(|i| i.is_slag());
             if let Some(InventoryItem::Slag {
@@ -579,6 +582,7 @@ fn resolve_recipe<'a>(
 fn consume_ore_fifo_with_lots(
     inventory: &mut Vec<InventoryItem>,
     rate_kg: f32,
+    min_meaningful_kg: f32,
     filter: impl Fn(&InventoryItem) -> bool,
 ) -> (f32, Vec<(HashMap<String, f32>, f32)>) {
     let mut remaining = rate_kg;
@@ -603,7 +607,7 @@ fn consume_ore_fifo_with_lots(
                 consumed_kg += take;
                 lots.push((composition.clone(), take));
                 let leftover = kg - take;
-                if leftover > MIN_MEANINGFUL_KG {
+                if leftover > min_meaningful_kg {
                     new_inventory.push(InventoryItem::Ore {
                         lot_id,
                         asteroid_id,
@@ -623,7 +627,7 @@ fn consume_ore_fifo_with_lots(
                 consumed_kg += take;
                 lots.push((HashMap::from([(element.clone(), 1.0)]), take));
                 let leftover = kg - take;
-                if leftover > MIN_MEANINGFUL_KG {
+                if leftover > min_meaningful_kg {
                     new_inventory.push(InventoryItem::Material {
                         element,
                         kg: leftover,

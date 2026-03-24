@@ -225,6 +225,14 @@ pub fn base_content() -> GameContent {
             thermal_overheat_damage_offset_mk: 800_000,
             thermal_wear_multiplier_warning: 2.0,
             thermal_wear_multiplier_critical: 4.0,
+            // Extracted constants (previously hardcoded)
+            t_max_absolute_mk: 10_000_000,
+            min_meaningful_kg: 1e-3,
+            replenish_batch_size: 5,
+            trade_unlock_delay_minutes: 525_600,
+            autopilot_budget_cap_fraction: 0.05,
+            autopilot_lh2_abundant_multiplier: 2.0,
+            boiloff_hot_offset_mk: 100_000,
             // Derived fields — filled by derive_tick_values()
             survey_scan_ticks: 0,
             deep_scan_ticks: 0,
@@ -421,6 +429,14 @@ pub fn minimal_content() -> GameContent {
             thermal_overheat_damage_offset_mk: 800_000,
             thermal_wear_multiplier_warning: 2.0,
             thermal_wear_multiplier_critical: 4.0,
+            // Extracted constants (previously hardcoded)
+            t_max_absolute_mk: 10_000_000,
+            min_meaningful_kg: 1e-3,
+            replenish_batch_size: 5,
+            trade_unlock_delay_minutes: 525_600,
+            autopilot_budget_cap_fraction: 0.05,
+            autopilot_lh2_abundant_multiplier: 2.0,
+            boiloff_hot_offset_mk: 100_000,
             // Derived fields — filled by derive_tick_values()
             survey_scan_ticks: 0,
             deep_scan_ticks: 0,
