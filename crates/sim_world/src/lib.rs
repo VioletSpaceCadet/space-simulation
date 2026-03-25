@@ -377,6 +377,7 @@ fn validate_autopilot(content: &GameContent, element_ids: &HashSet<&str>) {
         .propellant_modules
         .iter()
         .chain(&ap.propellant_enable_modules)
+        .filter(|id| !id.is_empty())
     {
         assert!(
             content.module_defs.contains_key(mid),
@@ -520,7 +521,8 @@ fn load_optional_json<T: serde::de::DeserializeOwned + Default>(
 ) -> Result<T> {
     match std::fs::read_to_string(dir.join(filename)) {
         Ok(text) => serde_json::from_str(&text).with_context(|| format!("parsing {filename}")),
-        Err(_) => Ok(T::default()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(T::default()),
+        Err(e) => Err(anyhow::anyhow!("reading {filename}: {e}")),
     }
 }
 
