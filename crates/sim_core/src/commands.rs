@@ -780,6 +780,7 @@ mod tests {
                     ModifierSource::Equipment("cargo_expander".to_string()),
                 )],
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         content
@@ -992,6 +993,7 @@ mod tests {
                     ModifierSource::Equipment("mining_laser".to_string()),
                 )],
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
 

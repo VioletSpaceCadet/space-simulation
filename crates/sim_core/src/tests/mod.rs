@@ -159,6 +159,7 @@ fn refinery_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     )]
     .into_iter()
@@ -231,6 +232,7 @@ fn assembler_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     )]
     .into_iter()
@@ -293,6 +295,7 @@ fn maintenance_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
     content

@@ -612,6 +612,7 @@ mod assembler_component_tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         content
@@ -961,6 +962,7 @@ mod assembler_component_tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         content

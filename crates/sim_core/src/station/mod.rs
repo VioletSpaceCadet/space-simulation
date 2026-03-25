@@ -795,6 +795,7 @@ mod framework_tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         content
@@ -936,6 +937,7 @@ mod framework_tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         assert!(extract_context(&state, &station_id, 0, &content2).is_none());

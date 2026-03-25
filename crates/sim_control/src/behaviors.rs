@@ -128,13 +128,13 @@ fn collect_deep_scan_candidates(
     candidates.into_iter().map(|(id, _)| id).collect()
 }
 
-/// Check if any station has a propellant-pipeline module installed.
-fn station_has_propellant_module(state: &GameState, module_ids: &[String]) -> bool {
+/// Check if any station has a module with the given role installed.
+fn station_has_module_with_role(state: &GameState, content: &GameContent, role: &str) -> bool {
     state.stations.values().any(|station| {
         station
             .modules
             .iter()
-            .any(|module| module_ids.contains(&module.def_id))
+            .any(|module| content.module_has_role(&module.def_id, role))
     })
 }
 
@@ -308,10 +308,7 @@ impl AutopilotBehavior for StationModuleManager {
                 // Skip propellant modules — managed by PropellantPipeline behavior.
                 if !module.enabled
                     && module.wear.wear < 1.0
-                    && !content
-                        .autopilot
-                        .propellant_modules
-                        .contains(&module.def_id)
+                    && !content.module_has_role(&module.def_id, &content.autopilot.propellant_role)
                 {
                     commands.push(make_cmd(
                         owner,
@@ -451,16 +448,22 @@ impl AutopilotBehavior for ThrusterImport {
             return commands;
         }
 
-        let shipyard_module = &content.autopilot.shipyard_module;
+        let shipyard_role = &content.autopilot.shipyard_role;
         let import_component = &content.autopilot.shipyard_import_component;
 
         let mut sorted_stations: Vec<_> = state.stations.values().collect();
         sorted_stations.sort_by(|a, b| a.id.0.cmp(&b.id.0));
 
-        // Look up the shipyard recipe's component requirement from content.
-        let required_components = content
+        // Look up the shipyard recipe's component requirement from the first module with the
+        // shipyard role (sorted by ID for determinism — AHashMap iteration order is not stable).
+        let mut shipyard_defs: Vec<_> = content
             .module_defs
-            .get(shipyard_module.as_str())
+            .values()
+            .filter(|def| def.roles.iter().any(|r| r == shipyard_role))
+            .collect();
+        shipyard_defs.sort_by(|a, b| a.id.cmp(&b.id));
+        let required_components = shipyard_defs
+            .first()
             .and_then(|def| match &def.behavior {
                 ModuleBehaviorDef::Assembler(assembler_def) => assembler_def
                     .recipes
@@ -484,11 +487,10 @@ impl AutopilotBehavior for ThrusterImport {
             });
 
         for station in sorted_stations {
-            // Find the shipyard module — must be enabled
-            let has_shipyard = station
-                .modules
-                .iter()
-                .any(|module| module.def_id == *shipyard_module && module.enabled);
+            // Find a module with the shipyard role — must be enabled
+            let has_shipyard = station.modules.iter().any(|module| {
+                content.module_has_role(&module.def_id, shipyard_role) && module.enabled
+            });
             if !has_shipyard {
                 continue;
             }
@@ -657,14 +659,14 @@ impl AutopilotBehavior for PropellantPipeline {
         let mut commands = Vec::new();
         let propellant_kg = total_element_inventory(state, &content.autopilot.propellant_element);
         let threshold = content.constants.autopilot_lh2_threshold_kg;
-        let propellant_modules = &content.autopilot.propellant_modules;
-        let enable_modules = &content.autopilot.propellant_enable_modules;
+        let propellant_role = &content.autopilot.propellant_role;
+        let support_role = &content.autopilot.propellant_support_role;
 
         for station in state.stations.values() {
             let has_propellant_module = station
                 .modules
                 .iter()
-                .any(|m| propellant_modules.contains(&m.def_id));
+                .any(|m| content.module_has_role(&m.def_id, propellant_role));
             if !has_propellant_module {
                 continue;
             }
@@ -672,7 +674,7 @@ impl AutopilotBehavior for PropellantPipeline {
             if propellant_kg > threshold * content.constants.autopilot_lh2_abundant_multiplier {
                 // Propellant abundant — disable propellant modules to save power
                 for module in &station.modules {
-                    if propellant_modules.contains(&module.def_id)
+                    if content.module_has_role(&module.def_id, propellant_role)
                         && module.enabled
                         && module.wear.wear < 1.0
                     {
@@ -689,9 +691,9 @@ impl AutopilotBehavior for PropellantPipeline {
                     }
                 }
             } else if propellant_kg < threshold {
-                // Propellant low — ensure propellant and related modules are enabled
+                // Propellant low — ensure propellant and support modules are enabled
                 for module in &station.modules {
-                    if enable_modules.contains(&module.def_id)
+                    if content.module_has_role(&module.def_id, support_role)
                         && !module.enabled
                         && module.wear.wear < 1.0
                     {
@@ -846,21 +848,18 @@ impl AutopilotBehavior for ShipTaskScheduler {
         let mut next_site = sorted_sites.iter();
 
         // Determine if we need volatile-rich mining (for H2O or propellant pipeline)
-        let has_propellant_module = state.stations.values().any(|s| {
-            s.modules
-                .iter()
-                .any(|m| content.autopilot.propellant_modules.contains(&m.def_id))
-        });
+        let propellant_role = &content.autopilot.propellant_role;
+        let support_role = &content.autopilot.propellant_support_role;
+        let has_propellant_module = station_has_module_with_role(state, content, propellant_role);
         let volatile_element = &content.autopilot.volatile_element;
         let propellant_element = &content.autopilot.propellant_element;
         let primary_element = &content.autopilot.primary_mining_element;
-        let needs_volatiles =
-            station_has_propellant_module(state, &content.autopilot.propellant_enable_modules)
-                && (total_element_inventory(state, volatile_element)
-                    < content.constants.autopilot_volatile_threshold_kg
-                    || (has_propellant_module
-                        && total_element_inventory(state, propellant_element)
-                            < content.constants.autopilot_lh2_threshold_kg));
+        let needs_volatiles = station_has_module_with_role(state, content, support_role)
+            && (total_element_inventory(state, volatile_element)
+                < content.constants.autopilot_volatile_threshold_kg
+                || (has_propellant_module
+                    && total_element_inventory(state, propellant_element)
+                        < content.constants.autopilot_lh2_threshold_kg));
 
         let mut mine_candidates: Vec<&AsteroidState> = state
             .asteroids

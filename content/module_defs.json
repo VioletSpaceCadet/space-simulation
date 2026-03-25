@@ -31,7 +31,11 @@
         ]
       }
     },
-    "power_stall_priority": 3
+    "power_stall_priority": 3,
+    "roles": [
+      "propellant",
+      "propellant_support"
+    ]
   },
   {
     "id": "module_heating_unit",
@@ -48,7 +52,10 @@
         ]
       }
     },
-    "power_stall_priority": 3
+    "power_stall_priority": 3,
+    "roles": [
+      "propellant_support"
+    ]
   },
   {
     "id": "module_maintenance_bay",
@@ -201,7 +208,10 @@
         ]
       }
     },
-    "power_stall_priority": 2
+    "power_stall_priority": 2,
+    "roles": [
+      "shipyard"
+    ]
   },
   {
     "id": "module_basic_solar_array",

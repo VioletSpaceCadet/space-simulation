@@ -63,12 +63,12 @@ pub enum AlertRuleType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AutopilotConfig {
-    /// Module def IDs managed by `PropellantPipeline` (excluded from auto-re-enable).
-    pub propellant_modules: Vec<String>,
-    /// Module def IDs to enable when propellant is low (superset of `propellant_modules`).
-    pub propellant_enable_modules: Vec<String>,
-    /// Module def ID for the shipyard assembler.
-    pub shipyard_module: String,
+    /// Module role for propellant generation (excluded from auto-re-enable, toggled by pipeline).
+    pub propellant_role: String,
+    /// Module role for propellant support (enabled when propellant is low — superset of propellant).
+    pub propellant_support_role: String,
+    /// Module role for the shipyard assembler.
+    pub shipyard_role: String,
     /// Element ID for the volatile resource (e.g., `"H2O"`).
     pub volatile_element: String,
     /// Element ID for the propellant (e.g., `"LH2"`).
@@ -92,12 +92,9 @@ pub struct AutopilotConfig {
 impl Default for AutopilotConfig {
     fn default() -> Self {
         Self {
-            propellant_modules: vec!["module_electrolysis_unit".to_string()],
-            propellant_enable_modules: vec![
-                "module_electrolysis_unit".to_string(),
-                "module_heating_unit".to_string(),
-            ],
-            shipyard_module: "module_shipyard".to_string(),
+            propellant_role: "propellant".to_string(),
+            propellant_support_role: "propellant_support".to_string(),
+            shipyard_role: "shipyard".to_string(),
             volatile_element: "H2O".to_string(),
             propellant_element: "LH2".to_string(),
             primary_mining_element: "Fe".to_string(),
@@ -219,6 +216,13 @@ impl GameContent {
             .iter()
             .map(|e| (e.id.clone(), e.density_kg_per_m3))
             .collect();
+    }
+
+    /// Check whether a module definition has a given role.
+    pub fn module_has_role(&self, def_id: &str, role: &str) -> bool {
+        self.module_defs
+            .get(def_id)
+            .is_some_and(|def| def.roles.iter().any(|r| r == role))
     }
 }
 
@@ -544,6 +548,10 @@ pub struct ModuleDef {
     /// If `None`, falls back to the behavior-type default.
     #[serde(default)]
     pub power_stall_priority: Option<u8>,
+    /// Semantic roles for this module (e.g., `"propellant"`, `"shipyard"`).
+    /// Used by autopilot for role-based module discovery.
+    #[serde(default)]
+    pub roles: Vec<String>,
 }
 
 impl ModuleDef {

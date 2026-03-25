@@ -18,6 +18,7 @@ fn solar_array_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
     content.module_defs.insert(
@@ -38,6 +39,7 @@ fn solar_array_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
     content
@@ -157,6 +159,7 @@ fn power_budget_deficit_when_insufficient() {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -305,6 +308,7 @@ fn stall_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
     content
@@ -497,6 +501,7 @@ fn battery_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
     content
@@ -564,6 +569,7 @@ fn battery_discharges_to_cover_deficit() {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -653,6 +659,7 @@ fn battery_partial_discharge_then_stall() {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -827,6 +834,7 @@ fn power_priority_fallback_uses_behavior_type() {
         compatible_slots: Vec::new(),
         ship_modifiers: Vec::new(),
         power_stall_priority: None,
+        roles: vec![],
     };
     assert_eq!(def.power_priority(), Some(3), "Processor default is 3");
 }
@@ -849,6 +857,7 @@ fn power_priority_content_override_takes_precedence() {
         compatible_slots: Vec::new(),
         ship_modifiers: Vec::new(),
         power_stall_priority: Some(7),
+        roles: vec![],
     };
     assert_eq!(
         def.power_priority(),
