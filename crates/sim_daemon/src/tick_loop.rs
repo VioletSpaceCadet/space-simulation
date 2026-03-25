@@ -124,12 +124,15 @@ fn execute_tick(
         let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
         guard.push_metrics(snapshot);
 
-        let state = &mut *guard;
-        let history_clone = state.metrics_history.clone();
-        if let Some(engine) = state.alert_engine.as_mut() {
-            let tick = state.game_state.meta.tick;
-            let alert_events =
-                engine.evaluate(&history_clone, tick, &mut state.game_state.counters);
+        let SimState {
+            ref metrics_history,
+            ref mut alert_engine,
+            ref mut game_state,
+            ..
+        } = *guard;
+        if let Some(engine) = alert_engine.as_mut() {
+            let tick = game_state.meta.tick;
+            let alert_events = engine.evaluate(metrics_history, tick, &mut game_state.counters);
             events.extend(alert_events);
         }
     }
