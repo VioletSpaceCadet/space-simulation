@@ -68,7 +68,11 @@ pub async fn run_tick_loop(
         // --- Execute one tick ---
         let (events, done) = execute_tick(&sim, &command_queue, max_ticks);
 
-        let _ = event_tx.send(events);
+        // Only broadcast events when SSE clients are connected.
+        // Avoids cloning the Vec into the broadcast channel when nobody's listening.
+        if event_tx.receiver_count() > 0 {
+            let _ = event_tx.send(events);
+        }
 
         // --- Performance logging ---
         perf_window_ticks += 1;
