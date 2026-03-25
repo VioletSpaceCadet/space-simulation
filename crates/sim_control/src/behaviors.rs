@@ -454,11 +454,16 @@ impl AutopilotBehavior for ThrusterImport {
         let mut sorted_stations: Vec<_> = state.stations.values().collect();
         sorted_stations.sort_by(|a, b| a.id.0.cmp(&b.id.0));
 
-        // Look up the shipyard recipe's component requirement from any module with the shipyard role.
-        let required_components = content
+        // Look up the shipyard recipe's component requirement from the first module with the
+        // shipyard role (sorted by ID for determinism — AHashMap iteration order is not stable).
+        let mut shipyard_defs: Vec<_> = content
             .module_defs
             .values()
-            .find(|def| def.roles.iter().any(|r| r == shipyard_role))
+            .filter(|def| def.roles.iter().any(|r| r == shipyard_role))
+            .collect();
+        shipyard_defs.sort_by(|a, b| a.id.cmp(&b.id));
+        let required_components = shipyard_defs
+            .first()
             .and_then(|def| match &def.behavior {
                 ModuleBehaviorDef::Assembler(assembler_def) => assembler_def
                     .recipes
