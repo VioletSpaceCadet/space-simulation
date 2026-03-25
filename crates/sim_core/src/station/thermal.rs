@@ -19,6 +19,7 @@ pub(crate) fn tick_thermal(
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) {
+    super::ensure_station_index(state, station_id, content);
     let dt_s = thermal::dt_seconds(&content.constants);
     let sink_temp_mk = content.constants.thermal_sink_temp_mk;
 
@@ -26,22 +27,21 @@ pub(crate) fn tick_thermal(
         return;
     };
 
-    // Build a sorted map of (group_key -> sorted vec of module indices).
-    // BTreeMap gives us deterministic group ordering. Within each group we
-    // collect (module_id, index) pairs and sort by module_id.
+    // Use pre-computed thermal indices to build groups.
+    let thermal_indices = station.module_type_index.thermal.clone();
     let mut groups: BTreeMap<String, Vec<(String, usize)>> = BTreeMap::new();
 
-    for (module_index, module) in station.modules.iter().enumerate() {
-        // Only process modules that have a ThermalDef and ThermalState.
+    for &module_index in &thermal_indices {
+        let module = &station.modules[module_index];
         let Some(ref _thermal_state) = module.thermal else {
             continue;
         };
         let Some(def) = content.module_defs.get(&module.def_id) else {
             continue;
         };
-        let Some(ref _thermal_def) = def.thermal else {
+        if def.thermal.is_none() {
             continue;
-        };
+        }
 
         let group_key = module
             .thermal
@@ -60,10 +60,10 @@ pub(crate) fn tick_thermal(
         modules.sort_by(|a, b| a.0.cmp(&b.0));
     }
 
-    // Build a map of group_key → total radiator cooling capacity (W), adjusted for wear.
-    // Radiators are identified by their ModuleBehaviorDef::Radiator variant.
+    // Build radiator cooling using thermal indices (radiators have ThermalDef).
     let mut radiator_cooling_by_group: BTreeMap<String, f32> = BTreeMap::new();
-    for module in &station.modules {
+    for &module_index in &thermal_indices {
+        let module = &station.modules[module_index];
         if !module.enabled {
             continue;
         }
@@ -73,7 +73,6 @@ pub(crate) fn tick_thermal(
         let crate::ModuleBehaviorDef::Radiator(ref radiator_def) = def.behavior else {
             continue;
         };
-        // Radiator must have thermal state to belong to a group.
         let group_key = module
             .thermal
             .as_ref()
@@ -572,6 +571,7 @@ mod tests {
                     modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
                 },
             )]
             .into_iter()

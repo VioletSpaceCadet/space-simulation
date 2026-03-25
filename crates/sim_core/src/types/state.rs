@@ -279,6 +279,29 @@ pub struct PowerState {
     pub battery_stored_kwh: f32,
 }
 
+/// Pre-computed index of module indices by subsystem type.
+/// Rebuilt on module install/uninstall. Each subsystem iterates only its
+/// matching indices instead of scanning all modules every tick.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ModuleTypeIndex {
+    /// False until `rebuild_module_index` has been called at least once.
+    initialized: bool,
+    pub processors: Vec<usize>,
+    pub assemblers: Vec<usize>,
+    pub sensors: Vec<usize>,
+    pub labs: Vec<usize>,
+    pub maintenance: Vec<usize>,
+    /// Modules with a `ThermalDef` (cross-cutting, any behavior type).
+    pub thermal: Vec<usize>,
+}
+
+impl ModuleTypeIndex {
+    /// Returns true if the index has been built at least once.
+    pub fn is_initialized(&self) -> bool {
+        self.initialized
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StationState {
     pub id: StationId,
@@ -297,6 +320,9 @@ pub struct StationState {
     /// recomputed lazily via [`StationState::used_volume_m3`].
     #[serde(skip, default)]
     pub cached_inventory_volume_m3: Option<f32>,
+    /// Pre-computed module-type → indices mapping. Rebuilt on install/uninstall.
+    #[serde(skip, default)]
+    pub module_type_index: ModuleTypeIndex,
 }
 
 impl StationState {
@@ -313,6 +339,35 @@ impl StationState {
     /// Invalidate the cached volume. Call after any inventory mutation.
     pub fn invalidate_volume_cache(&mut self) {
         self.cached_inventory_volume_m3 = None;
+    }
+
+    /// Rebuild the module type index from the current modules list and content defs.
+    /// Call after install/uninstall or initial station construction.
+    pub fn rebuild_module_index(&mut self, content: &GameContent) {
+        let idx = &mut self.module_type_index;
+        idx.initialized = true;
+        idx.processors.clear();
+        idx.assemblers.clear();
+        idx.sensors.clear();
+        idx.labs.clear();
+        idx.maintenance.clear();
+        idx.thermal.clear();
+
+        for (i, module) in self.modules.iter().enumerate() {
+            if let Some(def) = content.module_defs.get(&module.def_id) {
+                match &def.behavior {
+                    crate::ModuleBehaviorDef::Processor(_) => idx.processors.push(i),
+                    crate::ModuleBehaviorDef::Assembler(_) => idx.assemblers.push(i),
+                    crate::ModuleBehaviorDef::SensorArray(_) => idx.sensors.push(i),
+                    crate::ModuleBehaviorDef::Lab(_) => idx.labs.push(i),
+                    crate::ModuleBehaviorDef::Maintenance(_) => idx.maintenance.push(i),
+                    _ => {}
+                }
+                if def.thermal.is_some() {
+                    idx.thermal.push(i);
+                }
+            }
+        }
     }
 }
 

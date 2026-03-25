@@ -103,6 +103,7 @@ pub(crate) fn handle_install_module(
         power_stalled: false,
         manufacturing_priority: 0,
     });
+    station.rebuild_module_index(content);
 
     events.push(crate::emit(
         &mut state.counters,
@@ -121,6 +122,7 @@ pub(crate) fn handle_install_module(
 /// Uninstall a module from the station and return it to inventory.
 pub(crate) fn handle_uninstall_module(
     state: &mut GameState,
+    content: &GameContent,
     station_id: &crate::StationId,
     module_id: &crate::ModuleInstanceId,
     current_tick: u64,
@@ -147,6 +149,7 @@ pub(crate) fn handle_uninstall_module(
         module_def_id: module.def_id.clone(),
     });
     station.invalidate_volume_cache();
+    station.rebuild_module_index(content);
 
     events.push(crate::emit(
         &mut state.counters,

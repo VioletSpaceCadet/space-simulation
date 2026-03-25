@@ -562,6 +562,7 @@ pub fn base_state(content: &GameContent) -> GameState {
                 modifiers: crate::modifiers::ModifierSet::default(),
                 power: crate::PowerState::default(),
                 cached_inventory_volume_m3: None,
+                module_type_index: crate::ModuleTypeIndex::default(),
             },
         )]
         .into_iter()
@@ -585,6 +586,14 @@ pub fn base_state(content: &GameContent) -> GameState {
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
         body_cache: crate::build_body_cache(&content.solar_system.bodies),
+    }
+}
+
+/// Rebuild module type indices for all stations in a GameState.
+/// Call after constructing test states that include modules.
+pub fn rebuild_indices(state: &mut GameState, content: &GameContent) {
+    for station in state.stations.values_mut() {
+        station.rebuild_module_index(content);
     }
 }
 

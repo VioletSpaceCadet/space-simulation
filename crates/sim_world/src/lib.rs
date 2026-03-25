@@ -682,6 +682,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         modifiers: sim_core::modifiers::ModifierSet::default(),
         power: PowerState::default(),
         cached_inventory_volume_m3: None,
+        module_type_index: sim_core::ModuleTypeIndex::default(),
     };
     let ship_id = ShipId("ship_0001".to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
@@ -836,13 +837,19 @@ pub fn load_or_build_state(
         );
 
         loaded.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
+        for station in loaded.stations.values_mut() {
+            station.rebuild_module_index(content);
+        }
         let rng = ChaCha8Rng::seed_from_u64(loaded.meta.seed);
         validate_state(&loaded, content);
         Ok((loaded, rng))
     } else {
         let resolved_seed = seed.unwrap_or_else(rand::random);
         let mut rng = ChaCha8Rng::seed_from_u64(resolved_seed);
-        let state = build_initial_state(content, resolved_seed, &mut rng);
+        let mut state = build_initial_state(content, resolved_seed, &mut rng);
+        for station in state.stations.values_mut() {
+            station.rebuild_module_index(content);
+        }
         Ok((state, rng))
     }
 }
@@ -1312,6 +1319,7 @@ mod tests {
                     modifiers: sim_core::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
+                    module_type_index: sim_core::ModuleTypeIndex::default(),
                 },
             )]
             .into_iter()

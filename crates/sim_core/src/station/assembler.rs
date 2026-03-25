@@ -13,23 +13,11 @@ pub(super) fn tick_assembler_modules(
     events: &mut Vec<EventEnvelope>,
     scratch: &mut Vec<usize>,
 ) {
-    let module_count = state
-        .stations
-        .get(station_id)
-        .map_or(0, |s| s.modules.len());
-
-    // Collect assembler module indices, sorted by priority (desc) then id (asc)
+    super::ensure_station_index(state, station_id, content);
+    // Use pre-computed assembler indices, then sort by priority
     scratch.clear();
-    scratch.extend((0..module_count).filter(|&module_index| {
-        state
-            .stations
-            .get(station_id)
-            .and_then(|s| s.modules.get(module_index))
-            .and_then(|m| content.module_defs.get(&m.def_id))
-            .is_some_and(|d| matches!(d.behavior, ModuleBehaviorDef::Assembler(_)))
-    }));
-
     if let Some(station) = state.stations.get(station_id) {
+        scratch.extend_from_slice(&station.module_type_index.assemblers);
         scratch.sort_by(|&a, &b| {
             let ma = &station.modules[a];
             let mb = &station.modules[b];
@@ -669,6 +657,7 @@ mod assembler_component_tests {
                     modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
                 },
             )]
             .into_iter()
@@ -1019,6 +1008,7 @@ mod assembler_component_tests {
                     modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
                 },
             )]
             .into_iter()

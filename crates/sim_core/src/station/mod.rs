@@ -77,6 +77,24 @@ fn matches_input_filter(item: &InventoryItem, filter: Option<&InputFilter>) -> b
     }
 }
 
+/// Ensure module type indices are initialized for all stations.
+fn ensure_indices(state: &mut GameState, content: &GameContent) {
+    for station in state.stations.values_mut() {
+        if !station.module_type_index.is_initialized() {
+            station.rebuild_module_index(content);
+        }
+    }
+}
+
+/// Ensure module type index is initialized for a single station.
+fn ensure_station_index(state: &mut GameState, station_id: &StationId, content: &GameContent) {
+    if let Some(station) = state.stations.get_mut(station_id) {
+        if !station.module_type_index.is_initialized() {
+            station.rebuild_module_index(content);
+        }
+    }
+}
+
 pub(crate) fn tick_stations(
     state: &mut GameState,
     content: &GameContent,
@@ -84,6 +102,8 @@ pub(crate) fn tick_stations(
     events: &mut Vec<EventEnvelope>,
     mut timings: Option<&mut TickTimings>,
 ) {
+    // Ensure module type indices are initialized.
+    ensure_indices(state, content);
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
     let mut scratch_indices: Vec<usize> = Vec::new();
     for station_id in &station_ids {
@@ -834,6 +854,7 @@ mod framework_tests {
                     modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
                 },
             )]
             .into_iter()

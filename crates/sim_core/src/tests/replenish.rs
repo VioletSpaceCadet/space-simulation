@@ -160,6 +160,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
                 modifiers: crate::modifiers::ModifierSet::default(),
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
+                module_type_index: crate::ModuleTypeIndex::default(),
             },
         )]
         .into_iter()
