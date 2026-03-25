@@ -259,7 +259,7 @@ export interface SimSnapshot {
 }
 
 export interface SimEvent {
-  id: string
+  id: number
   tick: number
   event: Record<string, unknown>
 }

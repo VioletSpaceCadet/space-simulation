@@ -32,7 +32,7 @@ fn make_cmd(
     next_id: &mut u64,
     command: Command,
 ) -> CommandEnvelope {
-    let cmd_id = CommandId(format!("cmd_{:06}", *next_id));
+    let cmd_id = CommandId(*next_id);
     *next_id += 1;
     CommandEnvelope {
         id: cmd_id,

@@ -148,7 +148,7 @@ fn economy_state(content: &GameContent) -> GameState {
 
 fn make_command(tick: u64, command: Command) -> CommandEnvelope {
     CommandEnvelope {
-        id: CommandId(format!("cmd_test_{tick}")),
+        id: CommandId(tick),
         issued_by: PrincipalId("principal_autopilot".to_string()),
         issued_tick: tick,
         execute_at_tick: tick,

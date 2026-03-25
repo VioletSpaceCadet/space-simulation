@@ -89,7 +89,7 @@ pub use types::{boiloff_rate_per_tick, derive_module_tick_values, Constants};
 pub use wear::wear_efficiency;
 
 pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnvelope {
-    let id = EventId(format!("evt_{:06}", counters.next_event_id));
+    let id = EventId(counters.next_event_id);
     counters.next_event_id += 1;
     EventEnvelope { id, tick, event }
 }

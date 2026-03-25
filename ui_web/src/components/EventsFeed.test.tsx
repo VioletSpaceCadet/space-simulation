@@ -6,14 +6,14 @@ import type { SimEvent } from '../types';
 import { EventsFeed } from './EventsFeed';
 
 const events: SimEvent[] = [
-  { id: 'evt_000001', tick: 10, event: { TechUnlocked: { tech_id: 'tech_deep_scan_v1' } } },
-  { id: 'evt_000002', tick: 5, event: { AsteroidDiscovered: { asteroid_id: 'asteroid_0001' } } },
+  { id: 1, tick: 10, event: { TechUnlocked: { tech_id: 'tech_deep_scan_v1' } } },
+  { id: 2, tick: 5, event: { AsteroidDiscovered: { asteroid_id: 'asteroid_0001' } } },
 ];
 
 describe('EventsFeed', () => {
   it('renders event IDs', () => {
     render(<EventsFeed events={events} />);
-    expect(screen.getByText(/evt_000001/)).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
   });
 
   it('renders event type name', () => {
@@ -29,7 +29,7 @@ describe('EventsFeed', () => {
   it('renders SimEventFired with target and label', () => {
     const simEvents: SimEvent[] = [
       {
-        id: 'evt_000010', tick: 42, event: {
+        id: 10, tick: 42, event: {
           SimEventFired: {
             event_def_id: 'evt_solar_flare',
             target: { type: 'station', station_id: 'station_earth_orbit' },
@@ -47,7 +47,7 @@ describe('EventsFeed', () => {
   it('renders SimEventExpired with effect ended label', () => {
     const simEvents: SimEvent[] = [
       {
-        id: 'evt_000020', tick: 100, event: {
+        id: 20, tick: 100, event: {
           SimEventExpired: { event_def_id: 'evt_solar_flare' },
         },
       },
@@ -59,7 +59,7 @@ describe('EventsFeed', () => {
   it('falls back to event_def_id when unknown event', () => {
     const simEvents: SimEvent[] = [
       {
-        id: 'evt_000030', tick: 50, event: {
+        id: 30, tick: 50, event: {
           SimEventFired: {
             event_def_id: 'evt_unknown_thing',
             target: { type: 'global' },

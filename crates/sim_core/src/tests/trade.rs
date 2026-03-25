@@ -128,7 +128,7 @@ fn make_command(command: Command) -> CommandEnvelope {
     let content = crate::test_fixtures::base_content();
     let unlock_tick = trade_unlock_tick(&content.constants);
     CommandEnvelope {
-        id: CommandId("cmd_test".to_string()),
+        id: CommandId(0),
         issued_by: PrincipalId("principal_autopilot".to_string()),
         issued_tick: unlock_tick,
         execute_at_tick: unlock_tick,
@@ -600,7 +600,7 @@ fn import_rejected_before_trade_unlock_tick() {
     let balance_before = state.balance;
 
     let cmd = CommandEnvelope {
-        id: CommandId("cmd_early".to_string()),
+        id: CommandId(0),
         issued_by: PrincipalId("principal_autopilot".to_string()),
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
@@ -645,7 +645,7 @@ fn export_rejected_before_trade_unlock_tick() {
     let balance_before = state.balance;
 
     let cmd = CommandEnvelope {
-        id: CommandId("cmd_early_export".to_string()),
+        id: CommandId(0),
         issued_by: PrincipalId("principal_autopilot".to_string()),
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,

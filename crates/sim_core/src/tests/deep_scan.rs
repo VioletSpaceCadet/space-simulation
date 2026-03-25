@@ -18,7 +18,7 @@ fn test_deep_scan_blocked_without_tech() {
     let owner = state.ships[&ship_id].owner.clone();
 
     let deep_cmd = CommandEnvelope {
-        id: CommandId("cmd_000002".to_string()),
+        id: CommandId(0),
         issued_by: owner,
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
@@ -66,7 +66,7 @@ fn test_deep_scan_maps_composition() {
     let ship_id = ShipId("ship_0001".to_string());
     let owner = state.ships[&ship_id].owner.clone();
     let deep_cmd = CommandEnvelope {
-        id: CommandId("cmd_000002".to_string()),
+        id: CommandId(0),
         issued_by: owner,
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
@@ -107,7 +107,7 @@ fn test_deep_scan_composition_matches_truth_with_zero_sigma() {
     let ship_id = ShipId("ship_0001".to_string());
     let owner = state.ships[&ship_id].owner.clone();
     let deep_cmd = CommandEnvelope {
-        id: CommandId("cmd_000002".to_string()),
+        id: CommandId(0),
         issued_by: owner,
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,

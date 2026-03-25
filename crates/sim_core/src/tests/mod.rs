@@ -46,7 +46,7 @@ fn survey_command(state: &GameState) -> CommandEnvelope {
     let ship_id = test_ship_id();
     let owner = state.ships[&ship_id].owner.clone();
     CommandEnvelope {
-        id: CommandId("cmd_000001".to_string()),
+        id: CommandId(0),
         issued_by: owner,
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
@@ -75,7 +75,7 @@ fn deposit_command(state: &GameState) -> CommandEnvelope {
     let station_id = test_station_id();
     let ship = &state.ships[&ship_id];
     CommandEnvelope {
-        id: CommandId("cmd_deposit_001".to_string()),
+        id: CommandId(0),
         issued_by: ship.owner.clone(),
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
@@ -98,7 +98,7 @@ fn mine_command(
     let ship = &state.ships[&ship_id];
     let duration_ticks = 10;
     CommandEnvelope {
-        id: CommandId("cmd_mine_001".to_string()),
+        id: CommandId(0),
         issued_by: ship.owner.clone(),
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,

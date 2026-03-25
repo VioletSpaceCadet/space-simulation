@@ -7,7 +7,7 @@ import { useModuleFlowStats } from './useModuleFlowStats';
 
 function makeRefineryEvent(tick: number, moduleId: string, oreKg: number, materialKg: number): SimEvent {
   return {
-    id: `evt_${tick}`,
+    id: tick,
     tick,
     event: {
       RefineryRan: {
@@ -25,7 +25,7 @@ function makeAssemblerEvent(
   materialKg: number, componentCount: number,
 ): SimEvent {
   return {
-    id: `evt_${tick}`,
+    id: tick,
     tick,
     event: {
       AssemblerRan: {

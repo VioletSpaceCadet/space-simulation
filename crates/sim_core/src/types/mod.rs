@@ -82,6 +82,22 @@ macro_rules! string_id {
     };
 }
 
+/// Numeric ID types — cheap to create (no heap allocation).
+macro_rules! numeric_id {
+    ($name:ident) => {
+        #[derive(
+            Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+        )]
+        pub struct $name(pub u64);
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+    };
+}
+
 string_id!(ShipId);
 string_id!(AsteroidId);
 string_id!(StationId);
@@ -89,8 +105,8 @@ string_id!(TechId);
 string_id!(NodeId);
 string_id!(BodyId);
 string_id!(SiteId);
-string_id!(CommandId);
-string_id!(EventId);
+numeric_id!(CommandId);
+numeric_id!(EventId);
 string_id!(PrincipalId);
 string_id!(LotId);
 string_id!(ModuleItemId);
