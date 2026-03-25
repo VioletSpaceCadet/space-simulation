@@ -87,6 +87,9 @@ pub struct AutopilotConfig {
     pub export_elements: Vec<ExportElementConfig>,
     /// Anomaly tags to target for deep scanning, with per-tag confidence thresholds.
     pub deep_scan_targets: Vec<DeepScanTargetConfig>,
+    /// Ship task scheduling priority order. Tasks are attempted in this order per idle ship.
+    /// Valid entries: `"Deposit"`, `"Mine"`, `"DeepScan"`, `"Survey"`.
+    pub task_priority: Vec<String>,
 }
 
 impl Default for AutopilotConfig {
@@ -125,6 +128,12 @@ impl Default for AutopilotConfig {
                     tag: "VolatileRich".to_string(),
                     min_confidence: 0.7,
                 },
+            ],
+            task_priority: vec![
+                "Deposit".to_string(),
+                "Mine".to_string(),
+                "DeepScan".to_string(),
+                "Survey".to_string(),
             ],
         }
     }

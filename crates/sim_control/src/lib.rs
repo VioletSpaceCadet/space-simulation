@@ -836,6 +836,84 @@ mod tests {
         );
     }
 
+    // --- Task priority ordering tests ---
+
+    #[test]
+    fn test_task_priority_survey_before_mine_when_reordered() {
+        let mut content = autopilot_content();
+        // Reorder: Survey before Mine (normally Mine is higher priority)
+        content.autopilot.task_priority = vec![
+            "Deposit".to_string(),
+            "Survey".to_string(),
+            "Mine".to_string(),
+            "DeepScan".to_string(),
+        ];
+        let mut state = autopilot_state(&content);
+
+        // Add both a known asteroid (mine target) and a scan site (survey target)
+        let asteroid_id = AsteroidId("asteroid_0001".to_string());
+        state.asteroids.insert(
+            asteroid_id.clone(),
+            AsteroidState {
+                id: asteroid_id,
+                position: test_position(),
+                true_composition: HashMap::from([("Fe".to_string(), 1.0)]),
+                anomaly_tags: vec![],
+                mass_kg: 500.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![],
+                    composition: Some(HashMap::from([("Fe".to_string(), 1.0)])),
+                },
+            },
+        );
+        // autopilot_state clears scan_sites, so add one back
+        state.scan_sites.push(sim_core::ScanSite {
+            id: sim_core::SiteId("site_test_001".to_string()),
+            position: test_position(),
+            template_id: "tmpl_iron_rich".to_string(),
+        });
+
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        // With reordered priority, ship should survey (not mine) since Survey is before Mine
+        let assigned = commands
+            .iter()
+            .find(|cmd| matches!(&cmd.command, sim_core::Command::AssignShipTask { .. }));
+        assert!(assigned.is_some(), "should assign a task");
+        let is_survey = matches!(
+            &assigned.unwrap().command,
+            sim_core::Command::AssignShipTask {
+                task_kind: TaskKind::Survey { .. },
+                ..
+            }
+        );
+        assert!(
+            is_survey,
+            "with Survey before Mine in task_priority, ship should survey first"
+        );
+    }
+
+    #[test]
+    fn test_empty_task_priority_assigns_nothing() {
+        let mut content = autopilot_content();
+        content.autopilot.task_priority = vec![];
+        let state = autopilot_state(&content);
+
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let has_ship_task = commands
+            .iter()
+            .any(|cmd| matches!(&cmd.command, sim_core::Command::AssignShipTask { .. }));
+        assert!(
+            !has_ship_task,
+            "empty task_priority should assign no ship tasks"
+        );
+    }
+
     // --- Thruster import tests ---
 
     /// Helper to set up state for thruster import tests.
