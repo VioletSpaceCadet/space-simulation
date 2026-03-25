@@ -1,0 +1,24 @@
+{
+  "propellant_modules": ["module_electrolysis_unit"],
+  "propellant_enable_modules": ["module_electrolysis_unit", "module_heating_unit"],
+  "shipyard_module": "module_shipyard",
+  "volatile_element": "H2O",
+  "propellant_element": "LH2",
+  "primary_mining_element": "Fe",
+  "deep_scan_tech": "tech_deep_scan_v1",
+  "ship_construction_tech": "tech_ship_construction",
+  "shipyard_import_component": "thruster",
+  "export_component": {
+    "component_id": "repair_kit",
+    "reserve": 10
+  },
+  "export_elements": [
+    { "element": "He", "reserve_kg": 0.0 },
+    { "element": "Si", "reserve_kg": 0.0 },
+    { "element": "Fe", "reserve_kg": 12000.0 }
+  ],
+  "deep_scan_targets": [
+    { "tag": "IronRich", "min_confidence": 0.7 },
+    { "tag": "VolatileRich", "min_confidence": 0.7 }
+  ]
+}
