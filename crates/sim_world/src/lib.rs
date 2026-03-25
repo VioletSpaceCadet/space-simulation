@@ -446,6 +446,16 @@ fn validate_autopilot(content: &GameContent, element_ids: &HashSet<&str>) {
             entry.element
         );
     }
+    let valid_tasks: HashSet<&str> = ["Deposit", "Mine", "DeepScan", "Survey"]
+        .into_iter()
+        .collect();
+    for task in &ap.task_priority {
+        assert!(
+            valid_tasks.contains(task.as_str()),
+            "autopilot.task_priority contains unknown task type '{task}'. \
+             Valid values: Deposit, Mine, DeepScan, Survey"
+        );
+    }
 }
 
 pub fn validate_state(state: &GameState, content: &GameContent) {
