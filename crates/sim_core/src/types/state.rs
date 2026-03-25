@@ -282,7 +282,7 @@ pub struct PowerState {
 /// Pre-computed index of module indices by subsystem type.
 /// Rebuilt on module install/uninstall. Each subsystem iterates only its
 /// matching indices instead of scanning all modules every tick.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ModuleTypeIndex {
     /// False until `rebuild_module_index` has been called at least once.
     initialized: bool,
@@ -293,20 +293,6 @@ pub struct ModuleTypeIndex {
     pub maintenance: Vec<usize>,
     /// Modules with a `ThermalDef` (cross-cutting, any behavior type).
     pub thermal: Vec<usize>,
-}
-
-impl Default for ModuleTypeIndex {
-    fn default() -> Self {
-        Self {
-            initialized: false,
-            processors: Vec::new(),
-            assemblers: Vec::new(),
-            sensors: Vec::new(),
-            labs: Vec::new(),
-            maintenance: Vec::new(),
-            thermal: Vec::new(),
-        }
-    }
 }
 
 impl ModuleTypeIndex {
