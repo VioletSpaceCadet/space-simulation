@@ -373,23 +373,22 @@ fn validate_autopilot(content: &GameContent, element_ids: &HashSet<&str>) {
         .map(|c| c.id.as_str())
         .collect();
 
-    for mid in ap
-        .propellant_modules
-        .iter()
-        .chain(&ap.propellant_enable_modules)
-        .filter(|id| !id.is_empty())
-    {
-        assert!(
-            content.module_defs.contains_key(mid),
-            "autopilot references unknown module '{mid}'"
-        );
-    }
-    if !ap.shipyard_module.is_empty() {
-        assert!(
-            content.module_defs.contains_key(&ap.shipyard_module),
-            "autopilot.shipyard_module '{}' not in module_defs",
-            ap.shipyard_module
-        );
+    // Validate that role names referenced by the autopilot have at least one matching module
+    for (role_name, field_name) in [
+        (&ap.propellant_role, "propellant_role"),
+        (&ap.propellant_support_role, "propellant_support_role"),
+        (&ap.shipyard_role, "shipyard_role"),
+    ] {
+        if !role_name.is_empty() {
+            let has_module = content
+                .module_defs
+                .values()
+                .any(|def| def.roles.iter().any(|r| r == role_name));
+            assert!(
+                has_module,
+                "autopilot.{field_name} '{role_name}' has no matching modules in module_defs"
+            );
+        }
     }
     if !ap.volatile_element.is_empty() {
         assert!(
@@ -1048,6 +1047,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         validate_content(&content);
@@ -1139,6 +1139,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         validate_content(&content);
@@ -1632,6 +1633,7 @@ mod tests {
                 compatible_slots: vec![sim_core::SlotType("utility".to_string())],
                 ship_modifiers: vec![],
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         content.fitting_templates.insert(

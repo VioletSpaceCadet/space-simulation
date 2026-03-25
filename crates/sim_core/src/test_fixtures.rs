@@ -489,9 +489,9 @@ pub fn minimal_content() -> GameContent {
         fitting_templates: BTreeMap::new(),
         initial_station: InitialStationDef::default(),
         autopilot: AutopilotConfig {
-            propellant_modules: vec![],
-            propellant_enable_modules: vec![],
-            shipyard_module: String::new(),
+            propellant_role: String::new(),
+            propellant_support_role: String::new(),
+            shipyard_role: String::new(),
             propellant_element: String::new(),
             primary_mining_element: String::new(),
             deep_scan_tech: String::new(),
@@ -629,6 +629,7 @@ pub fn thermal_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -656,6 +657,7 @@ pub fn thermal_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 

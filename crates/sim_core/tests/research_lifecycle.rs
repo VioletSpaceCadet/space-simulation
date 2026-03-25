@@ -33,6 +33,7 @@ fn full_research_lifecycle() {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -111,6 +112,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 

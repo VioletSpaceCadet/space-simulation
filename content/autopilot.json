@@ -1,7 +1,7 @@
 {
-  "propellant_modules": ["module_electrolysis_unit"],
-  "propellant_enable_modules": ["module_electrolysis_unit", "module_heating_unit"],
-  "shipyard_module": "module_shipyard",
+  "propellant_role": "propellant",
+  "propellant_support_role": "propellant_support",
+  "shipyard_role": "shipyard",
   "volatile_element": "H2O",
   "propellant_element": "LH2",
   "primary_mining_element": "Fe",

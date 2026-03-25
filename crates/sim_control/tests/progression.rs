@@ -88,6 +88,7 @@ fn production_like_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -113,6 +114,7 @@ fn production_like_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -138,6 +140,7 @@ fn production_like_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -163,6 +166,7 @@ fn production_like_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -214,6 +218,7 @@ fn production_like_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -257,6 +262,7 @@ fn production_like_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -282,6 +288,7 @@ fn production_like_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     );
 
@@ -581,6 +588,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec!["shipyard".to_string()],
         },
     );
 

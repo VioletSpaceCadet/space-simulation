@@ -100,6 +100,7 @@ fn trade_content() -> GameContent {
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
+            roles: vec![],
         },
     )]
     .into_iter()

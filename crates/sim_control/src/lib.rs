@@ -66,7 +66,43 @@ mod tests {
         let mut content = base_content();
         content.techs.clear();
         content.constants.station_power_available_per_tick = 0.0;
+        // Add minimal module defs for role-based autopilot lookups
+        add_role_module_defs(&mut content);
         content
+    }
+
+    /// Insert stub module defs with roles for autopilot tests.
+    fn add_role_module_defs(content: &mut sim_core::GameContent) {
+        use sim_core::{ModuleBehaviorDef, ModuleDef, ProcessorDef};
+        let stub = |id: &str, roles: Vec<&str>| ModuleDef {
+            id: id.to_string(),
+            name: id.to_string(),
+            mass_kg: 0.0,
+            volume_m3: 0.0,
+            power_consumption_per_run: 0.0,
+            wear_per_run: 0.0,
+            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_minutes: 1,
+                processing_interval_ticks: 1,
+                recipes: vec![],
+            }),
+            thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
+            power_stall_priority: None,
+            roles: roles.into_iter().map(String::from).collect(),
+        };
+        content.module_defs.insert(
+            "module_electrolysis_unit".to_string(),
+            stub(
+                "module_electrolysis_unit",
+                vec!["propellant", "propellant_support"],
+            ),
+        );
+        content.module_defs.insert(
+            "module_heating_unit".to_string(),
+            stub("module_heating_unit", vec!["propellant_support"]),
+        );
     }
 
     fn autopilot_state(content: &sim_core::GameContent) -> sim_core::GameState {
@@ -243,6 +279,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         let mut state = autopilot_state(&content);
@@ -542,6 +579,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -749,6 +787,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -866,6 +905,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec!["shipyard".to_string()],
             },
         );
 
@@ -1961,6 +2001,7 @@ mod tests {
                 compatible_slots: vec![SlotType("utility".to_string())],
                 ship_modifiers: vec![],
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         // Add fitting template
@@ -2049,6 +2090,7 @@ mod tests {
                 compatible_slots: vec![SlotType("utility".to_string())],
                 ship_modifiers: vec![],
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         content.fitting_templates.insert(

@@ -1226,6 +1226,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         )]
         .into_iter()
@@ -1401,6 +1402,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         )]
         .into_iter()
@@ -1515,6 +1517,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         )]
         .into_iter()
@@ -1595,6 +1598,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
         let mut state = empty_state();
@@ -1663,6 +1667,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
 
@@ -1774,6 +1779,7 @@ mod tests {
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
+                roles: vec![],
             },
         );
 
