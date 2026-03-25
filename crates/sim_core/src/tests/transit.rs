@@ -53,7 +53,7 @@ fn transit_moves_ship_and_starts_next_task() {
             position: pos_b.clone(),
             template_id: "tmpl_iron_rich".to_string(),
         }],
-        asteroids: AHashMap::default(),
+        asteroids: std::collections::BTreeMap::new(),
         ships: [(
             ship_id.clone(),
             ShipState {
@@ -241,7 +241,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
             content_version: "test".to_string(),
         },
         scan_sites: vec![],
-        asteroids: AHashMap::default(),
+        asteroids: std::collections::BTreeMap::new(),
         ships: [(
             ship_id.clone(),
             ShipState {

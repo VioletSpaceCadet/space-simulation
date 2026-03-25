@@ -146,8 +146,8 @@ fn empty_sites_state(content: &GameContent) -> GameState {
             content_version: content.content_version.clone(),
         },
         scan_sites: vec![],
-        asteroids: AHashMap::default(),
-        ships: AHashMap::default(),
+        asteroids: std::collections::BTreeMap::new(),
+        ships: std::collections::BTreeMap::new(),
         stations: [(
             StationId("station_test".to_string()),
             StationState {

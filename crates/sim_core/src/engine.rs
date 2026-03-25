@@ -283,8 +283,8 @@ fn resolve_ship_tasks(
 ) {
     let current_tick = state.meta.tick;
 
-    // Collect ships whose task eta has arrived, sorted for determinism.
-    let mut ship_ids: Vec<ShipId> = state
+    // Collect ships whose task eta has arrived. BTreeMap iteration is already sorted by ID.
+    let ship_ids: Vec<ShipId> = state
         .ships
         .values()
         .filter(|ship| {
@@ -294,7 +294,6 @@ fn resolve_ship_tasks(
         })
         .map(|ship| ship.id.clone())
         .collect();
-    ship_ids.sort_by(|a, b| a.0.cmp(&b.0));
 
     for ship_id in ship_ids {
         // Clone the task kind to release the borrow on state.ships.
