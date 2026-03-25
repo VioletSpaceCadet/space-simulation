@@ -100,8 +100,8 @@ describe('useSimStream', () => {
     await act(async () => { await Promise.resolve(); });
 
     const events = [
-      { id: 'evt_000010', tick: 20, event: { AsteroidDiscovered: { asteroid_id: 'asteroid_0005', position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 } } } },
-      { id: 'evt_000011', tick: 20, event: { ScanResult: { asteroid_id: 'asteroid_0005', tags: [['IronRich', 0.9]] } } },
+      { id: 10, tick: 20, event: { AsteroidDiscovered: { asteroid_id: 'asteroid_0005', position: { parent_body: 'node_belt_inner', radius_au_um: 0, angle_mdeg: 0 } } } },
+      { id: 11, tick: 20, event: { ScanResult: { asteroid_id: 'asteroid_0005', tags: [['IronRich', 0.9]] } } },
     ];
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }));
@@ -119,7 +119,7 @@ describe('useSimStream', () => {
     await act(async () => { await Promise.resolve(); });
 
     const events = [
-      { id: 'evt_000001', tick: 42, event: { TaskStarted: { ship_id: 'ship_0001' } } },
+      { id: 1, tick: 42, event: { TaskStarted: { ship_id: 'ship_0001' } } },
     ];
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }));
@@ -135,7 +135,7 @@ describe('useSimStream', () => {
     await act(async () => { await Promise.resolve(); });
 
     const events = [
-      { id: 'evt_t1', tick: 10, event: { TaskStarted: { ship_id: 'ship_0001', task_kind: 'Survey', target: 'site_001' } } },
+      { id: 1, tick: 10, event: { TaskStarted: { ship_id: 'ship_0001', task_kind: 'Survey', target: 'site_001' } } },
     ];
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }));
@@ -165,7 +165,7 @@ describe('useSimStream', () => {
     expect(result.current.snapshot?.ships['ship_0001'].task).not.toBeNull();
 
     const events = [
-      { id: 'evt_t2', tick: 15, event: { TaskCompleted: { ship_id: 'ship_0001', task_kind: 'Survey', target: 'site_001' } } },
+      { id: 2, tick: 15, event: { TaskCompleted: { ship_id: 'ship_0001', task_kind: 'Survey', target: 'site_001' } } },
     ];
     act(() => {
       mockEs.onmessage!(new MessageEvent('message', { data: JSON.stringify(events) }));

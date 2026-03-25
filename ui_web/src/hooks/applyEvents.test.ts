@@ -65,7 +65,7 @@ describe('applyEvents', () => {
       const oreLot = makeOreLot();
 
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           OreMined: {
@@ -98,7 +98,7 @@ describe('applyEvents', () => {
       const oreLot = makeOreLot({ kg: 10 });
 
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           OreMined: {
@@ -136,7 +136,7 @@ describe('applyEvents', () => {
       const depositedItems = [makeOreLot({ lot_id: 'lot_1', kg: 50 })];
 
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 20,
         event: {
           OreDeposited: {
@@ -170,7 +170,7 @@ describe('applyEvents', () => {
       const newOre = makeOreLot({ lot_id: 'lot_new', kg: 75 });
 
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 20,
         event: {
           OreDeposited: {
@@ -203,7 +203,7 @@ describe('applyEvents', () => {
       const station = makeStation();
       const itemSpec: TradeItemSpec = { Material: { element: 'Fe', kg: 100 } };
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           ItemImported: {
@@ -231,7 +231,7 @@ describe('applyEvents', () => {
       });
       const itemSpec: TradeItemSpec = { Material: { element: 'Fe', kg: 100 } };
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           ItemImported: {
@@ -256,7 +256,7 @@ describe('applyEvents', () => {
       });
       const itemSpec: TradeItemSpec = { Component: { component_id: 'thruster', count: 3 } };
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           ItemImported: {
@@ -279,7 +279,7 @@ describe('applyEvents', () => {
       const station = makeStation();
       const itemSpec: TradeItemSpec = { Module: { module_def_id: 'module_refinery' } };
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           ItemImported: {
@@ -306,7 +306,7 @@ describe('applyEvents', () => {
       });
       const itemSpec: TradeItemSpec = { Material: { element: 'Fe', kg: 50 } };
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           ItemExported: {
@@ -332,7 +332,7 @@ describe('applyEvents', () => {
       });
       const itemSpec: TradeItemSpec = { Material: { element: 'Fe', kg: 100 } };
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           ItemExported: {
@@ -355,7 +355,7 @@ describe('applyEvents', () => {
       });
       const itemSpec: TradeItemSpec = { Component: { component_id: 'repair_kit', count: 2 } };
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           ItemExported: {
@@ -385,7 +385,7 @@ describe('applyEvents', () => {
         ],
       });
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: { SlagJettisoned: { station_id: 'station_001', kg: 80 } },
       }];
@@ -408,7 +408,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           LabRan: {
             station_id: 'station_001', module_id: 'mod_lab',
@@ -437,7 +437,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { LabStarved: { station_id: 'station_001', module_id: 'mod_lab' } },
       }];
 
@@ -460,7 +460,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { LabResumed: { station_id: 'station_001', module_id: 'mod_lab' } },
       }];
 
@@ -483,7 +483,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ModuleUninstalled: {
             station_id: 'station_001', module_id: 'mod_proc', module_item_id: 'item_001',
@@ -512,7 +512,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { ModuleStalled: { station_id: 'station_001', module_id: 'mod_proc', shortfall_m3: 5.0 } },
       }];
 
@@ -531,7 +531,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { ModuleStalled: { station_id: 'station_001', module_id: 'mod_asm', shortfall_m3: 3.0 } },
       }];
 
@@ -554,7 +554,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { ModuleResumed: { station_id: 'station_001', module_id: 'mod_proc' } },
       }];
 
@@ -573,7 +573,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { ModuleResumed: { station_id: 'station_001', module_id: 'mod_asm' } },
       }];
 
@@ -596,7 +596,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { AssemblerCapped: { station_id: 'station_001', module_id: 'mod_asm' } },
       }];
 
@@ -619,7 +619,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { AssemblerUncapped: { station_id: 'station_001', module_id: 'mod_asm' } },
       }];
 
@@ -641,7 +641,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { DepositBlocked: { ship_id: 'ship_0001', station_id: 'station_001', shortfall_m3: 5.0 } },
       }];
 
@@ -661,7 +661,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { DepositUnblocked: { ship_id: 'ship_0001', station_id: 'station_001' } },
       }];
 
@@ -680,7 +680,7 @@ describe('applyEvents', () => {
       };
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { PowerStateUpdated: { station_id: 'station_001', power: newPower } },
       }];
 
@@ -693,7 +693,7 @@ describe('applyEvents', () => {
     it('does not change state', () => {
       const station = makeStation();
       const events = [{
-        id: 'e1',
+        id: 1,
         tick: 10,
         event: {
           InsufficientFunds: {
@@ -715,7 +715,7 @@ describe('applyEvents', () => {
   describe('AsteroidDiscovered', () => {
     it('adds a new asteroid to state', () => {
       const events = [{
-        id: 'e1', tick: 5,
+        id: 1, tick: 5,
         event: { AsteroidDiscovered: { asteroid_id: 'ast_new', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 } } },
       }];
 
@@ -731,7 +731,7 @@ describe('applyEvents', () => {
     it('does not overwrite an existing asteroid', () => {
       const existing = makeAsteroid({ id: 'ast_001', mass_kg: 999 });
       const events = [{
-        id: 'e1', tick: 5,
+        id: 1, tick: 5,
         event: { AsteroidDiscovered: { asteroid_id: 'ast_001', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 } } },
       }];
 
@@ -752,7 +752,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ModuleInstalled: {
             station_id: 'station_001', module_id: 'mod_1',
@@ -791,7 +791,7 @@ describe('applyEvents', () => {
       for (const [behaviorType, expectedKindState] of Object.entries(behaviorTypes)) {
         const station = makeStation();
         const events = [{
-          id: 'e1', tick: 10,
+          id: 1, tick: 10,
           event: {
             ModuleInstalled: {
               station_id: 'station_001', module_id: `mod_${behaviorType}`,
@@ -811,7 +811,7 @@ describe('applyEvents', () => {
     it('falls back to Processor for unknown behavior_type', () => {
       const station = makeStation();
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ModuleInstalled: {
             station_id: 'station_001', module_id: 'mod_unknown',
@@ -841,7 +841,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { ModuleToggled: { station_id: 'station_001', module_id: 'mod_1', enabled: true } },
       }];
 
@@ -859,7 +859,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { ModuleToggled: { station_id: 'station_001', module_id: 'mod_1', enabled: false } },
       }];
 
@@ -879,7 +879,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ModuleThresholdSet: {
             station_id: 'station_001', module_id: 'mod_1', threshold_kg: 500,
@@ -904,7 +904,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ModuleThresholdSet: {
             station_id: 'station_001', module_id: 'mod_1', threshold_kg: 500,
@@ -924,7 +924,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           RefineryRan: {
             station_id: 'station_001', module_id: 'mod_1',
@@ -965,7 +965,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           RefineryRan: {
             station_id: 'station_001', module_id: 'mod_1',
@@ -991,7 +991,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           RefineryRan: {
             station_id: 'station_001', module_id: 'mod_1',
@@ -1015,7 +1015,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           AssemblerRan: {
             station_id: 'station_001', module_id: 'mod_1',
@@ -1048,7 +1048,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           AssemblerRan: {
             station_id: 'station_001', module_id: 'mod_1',
@@ -1079,7 +1079,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           WearAccumulated: {
             station_id: 'station_001', module_id: 'mod_1', wear_before: 0.1, wear_after: 0.25,
@@ -1103,7 +1103,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ModuleAutoDisabled: {
             station_id: 'station_001', module_id: 'mod_1', reason: 'WearLimit',
@@ -1137,7 +1137,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           MaintenanceRan: {
             station_id: 'station_001',
@@ -1164,7 +1164,7 @@ describe('applyEvents', () => {
   describe('ShipConstructed', () => {
     it('adds a new ship to state', () => {
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ShipConstructed: {
             ship_id: 'ship_new', station_id: 'station_001',
@@ -1196,7 +1196,7 @@ describe('applyEvents', () => {
         },
       };
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ShipModuleFitted: {
             ship_id: 'ship_001', slot_index: 0,
@@ -1212,7 +1212,7 @@ describe('applyEvents', () => {
 
     it('no-ops when ship does not exist', () => {
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ShipModuleFitted: {
             ship_id: 'nonexistent', slot_index: 0,
@@ -1239,7 +1239,7 @@ describe('applyEvents', () => {
         },
       };
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ShipModuleUnfitted: {
             ship_id: 'ship_001', slot_index: 0,
@@ -1255,7 +1255,7 @@ describe('applyEvents', () => {
 
     it('no-ops when ship does not exist', () => {
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ShipModuleUnfitted: {
             ship_id: 'nonexistent', slot_index: 0,
@@ -1271,7 +1271,7 @@ describe('applyEvents', () => {
   describe('TechUnlocked', () => {
     it('adds tech_id to research unlocked list', () => {
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { TechUnlocked: { tech_id: 'tech_advanced_mining' } },
       }];
 
@@ -1285,7 +1285,7 @@ describe('applyEvents', () => {
         unlocked: ['tech_basic'],
       };
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { TechUnlocked: { tech_id: 'tech_advanced' } },
       }];
 
@@ -1297,7 +1297,7 @@ describe('applyEvents', () => {
   describe('ScanSiteSpawned', () => {
     it('adds a new scan site', () => {
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ScanSiteSpawned: {
             site_id: 'site_1', position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_iron',
@@ -1317,7 +1317,7 @@ describe('applyEvents', () => {
         { id: 'site_0', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_gold' },
       ];
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ScanSiteSpawned: {
             site_id: 'site_1', position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 }, template_id: 'template_iron',
@@ -1336,7 +1336,7 @@ describe('applyEvents', () => {
       const tags: [string, number][] = [['metallic', 0.8], ['icy', 0.2]];
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { ScanResult: { asteroid_id: 'ast_001', tags } },
       }];
 
@@ -1353,7 +1353,7 @@ describe('applyEvents', () => {
       const composition = { Fe: 0.6, Si: 0.3, Ni: 0.1 };
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { CompositionMapped: { asteroid_id: 'ast_001', composition } },
       }];
 
@@ -1368,7 +1368,7 @@ describe('applyEvents', () => {
     it('assigns a Mine task to the ship', () => {
       const ship = makeShip();
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           TaskStarted: {
             ship_id: 'ship_0001', task_kind: 'Mine', target: 'ast_001',
@@ -1385,7 +1385,7 @@ describe('applyEvents', () => {
     it('assigns a Survey task to the ship', () => {
       const ship = makeShip();
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           TaskStarted: {
             ship_id: 'ship_0001', task_kind: 'Survey', target: 'site_1',
@@ -1400,7 +1400,7 @@ describe('applyEvents', () => {
     it('assigns a DeepScan task to the ship', () => {
       const ship = makeShip();
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           TaskStarted: {
             ship_id: 'ship_0001', task_kind: 'DeepScan', target: 'ast_001',
@@ -1415,7 +1415,7 @@ describe('applyEvents', () => {
     it('assigns a Deposit task to the ship', () => {
       const ship = makeShip();
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           TaskStarted: {
             ship_id: 'ship_0001', task_kind: 'Deposit', target: 'station_001',
@@ -1432,7 +1432,7 @@ describe('applyEvents', () => {
     it('assigns a Transit task to the ship', () => {
       const ship = makeShip();
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           TaskStarted: {
             ship_id: 'ship_0001', task_kind: 'Transit', target: 'node_b',
@@ -1449,7 +1449,7 @@ describe('applyEvents', () => {
     it('falls back to Idle for unknown task kind', () => {
       const ship = makeShip();
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           TaskStarted: {
             ship_id: 'ship_0001', task_kind: 'UnknownTask', target: null,
@@ -1472,7 +1472,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 15,
+        id: 1, tick: 15,
         event: { TaskCompleted: { ship_id: 'ship_0001', task_kind: 'Mine', target: 'ast_001' } },
       }];
 
@@ -1486,7 +1486,7 @@ describe('applyEvents', () => {
       const ship = makeShip({ position: { parent_body: 'body_a', radius_au_um: 0, angle_mdeg: 0 } });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { ShipArrived: { ship_id: 'ship_0001', position: { parent_body: 'body_b', radius_au_um: 0, angle_mdeg: 0 } } },
       }];
 
@@ -1498,7 +1498,7 @@ describe('applyEvents', () => {
   describe('DataGenerated', () => {
     it('adds to research data pool', () => {
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { DataGenerated: { kind: 'Materials', amount: 5.0 } },
       }];
 
@@ -1512,7 +1512,7 @@ describe('applyEvents', () => {
         data_pool: { Materials: 3.0 },
       };
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: { DataGenerated: { kind: 'Materials', amount: 7.0 } },
       }];
 
@@ -1532,7 +1532,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ModuleAwaitingTech: {
             station_id: 'station_001', module_id: 'mod_1', tech_id: 'tech_advanced',
@@ -1554,7 +1554,7 @@ describe('applyEvents', () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           AsteroidDiscovered: {
             asteroid_id: 123, // should be string, not number
@@ -1581,7 +1581,7 @@ describe('applyEvents', () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           ModuleToggled: { station_id: 'station_001' },
         },
@@ -1609,11 +1609,11 @@ describe('applyEvents', () => {
 
       const events = [
         {
-          id: 'e1', tick: 10,
+          id: 1, tick: 10,
           event: { TechUnlocked: { tech_id: 42 } }, // invalid: number instead of string
         },
         {
-          id: 'e2', tick: 10,
+          id: 2, tick: 10,
           event: { TechUnlocked: { tech_id: 'tech_valid' } }, // valid
         },
       ];
@@ -1643,7 +1643,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           OverheatWarning: {
             station_id: 'station_001', module_id: 'mod_smelter',
@@ -1677,7 +1677,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           OverheatCritical: {
             station_id: 'station_001', module_id: 'mod_smelter',
@@ -1712,7 +1712,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           OverheatCleared: {
             station_id: 'station_001', module_id: 'mod_smelter',
@@ -1741,7 +1741,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'e1', tick: 10,
+        id: 1, tick: 10,
         event: {
           OverheatCleared: {
             station_id: 'station_001', module_id: 'mod_smelter',
@@ -1770,7 +1770,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'evt_1', tick: 2,
+        id: 1, tick: 2,
         event: { BoiloffLoss: { station_id: 'station_001', element: 'LH2', kg_lost: 14.0 } },
       }];
 
@@ -1792,7 +1792,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'evt_1', tick: 2,
+        id: 1, tick: 2,
         event: { BoiloffLoss: { station_id: 'station_001', element: 'LH2', kg_lost: 0.005 } },
       }];
 
@@ -1816,7 +1816,7 @@ describe('applyEvents', () => {
       });
 
       const events = [{
-        id: 'evt_1', tick: 2,
+        id: 1, tick: 2,
         event: { BoiloffLoss: { station_id: 'station_001', element: 'LH2', kg_lost: 10.0 } },
       }];
 
