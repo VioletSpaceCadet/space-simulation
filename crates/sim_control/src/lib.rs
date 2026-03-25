@@ -18,12 +18,15 @@ pub trait CommandSource {
 /// (Deposit > Mine > `DeepScan` > Survey).
 pub struct AutopilotController {
     behaviors: Vec<Box<dyn AutopilotBehavior>>,
+    /// Cached owner ID — avoids per-tick String allocation.
+    owner: PrincipalId,
 }
 
 impl AutopilotController {
     pub fn new() -> Self {
         Self {
             behaviors: behaviors::default_behaviors(),
+            owner: PrincipalId(AUTOPILOT_OWNER.to_string()),
         }
     }
 }
@@ -41,10 +44,9 @@ impl CommandSource for AutopilotController {
         content: &GameContent,
         next_command_id: &mut u64,
     ) -> Vec<CommandEnvelope> {
-        let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut commands = Vec::new();
         for behavior in &self.behaviors {
-            commands.extend(behavior.generate(state, content, &owner, next_command_id));
+            commands.extend(behavior.generate(state, content, &self.owner, next_command_id));
         }
         commands
     }
