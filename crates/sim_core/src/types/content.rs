@@ -222,7 +222,7 @@ impl GameContent {
     pub fn module_has_role(&self, def_id: &str, role: &str) -> bool {
         self.module_defs
             .get(def_id)
-            .map_or(false, |def| def.roles.iter().any(|r| r == role))
+            .is_some_and(|def| def.roles.iter().any(|r| r == role))
     }
 }
 
