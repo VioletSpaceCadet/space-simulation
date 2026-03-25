@@ -808,3 +808,51 @@ fn battery_not_stalled_by_power_system() {
         "battery should never be power_stalled"
     );
 }
+
+#[test]
+fn power_priority_fallback_uses_behavior_type() {
+    let def = ModuleDef {
+        id: "test_processor".to_string(),
+        name: "Test".to_string(),
+        mass_kg: 0.0,
+        volume_m3: 0.0,
+        power_consumption_per_run: 0.0,
+        wear_per_run: 0.0,
+        behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+            processing_interval_minutes: 1,
+            processing_interval_ticks: 1,
+            recipes: vec![],
+        }),
+        thermal: None,
+        compatible_slots: Vec::new(),
+        ship_modifiers: Vec::new(),
+        power_stall_priority: None,
+    };
+    assert_eq!(def.power_priority(), Some(3), "Processor default is 3");
+}
+
+#[test]
+fn power_priority_content_override_takes_precedence() {
+    let def = ModuleDef {
+        id: "test_processor".to_string(),
+        name: "Test".to_string(),
+        mass_kg: 0.0,
+        volume_m3: 0.0,
+        power_consumption_per_run: 0.0,
+        wear_per_run: 0.0,
+        behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+            processing_interval_minutes: 1,
+            processing_interval_ticks: 1,
+            recipes: vec![],
+        }),
+        thermal: None,
+        compatible_slots: Vec::new(),
+        ship_modifiers: Vec::new(),
+        power_stall_priority: Some(7),
+    };
+    assert_eq!(
+        def.power_priority(),
+        Some(7),
+        "content override should take precedence over behavior default"
+    );
+}

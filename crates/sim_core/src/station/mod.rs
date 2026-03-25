@@ -144,9 +144,6 @@ pub(crate) fn tick_stations(
     }
 }
 
-// power_priority is now ModuleDef::power_priority() — reads from content field first,
-// falls back to behavior-type default.
-
 /// Apply battery charge/discharge. Returns (discharge, charge, stored) in kW/kWh.
 fn apply_battery_buffering(
     state: &mut GameState,

@@ -663,9 +663,9 @@ impl ModuleBehaviorDef {
         }
     }
 
-    /// Returns the power-stall priority for ticking modules. Lower = stalled first.
-    /// Passive modules (solar, storage, battery, radiator) return `None`.
-    pub fn power_priority(&self) -> Option<u8> {
+    /// Returns the default power-stall priority based on behavior type.
+    /// Callers should prefer `ModuleDef::power_priority()` which checks content first.
+    pub(crate) fn power_priority(&self) -> Option<u8> {
         match self {
             Self::SensorArray(_) => Some(0),
             Self::Lab(_) => Some(1),
