@@ -87,6 +87,7 @@ fn production_like_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -111,6 +112,7 @@ fn production_like_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -135,6 +137,7 @@ fn production_like_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -159,6 +162,7 @@ fn production_like_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -209,6 +213,7 @@ fn production_like_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -251,6 +256,7 @@ fn production_like_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -275,6 +281,7 @@ fn production_like_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -573,6 +580,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 

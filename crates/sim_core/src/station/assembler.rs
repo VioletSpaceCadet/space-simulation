@@ -611,6 +611,7 @@ mod assembler_component_tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         content
@@ -959,6 +960,7 @@ mod assembler_component_tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         content

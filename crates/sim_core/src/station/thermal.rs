@@ -522,6 +522,7 @@ mod tests {
                 }),
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         content
@@ -735,6 +736,7 @@ mod tests {
                 }),
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
 
@@ -806,6 +808,7 @@ mod tests {
                 }),
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         let station = state.stations.get_mut(station_id).unwrap();
@@ -1325,6 +1328,7 @@ mod tests {
                 }),
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         content

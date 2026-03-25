@@ -9,9 +9,12 @@
     "behavior": {
       "Processor": {
         "processing_interval_minutes": 60,
-        "recipes": ["recipe_basic_iron"]
+        "recipes": [
+          "recipe_basic_iron"
+        ]
       }
-    }
+    },
+    "power_stall_priority": 3
   },
   {
     "id": "module_electrolysis_unit",
@@ -23,9 +26,12 @@
     "behavior": {
       "Processor": {
         "processing_interval_minutes": 60,
-        "recipes": ["recipe_electrolysis"]
+        "recipes": [
+          "recipe_electrolysis"
+        ]
       }
-    }
+    },
+    "power_stall_priority": 3
   },
   {
     "id": "module_heating_unit",
@@ -37,9 +43,12 @@
     "behavior": {
       "Processor": {
         "processing_interval_minutes": 60,
-        "recipes": ["recipe_extract_water"]
+        "recipes": [
+          "recipe_extract_water"
+        ]
       }
-    }
+    },
+    "power_stall_priority": 3
   },
   {
     "id": "module_maintenance_bay",
@@ -55,7 +64,8 @@
         "repair_kit_cost": 1,
         "repair_threshold": 0.1
       }
-    }
+    },
+    "power_stall_priority": 4
   },
   {
     "id": "module_basic_assembler",
@@ -67,10 +77,17 @@
     "behavior": {
       "Assembler": {
         "assembly_interval_minutes": 360,
-        "recipes": ["recipe_basic_repair_kit", "recipe_advanced_repair_kit"],
-        "max_stock": { "repair_kit": 50, "advanced_repair_kit": 20 }
+        "recipes": [
+          "recipe_basic_repair_kit",
+          "recipe_advanced_repair_kit"
+        ],
+        "max_stock": {
+          "repair_kit": 50,
+          "advanced_repair_kit": 20
+        }
       }
-    }
+    },
+    "power_stall_priority": 2
   },
   {
     "id": "module_materials_lab",
@@ -84,10 +101,14 @@
         "domain": "Materials",
         "data_consumption_per_run": 10.0,
         "research_points_per_run": 5.0,
-        "accepted_data": ["AssayData", "ManufacturingData"],
+        "accepted_data": [
+          "AssayData",
+          "ManufacturingData"
+        ],
         "research_interval_minutes": 60
       }
-    }
+    },
+    "power_stall_priority": 1
   },
   {
     "id": "module_exploration_lab",
@@ -101,10 +122,13 @@
         "domain": "Survey",
         "data_consumption_per_run": 8.0,
         "research_points_per_run": 4.0,
-        "accepted_data": ["SurveyData"],
+        "accepted_data": [
+          "SurveyData"
+        ],
         "research_interval_minutes": 60
       }
-    }
+    },
+    "power_stall_priority": 1
   },
   {
     "id": "module_engineering_lab",
@@ -118,10 +142,13 @@
         "domain": "Manufacturing",
         "data_consumption_per_run": 10.0,
         "research_points_per_run": 5.0,
-        "accepted_data": ["ManufacturingData"],
+        "accepted_data": [
+          "ManufacturingData"
+        ],
         "research_interval_minutes": 60
       }
-    }
+    },
+    "power_stall_priority": 1
   },
   {
     "id": "module_propulsion_lab",
@@ -135,10 +162,13 @@
         "domain": "Propulsion",
         "data_consumption_per_run": 8.0,
         "research_points_per_run": 4.0,
-        "accepted_data": ["TransitData"],
+        "accepted_data": [
+          "TransitData"
+        ],
         "research_interval_minutes": 60
       }
-    }
+    },
+    "power_stall_priority": 1
   },
   {
     "id": "module_sensor_array",
@@ -153,7 +183,8 @@
         "action_key": "sensor_scan",
         "scan_interval_minutes": 120
       }
-    }
+    },
+    "power_stall_priority": 0
   },
   {
     "id": "module_shipyard",
@@ -165,9 +196,12 @@
     "behavior": {
       "Assembler": {
         "assembly_interval_minutes": 20160,
-        "recipes": ["recipe_basic_mining_shuttle"]
+        "recipes": [
+          "recipe_basic_mining_shuttle"
+        ]
       }
-    }
+    },
+    "power_stall_priority": 2
   },
   {
     "id": "module_basic_solar_array",
@@ -175,7 +209,7 @@
     "mass_kg": 1500.0,
     "volume_m3": 12.0,
     "power_consumption_per_run": 0.0,
-    "wear_per_run": 0.00002,
+    "wear_per_run": 2e-05,
     "behavior": {
       "SolarArray": {
         "base_output_kw": 50.0
@@ -207,7 +241,9 @@
     "behavior": {
       "Processor": {
         "processing_interval_minutes": 60,
-        "recipes": ["recipe_smelt_iron"]
+        "recipes": [
+          "recipe_smelt_iron"
+        ]
       }
     },
     "thermal": {
@@ -218,7 +254,8 @@
       "operating_max_mk": 2100000,
       "thermal_group": "default",
       "idle_heat_generation_w": 10000.0
-    }
+    },
+    "power_stall_priority": 3
   },
   {
     "id": "module_basic_radiator",
@@ -249,9 +286,12 @@
     "behavior": {
       "Processor": {
         "processing_interval_minutes": 60,
-        "recipes": ["recipe_fe_plate"]
+        "recipes": [
+          "recipe_fe_plate"
+        ]
       }
-    }
+    },
+    "power_stall_priority": 3
   },
   {
     "id": "module_structural_assembler",
@@ -263,10 +303,17 @@
     "behavior": {
       "Assembler": {
         "assembly_interval_minutes": 480,
-        "recipes": ["recipe_structural_beam", "recipe_hull_panel"],
-        "max_stock": { "structural_beam": 20, "hull_panel": 5 }
+        "recipes": [
+          "recipe_structural_beam",
+          "recipe_hull_panel"
+        ],
+        "max_stock": {
+          "structural_beam": 20,
+          "hull_panel": 5
+        }
       }
-    }
+    },
+    "power_stall_priority": 2
   },
   {
     "id": "module_mining_laser",
@@ -276,13 +323,17 @@
     "power_consumption_per_run": 0.0,
     "wear_per_run": 0.0,
     "behavior": "Equipment",
-    "compatible_slots": ["industrial"],
+    "compatible_slots": [
+      "industrial"
+    ],
     "ship_modifiers": [
       {
         "stat": "mining_rate",
         "op": "pct_multiplicative",
         "value": 1.2,
-        "source": { "equipment": "module_mining_laser" }
+        "source": {
+          "equipment": "module_mining_laser"
+        }
       }
     ]
   },
@@ -294,13 +345,17 @@
     "power_consumption_per_run": 0.0,
     "wear_per_run": 0.0,
     "behavior": "Equipment",
-    "compatible_slots": ["utility"],
+    "compatible_slots": [
+      "utility"
+    ],
     "ship_modifiers": [
       {
         "stat": "cargo_capacity",
         "op": "pct_multiplicative",
         "value": 1.3,
-        "source": { "equipment": "module_cargo_expander" }
+        "source": {
+          "equipment": "module_cargo_expander"
+        }
       }
     ]
   },
@@ -312,13 +367,17 @@
     "power_consumption_per_run": 0.0,
     "wear_per_run": 0.0,
     "behavior": "Equipment",
-    "compatible_slots": ["utility"],
+    "compatible_slots": [
+      "utility"
+    ],
     "ship_modifiers": [
       {
         "stat": "scan_duration",
         "op": "pct_multiplicative",
         "value": 0.85,
-        "source": { "equipment": "module_survey_scanner" }
+        "source": {
+          "equipment": "module_survey_scanner"
+        }
       }
     ]
   },
@@ -330,13 +389,17 @@
     "power_consumption_per_run": 0.0,
     "wear_per_run": 0.0,
     "behavior": "Equipment",
-    "compatible_slots": ["propulsion"],
+    "compatible_slots": [
+      "propulsion"
+    ],
     "ship_modifiers": [
       {
         "stat": "ship_speed",
         "op": "pct_multiplicative",
         "value": 0.85,
-        "source": { "equipment": "module_basic_engine" }
+        "source": {
+          "equipment": "module_basic_engine"
+        }
       }
     ]
   },
@@ -348,13 +411,17 @@
     "power_consumption_per_run": 0.0,
     "wear_per_run": 0.0,
     "behavior": "Equipment",
-    "compatible_slots": ["utility"],
+    "compatible_slots": [
+      "utility"
+    ],
     "ship_modifiers": [
       {
         "stat": "propellant_capacity",
         "op": "pct_multiplicative",
         "value": 1.5,
-        "source": { "equipment": "module_propellant_tank" }
+        "source": {
+          "equipment": "module_propellant_tank"
+        }
       }
     ]
   }

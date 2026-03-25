@@ -17,6 +17,7 @@ fn solar_array_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
     content.module_defs.insert(
@@ -36,6 +37,7 @@ fn solar_array_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
     content
@@ -154,6 +156,7 @@ fn power_budget_deficit_when_insufficient() {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -301,6 +304,7 @@ fn stall_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
     content
@@ -492,6 +496,7 @@ fn battery_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
     content
@@ -558,6 +563,7 @@ fn battery_discharges_to_cover_deficit() {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -646,6 +652,7 @@ fn battery_partial_discharge_then_stall() {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 

@@ -144,12 +144,8 @@ pub(crate) fn tick_stations(
     }
 }
 
-/// Returns the power priority for a module behavior. Lower = stalled first.
-/// Priority (highest first): Maintenance(4) > Processor(3) > Assembler(2) > Lab(1) > SensorArray(0).
-/// Solar arrays and storage are never stalled (they generate power or are passive).
-fn power_priority(behavior: &crate::ModuleBehaviorDef) -> Option<u8> {
-    behavior.power_priority()
-}
+// power_priority is now ModuleDef::power_priority() — reads from content field first,
+// falls back to behavior-type default.
 
 /// Apply battery charge/discharge. Returns (discharge, charge, stored) in kW/kWh.
 fn apply_battery_buffering(
@@ -323,7 +319,7 @@ fn compute_power_budget(
             }
             _ => {
                 consumed_kw += def.power_consumption_per_run;
-                if let Some(priority) = power_priority(&def.behavior) {
+                if let Some(priority) = def.power_priority() {
                     consumers.push((module_index, priority, def.power_consumption_per_run));
                 }
             }
@@ -801,6 +797,7 @@ mod framework_tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         content
@@ -941,6 +938,7 @@ mod framework_tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         assert!(extract_context(&state, &station_id, 0, &content2).is_none());

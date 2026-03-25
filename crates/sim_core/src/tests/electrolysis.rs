@@ -85,6 +85,7 @@ fn electrolysis_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -104,6 +105,7 @@ fn electrolysis_content() -> GameContent {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -483,6 +485,7 @@ fn test_full_chain_ore_to_propellant() {
             thermal: None,
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
