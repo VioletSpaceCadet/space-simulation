@@ -20,5 +20,6 @@
   "deep_scan_targets": [
     { "tag": "IronRich", "min_confidence": 0.7 },
     { "tag": "VolatileRich", "min_confidence": 0.7 }
-  ]
+  ],
+  "task_priority": ["Deposit", "Mine", "DeepScan", "Survey"]
 }

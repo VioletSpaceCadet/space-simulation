@@ -800,7 +800,76 @@ impl AutopilotBehavior for ShipFitting {
     }
 }
 
-/// Ship task scheduling: Deposit > Mine > `DeepScan` > Survey priority loop.
+/// Try to assign a mine task from the next best asteroid.
+fn try_mine<'a>(
+    ship: &ShipState,
+    next_mine: &mut impl Iterator<Item = &'a &'a AsteroidState>,
+    ship_speed: u64,
+    state: &GameState,
+    content: &GameContent,
+) -> Option<TaskKind> {
+    let asteroid = next_mine.next()?;
+    Some(maybe_transit(
+        TaskKind::Mine {
+            asteroid: asteroid.id.clone(),
+            duration_ticks: mine_duration(asteroid, ship, content),
+        },
+        &ship.position,
+        &asteroid.position,
+        ship_speed,
+        state,
+        content,
+    ))
+}
+
+/// Try to assign a deep scan task if tech is unlocked and candidates remain.
+fn try_deep_scan<'a>(
+    ship: &ShipState,
+    deep_scan_unlocked: bool,
+    next_deep_scan: &mut impl Iterator<Item = &'a AsteroidId>,
+    ship_speed: u64,
+    state: &GameState,
+    content: &GameContent,
+) -> Option<TaskKind> {
+    if !deep_scan_unlocked {
+        return None;
+    }
+    let asteroid_id = next_deep_scan.next()?;
+    let asteroid_pos = state.asteroids[asteroid_id].position.clone();
+    Some(maybe_transit(
+        TaskKind::DeepScan {
+            asteroid: asteroid_id.clone(),
+        },
+        &ship.position,
+        &asteroid_pos,
+        ship_speed,
+        state,
+        content,
+    ))
+}
+
+/// Try to assign a survey task from the next nearest unscanned site.
+fn try_survey<'a>(
+    ship: &ShipState,
+    next_site: &mut impl Iterator<Item = &'a &'a sim_core::ScanSite>,
+    ship_speed: u64,
+    state: &GameState,
+    content: &GameContent,
+) -> Option<TaskKind> {
+    let site = next_site.next()?;
+    Some(maybe_transit(
+        TaskKind::Survey {
+            site: SiteId(site.id.0.clone()),
+        },
+        &ship.position,
+        &site.position,
+        ship_speed,
+        state,
+        content,
+    ))
+}
+
+/// Ship task scheduling with configurable priority from `content.autopilot.task_priority`.
 pub(crate) struct ShipTaskScheduler;
 
 impl AutopilotBehavior for ShipTaskScheduler {
@@ -808,7 +877,6 @@ impl AutopilotBehavior for ShipTaskScheduler {
         "ship_task_scheduler"
     }
 
-    #[allow(clippy::too_many_lines)]
     fn generate(
         &self,
         state: &GameState,
@@ -884,95 +952,33 @@ impl AutopilotBehavior for ShipTaskScheduler {
 
         for ship_id in idle_ships {
             let ship = &state.ships[&ship_id];
-
-            // Priority 1: ship has ore → deposit at nearest station.
-            if let Some(task) = deposit_priority(ship, state, content) {
-                commands.push(make_cmd(
-                    &ship.owner,
-                    state.meta.tick,
-                    next_id,
-                    Command::AssignShipTask {
-                        ship_id,
-                        task_kind: task,
-                    },
-                ));
-                continue;
-            }
-
-            // Priority 2: mine best available asteroid.
             let ship_speed = ship.ticks_per_au(content.constants.ticks_per_au);
-            if let Some(asteroid) = next_mine.next() {
-                let task = maybe_transit(
-                    TaskKind::Mine {
-                        asteroid: asteroid.id.clone(),
-                        duration_ticks: mine_duration(asteroid, ship, content),
-                    },
-                    &ship.position,
-                    &asteroid.position,
-                    ship_speed,
-                    state,
-                    content,
-                );
-                commands.push(make_cmd(
-                    &ship.owner,
-                    state.meta.tick,
-                    next_id,
-                    Command::AssignShipTask {
-                        ship_id,
-                        task_kind: task,
-                    },
-                ));
-                continue;
-            }
 
-            // Priority 3: deep scan (enables future mining).
-            if deep_scan_unlocked {
-                if let Some(asteroid_id) = next_deep_scan.next() {
-                    let asteroid_pos = state.asteroids[asteroid_id].position.clone();
-                    let task = maybe_transit(
-                        TaskKind::DeepScan {
-                            asteroid: asteroid_id.clone(),
-                        },
-                        &ship.position,
-                        &asteroid_pos,
+            // Iterate configurable priority order from content.autopilot.task_priority.
+            for priority in &content.autopilot.task_priority {
+                let task = match priority.as_str() {
+                    "Deposit" => deposit_priority(ship, state, content),
+                    "Mine" => try_mine(ship, &mut next_mine, ship_speed, state, content),
+                    "DeepScan" => try_deep_scan(
+                        ship,
+                        deep_scan_unlocked,
+                        &mut next_deep_scan,
                         ship_speed,
                         state,
                         content,
-                    );
+                    ),
+                    "Survey" => try_survey(ship, &mut next_site, ship_speed, state, content),
+                    _ => None,
+                };
+                if let Some(task_kind) = task {
                     commands.push(make_cmd(
                         &ship.owner,
                         state.meta.tick,
                         next_id,
-                        Command::AssignShipTask {
-                            ship_id,
-                            task_kind: task,
-                        },
+                        Command::AssignShipTask { ship_id, task_kind },
                     ));
-                    continue;
+                    break;
                 }
-            }
-
-            // Priority 4: survey unscanned sites (nearest first).
-            if let Some(&site) = next_site.next() {
-                let task = maybe_transit(
-                    TaskKind::Survey {
-                        site: SiteId(site.id.0.clone()),
-                    },
-                    &ship.position,
-                    &site.position,
-                    ship_speed,
-                    state,
-                    content,
-                );
-                commands.push(make_cmd(
-                    &ship.owner,
-                    state.meta.tick,
-                    next_id,
-                    Command::AssignShipTask {
-                        ship_id,
-                        task_kind: task,
-                    },
-                ));
             }
         }
 
