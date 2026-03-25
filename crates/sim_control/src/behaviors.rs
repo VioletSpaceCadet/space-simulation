@@ -76,7 +76,7 @@ fn maybe_transit(
     }
 }
 
-/// Returns idle autopilot ships. BTreeMap iteration is already sorted by ID.
+/// Returns idle autopilot ships. `BTreeMap` iteration is already sorted by ID.
 fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
     state
         .ships
