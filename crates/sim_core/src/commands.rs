@@ -779,6 +779,7 @@ mod tests {
                     1.3,
                     ModifierSource::Equipment("cargo_expander".to_string()),
                 )],
+                power_stall_priority: None,
             },
         );
         content
@@ -990,6 +991,7 @@ mod tests {
                     1.2,
                     ModifierSource::Equipment("mining_laser".to_string()),
                 )],
+                power_stall_priority: None,
             },
         );
 

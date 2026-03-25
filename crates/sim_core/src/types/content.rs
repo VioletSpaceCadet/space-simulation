@@ -540,6 +540,19 @@ pub struct ModuleDef {
     /// Modifiers applied to a ship when this module is fitted.
     #[serde(default)]
     pub ship_modifiers: Vec<crate::modifiers::Modifier>,
+    /// Power-stall priority (lower = stalled first under power shortage).
+    /// If `None`, falls back to the behavior-type default.
+    #[serde(default)]
+    pub power_stall_priority: Option<u8>,
+}
+
+impl ModuleDef {
+    /// Returns the power-stall priority. Uses explicit `power_stall_priority` if set,
+    /// otherwise falls back to the behavior-type default.
+    pub fn power_priority(&self) -> Option<u8> {
+        self.power_stall_priority
+            .or_else(|| self.behavior.power_priority())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -650,9 +663,9 @@ impl ModuleBehaviorDef {
         }
     }
 
-    /// Returns the power-stall priority for ticking modules. Lower = stalled first.
-    /// Passive modules (solar, storage, battery, radiator) return `None`.
-    pub fn power_priority(&self) -> Option<u8> {
+    /// Returns the default power-stall priority based on behavior type.
+    /// Callers should prefer `ModuleDef::power_priority()` which checks content first.
+    pub(crate) fn power_priority(&self) -> Option<u8> {
         match self {
             Self::SensorArray(_) => Some(0),
             Self::Lab(_) => Some(1),

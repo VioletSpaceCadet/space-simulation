@@ -1225,6 +1225,7 @@ mod tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         )]
         .into_iter()
@@ -1399,6 +1400,7 @@ mod tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         )]
         .into_iter()
@@ -1512,6 +1514,7 @@ mod tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         )]
         .into_iter()
@@ -1591,6 +1594,7 @@ mod tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         let mut state = empty_state();
@@ -1658,6 +1662,7 @@ mod tests {
                 }),
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
 
@@ -1768,6 +1773,7 @@ mod tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
 

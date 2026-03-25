@@ -1047,6 +1047,7 @@ mod tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         validate_content(&content);
@@ -1137,6 +1138,7 @@ mod tests {
                 thermal: None,
                 compatible_slots: Vec::new(),
                 ship_modifiers: Vec::new(),
+                power_stall_priority: None,
             },
         );
         validate_content(&content);
@@ -1629,6 +1631,7 @@ mod tests {
                 thermal: None,
                 compatible_slots: vec![sim_core::SlotType("utility".to_string())],
                 ship_modifiers: vec![],
+                power_stall_priority: None,
             },
         );
         content.fitting_templates.insert(

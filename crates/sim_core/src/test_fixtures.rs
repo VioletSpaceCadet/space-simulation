@@ -628,6 +628,7 @@ pub fn thermal_content() -> GameContent {
             }),
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
@@ -654,6 +655,7 @@ pub fn thermal_content() -> GameContent {
             }),
             compatible_slots: Vec::new(),
             ship_modifiers: Vec::new(),
+            power_stall_priority: None,
         },
     );
 
