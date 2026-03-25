@@ -76,9 +76,9 @@ fn maybe_transit(
     }
 }
 
-/// Returns idle autopilot ships sorted by ID for determinism.
+/// Returns idle autopilot ships. `BTreeMap` iteration is already sorted by ID.
 fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
-    let mut ships: Vec<ShipId> = state
+    state
         .ships
         .values()
         .filter(|ship| {
@@ -89,9 +89,7 @@ fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
                     .is_none_or(|t| matches!(t.kind, TaskKind::Idle))
         })
         .map(|ship| ship.id.clone())
-        .collect();
-    ships.sort_by(|a, b| a.0.cmp(&b.0));
-    ships
+        .collect()
 }
 
 /// Returns asteroid IDs above confidence threshold with unknown composition,
@@ -451,11 +449,11 @@ impl AutopilotBehavior for ThrusterImport {
         let shipyard_role = &content.autopilot.shipyard_role;
         let import_component = &content.autopilot.shipyard_import_component;
 
-        let mut sorted_stations: Vec<_> = state.stations.values().collect();
-        sorted_stations.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+        // BTreeMap iteration is already sorted by station ID.
+        let sorted_stations: Vec<_> = state.stations.values().collect();
 
         // Look up the shipyard recipe's component requirement from the first module with the
-        // shipyard role (sorted by ID for determinism — AHashMap iteration order is not stable).
+        // shipyard role. module_defs is AHashMap so still needs sorting for determinism.
         let mut shipyard_defs: Vec<_> = content
             .module_defs
             .values()
@@ -608,10 +606,8 @@ impl AutopilotBehavior for MaterialExport {
         let batch_size_kg = content.constants.autopilot_export_batch_size_kg;
         let min_revenue = content.constants.autopilot_export_min_revenue;
 
-        let mut sorted_stations: Vec<_> = state.stations.values().collect();
-        sorted_stations.sort_by(|a, b| a.id.0.cmp(&b.id.0));
-
-        for station in sorted_stations {
+        // BTreeMap iteration is already sorted by station ID.
+        for station in state.stations.values() {
             // Export candidates in priority order (from autopilot config)
             let candidates = build_export_candidates(station, &content.autopilot, batch_size_kg);
 

@@ -22,9 +22,9 @@ pub struct GameState {
     /// Unscanned potential asteroid locations. Populated at world-gen; entries
     /// are removed when surveyed and replaced by a real `AsteroidState`.
     pub scan_sites: Vec<ScanSite>,
-    pub asteroids: AHashMap<AsteroidId, AsteroidState>,
-    pub ships: AHashMap<ShipId, ShipState>,
-    pub stations: AHashMap<StationId, StationState>,
+    pub asteroids: std::collections::BTreeMap<AsteroidId, AsteroidState>,
+    pub ships: std::collections::BTreeMap<ShipId, ShipState>,
+    pub stations: std::collections::BTreeMap<StationId, StationState>,
     pub research: ResearchState,
     #[serde(default)]
     pub balance: f64,

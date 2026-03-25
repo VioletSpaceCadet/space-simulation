@@ -530,7 +530,7 @@ pub fn base_state(content: &GameContent) -> GameState {
             position: test_position(),
             template_id: "tmpl_iron_rich".to_string(),
         }],
-        asteroids: AHashMap::default(),
+        asteroids: std::collections::BTreeMap::new(),
         ships: [(
             ship_id.clone(),
             ShipState {

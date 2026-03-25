@@ -106,8 +106,8 @@ mod tests {
                 content_version: content.content_version.clone(),
             },
             scan_sites: vec![],
-            asteroids: AHashMap::default(),
-            ships: AHashMap::default(),
+            asteroids: std::collections::BTreeMap::new(),
+            ships: std::collections::BTreeMap::new(),
             stations: [(
                 station_id.clone(),
                 StationState {

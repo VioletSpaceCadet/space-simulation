@@ -743,7 +743,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             content_version: content.content_version.clone(),
         },
         scan_sites,
-        asteroids: AHashMap::default(),
+        asteroids: std::collections::BTreeMap::new(),
         ships: [(ship_id, ship)].into_iter().collect(),
         stations: [(station_id, station)].into_iter().collect(),
         research: ResearchState {
@@ -1300,8 +1300,8 @@ mod tests {
                 content_version: "test".to_string(),
             },
             scan_sites: vec![],
-            asteroids: AHashMap::default(),
-            ships: AHashMap::default(),
+            asteroids: std::collections::BTreeMap::new(),
+            ships: std::collections::BTreeMap::new(),
             stations: [(
                 station_id.clone(),
                 StationState {
