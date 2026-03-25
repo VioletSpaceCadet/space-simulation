@@ -9,21 +9,21 @@ pub(super) fn tick_sensor_array_modules(
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) {
-    let module_count = state
+    super::ensure_station_index(state, station_id, content);
+    let indices: Vec<usize> = state
         .stations
         .get(station_id)
-        .map_or(0, |s| s.modules.len());
+        .map(|s| s.module_type_index.sensors.clone())
+        .unwrap_or_default();
 
-    for module_idx in 0..module_count {
+    for module_idx in indices {
         let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
             continue;
         };
 
-        // Only process sensor arrays
         let ModuleBehaviorDef::SensorArray(sensor_def) = &ctx.def.behavior else {
             continue;
         };
-        // Clone the def to release the borrow on ctx.def before mutating state
         let sensor_def = sensor_def.clone();
 
         if !super::should_run(state, &ctx) {
@@ -98,7 +98,7 @@ mod tests {
 
     fn sensor_state(content: &GameContent) -> GameState {
         let station_id = StationId("station_test".to_string());
-        GameState {
+        let mut state = GameState {
             meta: MetaState {
                 tick: 0,
                 seed: 42,
@@ -131,6 +131,7 @@ mod tests {
                     modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
                 },
             )]
             .into_iter()
@@ -154,7 +155,9 @@ mod tests {
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
             body_cache: AHashMap::default(),
-        }
+        };
+        crate::test_fixtures::rebuild_indices(&mut state, content);
+        state
     }
 
     #[test]

@@ -8,12 +8,14 @@ pub(super) fn tick_maintenance_modules(
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) {
-    let module_count = state
+    super::ensure_station_index(state, station_id, content);
+    let indices: Vec<usize> = state
         .stations
         .get(station_id)
-        .map_or(0, |s| s.modules.len());
+        .map(|s| s.module_type_index.maintenance.clone())
+        .unwrap_or_default();
 
-    for module_idx in 0..module_count {
+    for module_idx in indices {
         let Some(ctx) = super::extract_context(state, station_id, module_idx, content) else {
             continue;
         };

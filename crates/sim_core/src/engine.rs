@@ -136,6 +136,7 @@ fn apply_commands(
             } => {
                 commands::handle_uninstall_module(
                     state,
+                    content,
                     station_id,
                     module_id,
                     current_tick,
