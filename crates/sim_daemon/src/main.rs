@@ -606,12 +606,12 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let resp_body = response.into_body().collect().await?.to_bytes();
         let json: serde_json::Value = serde_json::from_slice(&resp_body)?;
-        assert_eq!(json["command_id"], "cmd_0");
+        assert_eq!(json["command_id"], 0);
 
         // Verify command was queued
         let queue = state.command_queue.lock();
         assert_eq!(queue.len(), 1);
-        assert_eq!(queue[0].id.0, "cmd_0");
+        assert_eq!(queue[0].id.0, 0);
         Ok(())
     }
 

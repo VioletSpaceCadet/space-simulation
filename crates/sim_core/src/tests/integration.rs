@@ -4,7 +4,7 @@ use super::*;
 fn test_identical_seeds_produce_identical_event_logs() {
     let content = test_content();
 
-    let run = |seed: u64| -> Vec<(String, u64)> {
+    let run = |seed: u64| -> Vec<(u64, u64)> {
         let mut state = test_state(&content);
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let mut log = Vec::new();
@@ -18,7 +18,7 @@ fn test_identical_seeds_produce_identical_event_logs() {
             };
             let events = tick(&mut state, commands, &content, &mut rng, None);
             for event in events {
-                log.push((event.id.0.clone(), event.tick));
+                log.push((event.id.0, event.tick));
             }
         }
         log
@@ -88,7 +88,7 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
     );
 
     let deep_cmd = CommandEnvelope {
-        id: CommandId(format!("cmd_{:06}", state.counters.next_command_id)),
+        id: CommandId(state.counters.next_command_id),
         issued_by: owner.clone(),
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
@@ -123,7 +123,7 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
     assert_eq!(duration_ticks, 10, "mining should take 10 ticks");
 
     let mine_cmd = CommandEnvelope {
-        id: CommandId(format!("cmd_{:06}", state.counters.next_command_id + 1)),
+        id: CommandId(state.counters.next_command_id + 1),
         issued_by: owner.clone(),
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
@@ -164,7 +164,7 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
 
     // --- Phase 5: Deposit ---
     let deposit_cmd = CommandEnvelope {
-        id: CommandId(format!("cmd_{:06}", state.counters.next_command_id + 2)),
+        id: CommandId(state.counters.next_command_id + 2),
         issued_by: owner.clone(),
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,

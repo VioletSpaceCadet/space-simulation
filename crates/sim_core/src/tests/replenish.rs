@@ -273,7 +273,7 @@ fn jettison_slag_removes_all_slag_and_emits_event() {
     });
 
     let cmd = CommandEnvelope {
-        id: crate::CommandId("cmd_000001".to_string()),
+        id: crate::CommandId(0),
         issued_by: crate::PrincipalId("test".to_string()),
         issued_tick: 0,
         execute_at_tick: 0,
@@ -325,7 +325,7 @@ fn jettison_slag_no_event_when_no_slag() {
     let station_id = StationId("station_test".to_string());
 
     let cmd = CommandEnvelope {
-        id: crate::CommandId("cmd_000001".to_string()),
+        id: crate::CommandId(0),
         issued_by: crate::PrincipalId("test".to_string()),
         issued_tick: 0,
         execute_at_tick: 0,

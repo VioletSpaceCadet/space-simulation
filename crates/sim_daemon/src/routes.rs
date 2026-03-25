@@ -280,17 +280,16 @@ pub async fn command_handler(
         }
     };
 
-    let (command_id_str, tick) = {
+    let (command_id, tick) = {
         let mut sim = app_state.sim.lock();
         let id_num = sim.next_command_id;
         sim.next_command_id += 1;
         let tick = sim.game_state.meta.tick;
-        let command_id = format!("cmd_{id_num}");
-        (command_id, tick)
+        (CommandId(id_num), tick)
     };
 
     let envelope = CommandEnvelope {
-        id: CommandId(command_id_str.clone()),
+        id: command_id,
         issued_by: PrincipalId("principal_player".to_string()),
         issued_tick: tick,
         execute_at_tick: tick,
@@ -301,7 +300,7 @@ pub async fn command_handler(
 
     (
         StatusCode::OK,
-        Json(serde_json::json!({"command_id": command_id_str})),
+        Json(serde_json::json!({"command_id": command_id.0})),
     )
 }
 

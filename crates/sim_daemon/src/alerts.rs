@@ -272,7 +272,7 @@ fn make_envelope(
     tick: u64,
     event: sim_core::Event,
 ) -> sim_core::EventEnvelope {
-    let id = sim_core::EventId(format!("evt_{:06}", counters.next_event_id));
+    let id = sim_core::EventId(counters.next_event_id);
     counters.next_event_id += 1;
     sim_core::EventEnvelope { id, tick, event }
 }

@@ -114,7 +114,7 @@ fn transit_moves_ship_and_starts_next_task() {
     let mut rng = ChaCha8Rng::seed_from_u64(0);
 
     let transit_cmd = CommandEnvelope {
-        id: CommandId("cmd_000000".to_string()),
+        id: CommandId(0),
         issued_by: owner,
         issued_tick: 0,
         execute_at_tick: 0,
@@ -303,7 +303,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
 
     // First transit: Idle as follow-on
     let transit_cmd = CommandEnvelope {
-        id: CommandId("cmd_000000".to_string()),
+        id: CommandId(0),
         issued_by: owner.clone(),
         issued_tick: 0,
         execute_at_tick: 0,
@@ -336,7 +336,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
 
     // Second transit back: should generate less data (diminishing returns)
     let transit_back = CommandEnvelope {
-        id: CommandId("cmd_000001".to_string()),
+        id: CommandId(0),
         issued_by: owner,
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,

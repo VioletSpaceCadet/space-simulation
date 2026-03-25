@@ -41,7 +41,7 @@ fn test_wrong_owner_command_is_dropped() {
 
     let ship_id = ShipId("ship_0001".to_string());
     let bad_command = CommandEnvelope {
-        id: CommandId("cmd_000001".to_string()),
+        id: CommandId(0),
         issued_by: PrincipalId("principal_intruder".to_string()),
         issued_tick: 0,
         execute_at_tick: 0,
@@ -70,7 +70,7 @@ fn test_future_command_not_applied_early() {
 
     let ship_id = ShipId("ship_0001".to_string());
     let future_command = CommandEnvelope {
-        id: CommandId("cmd_000001".to_string()),
+        id: CommandId(0),
         issued_by: state.ships[&ship_id].owner.clone(),
         issued_tick: 0,
         execute_at_tick: 5,
@@ -111,7 +111,7 @@ fn test_install_module_initializes_thermal_state_for_thermal_modules() {
     station.invalidate_volume_cache();
 
     let install_cmd = CommandEnvelope {
-        id: CommandId("cmd_install_001".to_string()),
+        id: CommandId(0),
         issued_by: PrincipalId("principal_autopilot".to_string()),
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
@@ -175,7 +175,7 @@ fn test_install_module_no_thermal_state_for_non_thermal_modules() {
     station.invalidate_volume_cache();
 
     let install_cmd = CommandEnvelope {
-        id: CommandId("cmd_install_002".to_string()),
+        id: CommandId(0),
         issued_by: PrincipalId("principal_autopilot".to_string()),
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
@@ -228,7 +228,7 @@ fn test_select_recipe_updates_processor_state() {
 
     // SelectRecipe with a valid recipe ID.
     let select_cmd = CommandEnvelope {
-        id: CommandId("cmd_select".to_string()),
+        id: CommandId(0),
         issued_by: PrincipalId("principal_autopilot".to_string()),
         issued_tick: 0,
         execute_at_tick: 0,
@@ -280,7 +280,7 @@ fn test_select_recipe_out_of_bounds_rejected() {
 
     // SelectRecipe with a recipe ID not in this module's list (should be rejected).
     let select_cmd = CommandEnvelope {
-        id: CommandId("cmd_select".to_string()),
+        id: CommandId(0),
         issued_by: PrincipalId("principal_autopilot".to_string()),
         issued_tick: 0,
         execute_at_tick: 0,
