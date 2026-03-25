@@ -7,13 +7,14 @@
 use crate::AHashMap;
 use crate::{AngleMilliDeg, BodyId, Position, RadiusAuMicro};
 use crate::{
-    AnomalyTag, AsteroidId, AsteroidTemplateDef, BodyType, Constants, Counters, DataKind,
-    ElementDef, GameContent, GameState, HullId, InitialStationDef, InputAmount, InputFilter,
-    ItemKind, LotId, MetaState, ModuleDef, ModuleInstanceId, ModuleKindState, ModuleState, NodeDef,
-    NodeId, OrbitalBodyDef, OutputSpec, PricingTable, PrincipalId, ProcessorDef, ProcessorState,
-    QualityFormula, RadiatorDef, RadiatorState, RecipeDef, RecipeId, RecipeThermalReq,
-    ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef, StationId, StationState,
-    TechDef, TechEffect, TechId, ThermalDef, ThermalState, WearState, YieldFormula,
+    AnomalyTag, AsteroidId, AsteroidTemplateDef, AutopilotConfig, BodyType, Constants, Counters,
+    DataKind, ElementDef, GameContent, GameState, HullId, InitialStationDef, InputAmount,
+    InputFilter, ItemKind, LotId, MetaState, ModuleDef, ModuleInstanceId, ModuleKindState,
+    ModuleState, NodeDef, NodeId, OrbitalBodyDef, OutputSpec, PricingTable, PrincipalId,
+    ProcessorDef, ProcessorState, QualityFormula, RadiatorDef, RadiatorState, RecipeDef, RecipeId,
+    RecipeThermalReq, ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef,
+    StationId, StationState, TechDef, TechEffect, TechId, ThermalDef, ThermalState, WearState,
+    YieldFormula,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -210,16 +211,12 @@ pub fn base_content() -> GameContent {
             station_power_available_per_minute: 100.0,
             mining_rate_kg_per_minute: 50.0,
             deposit_minutes: 1, // fast for tests
-            autopilot_iron_rich_confidence_threshold: 0.7,
-            autopilot_volatile_confidence_threshold: 0.7,
             autopilot_volatile_threshold_kg: 500.0,
             autopilot_refinery_threshold_kg: 500.0,
             data_generation_peak: 100.0,
             data_generation_floor: 5.0,
             data_generation_decay_rate: 0.7,
             autopilot_slag_jettison_pct: 0.75,
-            autopilot_repair_kit_reserve: 10,
-            autopilot_fe_reserve_kg: 12_000.0,
             autopilot_export_batch_size_kg: 500.0,
             autopilot_export_min_revenue: 1_000.0,
             autopilot_lh2_threshold_kg: 5_000.0,
@@ -268,6 +265,7 @@ pub fn base_content() -> GameContent {
         hulls: BTreeMap::new(),
         fitting_templates: BTreeMap::new(),
         initial_station: InitialStationDef::default(),
+        autopilot: AutopilotConfig::default(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -436,16 +434,12 @@ pub fn minimal_content() -> GameContent {
             station_cargo_capacity_m3: 1000.0,
             mining_rate_kg_per_minute: 50.0,
             deposit_minutes: 1,
-            autopilot_iron_rich_confidence_threshold: 0.7,
-            autopilot_volatile_confidence_threshold: 0.7,
             autopilot_volatile_threshold_kg: 500.0,
             autopilot_refinery_threshold_kg: 500.0,
             data_generation_peak: 100.0,
             data_generation_floor: 5.0,
             data_generation_decay_rate: 0.7,
             autopilot_slag_jettison_pct: 0.75,
-            autopilot_repair_kit_reserve: 10,
-            autopilot_fe_reserve_kg: 12_000.0,
             autopilot_export_batch_size_kg: 500.0,
             autopilot_export_min_revenue: 1_000.0,
             autopilot_lh2_threshold_kg: 5_000.0,
@@ -494,6 +488,23 @@ pub fn minimal_content() -> GameContent {
         hulls: BTreeMap::new(),
         fitting_templates: BTreeMap::new(),
         initial_station: InitialStationDef::default(),
+        autopilot: AutopilotConfig {
+            propellant_modules: vec![],
+            propellant_enable_modules: vec![],
+            shipyard_module: String::new(),
+            propellant_element: String::new(),
+            primary_mining_element: String::new(),
+            deep_scan_tech: String::new(),
+            ship_construction_tech: String::new(),
+            shipyard_import_component: String::new(),
+            export_component: crate::ExportComponentConfig {
+                component_id: String::new(),
+                reserve: 0,
+            },
+            export_elements: vec![],
+            deep_scan_targets: vec![],
+            ..AutopilotConfig::default()
+        },
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();

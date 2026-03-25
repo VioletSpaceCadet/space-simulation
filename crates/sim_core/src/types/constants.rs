@@ -23,11 +23,6 @@ pub struct Constants {
     pub mining_rate_kg_per_minute: f32,
     pub deposit_minutes: u64,
     pub station_power_available_per_minute: f32,
-    /// Minimum `IronRich` tag confidence for autopilot to queue a deep scan.
-    pub autopilot_iron_rich_confidence_threshold: f32,
-    /// Minimum `VolatileRich` tag confidence for autopilot to queue a deep scan.
-    #[serde(default = "default_autopilot_volatile_confidence_threshold")]
-    pub autopilot_volatile_confidence_threshold: f32,
     /// H2O inventory (kg) below which autopilot prioritizes volatile-rich mining.
     #[serde(default = "default_autopilot_volatile_threshold_kg")]
     pub autopilot_volatile_threshold_kg: f32,
@@ -52,12 +47,6 @@ pub struct Constants {
     /// Test fixtures use 1 to preserve existing assertions.
     pub minutes_per_tick: u32,
     // Autopilot export
-    /// Minimum repair kits to keep for maintenance before exporting surplus.
-    #[serde(default = "default_autopilot_repair_kit_reserve")]
-    pub autopilot_repair_kit_reserve: u32,
-    /// Fe (kg) reserved for shipyard recipe + assembler buffer. Surplus above this may be exported.
-    #[serde(default = "default_autopilot_fe_reserve_kg")]
-    pub autopilot_fe_reserve_kg: f32,
     /// Max kg per material export command per tick. Prevents dumping entire stockpile at once.
     #[serde(default = "default_autopilot_export_batch_size_kg")]
     pub autopilot_export_batch_size_kg: f32,
@@ -210,19 +199,8 @@ impl Constants {
 fn default_slag_jettison_pct() -> f32 {
     0.75
 }
-fn default_autopilot_volatile_confidence_threshold() -> f32 {
-    0.7
-}
 fn default_autopilot_volatile_threshold_kg() -> f32 {
     500.0
-}
-
-fn default_autopilot_repair_kit_reserve() -> u32 {
-    10
-}
-
-fn default_autopilot_fe_reserve_kg() -> f32 {
-    12_000.0
 }
 
 fn default_autopilot_export_batch_size_kg() -> f32 {

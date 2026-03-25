@@ -96,6 +96,7 @@ fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
 
 /// Returns asteroid IDs above confidence threshold with unknown composition,
 /// sorted by distance from `reference_pos` (nearest first), with ID tiebreak for determinism.
+/// Targets are read from `content.autopilot.deep_scan_targets`.
 fn collect_deep_scan_candidates(
     state: &GameState,
     content: &GameContent,
@@ -104,6 +105,7 @@ fn collect_deep_scan_candidates(
     if state.asteroids.is_empty() {
         return Vec::new();
     }
+    let targets = &content.autopilot.deep_scan_targets;
     let ref_abs = compute_entity_absolute(reference_pos, &state.body_cache);
     let mut candidates: Vec<(AsteroidId, u128)> = state
         .asteroids
@@ -111,10 +113,9 @@ fn collect_deep_scan_candidates(
         .filter(|asteroid| {
             asteroid.knowledge.composition.is_none()
                 && asteroid.knowledge.tag_beliefs.iter().any(|(tag, conf)| {
-                    (tag.0 == sim_core::TAG_IRON_RICH
-                        && *conf > content.constants.autopilot_iron_rich_confidence_threshold)
-                        || (tag.0 == sim_core::TAG_VOLATILE_RICH
-                            && *conf > content.constants.autopilot_volatile_confidence_threshold)
+                    targets
+                        .iter()
+                        .any(|target| tag.0 == target.tag && *conf > target.min_confidence)
                 })
         })
         .map(|a| {
@@ -127,62 +128,39 @@ fn collect_deep_scan_candidates(
     candidates.into_iter().map(|(id, _)| id).collect()
 }
 
-/// Check if any station has a heating module installed.
-fn station_has_heating_module(state: &GameState) -> bool {
+/// Check if any station has a propellant-pipeline module installed.
+fn station_has_propellant_module(state: &GameState, module_ids: &[String]) -> bool {
     state.stations.values().any(|station| {
         station
             .modules
             .iter()
-            .any(|module| module.def_id == "module_heating_unit")
+            .any(|module| module_ids.contains(&module.def_id))
     })
 }
 
-/// Total H2O material across all station inventories.
-fn total_h2o_inventory(state: &GameState) -> f32 {
+/// Total inventory of a specific element across all stations.
+fn total_element_inventory(state: &GameState, element: &str) -> f32 {
     state
         .stations
         .values()
         .flat_map(|s| s.inventory.iter())
         .filter_map(|item| match item {
-            InventoryItem::Material { element, kg, .. } if element == "H2O" => Some(*kg),
+            InventoryItem::Material {
+                element: el, kg, ..
+            } if el == element => Some(*kg),
             _ => None,
         })
         .sum()
 }
 
-/// Total LH2 material across all station inventories.
-fn total_lh2_inventory(state: &GameState) -> f32 {
-    state
-        .stations
-        .values()
-        .flat_map(|s| s.inventory.iter())
-        .filter_map(|item| match item {
-            InventoryItem::Material { element, kg, .. } if element == "LH2" => Some(*kg),
-            _ => None,
-        })
-        .sum()
-}
-
-/// Mining value for sorting: `mass_kg × H2O_fraction`.
-fn h2o_mining_value(asteroid: &AsteroidState) -> f32 {
+/// Mining value for sorting: `mass_kg × element_fraction`.
+fn element_mining_value(asteroid: &AsteroidState, element: &str) -> f32 {
     asteroid.mass_kg
         * asteroid
             .knowledge
             .composition
             .as_ref()
-            .and_then(|c| c.get("H2O"))
-            .copied()
-            .unwrap_or(0.0)
-}
-
-/// Mining value for sorting: `mass_kg × Fe_fraction`.
-fn fe_mining_value(asteroid: &AsteroidState) -> f32 {
-    asteroid.mass_kg
-        * asteroid
-            .knowledge
-            .composition
-            .as_ref()
-            .and_then(|c| c.get("Fe"))
+            .and_then(|c| c.get(element))
             .copied()
             .unwrap_or(0.0)
 }
@@ -237,16 +215,17 @@ fn compute_sufficiency(tech: &TechDef, progress: Option<&DomainProgress>) -> f32
 }
 
 /// Builds the list of export candidates for a station in priority order.
+/// Reads component and element export config from `autopilot`.
 fn build_export_candidates(
     station: &StationState,
-    reserve_kits: u32,
-    reserve_fe_kg: f32,
+    autopilot: &sim_core::AutopilotConfig,
     batch_size_kg: f32,
 ) -> Vec<TradeItemSpec> {
     let mut candidates = Vec::new();
 
-    // 1. Repair kits — export surplus above reserve
-    let kit_count: u32 = station
+    // 1. Export component surplus above reserve
+    let export_comp = &autopilot.export_component;
+    let comp_count: u32 = station
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -254,34 +233,34 @@ fn build_export_candidates(
                 component_id,
                 count,
                 ..
-            } if component_id.0 == "repair_kit" => Some(*count),
+            } if component_id.0 == export_comp.component_id => Some(*count),
             _ => None,
         })
         .sum();
-    if kit_count > reserve_kits {
+    if comp_count > export_comp.reserve {
         candidates.push(TradeItemSpec::Component {
-            component_id: ComponentId("repair_kit".to_string()),
-            count: kit_count - reserve_kits,
+            component_id: ComponentId(export_comp.component_id.clone()),
+            count: comp_count - export_comp.reserve,
         });
     }
 
-    // 2-4. Materials in priority order: He, Si, Fe
-    for (element, reserve_kg) in [("He", 0.0_f32), ("Si", 0.0_f32), ("Fe", reserve_fe_kg)] {
+    // 2+. Materials in priority order from config
+    for entry in &autopilot.export_elements {
         let available_kg: f32 = station
             .inventory
             .iter()
             .filter_map(|item| match item {
                 InventoryItem::Material {
                     element: el, kg, ..
-                } if el == element => Some(*kg),
+                } if *el == entry.element => Some(*kg),
                 _ => None,
             })
             .sum();
-        let surplus_kg = available_kg - reserve_kg;
+        let surplus_kg = available_kg - entry.reserve_kg;
         if surplus_kg > 0.0 {
             let export_kg = surplus_kg.min(batch_size_kg);
             candidates.push(TradeItemSpec::Material {
-                element: element.to_string(),
+                element: entry.element.clone(),
                 kg: export_kg,
             });
         }
@@ -326,10 +305,13 @@ impl AutopilotBehavior for StationModuleManager {
             }
             for module in &station.modules {
                 // Re-enable disabled modules, but not if auto-disabled due to max wear.
-                // Skip electrolysis — managed by PropellantPipeline behavior.
+                // Skip propellant modules — managed by PropellantPipeline behavior.
                 if !module.enabled
                     && module.wear.wear < 1.0
-                    && module.def_id != "module_electrolysis_unit"
+                    && !content
+                        .autopilot
+                        .propellant_modules
+                        .contains(&module.def_id)
                 {
                     commands.push(make_cmd(
                         owner,
@@ -464,18 +446,21 @@ impl AutopilotBehavior for ThrusterImport {
         let tech_unlocked = state
             .research
             .unlocked
-            .contains(&TechId("tech_ship_construction".to_string()));
+            .contains(&TechId(content.autopilot.ship_construction_tech.clone()));
         if !tech_unlocked {
             return commands;
         }
 
+        let shipyard_module = &content.autopilot.shipyard_module;
+        let import_component = &content.autopilot.shipyard_import_component;
+
         let mut sorted_stations: Vec<_> = state.stations.values().collect();
         sorted_stations.sort_by(|a, b| a.id.0.cmp(&b.id.0));
 
-        // Look up the shipyard recipe's thruster requirement from content.
-        let required_thrusters = content
+        // Look up the shipyard recipe's component requirement from content.
+        let required_components = content
             .module_defs
-            .get("module_shipyard")
+            .get(shipyard_module.as_str())
             .and_then(|def| match &def.behavior {
                 ModuleBehaviorDef::Assembler(assembler_def) => assembler_def
                     .recipes
@@ -489,7 +474,7 @@ impl AutopilotBehavior for ThrusterImport {
                     .iter()
                     .find_map(|input| match (&input.filter, &input.amount) {
                         (InputFilter::Component(cid), InputAmount::Count(n))
-                            if cid.0 == "thruster" =>
+                            if cid.0 == *import_component =>
                         {
                             Some(*n)
                         }
@@ -503,13 +488,13 @@ impl AutopilotBehavior for ThrusterImport {
             let has_shipyard = station
                 .modules
                 .iter()
-                .any(|module| module.def_id == "module_shipyard" && module.enabled);
+                .any(|module| module.def_id == *shipyard_module && module.enabled);
             if !has_shipyard {
                 continue;
             }
 
-            // Count current thrusters in inventory
-            let thruster_count: u32 = station
+            // Count current import components in inventory
+            let component_count: u32 = station
                 .inventory
                 .iter()
                 .filter_map(|item| match item {
@@ -517,17 +502,17 @@ impl AutopilotBehavior for ThrusterImport {
                         component_id,
                         count,
                         ..
-                    } if component_id.0 == "thruster" => Some(*count),
+                    } if component_id.0 == *import_component => Some(*count),
                     _ => None,
                 })
                 .sum();
-            if thruster_count >= required_thrusters {
+            if component_count >= required_components {
                 continue; // Already have enough for the recipe
             }
 
-            let needed = required_thrusters - thruster_count;
+            let needed = required_components - component_count;
             let item_spec = TradeItemSpec::Component {
-                component_id: ComponentId("thruster".to_string()),
+                component_id: ComponentId(import_component.clone()),
                 count: needed,
             };
 
@@ -618,8 +603,6 @@ impl AutopilotBehavior for MaterialExport {
             return commands;
         }
 
-        let reserve_kits = content.constants.autopilot_repair_kit_reserve;
-        let reserve_fe_kg = content.constants.autopilot_fe_reserve_kg;
         let batch_size_kg = content.constants.autopilot_export_batch_size_kg;
         let min_revenue = content.constants.autopilot_export_min_revenue;
 
@@ -627,9 +610,8 @@ impl AutopilotBehavior for MaterialExport {
         sorted_stations.sort_by(|a, b| a.id.0.cmp(&b.id.0));
 
         for station in sorted_stations {
-            // Export candidates in priority order
-            let candidates =
-                build_export_candidates(station, reserve_kits, reserve_fe_kg, batch_size_kg);
+            // Export candidates in priority order (from autopilot config)
+            let candidates = build_export_candidates(station, &content.autopilot, batch_size_kg);
 
             for candidate in candidates {
                 let revenue =
@@ -673,22 +655,24 @@ impl AutopilotBehavior for PropellantPipeline {
         next_id: &mut u64,
     ) -> Vec<CommandEnvelope> {
         let mut commands = Vec::new();
-        let lh2_kg = total_lh2_inventory(state);
+        let propellant_kg = total_element_inventory(state, &content.autopilot.propellant_element);
         let threshold = content.constants.autopilot_lh2_threshold_kg;
+        let propellant_modules = &content.autopilot.propellant_modules;
+        let enable_modules = &content.autopilot.propellant_enable_modules;
 
         for station in state.stations.values() {
-            let has_electrolysis = station
+            let has_propellant_module = station
                 .modules
                 .iter()
-                .any(|m| m.def_id == "module_electrolysis_unit");
-            if !has_electrolysis {
+                .any(|m| propellant_modules.contains(&m.def_id));
+            if !has_propellant_module {
                 continue;
             }
 
-            if lh2_kg > threshold * content.constants.autopilot_lh2_abundant_multiplier {
-                // LH2 abundant — disable electrolysis to save power
+            if propellant_kg > threshold * content.constants.autopilot_lh2_abundant_multiplier {
+                // Propellant abundant — disable propellant modules to save power
                 for module in &station.modules {
-                    if module.def_id == "module_electrolysis_unit"
+                    if propellant_modules.contains(&module.def_id)
                         && module.enabled
                         && module.wear.wear < 1.0
                     {
@@ -704,11 +688,10 @@ impl AutopilotBehavior for PropellantPipeline {
                         ));
                     }
                 }
-            } else if lh2_kg < threshold {
-                // LH2 low — ensure electrolysis and heating are enabled
+            } else if propellant_kg < threshold {
+                // Propellant low — ensure propellant and related modules are enabled
                 for module in &station.modules {
-                    if (module.def_id == "module_electrolysis_unit"
-                        || module.def_id == "module_heating_unit")
+                    if enable_modules.contains(&module.def_id)
                         && !module.enabled
                         && module.wear.wear < 1.0
                     {
@@ -840,7 +823,7 @@ impl AutopilotBehavior for ShipTaskScheduler {
         let deep_scan_unlocked = state
             .research
             .unlocked
-            .contains(&TechId("tech_deep_scan_v1".to_string()));
+            .contains(&TechId(content.autopilot.deep_scan_tech.clone()));
 
         // Use first idle ship's position as reference for distance sorting.
         let reference_pos = &state.ships[&idle_ships[0]].position;
@@ -863,32 +846,38 @@ impl AutopilotBehavior for ShipTaskScheduler {
         let mut next_site = sorted_sites.iter();
 
         // Determine if we need volatile-rich mining (for H2O or propellant pipeline)
-        let has_electrolysis = state.stations.values().any(|s| {
+        let has_propellant_module = state.stations.values().any(|s| {
             s.modules
                 .iter()
-                .any(|m| m.def_id == "module_electrolysis_unit")
+                .any(|m| content.autopilot.propellant_modules.contains(&m.def_id))
         });
-        let needs_water = station_has_heating_module(state)
-            && (total_h2o_inventory(state) < content.constants.autopilot_volatile_threshold_kg
-                || (has_electrolysis
-                    && total_lh2_inventory(state) < content.constants.autopilot_lh2_threshold_kg));
+        let volatile_element = &content.autopilot.volatile_element;
+        let propellant_element = &content.autopilot.propellant_element;
+        let primary_element = &content.autopilot.primary_mining_element;
+        let needs_volatiles =
+            station_has_propellant_module(state, &content.autopilot.propellant_enable_modules)
+                && (total_element_inventory(state, volatile_element)
+                    < content.constants.autopilot_volatile_threshold_kg
+                    || (has_propellant_module
+                        && total_element_inventory(state, propellant_element)
+                            < content.constants.autopilot_lh2_threshold_kg));
 
         let mut mine_candidates: Vec<&AsteroidState> = state
             .asteroids
             .values()
             .filter(|a| a.mass_kg > 0.0 && a.knowledge.composition.is_some())
             .collect();
-        if needs_water {
-            // Prioritize H2O-rich asteroids when water inventory is low
+        if needs_volatiles {
+            // Prioritize volatile-rich asteroids when volatile inventory is low
             mine_candidates.sort_by(|a, b| {
-                h2o_mining_value(b)
-                    .total_cmp(&h2o_mining_value(a))
+                element_mining_value(b, volatile_element)
+                    .total_cmp(&element_mining_value(a, volatile_element))
                     .then_with(|| a.id.0.cmp(&b.id.0))
             });
         } else {
             mine_candidates.sort_by(|a, b| {
-                fe_mining_value(b)
-                    .total_cmp(&fe_mining_value(a))
+                element_mining_value(b, primary_element)
+                    .total_cmp(&element_mining_value(a, primary_element))
                     .then_with(|| a.id.0.cmp(&b.id.0))
             });
         }

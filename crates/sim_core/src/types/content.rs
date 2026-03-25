@@ -55,6 +55,122 @@ pub enum AlertRuleType {
 }
 
 // ---------------------------------------------------------------------------
+// Autopilot config
+// ---------------------------------------------------------------------------
+
+/// Content-driven autopilot configuration loaded from `content/autopilot.json`.
+/// Maps semantic roles to content IDs so behaviors don't hardcode strings.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AutopilotConfig {
+    /// Module def IDs managed by `PropellantPipeline` (excluded from auto-re-enable).
+    pub propellant_modules: Vec<String>,
+    /// Module def IDs to enable when propellant is low (superset of `propellant_modules`).
+    pub propellant_enable_modules: Vec<String>,
+    /// Module def ID for the shipyard assembler.
+    pub shipyard_module: String,
+    /// Element ID for the volatile resource (e.g., `"H2O"`).
+    pub volatile_element: String,
+    /// Element ID for the propellant (e.g., `"LH2"`).
+    pub propellant_element: String,
+    /// Element ID used as the primary mining value sort key (e.g., `"Fe"`).
+    pub primary_mining_element: String,
+    /// Tech ID required for deep scanning.
+    pub deep_scan_tech: String,
+    /// Tech ID required for ship construction.
+    pub ship_construction_tech: String,
+    /// Component ID imported for shipyard recipes (e.g., `"thruster"`).
+    pub shipyard_import_component: String,
+    /// Component export configuration (ID + reserve count).
+    pub export_component: ExportComponentConfig,
+    /// Elements to export in priority order, with per-element reserves.
+    pub export_elements: Vec<ExportElementConfig>,
+    /// Anomaly tags to target for deep scanning, with per-tag confidence thresholds.
+    pub deep_scan_targets: Vec<DeepScanTargetConfig>,
+}
+
+impl Default for AutopilotConfig {
+    fn default() -> Self {
+        Self {
+            propellant_modules: vec!["module_electrolysis_unit".to_string()],
+            propellant_enable_modules: vec![
+                "module_electrolysis_unit".to_string(),
+                "module_heating_unit".to_string(),
+            ],
+            shipyard_module: "module_shipyard".to_string(),
+            volatile_element: "H2O".to_string(),
+            propellant_element: "LH2".to_string(),
+            primary_mining_element: "Fe".to_string(),
+            deep_scan_tech: "tech_deep_scan_v1".to_string(),
+            ship_construction_tech: "tech_ship_construction".to_string(),
+            shipyard_import_component: "thruster".to_string(),
+            export_component: ExportComponentConfig::default(),
+            export_elements: vec![
+                ExportElementConfig {
+                    element: "He".to_string(),
+                    reserve_kg: 0.0,
+                },
+                ExportElementConfig {
+                    element: "Si".to_string(),
+                    reserve_kg: 0.0,
+                },
+                ExportElementConfig {
+                    element: "Fe".to_string(),
+                    reserve_kg: 12_000.0,
+                },
+            ],
+            deep_scan_targets: vec![
+                DeepScanTargetConfig {
+                    tag: "IronRich".to_string(),
+                    min_confidence: 0.7,
+                },
+                DeepScanTargetConfig {
+                    tag: "VolatileRich".to_string(),
+                    min_confidence: 0.7,
+                },
+            ],
+        }
+    }
+}
+
+/// Component export configuration: which component to export and how many to reserve.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportComponentConfig {
+    /// Component ID (e.g., `"repair_kit"`).
+    pub component_id: String,
+    /// Number of this component to reserve before exporting surplus.
+    pub reserve: u32,
+}
+
+impl Default for ExportComponentConfig {
+    fn default() -> Self {
+        Self {
+            component_id: "repair_kit".to_string(),
+            reserve: 10,
+        }
+    }
+}
+
+/// Per-element export configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportElementConfig {
+    /// Element ID.
+    pub element: String,
+    /// Kg to reserve before exporting surplus.
+    #[serde(default)]
+    pub reserve_kg: f32,
+}
+
+/// Deep scan target: an anomaly tag and the minimum confidence to trigger a scan.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeepScanTargetConfig {
+    /// Anomaly tag string (e.g., `"IronRich"`).
+    pub tag: String,
+    /// Minimum belief confidence to queue a deep scan for this tag.
+    pub min_confidence: f32,
+}
+
+// ---------------------------------------------------------------------------
 // Game content
 // ---------------------------------------------------------------------------
 
@@ -87,6 +203,9 @@ pub struct GameContent {
     /// Initial station configuration from `content/initial_station.json`.
     #[serde(default)]
     pub initial_station: InitialStationDef,
+    /// Autopilot behavior configuration from `content/autopilot.json`.
+    #[serde(default)]
+    pub autopilot: AutopilotConfig,
     /// Pre-computed element id -> density (kg/m3) lookup. Populated by `init_caches()`.
     #[serde(skip)]
     pub density_map: AHashMap<String, f32>,

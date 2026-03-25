@@ -45,6 +45,7 @@ pub fn validate_content(content: &GameContent) {
     validate_asteroid_templates(content, &element_ids);
     validate_module_recipes(content, &element_ids);
     validate_hull_defs(content);
+    validate_autopilot(content, &element_ids);
 }
 
 fn validate_constants(content: &GameContent) {
@@ -361,6 +362,93 @@ fn validate_hull_defs(content: &GameContent) {
     }
 }
 
+/// Validate autopilot config cross-references against content.
+/// Only checks non-empty fields — empty means "not configured" (test fixtures).
+fn validate_autopilot(content: &GameContent, element_ids: &HashSet<&str>) {
+    let ap = &content.autopilot;
+    let tech_ids: HashSet<&str> = content.techs.iter().map(|t| t.id.0.as_str()).collect();
+    let comp_ids: HashSet<&str> = content
+        .component_defs
+        .iter()
+        .map(|c| c.id.as_str())
+        .collect();
+
+    for mid in ap
+        .propellant_modules
+        .iter()
+        .chain(&ap.propellant_enable_modules)
+        .filter(|id| !id.is_empty())
+    {
+        assert!(
+            content.module_defs.contains_key(mid),
+            "autopilot references unknown module '{mid}'"
+        );
+    }
+    if !ap.shipyard_module.is_empty() {
+        assert!(
+            content.module_defs.contains_key(&ap.shipyard_module),
+            "autopilot.shipyard_module '{}' not in module_defs",
+            ap.shipyard_module
+        );
+    }
+    if !ap.volatile_element.is_empty() {
+        assert!(
+            element_ids.contains(ap.volatile_element.as_str()),
+            "autopilot.volatile_element '{}' not in elements",
+            ap.volatile_element
+        );
+    }
+    if !ap.propellant_element.is_empty() {
+        assert!(
+            element_ids.contains(ap.propellant_element.as_str()),
+            "autopilot.propellant_element '{}' not in elements",
+            ap.propellant_element
+        );
+    }
+    if !ap.primary_mining_element.is_empty() {
+        assert!(
+            element_ids.contains(ap.primary_mining_element.as_str()),
+            "autopilot.primary_mining_element '{}' not in elements",
+            ap.primary_mining_element
+        );
+    }
+    if !ap.deep_scan_tech.is_empty() {
+        assert!(
+            tech_ids.contains(ap.deep_scan_tech.as_str()),
+            "autopilot.deep_scan_tech '{}' not in techs",
+            ap.deep_scan_tech
+        );
+    }
+    if !ap.ship_construction_tech.is_empty() {
+        assert!(
+            tech_ids.contains(ap.ship_construction_tech.as_str()),
+            "autopilot.ship_construction_tech '{}' not in techs",
+            ap.ship_construction_tech
+        );
+    }
+    if !ap.shipyard_import_component.is_empty() {
+        assert!(
+            comp_ids.contains(ap.shipyard_import_component.as_str()),
+            "autopilot.shipyard_import_component '{}' not in component_defs",
+            ap.shipyard_import_component
+        );
+    }
+    if !ap.export_component.component_id.is_empty() {
+        assert!(
+            comp_ids.contains(ap.export_component.component_id.as_str()),
+            "autopilot.export_component.component_id '{}' not in component_defs",
+            ap.export_component.component_id
+        );
+    }
+    for entry in &ap.export_elements {
+        assert!(
+            element_ids.contains(entry.element.as_str()),
+            "autopilot.export_elements element '{}' not in elements",
+            entry.element
+        );
+    }
+}
+
 pub fn validate_state(state: &GameState, content: &GameContent) {
     let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
     for station in state.stations.values() {
@@ -426,6 +514,18 @@ fn load_fitting_templates(
     }
 }
 
+/// Load an optional JSON file, returning `T::default()` if the file is missing.
+fn load_optional_json<T: serde::de::DeserializeOwned + Default>(
+    dir: &Path,
+    filename: &str,
+) -> Result<T> {
+    match std::fs::read_to_string(dir.join(filename)) {
+        Ok(text) => serde_json::from_str(&text).with_context(|| format!("parsing {filename}")),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(T::default()),
+        Err(e) => Err(anyhow::anyhow!("reading {filename}: {e}")),
+    }
+}
+
 pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let dir = Path::new(content_dir);
     let constants: Constants = serde_json::from_str(
@@ -482,10 +582,8 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let hulls = load_hull_defs(dir)?;
     let fitting_templates = load_fitting_templates(dir)?;
     let initial_station: sim_core::InitialStationDef =
-        match std::fs::read_to_string(dir.join("initial_station.json")) {
-            Ok(text) => serde_json::from_str(&text).context("parsing initial_station.json")?,
-            Err(_) => sim_core::InitialStationDef::default(),
-        };
+        load_optional_json(dir, "initial_station.json")?;
+    let autopilot: sim_core::AutopilotConfig = load_optional_json(dir, "autopilot.json")?;
     let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
     )
@@ -517,6 +615,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         hulls,
         fitting_templates,
         initial_station,
+        autopilot,
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
