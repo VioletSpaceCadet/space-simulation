@@ -180,7 +180,7 @@ pub struct DeepScanTargetConfig {
 // Crew role definitions
 // ---------------------------------------------------------------------------
 
-/// A single crew role definition loaded from `content/crew_roles.json`.
+/// A crew role definition loaded from `content/crew_roles.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrewRoleDef {
     pub id: CrewRole,
@@ -224,7 +224,7 @@ pub struct GameContent {
     /// Autopilot behavior configuration from `content/autopilot.json`.
     #[serde(default)]
     pub autopilot: AutopilotConfig,
-    /// Crew role definitions loaded from `content/crew_roles.json`. Empty if file is missing.
+    /// Crew role definitions loaded from `content/crew_roles.json`.
     #[serde(default)]
     pub crew_roles: BTreeMap<CrewRole, CrewRoleDef>,
     /// Pre-computed element id -> density (kg/m3) lookup. Populated by `init_caches()`.
@@ -576,8 +576,7 @@ pub struct ModuleDef {
     /// Used by autopilot for role-based module discovery.
     #[serde(default)]
     pub roles: Vec<String>,
-    /// Crew roles and counts required to operate this module.
-    /// Empty = no crew needed (passive modules, automated variants).
+    /// Crew roles required to operate this module. Empty = no crew needed.
     #[serde(default)]
     pub crew_requirement: BTreeMap<CrewRole, u32>,
 }

@@ -46,7 +46,7 @@ pub fn validate_content(content: &GameContent) {
     validate_module_recipes(content, &element_ids);
     validate_hull_defs(content);
     validate_autopilot(content, &element_ids);
-    validate_crew_requirements(content);
+    validate_crew_roles(content);
 }
 
 fn validate_constants(content: &GameContent) {
@@ -459,9 +459,18 @@ fn validate_autopilot(content: &GameContent, element_ids: &HashSet<&str>) {
     }
 }
 
-fn validate_crew_requirements(content: &GameContent) {
-    for (module_id, def) in &content.module_defs {
-        for role in def.crew_requirement.keys() {
+fn validate_crew_roles(content: &GameContent) {
+    for (role_id, def) in &content.crew_roles {
+        if def.recruitment_cost <= 0.0 {
+            eprintln!(
+                "warning: crew role '{}' has non-positive recruitment_cost ({})",
+                role_id, def.recruitment_cost
+            );
+        }
+    }
+    // Validate module crew_requirement references valid roles
+    for (module_id, module_def) in &content.module_defs {
+        for role in module_def.crew_requirement.keys() {
             assert!(
                 content.crew_roles.contains_key(role),
                 "module '{module_id}' crew_requirement references unknown crew role '{role}'"

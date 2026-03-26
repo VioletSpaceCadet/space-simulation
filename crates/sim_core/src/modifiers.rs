@@ -69,6 +69,7 @@ pub enum ModifierOp {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModifierSource {
+    /// Crew-based modifier (forward compat — not wired in Phase 1).
     Crew(crate::CrewRole),
     Environment,
     Equipment(String),
