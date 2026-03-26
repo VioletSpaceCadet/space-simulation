@@ -693,7 +693,7 @@ pub(crate) fn resolve_refuels(
     }
 
     for (station_id, ship_ids) in &station_groups {
-        resolve_station_refuels(state, content, events, station_id, &ship_ids);
+        resolve_station_refuels(state, content, events, station_id, ship_ids);
     }
 }
 
