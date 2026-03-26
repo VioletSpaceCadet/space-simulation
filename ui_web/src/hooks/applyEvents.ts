@@ -796,6 +796,33 @@ function updateModuleThermalZone(
   });
 }
 
+function handleCrewAssigned(state: SimState, event: EventPayload<'CrewAssigned'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
+    const crew = { ...(m.assigned_crew ?? {}) };
+    crew[event.role] = (crew[event.role] ?? 0) + event.count;
+    return { ...m, assigned_crew: crew };
+  });
+}
+
+function handleCrewUnassigned(state: SimState, event: EventPayload<'CrewUnassigned'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => {
+    const crew = { ...(m.assigned_crew ?? {}) };
+    crew[event.role] = Math.max(0, (crew[event.role] ?? 0) - event.count);
+    if (crew[event.role] === 0) {
+      delete crew[event.role];
+    }
+    return { ...m, assigned_crew: crew };
+  });
+}
+
+function handleModuleUnderstaffed(state: SimState, event: EventPayload<'ModuleUnderstaffed'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => ({ ...m, crew_satisfied: false }));
+}
+
+function handleModuleFullyStaffed(state: SimState, event: EventPayload<'ModuleFullyStaffed'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => ({ ...m, crew_satisfied: true }));
+}
+
 // No-op handler for informational events that don't mutate state
 function noOp(state: SimState): SimState {
   return state;
@@ -860,10 +887,10 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   InsufficientPropellant: noOp,
   RefuelComplete: noOp,
   RefuelAborted: noOp,
-  CrewAssigned: noOp, // CR-06 will add state update handler
-  CrewUnassigned: noOp, // CR-06 will add state update handler
-  ModuleUnderstaffed: noOp, // CR-06 will add state update handler
-  ModuleFullyStaffed: noOp, // CR-06 will add state update handler
+  CrewAssigned: handleCrewAssigned,
+  CrewUnassigned: handleCrewUnassigned,
+  ModuleUnderstaffed: handleModuleUnderstaffed,
+  ModuleFullyStaffed: handleModuleFullyStaffed,
 };
 
 export function applyEvents(

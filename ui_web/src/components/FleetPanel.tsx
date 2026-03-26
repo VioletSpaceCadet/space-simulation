@@ -96,6 +96,47 @@ function PowerBar({ power }: { power: PowerState }) {
   );
 }
 
+function CrewRoster({ station }: { station: StationState }) {
+  const crew = station.crew ?? {};
+  const roles = Object.keys(crew).sort();
+  if (roles.length === 0) {
+    return null;
+  }
+
+  // Compute assigned counts per role
+  const assigned: Record<string, number> = {};
+  for (const module of station.modules) {
+    for (const [role, count] of Object.entries(module.assigned_crew ?? {})) {
+      assigned[role] = (assigned[role] ?? 0) + count;
+    }
+  }
+
+  return (
+    <div>
+      <div className="text-label text-[10px] uppercase tracking-wider mb-1">
+        Crew Roster
+      </div>
+      <div className="flex gap-3 flex-wrap">
+        {roles.map((role) => {
+          const total = crew[role] ?? 0;
+          const used = assigned[role] ?? 0;
+          const available = total - used;
+          return (
+            <span key={role} className="text-[10px]">
+              <span className="text-fg">{role}</span>
+              {' '}
+              <span className={available > 0 ? 'text-green-400' : 'text-dim'}>
+                {available}
+              </span>
+              <span className="text-dim">/{total}</span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function StationDetail({ station }: { station: StationState }) {
   const [tempUnit, setTempUnit] = useState<'K' | 'C'>('K');
   const hasThermal = station.modules.some((m) => m.thermal);
@@ -103,6 +144,9 @@ function StationDetail({ station }: { station: StationState }) {
   return (
     <div className="space-y-3 text-[11px] w-fit">
       <PowerBar power={station.power} />
+      {station.crew && Object.keys(station.crew).length > 0 && (
+        <CrewRoster station={station} />
+      )}
       <div className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2">
         <div>
           <div className="text-label text-[10px] uppercase tracking-wider mb-1">
