@@ -95,6 +95,62 @@ fn ensure_station_index(state: &mut GameState, station_id: &StationId, content: 
     }
 }
 
+/// Update `crew_satisfied` flags for all modules on a station, emitting transition events.
+fn update_crew_satisfaction(
+    state: &mut GameState,
+    station_id: &StationId,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+    let current_tick = state.meta.tick;
+    let mut transitions: Vec<(crate::ModuleInstanceId, bool, bool)> = Vec::new();
+    for module in &station.modules {
+        let Some(def) = content.module_defs.get(&module.def_id) else {
+            continue;
+        };
+        if def.crew_requirement.is_empty() {
+            continue;
+        }
+        let new_satisfied = crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement);
+        if new_satisfied != module.crew_satisfied {
+            transitions.push((module.id.clone(), module.crew_satisfied, new_satisfied));
+        }
+    }
+    let station = state
+        .stations
+        .get_mut(station_id)
+        .expect("station checked above");
+    for (module_id, _was, now) in &transitions {
+        if let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) {
+            module.crew_satisfied = *now;
+        }
+    }
+    for (module_id, was, now) in transitions {
+        if was && !now {
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::ModuleUnderstaffed {
+                    station_id: station_id.clone(),
+                    module_id,
+                },
+            ));
+        } else if !was && now {
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::ModuleFullyStaffed {
+                    station_id: station_id.clone(),
+                    module_id,
+                },
+            ));
+        }
+    }
+}
+
 pub(crate) fn tick_stations(
     state: &mut GameState,
     content: &GameContent,
@@ -107,6 +163,8 @@ pub(crate) fn tick_stations(
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
     let mut scratch_indices: Vec<usize> = Vec::new();
     for station_id in &station_ids {
+        // Update crew satisfaction flags and emit transition events
+        update_crew_satisfaction(state, station_id, content, events);
         timed!(
             timings,
             power_budget,
@@ -641,6 +699,9 @@ fn should_run(state: &mut GameState, ctx: &ModuleTickContext) -> bool {
     let Some(station) = state.stations.get(&ctx.station_id) else {
         return false;
     };
+    if !station.modules[ctx.module_idx].crew_satisfied {
+        return false;
+    }
     station.power_available_per_tick >= ctx.power_needed
 }
 
@@ -954,9 +1015,13 @@ mod framework_tests {
                         wear: WearState::default(),
                         power_stalled: false,
                         module_priority: 0,
+                        assigned_crew: Default::default(),
+                        crew_satisfied: true,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
+                    crew: Default::default(),
+                    leaders: Vec::new(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: crate::ModuleTypeIndex::default(),

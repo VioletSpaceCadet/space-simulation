@@ -575,6 +575,8 @@ mod tests {
                         wear: WearState::default(),
                         power_stalled: false,
                         module_priority: 0,
+                        assigned_crew: Default::default(),
+                        crew_satisfied: true,
                         thermal: Some(ThermalState {
                             temp_mk,
                             thermal_group: Some("smelting".to_string()),
@@ -582,6 +584,8 @@ mod tests {
                         }),
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
+                    crew: Default::default(),
+                    leaders: Vec::new(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: crate::ModuleTypeIndex::default(),
@@ -775,6 +779,8 @@ mod tests {
             wear: WearState::default(),
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
             thermal: Some(ThermalState {
                 temp_mk: 600_000,
                 thermal_group: Some("reactor".to_string()),
@@ -839,6 +845,8 @@ mod tests {
             wear: WearState { wear },
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
             thermal: Some(ThermalState {
                 temp_mk: DEFAULT_AMBIENT_TEMP_MK,
                 thermal_group: Some("smelting".to_string()),

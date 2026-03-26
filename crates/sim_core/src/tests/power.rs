@@ -59,6 +59,8 @@ fn state_with_solar_array(content: &GameContent) -> GameState {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
     state
@@ -115,6 +117,8 @@ fn power_budget_with_consumer() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -182,6 +186,8 @@ fn power_budget_deficit_when_insufficient() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -334,6 +340,8 @@ fn power_stall_lowest_priority_first() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     };
 
@@ -353,6 +361,8 @@ fn power_stall_lowest_priority_first() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -363,6 +373,8 @@ fn power_stall_lowest_priority_first() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -409,6 +421,8 @@ fn power_stall_no_stalling_without_solar_arrays() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -443,6 +457,8 @@ fn power_stall_clears_when_power_restored() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -453,6 +469,8 @@ fn power_stall_clears_when_power_restored() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -528,6 +546,8 @@ fn battery_charges_from_surplus() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -592,6 +612,8 @@ fn battery_discharges_to_cover_deficit() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -607,6 +629,8 @@ fn battery_discharges_to_cover_deficit() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -683,6 +707,8 @@ fn battery_partial_discharge_then_stall() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -698,6 +724,8 @@ fn battery_partial_discharge_then_stall() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -739,6 +767,8 @@ fn battery_charge_limited_by_capacity() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -772,6 +802,8 @@ fn battery_wear_reduces_effective_capacity() {
         },
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -810,6 +842,8 @@ fn battery_not_stalled_by_power_system() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 

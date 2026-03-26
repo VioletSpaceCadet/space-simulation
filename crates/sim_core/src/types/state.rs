@@ -5,9 +5,11 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
+use std::collections::BTreeMap;
+
 use crate::{
-    AnomalyTag, AsteroidId, BodyId, ComponentId, CompositionVec, Constants, DataKind,
-    DomainProgress, GameContent, HullId, InventoryItem, ModuleDefId, ModuleInstanceId,
+    AnomalyTag, AsteroidId, BodyId, ComponentId, CompositionVec, Constants, CrewRole, DataKind,
+    DomainProgress, GameContent, HullId, InventoryItem, LeaderId, ModuleDefId, ModuleInstanceId,
     OverheatZone, Phase, PrincipalId, RecipeId, ShipId, SiteId, StationId, TechId, ThermalGroupId,
     DEFAULT_AMBIENT_TEMP_MK,
 };
@@ -93,6 +95,28 @@ pub struct ModuleState {
     /// and power allocation. 0 = default.
     #[serde(default, alias = "manufacturing_priority")]
     pub module_priority: u32,
+    /// Crew assigned to this module, by role. Empty = no crew assigned.
+    #[serde(default)]
+    pub assigned_crew: BTreeMap<CrewRole, u32>,
+    /// Whether all `crew_requirement` roles are met by `assigned_crew`.
+    /// Recomputed each tick — not persisted.
+    #[serde(skip, default = "default_crew_satisfied")]
+    pub crew_satisfied: bool,
+}
+
+fn default_crew_satisfied() -> bool {
+    true
+}
+
+/// Check if assigned crew meets the crew requirement for a module.
+/// Empty requirement = always satisfied.
+pub fn is_crew_satisfied(
+    assigned: &BTreeMap<CrewRole, u32>,
+    requirement: &BTreeMap<CrewRole, u32>,
+) -> bool {
+    requirement
+        .iter()
+        .all(|(role, &needed)| assigned.get(role).copied().unwrap_or(0) >= needed)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -244,6 +268,12 @@ pub struct ShipState {
     /// Cached propellant capacity (kg). Recomputed from hull + tank module modifiers.
     #[serde(default)]
     pub propellant_capacity_kg: f32,
+    /// Ship crew roster.
+    #[serde(default)]
+    pub crew: BTreeMap<CrewRole, u32>,
+    /// Ship leaders (reserved for Phase 2 leader system).
+    #[serde(default)]
+    pub leaders: Vec<LeaderId>,
 }
 
 fn default_hull_id() -> HullId {
@@ -379,6 +409,12 @@ pub struct StationState {
     /// Per-station modifiers (from equipment, location).
     #[serde(default)]
     pub modifiers: crate::modifiers::ModifierSet,
+    /// Station crew roster: how many of each role are available.
+    #[serde(default)]
+    pub crew: BTreeMap<CrewRole, u32>,
+    /// Station leaders (reserved for Phase 2 leader system).
+    #[serde(default)]
+    pub leaders: Vec<LeaderId>,
     /// Computed fresh each tick -- not persisted across ticks.
     #[serde(skip_deserializing, default)]
     pub power: PowerState,
@@ -419,6 +455,28 @@ impl StationState {
 
     /// Rebuild the module type index from the current modules list and content defs.
     /// Call after install/uninstall or initial station construction.
+    /// Returns how many crew of a given role are available (not assigned to modules).
+    pub fn available_crew(&self, role: &CrewRole) -> u32 {
+        let total = self.crew.get(role).copied().unwrap_or(0);
+        let assigned: u32 = self
+            .modules
+            .iter()
+            .map(|m| m.assigned_crew.get(role).copied().unwrap_or(0))
+            .sum();
+        total.saturating_sub(assigned)
+    }
+
+    /// Initialize `crew_satisfied` on all modules based on content requirements.
+    /// Call after loading state to avoid spurious transition events on first tick.
+    pub fn init_crew_satisfaction(&mut self, content: &GameContent) {
+        for module in &mut self.modules {
+            if let Some(def) = content.module_defs.get(&module.def_id) {
+                module.crew_satisfied =
+                    is_crew_satisfied(&module.assigned_crew, &def.crew_requirement);
+            }
+        }
+    }
+
     pub fn rebuild_module_index(&mut self, content: &GameContent) {
         let idx = &mut self.module_type_index;
         idx.initialized = true;

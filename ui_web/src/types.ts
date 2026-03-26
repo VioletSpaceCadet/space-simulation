@@ -135,6 +135,8 @@ export interface ModuleState {
   wear: WearState
   thermal?: ThermalState
   module_priority?: number
+  assigned_crew?: Record<string, number>
+  crew_satisfied?: boolean
 }
 
 export interface Position {
@@ -159,6 +161,8 @@ export interface ShipState {
   fitted_modules?: FittedModule[]
   propellant_kg?: number
   propellant_capacity_kg?: number
+  crew?: Record<string, number>
+  leaders?: string[]
 }
 
 export interface PowerState {
@@ -178,6 +182,8 @@ export interface StationState {
   cargo_capacity_m3: number
   modules: ModuleState[]
   power: PowerState
+  crew?: Record<string, number>
+  leaders?: string[]
 }
 
 export interface AsteroidKnowledge {

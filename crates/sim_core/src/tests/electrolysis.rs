@@ -130,6 +130,8 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -147,6 +149,8 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -508,6 +512,8 @@ fn test_full_chain_ore_to_propellant() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -525,6 +531,8 @@ fn test_full_chain_ore_to_propellant() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -542,6 +550,8 @@ fn test_full_chain_ore_to_propellant() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 

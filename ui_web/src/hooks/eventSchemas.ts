@@ -380,6 +380,30 @@ export const eventSchemas = {
   SimEventExpired: z.object({
     event_def_id: z.string(),
   }),
+
+  CrewAssigned: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+    role: z.string(),
+    count: z.number(),
+  }),
+
+  CrewUnassigned: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+    role: z.string(),
+    count: z.number(),
+  }),
+
+  ModuleUnderstaffed: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+  }),
+
+  ModuleFullyStaffed: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

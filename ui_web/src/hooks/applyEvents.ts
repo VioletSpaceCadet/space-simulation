@@ -858,6 +858,10 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   ShipModuleUnfitted: handleShipModuleUnfitted,
   RefuelComplete: noOp,
   RefuelAborted: noOp,
+  CrewAssigned: noOp, // CR-06 will add state update handler
+  CrewUnassigned: noOp, // CR-06 will add state update handler
+  ModuleUnderstaffed: noOp, // CR-06 will add state update handler
+  ModuleFullyStaffed: noOp, // CR-06 will add state update handler
 };
 
 export function applyEvents(

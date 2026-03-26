@@ -1751,6 +1751,8 @@ mod tests {
             thermal: None,
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
         });
     }
 

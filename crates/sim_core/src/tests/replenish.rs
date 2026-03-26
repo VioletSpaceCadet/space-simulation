@@ -164,6 +164,8 @@ fn empty_sites_state(content: &GameContent) -> GameState {
                 power_available_per_tick: 100.0,
                 modules: vec![],
                 modifiers: crate::modifiers::ModifierSet::default(),
+                crew: Default::default(),
+                leaders: Vec::new(),
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),

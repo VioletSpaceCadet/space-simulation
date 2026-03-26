@@ -502,6 +502,8 @@ fn sensor_data_generation_rate_at_mpt_60() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 

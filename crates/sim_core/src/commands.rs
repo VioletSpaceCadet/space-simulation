@@ -102,6 +102,8 @@ pub(crate) fn handle_install_module(
         thermal,
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: std::collections::BTreeMap::new(),
+        crew_satisfied: def.crew_requirement.is_empty(),
     });
     station.rebuild_module_index(content);
     station.invalidate_power_cache();
@@ -476,6 +478,138 @@ pub(crate) fn handle_set_module_priority(
         return false;
     };
     module.module_priority = priority;
+    true
+}
+
+/// Assign crew of a given role to a module. Validates available crew and role requirement.
+pub(crate) fn handle_assign_crew(
+    state: &mut GameState,
+    content: &GameContent,
+    station_id: &crate::StationId,
+    module_id: &crate::ModuleInstanceId,
+    role: &crate::CrewRole,
+    count: u32,
+    events: &mut Vec<crate::EventEnvelope>,
+) -> bool {
+    let current_tick = state.meta.tick;
+    let Some(station) = state.stations.get(station_id) else {
+        return false;
+    };
+    // Validate module exists and role is in its requirement
+    let module_index = station.modules.iter().position(|m| &m.id == module_id);
+    let Some(module_index) = module_index else {
+        return false;
+    };
+    let def_id = &station.modules[module_index].def_id;
+    let Some(def) = content.module_defs.get(def_id) else {
+        return false;
+    };
+    if !def.crew_requirement.contains_key(role) {
+        return false;
+    }
+    // Check available crew
+    let available = station.available_crew(role);
+    if available < count {
+        return false;
+    }
+
+    let station = state
+        .stations
+        .get_mut(station_id)
+        .expect("station checked above");
+    let entry = station.modules[module_index]
+        .assigned_crew
+        .entry(role.clone())
+        .or_insert(0);
+    *entry += count;
+    // Check crew satisfaction transition
+    let was_satisfied = station.modules[module_index].crew_satisfied;
+    station.modules[module_index].crew_satisfied = crate::is_crew_satisfied(
+        &station.modules[module_index].assigned_crew,
+        &def.crew_requirement,
+    );
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::CrewAssigned {
+            station_id: station_id.clone(),
+            module_id: module_id.clone(),
+            role: role.clone(),
+            count,
+        },
+    ));
+    if !was_satisfied && station.modules[module_index].crew_satisfied {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::ModuleFullyStaffed {
+                station_id: station_id.clone(),
+                module_id: module_id.clone(),
+            },
+        ));
+    }
+    true
+}
+
+/// Unassign crew of a given role from a module.
+pub(crate) fn handle_unassign_crew(
+    state: &mut GameState,
+    content: &GameContent,
+    station_id: &crate::StationId,
+    module_id: &crate::ModuleInstanceId,
+    role: &crate::CrewRole,
+    count: u32,
+    events: &mut Vec<crate::EventEnvelope>,
+) -> bool {
+    let current_tick = state.meta.tick;
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return false;
+    };
+    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+        return false;
+    };
+    let assigned = module.assigned_crew.get(role).copied().unwrap_or(0);
+    if assigned < count {
+        return false;
+    }
+    let was_satisfied = module.crew_satisfied;
+    let new_assigned = assigned - count;
+    if new_assigned == 0 {
+        module.assigned_crew.remove(role);
+    } else {
+        module.assigned_crew.insert(role.clone(), new_assigned);
+    }
+    // Check crew satisfaction transition
+    let def_id = &module.def_id;
+    if let Some(def) = content.module_defs.get(def_id.as_str()) {
+        module.crew_satisfied =
+            crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement);
+    }
+    let module_id = module.id.clone();
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::CrewUnassigned {
+            station_id: station_id.clone(),
+            module_id: module_id.clone(),
+            role: role.clone(),
+            count,
+        },
+    ));
+    let now_satisfied = station
+        .modules
+        .iter()
+        .any(|m| m.id == module_id && m.crew_satisfied);
+    if was_satisfied && !now_satisfied {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::ModuleUnderstaffed {
+                station_id: station_id.clone(),
+                module_id,
+            },
+        ));
+    }
     true
 }
 

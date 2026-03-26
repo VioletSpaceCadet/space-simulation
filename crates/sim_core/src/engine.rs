@@ -273,6 +273,26 @@ fn apply_commands(
                     events,
                 );
             }
+            Command::AssignCrew {
+                station_id,
+                module_id,
+                role,
+                count,
+            } => {
+                commands::handle_assign_crew(
+                    state, content, station_id, module_id, role, *count, events,
+                );
+            }
+            Command::UnassignCrew {
+                station_id,
+                module_id,
+                role,
+                count,
+            } => {
+                commands::handle_unassign_crew(
+                    state, content, station_id, module_id, role, *count, events,
+                );
+            }
         }
     }
 

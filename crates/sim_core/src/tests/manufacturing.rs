@@ -221,6 +221,8 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -239,6 +241,8 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 5,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -257,6 +261,8 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 3,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
