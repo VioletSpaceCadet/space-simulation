@@ -497,10 +497,15 @@ pub enum TaskKind {
         #[serde(default)]
         blocked: bool,
     },
+    /// Ship is refueling at a station. Ongoing task — resolved every tick, no fixed eta.
+    Refuel {
+        station_id: StationId,
+        target_kg: f32,
+    },
 }
 
 impl TaskKind {
-    /// Task duration in ticks.
+    /// Task duration in ticks. Returns 0 for ongoing tasks (Refuel).
     pub fn duration(&self, constants: &Constants) -> u64 {
         match self {
             Self::Transit { total_ticks, .. } => *total_ticks,
@@ -508,7 +513,7 @@ impl TaskKind {
             Self::DeepScan { .. } => constants.deep_scan_ticks,
             Self::Mine { duration_ticks, .. } => *duration_ticks,
             Self::Deposit { .. } => constants.deposit_ticks,
-            Self::Idle => 0,
+            Self::Idle | Self::Refuel { .. } => 0,
         }
     }
 
@@ -521,6 +526,7 @@ impl TaskKind {
             Self::DeepScan { .. } => "DeepScan",
             Self::Mine { .. } => "Mine",
             Self::Deposit { .. } => "Deposit",
+            Self::Refuel { .. } => "Refuel",
         }
     }
 
@@ -531,7 +537,11 @@ impl TaskKind {
             Self::Transit { destination, .. } => Some(destination.parent_body.0.clone()),
             Self::Survey { site } => Some(site.0.clone()),
             Self::DeepScan { asteroid } | Self::Mine { asteroid, .. } => Some(asteroid.0.clone()),
-            Self::Deposit { station, .. } => Some(station.0.clone()),
+            Self::Deposit { station, .. }
+            | Self::Refuel {
+                station_id: station,
+                ..
+            } => Some(station.0.clone()),
         }
     }
 }

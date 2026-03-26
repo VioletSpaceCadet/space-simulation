@@ -252,12 +252,14 @@ pub fn base_content() -> GameContent {
             mining_rate_kg_per_tick: 0.0,
             deposit_ticks: 0,
             station_power_available_per_tick: 0.0,
+            refuel_kg_per_tick: 0.0,
             events_enabled: false,
             event_global_cooldown_ticks: 200,
             event_history_capacity: 100,
             // Propulsion
             fuel_cost_per_au: 500.0,
             reference_mass_kg: 15_000.0,
+            refuel_kg_per_minute: 16.67,
             // Bottleneck detection
             bottleneck_storage_threshold_pct: 0.95,
             bottleneck_slag_ratio_threshold: 0.5,
@@ -479,12 +481,14 @@ pub fn minimal_content() -> GameContent {
             mining_rate_kg_per_tick: 0.0,
             deposit_ticks: 0,
             station_power_available_per_tick: 0.0,
+            refuel_kg_per_tick: 0.0,
             events_enabled: false,
             event_global_cooldown_ticks: 200,
             event_history_capacity: 100,
             // Propulsion
             fuel_cost_per_au: 500.0,
             reference_mass_kg: 15_000.0,
+            refuel_kg_per_minute: 16.67,
             // Bottleneck detection
             bottleneck_storage_threshold_pct: 0.95,
             bottleneck_slag_ratio_threshold: 0.5,

@@ -36,6 +36,8 @@ pub fn tick(
         apply_commands,
         apply_commands(state, commands, content, rng, &mut events)
     );
+    // Ongoing tasks (Refuel) run every tick, before scheduled task resolution.
+    crate::tasks::resolve_refuels(state, content, &mut events);
     timed!(
         timings,
         resolve_ship_tasks,

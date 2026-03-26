@@ -284,4 +284,14 @@ pub enum Event {
     SimEventExpired {
         event_def_id: crate::sim_events::EventDefId,
     },
+    RefuelComplete {
+        ship_id: ShipId,
+        station_id: StationId,
+        kg_transferred: f32,
+    },
+    RefuelAborted {
+        ship_id: ShipId,
+        station_id: StationId,
+        reason: String,
+    },
 }
