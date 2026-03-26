@@ -6,31 +6,124 @@
     "content_version": "0.1.0"
   },
   "scan_sites": [
-    { "id": "site_0001", "position": { "parent_body": "inner_belt", "radius_au_um": 2450000, "angle_mdeg": 0 },      "template_id": "tmpl_iron_rich" },
-    { "id": "site_0002", "position": { "parent_body": "inner_belt", "radius_au_um": 2500000, "angle_mdeg": 72000 },   "template_id": "tmpl_iron_rich" },
-    { "id": "site_0003", "position": { "parent_body": "inner_belt", "radius_au_um": 2450000, "angle_mdeg": 144000 },  "template_id": "tmpl_iron_rich" },
-    { "id": "site_0004", "position": { "parent_body": "outer_belt", "radius_au_um": 3050000, "angle_mdeg": 0 },      "template_id": "tmpl_volatile_rich" },
-    { "id": "site_0005", "position": { "parent_body": "outer_belt", "radius_au_um": 3100000, "angle_mdeg": 90000 },   "template_id": "tmpl_carbonaceous" },
-    { "id": "site_0006", "position": { "parent_body": "earth_neos", "radius_au_um": 1000000, "angle_mdeg": 45000 },   "template_id": "tmpl_silicate" },
-    { "id": "site_0007", "position": { "parent_body": "lunar_orbit_zone", "radius_au_um": 200, "angle_mdeg": 0 },     "template_id": "tmpl_iron_rich" },
-    { "id": "site_0008", "position": { "parent_body": "jupiter_trojans", "radius_au_um": 5100000, "angle_mdeg": 325000 }, "template_id": "tmpl_volatile_rich" },
-    { "id": "site_0009", "position": { "parent_body": "inner_belt", "radius_au_um": 2500000, "angle_mdeg": 216000 },  "template_id": "tmpl_silicate" },
-    { "id": "site_0010", "position": { "parent_body": "outer_belt", "radius_au_um": 3050000, "angle_mdeg": 180000 },  "template_id": "tmpl_volatile_rich" }
+    {
+      "id": "site_0001",
+      "position": {
+        "parent_body": "inner_belt",
+        "radius_au_um": 2450000,
+        "angle_mdeg": 0
+      },
+      "template_id": "tmpl_iron_rich"
+    },
+    {
+      "id": "site_0002",
+      "position": {
+        "parent_body": "inner_belt",
+        "radius_au_um": 2500000,
+        "angle_mdeg": 72000
+      },
+      "template_id": "tmpl_iron_rich"
+    },
+    {
+      "id": "site_0003",
+      "position": {
+        "parent_body": "inner_belt",
+        "radius_au_um": 2450000,
+        "angle_mdeg": 144000
+      },
+      "template_id": "tmpl_iron_rich"
+    },
+    {
+      "id": "site_0004",
+      "position": {
+        "parent_body": "outer_belt",
+        "radius_au_um": 3050000,
+        "angle_mdeg": 0
+      },
+      "template_id": "tmpl_volatile_rich"
+    },
+    {
+      "id": "site_0005",
+      "position": {
+        "parent_body": "outer_belt",
+        "radius_au_um": 3100000,
+        "angle_mdeg": 90000
+      },
+      "template_id": "tmpl_carbonaceous"
+    },
+    {
+      "id": "site_0006",
+      "position": {
+        "parent_body": "earth_neos",
+        "radius_au_um": 1000000,
+        "angle_mdeg": 45000
+      },
+      "template_id": "tmpl_silicate"
+    },
+    {
+      "id": "site_0007",
+      "position": {
+        "parent_body": "lunar_orbit_zone",
+        "radius_au_um": 200,
+        "angle_mdeg": 0
+      },
+      "template_id": "tmpl_iron_rich"
+    },
+    {
+      "id": "site_0008",
+      "position": {
+        "parent_body": "jupiter_trojans",
+        "radius_au_um": 5100000,
+        "angle_mdeg": 325000
+      },
+      "template_id": "tmpl_volatile_rich"
+    },
+    {
+      "id": "site_0009",
+      "position": {
+        "parent_body": "inner_belt",
+        "radius_au_um": 2500000,
+        "angle_mdeg": 216000
+      },
+      "template_id": "tmpl_silicate"
+    },
+    {
+      "id": "site_0010",
+      "position": {
+        "parent_body": "outer_belt",
+        "radius_au_um": 3050000,
+        "angle_mdeg": 180000
+      },
+      "template_id": "tmpl_volatile_rich"
+    }
   ],
   "asteroids": {},
   "ships": {
     "ship_0001": {
       "id": "ship_0001",
-      "position": { "parent_body": "earth_orbit_zone", "radius_au_um": 3000, "angle_mdeg": 0 },
+      "position": {
+        "parent_body": "earth_orbit_zone",
+        "radius_au_um": 3000,
+        "angle_mdeg": 0
+      },
       "owner": "principal_autopilot",
       "inventory": [],
       "cargo_capacity_m3": 65.0,
       "task": null,
       "hull_id": "hull_general_purpose",
       "fitted_modules": [
-        { "slot_index": 0, "module_def_id": "module_cargo_expander" },
-        { "slot_index": 1, "module_def_id": "module_propellant_tank" },
-        { "slot_index": 2, "module_def_id": "module_mining_laser" }
+        {
+          "slot_index": 0,
+          "module_def_id": "module_cargo_expander"
+        },
+        {
+          "slot_index": 1,
+          "module_def_id": "module_propellant_tank"
+        },
+        {
+          "slot_index": 2,
+          "module_def_id": "module_mining_laser"
+        }
       ],
       "propellant_kg": 15000.0,
       "propellant_capacity_kg": 15000.0,
@@ -40,7 +133,11 @@
   "stations": {
     "station_earth_orbit": {
       "id": "station_earth_orbit",
-      "position": { "parent_body": "earth_orbit_zone", "radius_au_um": 3000, "angle_mdeg": 0 },
+      "position": {
+        "parent_body": "earth_orbit_zone",
+        "radius_au_um": 3000,
+        "angle_mdeg": 0
+      },
       "inventory": [
         {
           "kind": "Module",
@@ -155,15 +252,51 @@
           "kg": 5000.0,
           "quality": 1.0
         },
-        { "kind": "Module", "item_id": "module_item_0022", "module_def_id": "module_mining_laser" },
-        { "kind": "Module", "item_id": "module_item_0023", "module_def_id": "module_cargo_expander" },
-        { "kind": "Module", "item_id": "module_item_0024", "module_def_id": "module_propellant_tank" },
-        { "kind": "Module", "item_id": "module_item_0025", "module_def_id": "module_mining_laser" },
-        { "kind": "Module", "item_id": "module_item_0026", "module_def_id": "module_cargo_expander" },
-        { "kind": "Module", "item_id": "module_item_0027", "module_def_id": "module_propellant_tank" },
-        { "kind": "Module", "item_id": "module_item_0028", "module_def_id": "module_mining_laser" },
-        { "kind": "Module", "item_id": "module_item_0029", "module_def_id": "module_cargo_expander" },
-        { "kind": "Module", "item_id": "module_item_0030", "module_def_id": "module_propellant_tank" },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0022",
+          "module_def_id": "module_mining_laser"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0023",
+          "module_def_id": "module_cargo_expander"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0024",
+          "module_def_id": "module_propellant_tank"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0025",
+          "module_def_id": "module_mining_laser"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0026",
+          "module_def_id": "module_cargo_expander"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0027",
+          "module_def_id": "module_propellant_tank"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0028",
+          "module_def_id": "module_mining_laser"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0029",
+          "module_def_id": "module_cargo_expander"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0030",
+          "module_def_id": "module_propellant_tank"
+        },
         {
           "kind": "Module",
           "item_id": "module_item_0020",
@@ -177,7 +310,14 @@
       ],
       "cargo_capacity_m3": 2000.0,
       "power_available_per_tick": 6000.0,
-      "modules": []
+      "modules": [],
+      "crew": {
+        "operator": 11,
+        "pilot": 2,
+        "technician": 4,
+        "scientist": 4
+      },
+      "leaders": []
     }
   },
   "balance": 1000000000.0,

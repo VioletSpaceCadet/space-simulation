@@ -32,10 +32,28 @@
     "module_propellant_tank"
   ],
   "materials": [
-    { "element": "Fe", "kg": 500.0, "quality": 0.7 },
-    { "element": "H2O", "kg": 5000.0, "quality": 1.0 }
+    {
+      "element": "Fe",
+      "kg": 500.0,
+      "quality": 0.7
+    },
+    {
+      "element": "H2O",
+      "kg": 5000.0,
+      "quality": 1.0
+    }
   ],
   "components": [
-    { "id": "repair_kit", "count": 10, "quality": 1.0 }
-  ]
+    {
+      "id": "repair_kit",
+      "count": 10,
+      "quality": 1.0
+    }
+  ],
+  "crew": {
+    "operator": 11,
+    "pilot": 2,
+    "technician": 4,
+    "scientist": 4
+  }
 }

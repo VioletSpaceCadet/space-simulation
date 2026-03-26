@@ -5,49 +5,106 @@
       "id": "tech_deep_scan_v1",
       "name": "Deep Scan v1",
       "prereqs": [],
-      "domain_requirements": { "Survey": 100.0 },
-      "accepted_data": ["SurveyData"],
+      "domain_requirements": {
+        "Survey": 100.0
+      },
+      "accepted_data": [
+        "SurveyData"
+      ],
       "effects": [
-        { "type": "EnableDeepScan" },
-        { "type": "DeepScanCompositionNoise", "sigma": 0.02 }
+        {
+          "type": "EnableDeepScan"
+        },
+        {
+          "type": "DeepScanCompositionNoise",
+          "sigma": 0.02
+        }
       ]
     },
     {
       "id": "tech_advanced_refining",
       "name": "Advanced Refining",
       "prereqs": [],
-      "domain_requirements": { "Materials": 150.0, "Manufacturing": 50.0 },
-      "accepted_data": ["AssayData", "ManufacturingData"],
+      "domain_requirements": {
+        "Materials": 150.0,
+        "Manufacturing": 50.0
+      },
+      "accepted_data": [
+        "AssayData",
+        "ManufacturingData"
+      ],
       "effects": [
-        { "type": "StatModifier", "stat": "processing_yield", "op": "pct_additive", "value": 0.15 }
+        {
+          "type": "StatModifier",
+          "stat": "processing_yield",
+          "op": "pct_additive",
+          "value": 0.15
+        }
       ]
     },
     {
       "id": "tech_ship_construction",
       "name": "Ship Construction",
       "prereqs": [],
-      "domain_requirements": { "Manufacturing": 200.0 },
-      "accepted_data": ["ManufacturingData", "AssayData"],
+      "domain_requirements": {
+        "Manufacturing": 200.0
+      },
+      "accepted_data": [
+        "ManufacturingData",
+        "AssayData"
+      ],
       "effects": [
-        { "type": "EnableShipConstruction" }
+        {
+          "type": "EnableShipConstruction"
+        }
       ]
     },
     {
       "id": "tech_efficient_transit",
       "name": "Efficient Transit",
-      "prereqs": ["tech_ship_construction"],
-      "domain_requirements": { "Propulsion": 150.0 },
-      "accepted_data": ["TransitData"],
+      "prereqs": [
+        "tech_ship_construction"
+      ],
+      "domain_requirements": {
+        "Propulsion": 150.0
+      },
+      "accepted_data": [
+        "TransitData"
+      ],
       "effects": [
-        { "type": "StatModifier", "stat": "ship_speed", "op": "pct_additive", "value": 0.10 }
+        {
+          "type": "StatModifier",
+          "stat": "ship_speed",
+          "op": "pct_additive",
+          "value": 0.1
+        }
       ]
     },
     {
       "id": "tech_advanced_manufacturing",
       "name": "Advanced Manufacturing",
       "prereqs": [],
-      "domain_requirements": { "Manufacturing": 200.0 },
-      "accepted_data": ["ManufacturingData"],
+      "domain_requirements": {
+        "Manufacturing": 200.0
+      },
+      "accepted_data": [
+        "ManufacturingData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_automation_basic",
+      "name": "Basic Automation",
+      "prereqs": [
+        "tech_advanced_manufacturing"
+      ],
+      "domain_requirements": {
+        "Manufacturing": 500.0,
+        "Materials": 200.0
+      },
+      "accepted_data": [
+        "ManufacturingData"
+      ],
       "effects": []
     }
   ]

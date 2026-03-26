@@ -758,7 +758,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         power_available_per_tick: c.station_power_available_per_tick,
         modules: vec![],
         modifiers: sim_core::modifiers::ModifierSet::default(),
-        crew: std::collections::BTreeMap::new(),
+        crew: content.initial_station.crew.clone(),
         leaders: Vec::new(),
         power: PowerState::default(),
         cached_inventory_volume_m3: None,
@@ -821,6 +821,69 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         modifiers: sim_core::modifiers::ModifierSet::default(),
         events: sim_core::sim_events::SimEventState::default(),
         body_cache: sim_core::build_body_cache(&content.solar_system.bodies),
+    }
+}
+
+/// Auto-assign available crew to modules that need them, highest priority first.
+/// Call after building initial state so modules start with crew assigned.
+pub fn auto_assign_initial_crew(state: &mut GameState, content: &GameContent) {
+    let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
+    for station_id in station_ids {
+        let Some(station) = state.stations.get(&station_id) else {
+            continue;
+        };
+        // Collect modules with crew requirements, sorted by priority desc then ID asc
+        let mut module_order: Vec<usize> = (0..station.modules.len()).collect();
+        module_order.sort_by(|&a, &b| {
+            station.modules[b]
+                .module_priority
+                .cmp(&station.modules[a].module_priority)
+                .then_with(|| station.modules[a].id.0.cmp(&station.modules[b].id.0))
+        });
+        // Track remaining crew
+        let mut remaining: std::collections::BTreeMap<sim_core::CrewRole, u32> =
+            station.crew.clone();
+        let mut assignments: Vec<(usize, std::collections::BTreeMap<sim_core::CrewRole, u32>)> =
+            Vec::new();
+        for module_index in module_order {
+            let def_id = &station.modules[module_index].def_id;
+            let Some(def) = content.module_defs.get(def_id) else {
+                continue;
+            };
+            if def.crew_requirement.is_empty() {
+                continue;
+            }
+            let mut assigned = std::collections::BTreeMap::new();
+            let mut can_satisfy = true;
+            for (role, &needed) in &def.crew_requirement {
+                let available = remaining.get(role).copied().unwrap_or(0);
+                if available >= needed {
+                    assigned.insert(role.clone(), needed);
+                } else {
+                    can_satisfy = false;
+                    break;
+                }
+            }
+            if can_satisfy {
+                for (role, count) in &assigned {
+                    *remaining.entry(role.clone()).or_insert(0) -= count;
+                }
+                assignments.push((module_index, assigned));
+            }
+        }
+        let station = state.stations.get_mut(&station_id).expect("checked");
+        for (module_index, assigned) in assignments {
+            station.modules[module_index].assigned_crew = assigned;
+            if let Some(def) = content
+                .module_defs
+                .get(&station.modules[module_index].def_id)
+            {
+                station.modules[module_index].crew_satisfied = sim_core::is_crew_satisfied(
+                    &station.modules[module_index].assigned_crew,
+                    &def.crew_requirement,
+                );
+            }
+        }
     }
 }
 
