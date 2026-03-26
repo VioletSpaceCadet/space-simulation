@@ -134,6 +134,9 @@ pub struct Constants {
     /// LH2 transfer rate (kg/minute) during refueling. Derived to per-tick.
     #[serde(default = "default_refuel_kg_per_minute")]
     pub refuel_kg_per_minute: f32,
+    /// Propellant fraction below which autopilot opportunistically refuels when at a station.
+    #[serde(default = "default_autopilot_refuel_threshold_pct")]
+    pub autopilot_refuel_threshold_pct: f32,
     // Bottleneck detection (used by daemon analytics)
     /// Station storage usage fraction above which bottleneck detection flags `StorageFull`.
     #[serde(default = "default_bottleneck_storage_threshold_pct")]
@@ -299,6 +302,9 @@ fn default_reference_mass_kg() -> f32 {
 }
 fn default_refuel_kg_per_minute() -> f32 {
     16.67 // ~1000 kg/hr → at 60 min/tick = 1000 kg/tick
+}
+fn default_autopilot_refuel_threshold_pct() -> f32 {
+    0.8 // refuel when below 80% capacity
 }
 fn default_bottleneck_storage_threshold_pct() -> f32 {
     0.95
