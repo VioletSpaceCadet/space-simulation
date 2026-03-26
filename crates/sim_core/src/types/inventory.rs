@@ -5,8 +5,8 @@ use super::AHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AsteroidId, ComponentId, CompositionVec, ElementId, GameContent, LotId, MaterialThermalProps,
-    ModuleItemId,
+    AsteroidId, ComponentId, CompositionVec, CrewRole, ElementId, GameContent, LotId,
+    MaterialThermalProps, ModuleItemId,
 };
 
 // ---------------------------------------------------------------------------
@@ -116,6 +116,11 @@ pub enum TradeItemSpec {
     Module {
         module_def_id: String,
     },
+    /// Recruit crew members of a specific role.
+    Crew {
+        role: CrewRole,
+        count: u32,
+    },
 }
 
 impl TradeItemSpec {
@@ -125,10 +130,12 @@ impl TradeItemSpec {
             Self::Material { element, .. } => element.as_str(),
             Self::Component { component_id, .. } => component_id.0.as_str(),
             Self::Module { module_def_id } => module_def_id.as_str(),
+            Self::Crew { role, .. } => role.0.as_str(),
         }
     }
 
     /// Compute total mass in kg. Returns `None` if def not found in content.
+    /// Crew has zero mass (people don't occupy cargo).
     pub fn compute_mass(&self, content: &GameContent) -> Option<f64> {
         match self {
             Self::Material { kg, .. } => Some(f64::from(*kg)),
@@ -146,6 +153,7 @@ impl TradeItemSpec {
                 let def = content.module_defs.get(module_def_id.as_str())?;
                 Some(f64::from(def.mass_kg))
             }
+            Self::Crew { .. } => Some(0.0),
         }
     }
 
@@ -153,9 +161,14 @@ impl TradeItemSpec {
     pub fn quantity(&self) -> f64 {
         match self {
             Self::Material { kg, .. } => f64::from(*kg),
-            Self::Component { count, .. } => f64::from(*count),
+            Self::Component { count, .. } | Self::Crew { count, .. } => f64::from(*count),
             Self::Module { .. } => 1.0,
         }
+    }
+
+    /// Returns true if this is a crew trade item.
+    pub fn is_crew(&self) -> bool {
+        matches!(self, Self::Crew { .. })
     }
 }
 
