@@ -82,5 +82,12 @@
     "message": "LH2 propellant reserves critically low",
     "suggested_action": "Increase electrolysis output or import LH2",
     "rule": { "type": "threshold_latest_element", "element": "LH2", "condition": "lt", "threshold": 500.0, "min_value": 0.0 }
+  },
+  {
+    "id": "FLEET_PROPELLANT_LOW",
+    "severity": "Warning",
+    "message": "Fleet propellant below 20% — ships may be unable to complete missions",
+    "suggested_action": "Increase LH2 production or reduce mission range",
+    "rule": { "type": "threshold_latest", "metric": "fleet_propellant_pct", "condition": "lt", "threshold": 0.20 }
   }
 ]
