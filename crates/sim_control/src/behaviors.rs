@@ -44,7 +44,6 @@ fn make_cmd(
 }
 
 /// Wraps `task` in a Transit if `from` and `to` are not co-located; else returns `task` as-is.
-/// Uses the provided `ship_ticks_per_au` for travel speed (call `ship.ticks_per_au(default)` to resolve).
 fn maybe_transit(
     task: TaskKind,
     from: &Position,
@@ -74,6 +73,54 @@ fn maybe_transit(
         total_ticks: ticks,
         then: Box::new(task),
     }
+}
+
+fn maybe_assign_refuel(
+    ship: &ShipState,
+    ship_id: &ShipId,
+    state: &GameState,
+    content: &GameContent,
+    next_id: &mut u64,
+    commands: &mut Vec<CommandEnvelope>,
+) {
+    if let Some(task_kind) = try_refuel(ship, state, content) {
+        commands.push(make_cmd(
+            &ship.owner,
+            state.meta.tick,
+            next_id,
+            Command::AssignShipTask {
+                ship_id: ship_id.clone(),
+                task_kind,
+            },
+        ));
+    }
+}
+
+/// Try to issue a Refuel task if ship is at a station with LH2.
+fn try_refuel(ship: &ShipState, state: &GameState, content: &GameContent) -> Option<TaskKind> {
+    if content.constants.fuel_cost_per_au <= 0.0 {
+        return None;
+    }
+    // Only refuel if below capacity
+    if ship.propellant_kg >= ship.propellant_capacity_kg * 0.99 {
+        return None;
+    }
+    // Find co-located station with LH2
+    let station = state.stations.values().find(|s| {
+        is_co_located(
+            &ship.position,
+            &s.position,
+            &state.body_cache,
+            content.constants.docking_range_au_um,
+        ) && s.inventory.iter().any(|item| {
+            matches!(item, InventoryItem::Material { element, kg, .. }
+                if element == "LH2" && *kg > content.constants.min_meaningful_kg)
+        })
+    })?;
+    Some(TaskKind::Refuel {
+        station_id: station.id.clone(),
+        target_kg: ship.propellant_capacity_kg,
+    })
 }
 
 /// Returns idle autopilot ships. `BTreeMap` iteration is already sorted by ID.
@@ -951,6 +998,7 @@ impl AutopilotBehavior for ShipTaskScheduler {
             let ship_speed = ship.ticks_per_au(content.constants.ticks_per_au);
 
             // Iterate configurable priority order from content.autopilot.task_priority.
+            let mut assigned = false;
             for priority in &content.autopilot.task_priority {
                 let task = match priority.as_str() {
                     "Deposit" => deposit_priority(ship, state, content),
@@ -971,10 +1019,19 @@ impl AutopilotBehavior for ShipTaskScheduler {
                         &ship.owner,
                         state.meta.tick,
                         next_id,
-                        Command::AssignShipTask { ship_id, task_kind },
+                        Command::AssignShipTask {
+                            ship_id: ship_id.clone(),
+                            task_kind,
+                        },
                     ));
+                    assigned = true;
                     break;
                 }
+            }
+
+            // Fallback: if no task assigned, try refueling at co-located station
+            if !assigned {
+                maybe_assign_refuel(ship, &ship_id, state, content, next_id, &mut commands);
             }
         }
 
