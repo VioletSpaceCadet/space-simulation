@@ -820,6 +820,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         },
         modifiers: sim_core::modifiers::ModifierSet::default(),
         events: sim_core::sim_events::SimEventState::default(),
+        propellant_consumed_total: 0.0,
         body_cache: sim_core::build_body_cache(&content.solar_system.bodies),
     }
 }
@@ -1403,6 +1404,7 @@ mod tests {
             },
             modifiers: sim_core::modifiers::ModifierSet::default(),
             events: sim_core::sim_events::SimEventState::default(),
+            propellant_consumed_total: 0.0,
             body_cache: AHashMap::default(),
         };
         validate_state(&state, &content);

@@ -859,6 +859,16 @@ pub(crate) fn apply_ship_assignments(
     events: &mut Vec<EventEnvelope>,
 ) {
     for (ship_id, task_kind) in assignments {
+        // Deduct propellant on Transit start
+        if let TaskKind::Transit {
+            ref destination, ..
+        } = &task_kind
+        {
+            if !deduct_transit_fuel(state, content, &ship_id, destination, current_tick, events) {
+                continue; // insufficient fuel — assignment rejected
+            }
+        }
+
         let duration = task_kind.duration(&content.constants);
         let label = task_kind.label().to_string();
         let target = task_kind.target();
@@ -881,6 +891,63 @@ pub(crate) fn apply_ship_assignments(
             },
         ));
     }
+}
+
+/// Attempt to deduct transit fuel from a ship. Returns `true` if successful.
+/// Skips fuel deduction when propulsion is not configured (`fuel_cost_per_au` == 0).
+fn deduct_transit_fuel(
+    state: &mut GameState,
+    content: &GameContent,
+    ship_id: &ShipId,
+    destination: &crate::Position,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    // Skip fuel deduction when propulsion is not configured
+    if content.constants.fuel_cost_per_au <= 0.0 {
+        return true;
+    }
+    let Some(ship) = state.ships.get(ship_id) else {
+        return false;
+    };
+    let position = ship.position.clone();
+    let fuel_cost = crate::propulsion::compute_transit_fuel(
+        ship,
+        &position,
+        destination,
+        content,
+        &state.body_cache,
+    );
+
+    if fuel_cost <= 0.0 {
+        return true; // co-located, no fuel needed
+    }
+
+    if ship.propellant_kg < fuel_cost {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::InsufficientPropellant {
+                ship_id: ship_id.clone(),
+                destination: destination.clone(),
+            },
+        ));
+        return false;
+    }
+
+    let ship = state.ships.get_mut(ship_id).expect("ship exists");
+    ship.propellant_kg -= fuel_cost;
+    state.propellant_consumed_total += f64::from(fuel_cost);
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::PropellantConsumed {
+            ship_id: ship_id.clone(),
+            kg_consumed: fuel_cost,
+            destination: destination.clone(),
+        },
+    ));
+    true
 }
 
 #[cfg(test)]

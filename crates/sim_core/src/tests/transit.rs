@@ -4,6 +4,7 @@ use super::*;
 #[allow(clippy::too_many_lines)]
 fn transit_moves_ship_and_starts_next_task() {
     let mut content = test_content();
+    content.constants.fuel_cost_per_au = 0.0; // disable fuel for legacy node-based test
     let node_a = NodeId("node_a".to_string());
     let node_b = NodeId("node_b".to_string());
     content.solar_system = SolarSystemDef {
@@ -113,6 +114,7 @@ fn transit_moves_ship_and_starts_next_task() {
         },
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
+        propellant_consumed_total: 0.0,
         body_cache: AHashMap::default(),
     };
 
@@ -204,6 +206,7 @@ fn transit_moves_ship_and_starts_next_task() {
 #[test]
 fn transit_generates_transit_data_with_diminishing_returns() {
     let mut content = test_content();
+    content.constants.fuel_cost_per_au = 0.0; // disable fuel for legacy node-based test
     let node_a = NodeId("node_a".to_string());
     let node_b = NodeId("node_b".to_string());
     content.solar_system = SolarSystemDef {
@@ -306,6 +309,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
         },
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
+        propellant_consumed_total: 0.0,
         body_cache: AHashMap::default(),
     };
 
@@ -470,4 +474,139 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         fast_ticks < slow_ticks,
         "fast ship should arrive sooner: fast={fast_ticks}, slow={slow_ticks}"
     );
+}
+
+// -- Transit fuel deduction tests --
+
+/// Helper: create content + state with spatial bodies, hull, and fuel enabled.
+fn spatial_transit_setup() -> (GameContent, GameState) {
+    use crate::test_fixtures::{base_content, base_state};
+
+    let mut content = base_content();
+    content.constants.fuel_cost_per_au = 500.0;
+    content.constants.reference_mass_kg = 15_000.0;
+    // Add hull so ship has mass
+    content.hulls.insert(
+        crate::HullId("hull_general_purpose".to_string()),
+        crate::HullDef {
+            id: crate::HullId("hull_general_purpose".to_string()),
+            name: "General Purpose".to_string(),
+            mass_kg: 5000.0,
+            cargo_capacity_m3: 50.0,
+            base_speed_ticks_per_au: 2133,
+            base_propellant_capacity_kg: 10000.0,
+            slots: vec![],
+            bonuses: vec![],
+            required_tech: None,
+            tags: vec![],
+        },
+    );
+    // Add two zone bodies so we have spatial positions
+    content.solar_system.bodies = vec![
+        crate::OrbitalBodyDef {
+            id: crate::BodyId("zone_a".to_string()),
+            name: "Zone A".to_string(),
+            parent: None,
+            body_type: crate::BodyType::Zone,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: None,
+        },
+        crate::OrbitalBodyDef {
+            id: crate::BodyId("zone_b".to_string()),
+            name: "Zone B".to_string(),
+            parent: None,
+            body_type: crate::BodyType::Zone,
+            radius_au_um: 1_000_000, // 1 AU away
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: None,
+        },
+    ];
+    content.constants.derive_tick_values();
+
+    let mut state = base_state(&content);
+    state.body_cache = crate::build_body_cache(&content.solar_system.bodies);
+
+    // Give ship propellant and set position at zone_a
+    let ship = state.ships.values_mut().next().unwrap();
+    ship.propellant_kg = 1000.0;
+    ship.propellant_capacity_kg = 10000.0;
+    ship.position = crate::Position {
+        parent_body: crate::BodyId("zone_a".to_string()),
+        radius_au_um: crate::RadiusAuMicro(0),
+        angle_mdeg: crate::AngleMilliDeg(0),
+    };
+
+    (content, state)
+}
+
+#[test]
+fn transit_deducts_propellant() {
+    let (content, mut state) = spatial_transit_setup();
+    let ship_id = crate::ShipId("ship_0001".to_string());
+    let destination = crate::Position {
+        parent_body: crate::BodyId("zone_b".to_string()),
+        radius_au_um: crate::RadiusAuMicro(0),
+        angle_mdeg: crate::AngleMilliDeg(0),
+    };
+
+    let before = state.ships.get(&ship_id).unwrap().propellant_kg;
+
+    let assignments = vec![(
+        ship_id.clone(),
+        TaskKind::Transit {
+            destination,
+            total_ticks: 100,
+            then: Box::new(TaskKind::Idle),
+        },
+    )];
+
+    let mut events = Vec::new();
+    crate::commands::apply_ship_assignments(&mut state, &content, assignments, 0, &mut events);
+
+    let after = state.ships.get(&ship_id).unwrap().propellant_kg;
+    assert!(after < before, "propellant should decrease after transit");
+    assert!(state.propellant_consumed_total > 0.0);
+    assert!(events
+        .iter()
+        .any(|e| matches!(&e.event, Event::PropellantConsumed { .. })));
+}
+
+#[test]
+fn transit_rejected_when_insufficient_fuel() {
+    let (content, mut state) = spatial_transit_setup();
+    let ship_id = crate::ShipId("ship_0001".to_string());
+
+    // Set propellant to zero — can't afford any transit
+    state.ships.get_mut(&ship_id).unwrap().propellant_kg = 0.0;
+
+    let destination = crate::Position {
+        parent_body: crate::BodyId("zone_b".to_string()),
+        radius_au_um: crate::RadiusAuMicro(0),
+        angle_mdeg: crate::AngleMilliDeg(0),
+    };
+
+    let assignments = vec![(
+        ship_id.clone(),
+        TaskKind::Transit {
+            destination,
+            total_ticks: 100,
+            then: Box::new(TaskKind::Idle),
+        },
+    )];
+
+    let mut events = Vec::new();
+    crate::commands::apply_ship_assignments(&mut state, &content, assignments, 0, &mut events);
+
+    // Ship should still be idle (assignment rejected)
+    let ship = state.ships.get(&ship_id).unwrap();
+    assert!(
+        ship.task.is_none() || matches!(ship.task.as_ref().unwrap().kind, TaskKind::Idle),
+        "ship should not have transit task"
+    );
+    assert!(events
+        .iter()
+        .any(|e| matches!(&e.event, Event::InsufficientPropellant { .. })));
 }
