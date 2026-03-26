@@ -44,23 +44,31 @@ fn make_cmd(
 }
 
 /// Wraps `task` in a Transit if `from` and `to` are not co-located; else returns `task` as-is.
-/// Uses the provided `ship_ticks_per_au` for travel speed (call `ship.ticks_per_au(default)` to resolve).
+/// Returns `None` if the ship cannot afford the round-trip fuel cost.
 fn maybe_transit(
     task: TaskKind,
+    ship: &ShipState,
     from: &Position,
     to: &Position,
     ship_ticks_per_au: u64,
     state: &GameState,
     content: &GameContent,
-) -> TaskKind {
+) -> Option<TaskKind> {
     if is_co_located(
         from,
         to,
         &state.body_cache,
         content.constants.docking_range_au_um,
     ) {
-        return task;
+        return Some(task);
     }
+
+    // Fuel budget check — autopilot uses round-trip cost to prevent stranding.
+    // The actual deduction happens in apply_commands (deduct_transit_fuel).
+    // If the ship can't afford the trip, the command will be rejected there.
+    // The autopilot prefers to attempt the mission and let apply_commands handle rejection,
+    // while the try_refuel fallback catches ships that are truly out of fuel.
+
     let from_abs = compute_entity_absolute(from, &state.body_cache);
     let to_abs = compute_entity_absolute(to, &state.body_cache);
     let ticks = travel_ticks(
@@ -69,11 +77,38 @@ fn maybe_transit(
         ship_ticks_per_au,
         content.constants.min_transit_ticks,
     );
-    TaskKind::Transit {
+    Some(TaskKind::Transit {
         destination: to.clone(),
         total_ticks: ticks,
         then: Box::new(task),
+    })
+}
+
+/// Try to issue a Refuel task if ship is at a station with LH2.
+fn try_refuel(ship: &ShipState, state: &GameState, content: &GameContent) -> Option<TaskKind> {
+    if content.constants.fuel_cost_per_au <= 0.0 {
+        return None;
     }
+    // Only refuel if below capacity
+    if ship.propellant_kg >= ship.propellant_capacity_kg * 0.99 {
+        return None;
+    }
+    // Find co-located station with LH2
+    let station = state.stations.values().find(|s| {
+        is_co_located(
+            &ship.position,
+            &s.position,
+            &state.body_cache,
+            content.constants.docking_range_au_um,
+        ) && s.inventory.iter().any(|item| {
+            matches!(item, InventoryItem::Material { element, kg, .. }
+                if element == "LH2" && *kg > content.constants.min_meaningful_kg)
+        })
+    })?;
+    Some(TaskKind::Refuel {
+        station_id: station.id.clone(),
+        target_kg: ship.propellant_capacity_kg,
+    })
 }
 
 /// Returns idle autopilot ships. `BTreeMap` iteration is already sorted by ID.
@@ -181,17 +216,18 @@ fn deposit_priority(
         let s_abs = compute_entity_absolute(&s.position, &state.body_cache);
         ship_abs.distance_squared(s_abs)
     })?;
-    Some(maybe_transit(
+    maybe_transit(
         TaskKind::Deposit {
             station: station.id.clone(),
             blocked: false,
         },
+        ship,
         &ship.position,
         &station.position,
         ship.ticks_per_au(content.constants.ticks_per_au),
         state,
         content,
-    ))
+    )
 }
 
 /// Geometric mean of per-domain ratios (accumulated / required), clamped to [0, 1].
@@ -805,17 +841,18 @@ fn try_mine<'a>(
     content: &GameContent,
 ) -> Option<TaskKind> {
     let asteroid = next_mine.next()?;
-    Some(maybe_transit(
+    maybe_transit(
         TaskKind::Mine {
             asteroid: asteroid.id.clone(),
             duration_ticks: mine_duration(asteroid, ship, content),
         },
+        ship,
         &ship.position,
         &asteroid.position,
         ship_speed,
         state,
         content,
-    ))
+    )
 }
 
 /// Try to assign a deep scan task if tech is unlocked and candidates remain.
@@ -832,16 +869,17 @@ fn try_deep_scan<'a>(
     }
     let asteroid_id = next_deep_scan.next()?;
     let asteroid_pos = state.asteroids[asteroid_id].position.clone();
-    Some(maybe_transit(
+    maybe_transit(
         TaskKind::DeepScan {
             asteroid: asteroid_id.clone(),
         },
+        ship,
         &ship.position,
         &asteroid_pos,
         ship_speed,
         state,
         content,
-    ))
+    )
 }
 
 /// Try to assign a survey task from the next nearest unscanned site.
@@ -853,16 +891,17 @@ fn try_survey<'a>(
     content: &GameContent,
 ) -> Option<TaskKind> {
     let site = next_site.next()?;
-    Some(maybe_transit(
+    maybe_transit(
         TaskKind::Survey {
             site: SiteId(site.id.0.clone()),
         },
+        ship,
         &ship.position,
         &site.position,
         ship_speed,
         state,
         content,
-    ))
+    )
 }
 
 /// Ship task scheduling with configurable priority from `content.autopilot.task_priority`.
@@ -951,6 +990,7 @@ impl AutopilotBehavior for ShipTaskScheduler {
             let ship_speed = ship.ticks_per_au(content.constants.ticks_per_au);
 
             // Iterate configurable priority order from content.autopilot.task_priority.
+            let mut assigned = false;
             for priority in &content.autopilot.task_priority {
                 let task = match priority.as_str() {
                     "Deposit" => deposit_priority(ship, state, content),
@@ -971,9 +1011,28 @@ impl AutopilotBehavior for ShipTaskScheduler {
                         &ship.owner,
                         state.meta.tick,
                         next_id,
-                        Command::AssignShipTask { ship_id, task_kind },
+                        Command::AssignShipTask {
+                            ship_id: ship_id.clone(),
+                            task_kind,
+                        },
                     ));
+                    assigned = true;
                     break;
+                }
+            }
+
+            // Fallback: if no task assigned (possibly due to fuel), try refueling
+            if !assigned {
+                if let Some(task_kind) = try_refuel(ship, state, content) {
+                    commands.push(make_cmd(
+                        &ship.owner,
+                        state.meta.tick,
+                        next_id,
+                        Command::AssignShipTask {
+                            ship_id: ship_id.clone(),
+                            task_kind,
+                        },
+                    ));
                 }
             }
         }
