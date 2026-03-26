@@ -4,6 +4,7 @@ use super::*;
 #[allow(clippy::too_many_lines)]
 fn transit_moves_ship_and_starts_next_task() {
     let mut content = test_content();
+    content.constants.fuel_cost_per_au = 0.0; // disable fuel for legacy node-based test
     let node_a = NodeId("node_a".to_string());
     let node_b = NodeId("node_b".to_string());
     content.solar_system = SolarSystemDef {
@@ -109,6 +110,7 @@ fn transit_moves_ship_and_starts_next_task() {
         },
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
+        propellant_consumed_total: 0.0,
         body_cache: AHashMap::default(),
     };
 
@@ -200,6 +202,7 @@ fn transit_moves_ship_and_starts_next_task() {
 #[test]
 fn transit_generates_transit_data_with_diminishing_returns() {
     let mut content = test_content();
+    content.constants.fuel_cost_per_au = 0.0; // disable fuel for legacy node-based test
     let node_a = NodeId("node_a".to_string());
     let node_b = NodeId("node_b".to_string());
     content.solar_system = SolarSystemDef {
@@ -298,6 +301,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
         },
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
+        propellant_consumed_total: 0.0,
         body_cache: AHashMap::default(),
     };
 

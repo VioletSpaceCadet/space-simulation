@@ -598,6 +598,7 @@ pub fn base_state(content: &GameContent) -> GameState {
         },
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
+        propellant_consumed_total: 0.0,
         body_cache: crate::build_body_cache(&content.solar_system.bodies),
     }
 }

@@ -284,6 +284,15 @@ pub enum Event {
     SimEventExpired {
         event_def_id: crate::sim_events::EventDefId,
     },
+    PropellantConsumed {
+        ship_id: ShipId,
+        kg_consumed: f32,
+        destination: crate::Position,
+    },
+    InsufficientPropellant {
+        ship_id: ShipId,
+        destination: crate::Position,
+    },
     RefuelComplete {
         ship_id: ShipId,
         station_id: StationId,

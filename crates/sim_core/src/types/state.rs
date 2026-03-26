@@ -41,6 +41,9 @@ pub struct GameState {
     /// Sim events system runtime state.
     #[serde(default)]
     pub events: crate::sim_events::SimEventState,
+    /// Cumulative propellant consumed (kg) since simulation start.
+    #[serde(default)]
+    pub propellant_consumed_total: f64,
     /// Cached absolute positions for orbital bodies. Not serialized -- recomputed on load.
     #[serde(skip, default)]
     pub body_cache: AHashMap<BodyId, crate::spatial::BodyCache>,

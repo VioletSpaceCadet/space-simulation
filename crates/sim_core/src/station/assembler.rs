@@ -682,6 +682,7 @@ mod assembler_component_tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
+            propellant_consumed_total: 0.0,
             body_cache: AHashMap::default(),
         }
     }
@@ -1035,6 +1036,7 @@ mod assembler_component_tests {
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
+            propellant_consumed_total: 0.0,
             body_cache: AHashMap::default(),
         }
     }
