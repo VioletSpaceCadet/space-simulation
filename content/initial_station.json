@@ -41,6 +41,11 @@
       "element": "H2O",
       "kg": 5000.0,
       "quality": 1.0
+    },
+    {
+      "element": "LH2",
+      "kg": 10000.0,
+      "quality": 1.0
     }
   ],
   "components": [
