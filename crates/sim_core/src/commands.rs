@@ -341,6 +341,26 @@ pub(crate) fn handle_import(
         return false;
     }
 
+    // Crew import: add to station crew roster (no inventory/cargo involved)
+    if let crate::TradeItemSpec::Crew { role, count } = item_spec {
+        state.balance -= cost;
+        let Some(station) = state.stations.get_mut(station_id) else {
+            return false;
+        };
+        *station.crew.entry(role.clone()).or_insert(0) += count;
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::ItemImported {
+                station_id: station_id.clone(),
+                item_spec: item_spec.clone(),
+                cost,
+                balance_after: state.balance,
+            },
+        ));
+        return true;
+    }
+
     // Check cargo capacity
     let new_items = trade::create_inventory_items(item_spec, rng);
     let new_volume = inventory_volume_m3(&new_items, content);

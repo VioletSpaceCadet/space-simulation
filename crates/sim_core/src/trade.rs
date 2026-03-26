@@ -68,6 +68,10 @@ pub fn create_inventory_items(item_spec: &TradeItemSpec, rng: &mut impl Rng) -> 
                 module_def_id: module_def_id.clone(),
             }]
         }
+        TradeItemSpec::Crew { .. } => {
+            // Crew import doesn't create inventory items — handled directly on station.crew
+            vec![]
+        }
     }
 }
 
@@ -106,6 +110,7 @@ pub fn has_enough_for_export(inventory: &[InventoryItem], item_spec: &TradeItemS
         TradeItemSpec::Module { module_def_id } => inventory.iter().any(|item| {
             matches!(item, InventoryItem::Module { module_def_id: def_id, .. } if def_id == module_def_id)
         }),
+        TradeItemSpec::Crew { .. } => false, // crew export not supported
     }
 }
 
@@ -181,6 +186,7 @@ pub fn remove_inventory_items(
                 false
             }
         }
+        TradeItemSpec::Crew { .. } => false, // crew export not supported
     }
 }
 
