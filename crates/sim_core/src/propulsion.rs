@@ -1,7 +1,7 @@
 //! Propellant consumption calculations for ship transit.
 //!
 //! Uses a linear mass-proportional formula:
-//!   fuel_cost_kg = distance_au * fuel_cost_per_au * (total_mass_kg / reference_mass_kg)
+//!   `fuel_cost_kg = distance_au * fuel_cost_per_au * (total_mass_kg / reference_mass_kg)`
 
 use std::collections::HashMap;
 
