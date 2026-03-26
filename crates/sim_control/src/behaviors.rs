@@ -44,31 +44,22 @@ fn make_cmd(
 }
 
 /// Wraps `task` in a Transit if `from` and `to` are not co-located; else returns `task` as-is.
-/// Returns `None` if the ship cannot afford the round-trip fuel cost.
 fn maybe_transit(
     task: TaskKind,
-    ship: &ShipState,
     from: &Position,
     to: &Position,
     ship_ticks_per_au: u64,
     state: &GameState,
     content: &GameContent,
-) -> Option<TaskKind> {
+) -> TaskKind {
     if is_co_located(
         from,
         to,
         &state.body_cache,
         content.constants.docking_range_au_um,
     ) {
-        return Some(task);
+        return task;
     }
-
-    // Fuel budget check — autopilot uses round-trip cost to prevent stranding.
-    // The actual deduction happens in apply_commands (deduct_transit_fuel).
-    // If the ship can't afford the trip, the command will be rejected there.
-    // The autopilot prefers to attempt the mission and let apply_commands handle rejection,
-    // while the try_refuel fallback catches ships that are truly out of fuel.
-
     let from_abs = compute_entity_absolute(from, &state.body_cache);
     let to_abs = compute_entity_absolute(to, &state.body_cache);
     let ticks = travel_ticks(
@@ -77,11 +68,32 @@ fn maybe_transit(
         ship_ticks_per_au,
         content.constants.min_transit_ticks,
     );
-    Some(TaskKind::Transit {
+    TaskKind::Transit {
         destination: to.clone(),
         total_ticks: ticks,
         then: Box::new(task),
-    })
+    }
+}
+
+fn maybe_assign_refuel(
+    ship: &ShipState,
+    ship_id: &ShipId,
+    state: &GameState,
+    content: &GameContent,
+    next_id: &mut u64,
+    commands: &mut Vec<CommandEnvelope>,
+) {
+    if let Some(task_kind) = try_refuel(ship, state, content) {
+        commands.push(make_cmd(
+            &ship.owner,
+            state.meta.tick,
+            next_id,
+            Command::AssignShipTask {
+                ship_id: ship_id.clone(),
+                task_kind,
+            },
+        ));
+    }
 }
 
 /// Try to issue a Refuel task if ship is at a station with LH2.
@@ -216,18 +228,17 @@ fn deposit_priority(
         let s_abs = compute_entity_absolute(&s.position, &state.body_cache);
         ship_abs.distance_squared(s_abs)
     })?;
-    maybe_transit(
+    Some(maybe_transit(
         TaskKind::Deposit {
             station: station.id.clone(),
             blocked: false,
         },
-        ship,
         &ship.position,
         &station.position,
         ship.ticks_per_au(content.constants.ticks_per_au),
         state,
         content,
-    )
+    ))
 }
 
 /// Geometric mean of per-domain ratios (accumulated / required), clamped to [0, 1].
@@ -841,18 +852,17 @@ fn try_mine<'a>(
     content: &GameContent,
 ) -> Option<TaskKind> {
     let asteroid = next_mine.next()?;
-    maybe_transit(
+    Some(maybe_transit(
         TaskKind::Mine {
             asteroid: asteroid.id.clone(),
             duration_ticks: mine_duration(asteroid, ship, content),
         },
-        ship,
         &ship.position,
         &asteroid.position,
         ship_speed,
         state,
         content,
-    )
+    ))
 }
 
 /// Try to assign a deep scan task if tech is unlocked and candidates remain.
@@ -869,17 +879,16 @@ fn try_deep_scan<'a>(
     }
     let asteroid_id = next_deep_scan.next()?;
     let asteroid_pos = state.asteroids[asteroid_id].position.clone();
-    maybe_transit(
+    Some(maybe_transit(
         TaskKind::DeepScan {
             asteroid: asteroid_id.clone(),
         },
-        ship,
         &ship.position,
         &asteroid_pos,
         ship_speed,
         state,
         content,
-    )
+    ))
 }
 
 /// Try to assign a survey task from the next nearest unscanned site.
@@ -891,17 +900,16 @@ fn try_survey<'a>(
     content: &GameContent,
 ) -> Option<TaskKind> {
     let site = next_site.next()?;
-    maybe_transit(
+    Some(maybe_transit(
         TaskKind::Survey {
             site: SiteId(site.id.0.clone()),
         },
-        ship,
         &ship.position,
         &site.position,
         ship_speed,
         state,
         content,
-    )
+    ))
 }
 
 /// Ship task scheduling with configurable priority from `content.autopilot.task_priority`.
@@ -1021,19 +1029,9 @@ impl AutopilotBehavior for ShipTaskScheduler {
                 }
             }
 
-            // Fallback: if no task assigned (possibly due to fuel), try refueling
+            // Fallback: if no task assigned, try refueling at co-located station
             if !assigned {
-                if let Some(task_kind) = try_refuel(ship, state, content) {
-                    commands.push(make_cmd(
-                        &ship.owner,
-                        state.meta.tick,
-                        next_id,
-                        Command::AssignShipTask {
-                            ship_id: ship_id.clone(),
-                            task_kind,
-                        },
-                    ));
-                }
+                maybe_assign_refuel(ship, &ship_id, state, content, next_id, &mut commands);
             }
         }
 
