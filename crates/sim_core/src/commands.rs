@@ -461,7 +461,8 @@ pub(crate) fn handle_jettison_slag(
     true
 }
 
-/// Set the manufacturing priority on a module (processor or assembler).
+/// Set the priority on a module. Controls inventory consumption order, crew
+/// assignment, and power allocation within each behavior class.
 pub(crate) fn handle_set_module_priority(
     state: &mut GameState,
     station_id: &crate::StationId,

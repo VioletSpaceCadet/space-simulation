@@ -89,7 +89,8 @@ pub struct ModuleState {
     #[serde(skip, default)]
     pub power_stalled: bool,
     /// Module priority. Higher values run first within each behavior class.
-    /// Used to control which modules consume shared inventory/crew first. 0 = default.
+    /// Used to control which modules consume shared inventory first, crew assignment,
+    /// and power allocation. 0 = default.
     #[serde(default, alias = "manufacturing_priority")]
     pub module_priority: u32,
 }
