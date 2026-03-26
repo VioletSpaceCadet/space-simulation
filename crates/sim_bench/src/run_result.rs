@@ -192,7 +192,7 @@ mod tests {
             fleet_mining: 1,
             fleet_transiting: 1,
             fleet_surveying: 0,
-            fleet_depositing: 0,
+            fleet_depositing: 0, fleet_refueling: 0,
             scan_sites_remaining: 4,
             asteroids_discovered: 6,
             asteroids_depleted: 2,
