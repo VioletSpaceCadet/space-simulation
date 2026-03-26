@@ -34,6 +34,7 @@ fn full_research_lifecycle() {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -67,7 +68,7 @@ fn full_research_lifecycle() {
             }),
             wear: WearState::default(),
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
             thermal: None,
         });
 
@@ -113,6 +114,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -139,7 +141,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
             }),
             wear: WearState::default(),
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
             thermal: None,
         });
 

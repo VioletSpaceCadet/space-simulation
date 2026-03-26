@@ -89,6 +89,7 @@ fn production_like_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -115,6 +116,7 @@ fn production_like_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -141,6 +143,7 @@ fn production_like_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -167,6 +170,7 @@ fn production_like_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -219,6 +223,7 @@ fn production_like_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -263,6 +268,7 @@ fn production_like_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -289,6 +295,7 @@ fn production_like_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -494,7 +501,7 @@ fn sensor_data_generation_rate_at_mpt_60() {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: None,
     });
 
@@ -589,6 +596,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec!["shipyard".to_string()],
+            crew_requirement: Default::default(),
         },
     );
 

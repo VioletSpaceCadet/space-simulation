@@ -229,14 +229,12 @@ fn apply_commands(
             } => {
                 commands::handle_select_recipe(state, content, station_id, module_id, recipe_id);
             }
-            Command::SetManufacturingPriority {
+            Command::SetModulePriority {
                 station_id,
                 module_id,
                 priority,
             } => {
-                commands::handle_set_manufacturing_priority(
-                    state, station_id, module_id, *priority,
-                );
+                commands::handle_set_module_priority(state, station_id, module_id, *priority);
             }
             Command::FitShipModule {
                 ship_id,

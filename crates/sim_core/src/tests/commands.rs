@@ -223,7 +223,7 @@ fn test_select_recipe_updates_processor_state() {
         wear: WearState::default(),
         thermal: None,
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
     });
 
     // SelectRecipe with a valid recipe ID.
@@ -275,7 +275,7 @@ fn test_select_recipe_out_of_bounds_rejected() {
         wear: WearState::default(),
         thermal: None,
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
     });
 
     // SelectRecipe with a recipe ID not in this module's list (should be rejected).

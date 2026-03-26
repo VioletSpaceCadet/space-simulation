@@ -145,6 +145,7 @@ fn competing_demand_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -168,6 +169,7 @@ fn competing_demand_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -191,6 +193,7 @@ fn competing_demand_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -217,7 +220,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: None,
     });
 
@@ -235,7 +238,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 5,
+        module_priority: 5,
         thermal: None,
     });
 
@@ -253,7 +256,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 3,
+        module_priority: 3,
         thermal: None,
     });
 
@@ -345,9 +348,9 @@ fn competing_demand_reversed_priority() {
     let station = state.stations.get_mut(&station_id).unwrap();
     for module in &mut station.modules {
         if module.def_id == "module_basic_assembler" {
-            module.manufacturing_priority = 5;
+            module.module_priority = 5;
         } else if module.def_id == "module_structural_assembler" {
-            module.manufacturing_priority = 3;
+            module.module_priority = 3;
         }
     }
 

@@ -21,8 +21,8 @@ pub(super) fn tick_assembler_modules(
         scratch.sort_by(|&a, &b| {
             let ma = &station.modules[a];
             let mb = &station.modules[b];
-            mb.manufacturing_priority
-                .cmp(&ma.manufacturing_priority)
+            mb.module_priority
+                .cmp(&ma.module_priority)
                 .then_with(|| ma.id.0.cmp(&mb.id.0))
         });
     }
@@ -601,6 +601,7 @@ mod assembler_component_tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content
@@ -651,7 +652,7 @@ mod assembler_component_tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
-                        manufacturing_priority: 0,
+                        module_priority: 0,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
@@ -953,6 +954,7 @@ mod assembler_component_tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content
@@ -1003,7 +1005,7 @@ mod assembler_component_tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
-                        manufacturing_priority: 0,
+                        module_priority: 0,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),

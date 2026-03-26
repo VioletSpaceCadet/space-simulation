@@ -14,7 +14,7 @@ fn thermal_state_none_round_trip() {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: None,
     };
 
@@ -42,7 +42,7 @@ fn thermal_state_some_round_trip() {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: Some(thermal.clone()),
     };
 

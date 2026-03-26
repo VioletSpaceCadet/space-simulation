@@ -69,6 +69,7 @@ pub enum ModifierOp {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModifierSource {
+    Crew(crate::CrewRole),
     Environment,
     Equipment(String),
     Event(String),

@@ -101,7 +101,7 @@ pub(crate) fn handle_install_module(
         wear: crate::WearState::default(),
         thermal,
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
     });
     station.rebuild_module_index(content);
     station.invalidate_power_cache();
@@ -462,7 +462,7 @@ pub(crate) fn handle_jettison_slag(
 }
 
 /// Set the manufacturing priority on a module (processor or assembler).
-pub(crate) fn handle_set_manufacturing_priority(
+pub(crate) fn handle_set_module_priority(
     state: &mut GameState,
     station_id: &crate::StationId,
     module_id: &crate::ModuleInstanceId,
@@ -474,7 +474,7 @@ pub(crate) fn handle_set_manufacturing_priority(
     let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
         return false;
     };
-    module.manufacturing_priority = priority;
+    module.module_priority = priority;
     true
 }
 
@@ -787,6 +787,7 @@ mod tests {
                 )],
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content
@@ -1000,6 +1001,7 @@ mod tests {
                 )],
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
 
@@ -1099,5 +1101,72 @@ mod tests {
         recompute_ship_stats(ship, &content);
         // 50 * 1.3 = 65
         assert!((ship.cargo_capacity_m3 - 65.0).abs() < 0.1);
+    }
+
+    // -- Mass helper tests --
+
+    #[test]
+    fn dry_mass_hull_only() {
+        let content = content_with_hull();
+        let state = base_state(&content);
+        let ship = state.ships.values().next().unwrap();
+        // Hull mass_kg = 5000, no fitted modules
+        assert!((ship.dry_mass_kg(&content) - 5000.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn dry_mass_with_fitted_module() {
+        let content = content_with_hull();
+        let mut state = base_state(&content);
+        let ship_id = crate::ShipId("ship_0001".to_string());
+        let ship = state.ships.get_mut(&ship_id).unwrap();
+        ship.fitted_modules.push(FittedModule {
+            slot_index: 0,
+            module_def_id: ModuleDefId("module_cargo_expander".to_string()),
+        });
+        // Hull 5000 + cargo_expander 500 = 5500
+        assert!((ship.dry_mass_kg(&content) - 5500.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn total_mass_includes_propellant_and_cargo() {
+        let content = content_with_hull();
+        let mut state = base_state(&content);
+        let ship_id = crate::ShipId("ship_0001".to_string());
+        let ship = state.ships.get_mut(&ship_id).unwrap();
+        ship.propellant_kg = 8000.0;
+        ship.inventory.push(InventoryItem::Material {
+            element: "Fe".to_string(),
+            kg: 2000.0,
+            quality: 1.0,
+            thermal: None,
+        });
+        // dry=5000 + propellant=8000 + cargo=2000 = 15000
+        assert!((ship.total_mass_kg(&content) - 15000.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn inventory_mass_kg_sums_correctly() {
+        let inventory = vec![
+            InventoryItem::Material {
+                element: "Fe".to_string(),
+                kg: 1500.0,
+                quality: 1.0,
+                thermal: None,
+            },
+            InventoryItem::Ore {
+                lot_id: crate::LotId("lot1".to_string()),
+                asteroid_id: crate::AsteroidId("ast1".to_string()),
+                kg: 500.0,
+                composition: std::collections::HashMap::new(),
+            },
+            InventoryItem::Component {
+                component_id: crate::ComponentId("repair_kit".to_string()),
+                count: 5,
+                quality: 1.0,
+            },
+        ];
+        // Fe 1500 + Ore 500 + Component 0 = 2000
+        assert!((crate::tasks::inventory_mass_kg(&inventory) - 2000.0).abs() < 0.01);
     }
 }

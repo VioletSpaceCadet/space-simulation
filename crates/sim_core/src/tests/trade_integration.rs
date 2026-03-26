@@ -123,6 +123,7 @@ fn economy_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     )]
     .into_iter()

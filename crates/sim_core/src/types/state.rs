@@ -88,10 +88,10 @@ pub struct ModuleState {
     /// Set each tick by power budget computation. Stalled modules skip their tick.
     #[serde(skip, default)]
     pub power_stalled: bool,
-    /// Manufacturing priority. Higher values run first within each behavior class.
-    /// Used to control which modules consume shared inventory first. 0 = default.
-    #[serde(default)]
-    pub manufacturing_priority: u32,
+    /// Module priority. Higher values run first within each behavior class.
+    /// Used to control which modules consume shared inventory/crew first. 0 = default.
+    #[serde(default, alias = "manufacturing_priority")]
+    pub module_priority: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -253,6 +253,25 @@ impl ShipState {
     /// Returns this ship's travel speed, falling back to the global default.
     pub fn ticks_per_au(&self, global_default: u64) -> u64 {
         self.speed_ticks_per_au.unwrap_or(global_default)
+    }
+
+    /// Ship mass without propellant or cargo: hull + fitted module masses.
+    pub fn dry_mass_kg(&self, content: &GameContent) -> f32 {
+        let hull_mass = content.hulls.get(&self.hull_id).map_or(0.0, |h| h.mass_kg);
+        let module_mass: f32 = self
+            .fitted_modules
+            .iter()
+            .filter_map(|fm| content.module_defs.get(fm.module_def_id.0.as_str()))
+            .map(|def| def.mass_kg)
+            .sum();
+        hull_mass + module_mass
+    }
+
+    /// Total ship mass: dry mass + propellant + cargo.
+    pub fn total_mass_kg(&self, content: &GameContent) -> f32 {
+        self.dry_mass_kg(content)
+            + self.propellant_kg
+            + crate::tasks::inventory_mass_kg(&self.inventory)
     }
 }
 

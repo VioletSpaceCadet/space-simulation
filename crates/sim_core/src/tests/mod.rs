@@ -160,6 +160,7 @@ fn refinery_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     )]
     .into_iter()
@@ -233,6 +234,7 @@ fn assembler_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     )]
     .into_iter()
@@ -296,6 +298,7 @@ fn maintenance_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
     content

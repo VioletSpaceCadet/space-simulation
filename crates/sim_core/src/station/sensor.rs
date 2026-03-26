@@ -91,6 +91,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content
@@ -125,7 +126,7 @@ mod tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
-                        manufacturing_priority: 0,
+                        module_priority: 0,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),

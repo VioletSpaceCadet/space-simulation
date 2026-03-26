@@ -22,8 +22,8 @@ pub(super) fn tick_station_modules(
         scratch.sort_by(|&a, &b| {
             let ma = &station.modules[a];
             let mb = &station.modules[b];
-            mb.manufacturing_priority
-                .cmp(&ma.manufacturing_priority)
+            mb.module_priority
+                .cmp(&ma.module_priority)
                 .then_with(|| ma.id.0.cmp(&mb.id.0))
         });
     }
@@ -821,6 +821,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content
@@ -867,7 +868,7 @@ mod tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
-                        manufacturing_priority: 0,
+                        module_priority: 0,
                         thermal: Some(ThermalState {
                             temp_mk,
                             thermal_group: Some("smelting".to_string()),
@@ -1193,6 +1194,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content
@@ -1244,7 +1246,7 @@ mod tests {
                             wear: crate::WearState::default(),
                             thermal: None,
                             power_stalled: false,
-                            manufacturing_priority: 0,
+                            module_priority: 0,
                         },
                         // High-priority processor
                         ModuleState {
@@ -1260,7 +1262,7 @@ mod tests {
                             wear: crate::WearState::default(),
                             thermal: None,
                             power_stalled: false,
-                            manufacturing_priority: 10,
+                            module_priority: 10,
                         },
                     ],
                     modifiers: crate::modifiers::ModifierSet::default(),
@@ -1379,7 +1381,7 @@ mod tests {
                         wear: crate::WearState::default(),
                         thermal: None,
                         power_stalled: false,
-                        manufacturing_priority: 0,
+                        module_priority: 0,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
@@ -1502,6 +1504,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
 
@@ -1545,7 +1548,7 @@ mod tests {
                         wear: crate::WearState::default(),
                         thermal: None,
                         power_stalled: false,
-                        manufacturing_priority: 0,
+                        module_priority: 0,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),
@@ -1661,6 +1664,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
 
@@ -1704,7 +1708,7 @@ mod tests {
                         wear: crate::WearState::default(),
                         thermal: None,
                         power_stalled: false,
-                        manufacturing_priority: 0,
+                        module_priority: 0,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
                     power: PowerState::default(),

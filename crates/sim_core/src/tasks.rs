@@ -137,6 +137,12 @@ pub fn inventory_volume_m3(inventory: &[InventoryItem], content: &GameContent) -
         .sum()
 }
 
+/// Total mass (kg) of inventory items (ore, slag, materials).
+/// Components and modules are treated as massless for propulsion calculations.
+pub fn inventory_mass_kg(inventory: &[InventoryItem]) -> f32 {
+    inventory.iter().map(InventoryItem::mass_kg).sum()
+}
+
 /// Pre-compute how many ticks a mining run will take.
 ///
 /// Stops when the cargo hold fills OR the asteroid is depleted, whichever comes first.
