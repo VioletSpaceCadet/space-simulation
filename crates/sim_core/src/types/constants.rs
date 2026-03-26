@@ -124,6 +124,13 @@ pub struct Constants {
     /// Maximum number of fired events to keep in history ring buffer.
     #[serde(default = "default_event_history_capacity")]
     pub event_history_capacity: usize,
+    // Propulsion system
+    /// Fuel consumed (kg) per AU of travel for a reference-mass ship.
+    #[serde(default = "default_fuel_cost_per_au")]
+    pub fuel_cost_per_au: f32,
+    /// Reference ship mass (kg) for fuel cost scaling. Ships heavier than this burn more.
+    #[serde(default = "default_reference_mass_kg")]
+    pub reference_mass_kg: f32,
     // Bottleneck detection (used by daemon analytics)
     /// Station storage usage fraction above which bottleneck detection flags `StorageFull`.
     #[serde(default = "default_bottleneck_storage_threshold_pct")]
@@ -277,6 +284,12 @@ fn default_event_global_cooldown_ticks() -> u64 {
 }
 fn default_event_history_capacity() -> usize {
     100
+}
+fn default_fuel_cost_per_au() -> f32 {
+    500.0 // 500 kg LH2 per AU for a reference-mass ship
+}
+fn default_reference_mass_kg() -> f32 {
+    15_000.0 // reference mass for fuel scaling
 }
 fn default_bottleneck_storage_threshold_pct() -> f32 {
     0.95
