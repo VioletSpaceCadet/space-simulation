@@ -71,7 +71,8 @@ pub enum Command {
         module_id: ModuleInstanceId,
         recipe_id: RecipeId,
     },
-    SetManufacturingPriority {
+    #[serde(alias = "SetManufacturingPriority")]
+    SetModulePriority {
         station_id: StationId,
         module_id: ModuleInstanceId,
         priority: u32,

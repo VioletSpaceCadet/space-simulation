@@ -535,6 +535,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content
@@ -573,7 +574,7 @@ mod tests {
                         }),
                         wear: WearState::default(),
                         power_stalled: false,
-                        manufacturing_priority: 0,
+                        module_priority: 0,
                         thermal: Some(ThermalState {
                             temp_mk,
                             thermal_group: Some("smelting".to_string()),
@@ -752,6 +753,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
 
@@ -772,7 +774,7 @@ mod tests {
             }),
             wear: WearState::default(),
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
             thermal: Some(ThermalState {
                 temp_mk: 600_000,
                 thermal_group: Some("reactor".to_string()),
@@ -825,6 +827,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         let station = state.stations.get_mut(station_id).unwrap();
@@ -835,7 +838,7 @@ mod tests {
             kind_state: ModuleKindState::Radiator(RadiatorState::default()),
             wear: WearState { wear },
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
             thermal: Some(ThermalState {
                 temp_mk: DEFAULT_AMBIENT_TEMP_MK,
                 thermal_group: Some("smelting".to_string()),
@@ -1346,6 +1349,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content

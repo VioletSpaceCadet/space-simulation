@@ -35,12 +35,12 @@ pub use spatial::{
     random_radius_in_band, travel_ticks, AbsolutePos, AngleMilliDeg, BodyCache, EntityCache,
     Position, RadiusAuMicro, ResourceClass, FULL_CIRCLE, METERS_PER_AU, METERS_PER_MICRO_AU,
 };
-pub use tasks::{inventory_volume_m3, mine_duration};
+pub use tasks::{inventory_mass_kg, inventory_volume_m3, mine_duration};
 // -- types: ID newtypes --
 pub use types::{
-    AsteroidId, BodyId, CommandId, ComponentId, EventId, HullId, LotId, ModuleDefId,
-    ModuleInstanceId, ModuleItemId, NodeId, PrincipalId, RecipeId, ShipId, SiteId, SlotType,
-    StationId, TechId,
+    AsteroidId, BodyId, CommandId, ComponentId, CrewRole, EventId, HullId, LeaderId, LotId,
+    ModuleDefId, ModuleInstanceId, ModuleItemId, NodeId, PrincipalId, RecipeId, ShipId, SiteId,
+    SlotType, StationId, TechId,
 };
 // -- types: type aliases & constants --
 pub use types::{
@@ -70,9 +70,10 @@ pub use types::{MaterialThermalProps, ThermalState};
 // -- types: content definitions --
 pub use types::{
     AlertRuleDef, AlertRuleType, AsteroidTemplateDef, AutopilotConfig, BodyType, BoiloffCurveDef,
-    ComponentDef, DeepScanTargetConfig, ElementDef, ExportComponentConfig, ExportElementConfig,
-    GameContent, HullDef, InitialComponent, InitialMaterial, InitialStationDef, NodeDef,
-    OrbitalBodyDef, SlotDef, SolarSystemDef, TechDef, TechEffect, ThermalDef, ZoneDef,
+    ComponentDef, CrewRoleDef, DeepScanTargetConfig, ElementDef, ExportComponentConfig,
+    ExportElementConfig, GameContent, HullDef, InitialComponent, InitialMaterial,
+    InitialStationDef, NodeDef, OrbitalBodyDef, SlotDef, SolarSystemDef, TechDef, TechEffect,
+    ThermalDef, ZoneDef,
 };
 // -- types: module & recipe definitions --
 pub use types::{

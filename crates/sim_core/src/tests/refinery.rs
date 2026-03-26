@@ -79,7 +79,7 @@ fn test_refinery_skips_when_below_threshold() {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: None,
     });
     station.inventory.push(InventoryItem::Ore {

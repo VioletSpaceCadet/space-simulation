@@ -93,6 +93,7 @@ mod tests {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: roles.into_iter().map(String::from).collect(),
+            crew_requirement: Default::default(),
         };
         content.module_defs.insert(
             "module_electrolysis_unit".to_string(),
@@ -240,7 +241,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
-                manufacturing_priority: 0,
+                module_priority: 0,
                 thermal: None,
             });
 
@@ -282,6 +283,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         let mut state = autopilot_state(&content);
@@ -472,7 +474,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState { wear: 1.0 },
                 power_stalled: false,
-                manufacturing_priority: 0,
+                module_priority: 0,
                 thermal: None,
             });
 
@@ -582,6 +584,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -639,7 +642,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
-                manufacturing_priority: 0,
+                module_priority: 0,
                 thermal: None,
             });
 
@@ -680,7 +683,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
-                manufacturing_priority: 0,
+                module_priority: 0,
                 thermal: None,
             });
 
@@ -734,7 +737,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
-                manufacturing_priority: 0,
+                module_priority: 0,
                 thermal: None,
             });
 
@@ -790,6 +793,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -818,7 +822,7 @@ mod tests {
                 }),
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
-                manufacturing_priority: 0,
+                module_priority: 0,
                 thermal: None,
             });
 
@@ -986,6 +990,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec!["shipyard".to_string()],
+                crew_requirement: Default::default(),
             },
         );
 
@@ -1035,7 +1040,7 @@ mod tests {
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
             thermal: None,
         });
 
@@ -1482,7 +1487,7 @@ mod tests {
             }),
             thermal: None,
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
         });
         // No H2O in inventory → needs_water = true
 
@@ -1690,7 +1695,7 @@ mod tests {
             }),
             thermal: None,
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
         });
         // Add H2O above threshold (500 kg) → should NOT trigger volatile targeting
         station.inventory.push(InventoryItem::Material {
@@ -1783,7 +1788,7 @@ mod tests {
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
             thermal: None,
         });
     }
@@ -1803,7 +1808,7 @@ mod tests {
             }),
             wear: sim_core::WearState::default(),
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
             thermal: None,
         });
     }
@@ -1952,7 +1957,7 @@ mod tests {
             }),
             wear: sim_core::WearState { wear: 1.0 },
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
             thermal: None,
         });
         // LH2 = 0 (below threshold)
@@ -2082,6 +2087,7 @@ mod tests {
                 ship_modifiers: vec![],
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         // Add fitting template
@@ -2171,6 +2177,7 @@ mod tests {
                 ship_modifiers: vec![],
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content.fitting_templates.insert(

@@ -47,7 +47,7 @@ pub fn test_module(def_id: &str, kind_state: ModuleKindState) -> ModuleState {
         wear: WearState::default(),
         thermal: None,
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
     }
 }
 
@@ -266,6 +266,7 @@ pub fn base_content() -> GameContent {
         fitting_templates: BTreeMap::new(),
         initial_station: InitialStationDef::default(),
         autopilot: AutopilotConfig::default(),
+        crew_roles: BTreeMap::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -505,6 +506,7 @@ pub fn minimal_content() -> GameContent {
             deep_scan_targets: vec![],
             ..AutopilotConfig::default()
         },
+        crew_roles: BTreeMap::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -640,6 +642,7 @@ pub fn thermal_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -668,6 +671,7 @@ pub fn thermal_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -692,7 +696,7 @@ fn smelter_module(temp_mk: u32) -> ModuleState {
             ..Default::default()
         }),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
     }
 }
 
@@ -709,7 +713,7 @@ fn radiator_module() -> ModuleState {
             ..Default::default()
         }),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
     }
 }
 

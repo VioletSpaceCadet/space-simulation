@@ -134,7 +134,7 @@ export interface ModuleState {
   kind_state: ModuleKindState
   wear: WearState
   thermal?: ThermalState
-  manufacturing_priority?: number
+  module_priority?: number
 }
 
 export interface Position {

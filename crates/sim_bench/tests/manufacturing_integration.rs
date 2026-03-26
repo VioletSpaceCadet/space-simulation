@@ -224,9 +224,9 @@ fn competing_demand_with_real_content() {
     let station = state.stations.get_mut(&station_id).unwrap();
     for module in &mut station.modules {
         if module.def_id == "module_structural_assembler" {
-            module.manufacturing_priority = 5;
+            module.module_priority = 5;
         } else if module.def_id == "module_basic_assembler" {
-            module.manufacturing_priority = 3;
+            module.module_priority = 3;
             // Select advanced_repair_kit recipe (needs fe_plate + repair_kit)
             if let ModuleKindState::Assembler(ref mut asmb) = module.kind_state {
                 asmb.selected_recipe = Some(RecipeId("recipe_advanced_repair_kit".to_string()));

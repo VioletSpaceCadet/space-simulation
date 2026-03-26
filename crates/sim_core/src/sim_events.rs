@@ -1750,7 +1750,7 @@ mod tests {
             wear: crate::WearState { wear: 0.1 },
             thermal: None,
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
         });
     }
 

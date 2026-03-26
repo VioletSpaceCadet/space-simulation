@@ -920,6 +920,7 @@ mod framework_tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content
@@ -952,7 +953,7 @@ mod framework_tests {
                         kind_state,
                         wear: WearState::default(),
                         power_stalled: false,
-                        manufacturing_priority: 0,
+                        module_priority: 0,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
@@ -1064,6 +1065,7 @@ mod framework_tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         assert!(extract_context(&state, &station_id, 0, &content2).is_none());

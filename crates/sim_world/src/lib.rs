@@ -46,6 +46,7 @@ pub fn validate_content(content: &GameContent) {
     validate_module_recipes(content, &element_ids);
     validate_hull_defs(content);
     validate_autopilot(content, &element_ids);
+    validate_crew_requirements(content);
 }
 
 fn validate_constants(content: &GameContent) {
@@ -458,6 +459,17 @@ fn validate_autopilot(content: &GameContent, element_ids: &HashSet<&str>) {
     }
 }
 
+fn validate_crew_requirements(content: &GameContent) {
+    for (module_id, def) in &content.module_defs {
+        for role in def.crew_requirement.keys() {
+            assert!(
+                content.crew_roles.contains_key(role),
+                "module '{module_id}' crew_requirement references unknown crew role '{role}'"
+            );
+        }
+    }
+}
+
 pub fn validate_state(state: &GameState, content: &GameContent) {
     let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
     for station in state.stations.values() {
@@ -535,6 +547,25 @@ fn load_optional_json<T: serde::de::DeserializeOwned + Default>(
     }
 }
 
+/// Load crew role definitions from `crew_roles.json`.
+/// Returns an empty map if the file is missing.
+fn load_crew_roles(
+    dir: &Path,
+) -> Result<std::collections::BTreeMap<sim_core::CrewRole, sim_core::CrewRoleDef>> {
+    let defs: Vec<sim_core::CrewRoleDef> = load_optional_json(dir, "crew_roles.json")?;
+    let mut seen = std::collections::HashSet::new();
+    for def in &defs {
+        assert!(seen.insert(&def.id), "duplicate crew role id '{}'", def.id);
+        if def.recruitment_cost <= 0.0 {
+            eprintln!(
+                "warning: crew role '{}' has non-positive recruitment_cost ({})",
+                def.id, def.recruitment_cost
+            );
+        }
+    }
+    Ok(defs.into_iter().map(|d| (d.id.clone(), d)).collect())
+}
+
 pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let dir = Path::new(content_dir);
     let constants: Constants = serde_json::from_str(
@@ -593,6 +624,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let initial_station: sim_core::InitialStationDef =
         load_optional_json(dir, "initial_station.json")?;
     let autopilot: sim_core::AutopilotConfig = load_optional_json(dir, "autopilot.json")?;
+    let crew_roles = load_crew_roles(dir)?;
     let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
     )
@@ -625,6 +657,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         fitting_templates,
         initial_station,
         autopilot,
+        crew_roles,
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -1075,6 +1108,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         validate_content(&content);
@@ -1167,6 +1201,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         validate_content(&content);
@@ -1663,6 +1698,7 @@ mod tests {
                 ship_modifiers: vec![],
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         content.fitting_templates.insert(

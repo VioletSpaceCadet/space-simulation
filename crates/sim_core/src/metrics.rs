@@ -1229,6 +1229,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         )]
         .into_iter()
@@ -1255,7 +1256,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
-                manufacturing_priority: 0,
+                module_priority: 0,
                 thermal: None,
             }],
         );
@@ -1405,6 +1406,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         )]
         .into_iter()
@@ -1430,7 +1432,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
-                manufacturing_priority: 0,
+                module_priority: 0,
                 thermal: None,
             }],
         );
@@ -1520,6 +1522,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         )]
         .into_iter()
@@ -1545,7 +1548,7 @@ mod tests {
                     }),
                     wear: crate::WearState { wear: 0.3 },
                     power_stalled: false,
-                    manufacturing_priority: 0,
+                    module_priority: 0,
                     thermal: None,
                 },
                 ModuleState {
@@ -1560,7 +1563,7 @@ mod tests {
                     }),
                     wear: crate::WearState { wear: 0.7 },
                     power_stalled: false,
-                    manufacturing_priority: 0,
+                    module_priority: 0,
                     thermal: None,
                 },
             ],
@@ -1601,6 +1604,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
         let mut state = empty_state();
@@ -1622,7 +1626,7 @@ mod tests {
             kind_state: ModuleKindState::Battery(crate::BatteryState { charge_kwh: 50.0 }),
             wear: crate::WearState::default(),
             power_stalled: false,
-            manufacturing_priority: 0,
+            module_priority: 0,
             thermal: None,
         });
         state.stations.insert(station.id.clone(), station);
@@ -1670,6 +1674,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
 
@@ -1690,7 +1695,7 @@ mod tests {
                     }),
                     wear: crate::WearState::default(),
                     power_stalled: false,
-                    manufacturing_priority: 0,
+                    module_priority: 0,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 1_800_000,
                         thermal_group: None,
@@ -1711,7 +1716,7 @@ mod tests {
                     }),
                     wear: crate::WearState::default(),
                     power_stalled: false,
-                    manufacturing_priority: 0,
+                    module_priority: 0,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 2_400_000,
                         thermal_group: None,
@@ -1732,7 +1737,7 @@ mod tests {
                     }),
                     wear: crate::WearState::default(),
                     power_stalled: false,
-                    manufacturing_priority: 0,
+                    module_priority: 0,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 2_800_000,
                         thermal_group: None,
@@ -1782,6 +1787,7 @@ mod tests {
                 ship_modifiers: Vec::new(),
                 power_stall_priority: None,
                 roles: vec![],
+                crew_requirement: Default::default(),
             },
         );
 
@@ -1800,7 +1806,7 @@ mod tests {
                 }),
                 wear: crate::WearState::default(),
                 power_stalled: false,
-                manufacturing_priority: 0,
+                module_priority: 0,
                 thermal: None,
             }],
         );

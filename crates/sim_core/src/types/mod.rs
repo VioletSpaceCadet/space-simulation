@@ -116,6 +116,8 @@ string_id!(RecipeId);
 string_id!(HullId);
 string_id!(SlotType);
 string_id!(ModuleDefId);
+string_id!(CrewRole);
+string_id!(LeaderId);
 
 // ---------------------------------------------------------------------------
 // Core enums

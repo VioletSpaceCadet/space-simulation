@@ -87,6 +87,7 @@ fn electrolysis_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -108,6 +109,7 @@ fn electrolysis_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -127,7 +129,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         kind_state: ModuleKindState::SolarArray(SolarArrayState::default()),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: None,
     });
 
@@ -144,7 +146,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: None,
     });
 
@@ -489,6 +491,7 @@ fn test_full_chain_ore_to_propellant() {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            crew_requirement: Default::default(),
         },
     );
 
@@ -504,7 +507,7 @@ fn test_full_chain_ore_to_propellant() {
         kind_state: ModuleKindState::SolarArray(SolarArrayState::default()),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: None,
     });
 
@@ -521,7 +524,7 @@ fn test_full_chain_ore_to_propellant() {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: None,
     });
 
@@ -538,7 +541,7 @@ fn test_full_chain_ore_to_propellant() {
         }),
         wear: WearState::default(),
         power_stalled: false,
-        manufacturing_priority: 0,
+        module_priority: 0,
         thermal: None,
     });
 
