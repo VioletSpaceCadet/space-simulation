@@ -14,7 +14,10 @@
         ]
       }
     },
-    "power_stall_priority": 3
+    "power_stall_priority": 3,
+    "crew_requirement": {
+      "operator": 1
+    }
   },
   {
     "id": "module_electrolysis_unit",
@@ -35,7 +38,10 @@
     "roles": [
       "propellant",
       "propellant_support"
-    ]
+    ],
+    "crew_requirement": {
+      "operator": 1
+    }
   },
   {
     "id": "module_heating_unit",
@@ -55,7 +61,10 @@
     "power_stall_priority": 3,
     "roles": [
       "propellant_support"
-    ]
+    ],
+    "crew_requirement": {
+      "operator": 1
+    }
   },
   {
     "id": "module_maintenance_bay",
@@ -72,7 +81,10 @@
         "repair_threshold": 0.1
       }
     },
-    "power_stall_priority": 4
+    "power_stall_priority": 4,
+    "crew_requirement": {
+      "technician": 1
+    }
   },
   {
     "id": "module_basic_assembler",
@@ -94,7 +106,11 @@
         }
       }
     },
-    "power_stall_priority": 2
+    "power_stall_priority": 2,
+    "crew_requirement": {
+      "operator": 1,
+      "technician": 1
+    }
   },
   {
     "id": "module_materials_lab",
@@ -115,7 +131,10 @@
         "research_interval_minutes": 60
       }
     },
-    "power_stall_priority": 1
+    "power_stall_priority": 1,
+    "crew_requirement": {
+      "scientist": 1
+    }
   },
   {
     "id": "module_exploration_lab",
@@ -135,7 +154,10 @@
         "research_interval_minutes": 60
       }
     },
-    "power_stall_priority": 1
+    "power_stall_priority": 1,
+    "crew_requirement": {
+      "scientist": 1
+    }
   },
   {
     "id": "module_engineering_lab",
@@ -155,7 +177,10 @@
         "research_interval_minutes": 60
       }
     },
-    "power_stall_priority": 1
+    "power_stall_priority": 1,
+    "crew_requirement": {
+      "scientist": 1
+    }
   },
   {
     "id": "module_propulsion_lab",
@@ -175,7 +200,10 @@
         "research_interval_minutes": 60
       }
     },
-    "power_stall_priority": 1
+    "power_stall_priority": 1,
+    "crew_requirement": {
+      "scientist": 1
+    }
   },
   {
     "id": "module_sensor_array",
@@ -191,7 +219,10 @@
         "scan_interval_minutes": 120
       }
     },
-    "power_stall_priority": 0
+    "power_stall_priority": 0,
+    "crew_requirement": {
+      "operator": 1
+    }
   },
   {
     "id": "module_shipyard",
@@ -211,7 +242,11 @@
     "power_stall_priority": 2,
     "roles": [
       "shipyard"
-    ]
+    ],
+    "crew_requirement": {
+      "operator": 1,
+      "technician": 1
+    }
   },
   {
     "id": "module_basic_solar_array",
@@ -265,7 +300,10 @@
       "thermal_group": "default",
       "idle_heat_generation_w": 10000.0
     },
-    "power_stall_priority": 3
+    "power_stall_priority": 3,
+    "crew_requirement": {
+      "operator": 1
+    }
   },
   {
     "id": "module_basic_radiator",
@@ -301,7 +339,10 @@
         ]
       }
     },
-    "power_stall_priority": 3
+    "power_stall_priority": 3,
+    "crew_requirement": {
+      "operator": 1
+    }
   },
   {
     "id": "module_structural_assembler",
@@ -323,7 +364,11 @@
         }
       }
     },
-    "power_stall_priority": 2
+    "power_stall_priority": 2,
+    "crew_requirement": {
+      "operator": 1,
+      "technician": 1
+    }
   },
   {
     "id": "module_mining_laser",
@@ -434,5 +479,54 @@
         }
       }
     ]
+  },
+  {
+    "id": "module_automated_refinery",
+    "name": "Automated Refinery",
+    "mass_kg": 10000.0,
+    "volume_m3": 20.0,
+    "power_consumption_per_run": 15.0,
+    "wear_per_run": 0.015,
+    "behavior": {
+      "Processor": {
+        "processing_interval_minutes": 60,
+        "recipes": [
+          "recipe_basic_iron"
+        ]
+      }
+    },
+    "power_stall_priority": 3,
+    "crew_requirement": {},
+    "ship_modifiers": [
+      {
+        "stat": "processing_yield",
+        "op": "pct_multiplicative",
+        "value": 0.85,
+        "source": {
+          "equipment": "module_automated_refinery"
+        }
+      }
+    ]
+  },
+  {
+    "id": "module_automated_assembler",
+    "name": "Automated Assembler",
+    "mass_kg": 10000.0,
+    "volume_m3": 20.0,
+    "power_consumption_per_run": 15.0,
+    "wear_per_run": 0.012,
+    "behavior": {
+      "Assembler": {
+        "assembly_interval_minutes": 540,
+        "recipes": [
+          "recipe_basic_repair_kit"
+        ],
+        "max_stock": {
+          "repair_kit": 50
+        }
+      }
+    },
+    "power_stall_priority": 2,
+    "crew_requirement": {}
   }
 ]

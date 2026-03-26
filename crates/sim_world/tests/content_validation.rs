@@ -365,14 +365,16 @@ fn pricing_keys_reference_valid_items() {
         .map(|c| c.id.as_str())
         .collect();
     let module_ids: HashSet<&str> = content.module_defs.keys().map(String::as_str).collect();
+    let crew_role_ids: HashSet<&str> = content.crew_roles.keys().map(|r| r.0.as_str()).collect();
 
     for pricing_key in content.pricing.items.keys() {
         let is_known = element_ids.contains(pricing_key.as_str())
             || component_ids.contains(pricing_key.as_str())
-            || module_ids.contains(pricing_key.as_str());
+            || module_ids.contains(pricing_key.as_str())
+            || crew_role_ids.contains(pricing_key.as_str());
         assert!(
             is_known,
-            "pricing key '{pricing_key}' does not match any element, component, or module id",
+            "pricing key '{pricing_key}' does not match any element, component, module, or crew role id",
         );
     }
 }

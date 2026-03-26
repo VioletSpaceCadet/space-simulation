@@ -2,37 +2,233 @@
   "import_surcharge_per_kg": 100.0,
   "export_surcharge_per_kg": 50.0,
   "items": {
-    "ore":                          { "base_price_per_unit": 5.0,        "importable": false, "exportable": false, "category": "raw_ore" },
-    "slag":                         { "base_price_per_unit": 1.0,        "importable": false, "exportable": false, "category": "byproduct" },
-    "Fe":                           { "base_price_per_unit": 50.0,       "importable": true,  "exportable": true,  "category": "material" },
-    "Si":                           { "base_price_per_unit": 80.0,       "importable": true,  "exportable": true,  "category": "material" },
-    "He":                           { "base_price_per_unit": 200.0,      "importable": true,  "exportable": true,  "category": "material" },
-    "H2O":                          { "base_price_per_unit": 30.0,       "importable": true,  "exportable": true,  "category": "material" },
-    "LH2":                          { "base_price_per_unit": 500.0,      "importable": true,  "exportable": true,  "category": "material" },
-    "LOX":                          { "base_price_per_unit": 150.0,      "importable": true,  "exportable": true,  "category": "material" },
-    "repair_kit":                   { "base_price_per_unit": 8000.0,     "importable": true,  "exportable": true,  "category": "component" },
-    "thruster":                     { "base_price_per_unit": 1000000.0,  "importable": true,  "exportable": true,  "category": "component" },
-    "module_basic_iron_refinery":   { "base_price_per_unit": 2000000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_basic_assembler":       { "base_price_per_unit": 3000000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_maintenance_bay":       { "base_price_per_unit": 1500000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_exploration_lab":       { "base_price_per_unit": 2500000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_materials_lab":         { "base_price_per_unit": 2500000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_engineering_lab":       { "base_price_per_unit": 2500000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_propulsion_lab":        { "base_price_per_unit": 2500000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_shipyard":              { "base_price_per_unit": 10000000.0, "importable": true,  "exportable": true,  "category": "module" },
-    "module_basic_solar_array":     { "base_price_per_unit": 1800000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_basic_battery":         { "base_price_per_unit": 2200000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_electrolysis_unit":     { "base_price_per_unit": 3500000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "fe_plate":                     { "base_price_per_unit": 500.0,      "importable": false, "exportable": true,  "category": "component" },
-    "structural_beam":              { "base_price_per_unit": 2000.0,     "importable": false, "exportable": true,  "category": "component" },
-    "hull_panel":                   { "base_price_per_unit": 8000.0,     "importable": false, "exportable": true,  "category": "component" },
-    "advanced_repair_kit":          { "base_price_per_unit": 1500.0,     "importable": false, "exportable": true,  "category": "component" },
-    "module_plate_press":           { "base_price_per_unit": 3000000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_structural_assembler":  { "base_price_per_unit": 4000000.0,  "importable": true,  "exportable": true,  "category": "module" },
-    "module_mining_laser":          { "base_price_per_unit": 500000.0,   "importable": true,  "exportable": true,  "category": "equipment" },
-    "module_cargo_expander":        { "base_price_per_unit": 300000.0,   "importable": true,  "exportable": true,  "category": "equipment" },
-    "module_survey_scanner":        { "base_price_per_unit": 400000.0,   "importable": true,  "exportable": true,  "category": "equipment" },
-    "module_basic_engine":          { "base_price_per_unit": 800000.0,   "importable": true,  "exportable": true,  "category": "equipment" },
-    "module_propellant_tank":       { "base_price_per_unit": 350000.0,   "importable": true,  "exportable": true,  "category": "equipment" }
+    "ore": {
+      "base_price_per_unit": 5.0,
+      "importable": false,
+      "exportable": false,
+      "category": "raw_ore"
+    },
+    "slag": {
+      "base_price_per_unit": 1.0,
+      "importable": false,
+      "exportable": false,
+      "category": "byproduct"
+    },
+    "Fe": {
+      "base_price_per_unit": 50.0,
+      "importable": true,
+      "exportable": true,
+      "category": "material"
+    },
+    "Si": {
+      "base_price_per_unit": 80.0,
+      "importable": true,
+      "exportable": true,
+      "category": "material"
+    },
+    "He": {
+      "base_price_per_unit": 200.0,
+      "importable": true,
+      "exportable": true,
+      "category": "material"
+    },
+    "H2O": {
+      "base_price_per_unit": 30.0,
+      "importable": true,
+      "exportable": true,
+      "category": "material"
+    },
+    "LH2": {
+      "base_price_per_unit": 500.0,
+      "importable": true,
+      "exportable": true,
+      "category": "material"
+    },
+    "LOX": {
+      "base_price_per_unit": 150.0,
+      "importable": true,
+      "exportable": true,
+      "category": "material"
+    },
+    "repair_kit": {
+      "base_price_per_unit": 8000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "component"
+    },
+    "thruster": {
+      "base_price_per_unit": 1000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "component"
+    },
+    "module_basic_iron_refinery": {
+      "base_price_per_unit": 2000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_basic_assembler": {
+      "base_price_per_unit": 3000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_maintenance_bay": {
+      "base_price_per_unit": 1500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_exploration_lab": {
+      "base_price_per_unit": 2500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_materials_lab": {
+      "base_price_per_unit": 2500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_engineering_lab": {
+      "base_price_per_unit": 2500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_propulsion_lab": {
+      "base_price_per_unit": 2500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_shipyard": {
+      "base_price_per_unit": 10000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_basic_solar_array": {
+      "base_price_per_unit": 1800000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_basic_battery": {
+      "base_price_per_unit": 2200000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_electrolysis_unit": {
+      "base_price_per_unit": 3500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "fe_plate": {
+      "base_price_per_unit": 500.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "structural_beam": {
+      "base_price_per_unit": 2000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "hull_panel": {
+      "base_price_per_unit": 8000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "advanced_repair_kit": {
+      "base_price_per_unit": 1500.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "module_plate_press": {
+      "base_price_per_unit": 3000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_structural_assembler": {
+      "base_price_per_unit": 4000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_mining_laser": {
+      "base_price_per_unit": 500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "equipment"
+    },
+    "module_cargo_expander": {
+      "base_price_per_unit": 300000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "equipment"
+    },
+    "module_survey_scanner": {
+      "base_price_per_unit": 400000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "equipment"
+    },
+    "module_basic_engine": {
+      "base_price_per_unit": 800000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "equipment"
+    },
+    "module_propellant_tank": {
+      "base_price_per_unit": 350000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "equipment"
+    },
+    "operator": {
+      "base_price_per_unit": 50000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "crew"
+    },
+    "technician": {
+      "base_price_per_unit": 75000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "crew"
+    },
+    "scientist": {
+      "base_price_per_unit": 100000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "crew"
+    },
+    "pilot": {
+      "base_price_per_unit": 80000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "crew"
+    },
+    "module_automated_refinery": {
+      "base_price_per_unit": 4000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_automated_assembler": {
+      "base_price_per_unit": 6000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    }
   }
 }

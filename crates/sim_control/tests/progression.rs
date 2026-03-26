@@ -355,6 +355,15 @@ fn production_like_state(content: &GameContent) -> GameState {
         },
     ];
     state.balance = 1_000_000_000.0;
+    // Add enough crew for all modules
+    station.crew = [
+        (sim_core::CrewRole("operator".to_string()), 10),
+        (sim_core::CrewRole("technician".to_string()), 5),
+        (sim_core::CrewRole("scientist".to_string()), 5),
+        (sim_core::CrewRole("pilot".to_string()), 2),
+    ]
+    .into_iter()
+    .collect();
     state
 }
 
@@ -459,7 +468,11 @@ fn full_tech_tree_unlocks_within_1000_ticks() {
     let mut state = production_like_state(&content);
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-    run_with_autopilot(&content, &mut state, &mut rng, 1000);
+    // First ticks: autopilot installs modules from inventory.
+    run_with_autopilot(&content, &mut state, &mut rng, 3);
+    // Assign crew so modules can operate.
+    sim_world::auto_assign_initial_crew(&mut state, &content);
+    run_with_autopilot(&content, &mut state, &mut rng, 997);
 
     for tech_id in [
         "tech_deep_scan_v1",
@@ -502,7 +515,9 @@ fn sensor_data_generation_rate_at_mpt_60() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
-        assigned_crew: Default::default(),
+        assigned_crew: [(sim_core::CrewRole("operator".to_string()), 1)]
+            .into_iter()
+            .collect(),
         crew_satisfied: true,
         thermal: None,
     });
@@ -678,7 +693,11 @@ fn deep_scan_unlocks_with_production_content() {
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut state = sim_world::build_initial_state(&content, 42, &mut rng);
 
-    run_with_autopilot(&content, &mut state, &mut rng, 1500);
+    // First ticks: autopilot installs modules from inventory.
+    run_with_autopilot(&content, &mut state, &mut rng, 3);
+    // Assign crew so modules can operate.
+    sim_world::auto_assign_initial_crew(&mut state, &content);
+    run_with_autopilot(&content, &mut state, &mut rng, 1497);
 
     assert!(
         state

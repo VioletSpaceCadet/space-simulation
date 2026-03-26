@@ -96,11 +96,22 @@ fn four_tier_manufacturing_chain_with_real_content() {
     // With real content: minutes_per_tick=60.
     // Refinery: 1000kg ore → Fe per tick (60min interval = 1 tick).
     // Plate press: 500kg Fe → 1 fe_plate per tick (60min interval = 1 tick).
+    // First tick: autopilot installs modules from inventory.
     run_with_autopilot(
         &mut state,
         &content,
         &mut rng,
-        30,
+        3,
+        &mut next_cmd_id,
+        &mut autopilot,
+    );
+    // Assign crew to installed modules so they can run.
+    sim_world::auto_assign_initial_crew(&mut state, &content);
+    run_with_autopilot(
+        &mut state,
+        &content,
+        &mut rng,
+        27,
         &mut next_cmd_id,
         &mut autopilot,
     );
@@ -219,6 +230,8 @@ fn competing_demand_with_real_content() {
         &mut next_cmd_id,
         &mut autopilot,
     );
+    // Assign crew to installed modules so they can run.
+    sim_world::auto_assign_initial_crew(&mut state, &content);
 
     // Set priorities: structural_assembler (5) > basic_assembler (3)
     let station = state.stations.get_mut(&station_id).unwrap();

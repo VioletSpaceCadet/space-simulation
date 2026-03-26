@@ -266,6 +266,9 @@ pub struct InitialStationDef {
     /// Starting components (e.g., repair kits).
     #[serde(default)]
     pub components: Vec<InitialComponent>,
+    /// Starting crew roster.
+    #[serde(default)]
+    pub crew: std::collections::BTreeMap<CrewRole, u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
