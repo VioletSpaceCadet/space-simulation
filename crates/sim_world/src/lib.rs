@@ -662,6 +662,40 @@ fn build_initial_inventory(init: &sim_core::InitialStationDef) -> Vec<InventoryI
     inventory
 }
 
+fn build_initial_ship(
+    content: &GameContent,
+    c: &sim_core::Constants,
+    position: &sim_core::Position,
+) -> (ShipId, ShipState) {
+    let ship_id = ShipId("ship_0001".to_string());
+    let owner = PrincipalId("principal_autopilot".to_string());
+    let hull_id = sim_core::HullId("hull_general_purpose".to_string());
+    let fitted_modules = content
+        .fitting_templates
+        .get(&hull_id)
+        .cloned()
+        .unwrap_or_default();
+    let mut ship = ShipState {
+        id: ship_id.clone(),
+        position: position.clone(),
+        owner,
+        inventory: vec![],
+        cargo_capacity_m3: c.ship_cargo_capacity_m3,
+        task: None,
+        speed_ticks_per_au: None,
+        modifiers: sim_core::modifiers::ModifierSet::default(),
+        hull_id: hull_id.clone(),
+        fitted_modules,
+        propellant_kg: 0.0,
+        propellant_capacity_kg: 0.0,
+    };
+    if content.hulls.contains_key(&hull_id) {
+        sim_core::recompute_ship_stats(&mut ship, content);
+        ship.propellant_kg = ship.propellant_capacity_kg;
+    }
+    (ship_id, ship)
+}
+
 pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
     // Station is in Earth orbit zone (~3000 µAU from Earth, i.e. ~450km altitude)
     let earth_orbit_pos = sim_core::Position {
@@ -683,33 +717,9 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         power: PowerState::default(),
         cached_inventory_volume_m3: None,
         module_type_index: sim_core::ModuleTypeIndex::default(),
+        power_budget_cache: sim_core::PowerBudgetCache::default(),
     };
-    let ship_id = ShipId("ship_0001".to_string());
-    let owner = PrincipalId("principal_autopilot".to_string());
-    let hull_id = sim_core::HullId("hull_general_purpose".to_string());
-    let fitted_modules = content
-        .fitting_templates
-        .get(&hull_id)
-        .cloned()
-        .unwrap_or_default();
-    let mut ship = ShipState {
-        id: ship_id.clone(),
-        position: earth_orbit_pos.clone(),
-        owner,
-        inventory: vec![],
-        cargo_capacity_m3: c.ship_cargo_capacity_m3,
-        task: None,
-        speed_ticks_per_au: None,
-        modifiers: sim_core::modifiers::ModifierSet::default(),
-        hull_id: hull_id.clone(),
-        fitted_modules,
-        propellant_kg: 0.0,
-        propellant_capacity_kg: 0.0,
-    };
-    if content.hulls.contains_key(&hull_id) {
-        sim_core::recompute_ship_stats(&mut ship, content);
-        ship.propellant_kg = ship.propellant_capacity_kg;
-    }
+    let (ship_id, ship) = build_initial_ship(content, c, &earth_orbit_pos);
     // Place scan sites in zone bodies using weighted picking + area-sampled positions.
     let zone_bodies: Vec<&sim_core::OrbitalBodyDef> = content
         .solar_system
@@ -1320,6 +1330,7 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: sim_core::ModuleTypeIndex::default(),
+                    power_budget_cache: sim_core::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()

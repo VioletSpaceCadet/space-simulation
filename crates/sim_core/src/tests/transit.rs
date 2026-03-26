@@ -86,6 +86,7 @@ fn transit_moves_ship_and_starts_next_task() {
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),
+                power_budget_cache: crate::PowerBudgetCache::default(),
             },
         )]
         .into_iter()
@@ -274,6 +275,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),
+                power_budget_cache: crate::PowerBudgetCache::default(),
             },
         )]
         .into_iter()

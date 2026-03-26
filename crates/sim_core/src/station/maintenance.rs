@@ -113,6 +113,7 @@ fn execute(
         // Re-enable module if it was auto-disabled due to wear
         if !target_module.enabled && wear_after < 1.0 {
             target_module.enabled = true;
+            station.invalidate_power_cache();
         }
 
         let kits_remaining: u32 = station

@@ -232,29 +232,14 @@ fn apply_battery_buffering(
     (discharge_kw, charge_kw, stored_kwh)
 }
 
-/// Compute the power budget for a station, store it in `PowerState`, and
-/// mark modules as `power_stalled` when there is a deficit.
-///
-/// Generated power = sum of all enabled solar arrays:
-///   `base_output_kw` * `solar_intensity` * `wear_efficiency`
-///
-/// Consumed power = sum of `power_consumption_per_run` for all enabled modules.
-///
-/// Batteries buffer power: surplus charges them, deficit discharges them.
-/// Wear reduces effective battery capacity.
-/// Modules are only stalled when batteries cannot cover the remaining deficit.
-#[allow(clippy::too_many_lines)]
-fn compute_power_budget(
-    state: &mut GameState,
-    station_id: &StationId,
+/// Rebuild the cached power generation/consumption summary for a station.
+/// Iterates all modules, looks up defs, computes wear-adjusted generation.
+/// Only called when `power_budget_cache.is_valid()` is false.
+fn rebuild_power_cache(
+    station: &crate::StationState,
     content: &GameContent,
-    events: &mut Vec<EventEnvelope>,
-) {
-    let Some(station) = state.stations.get(station_id) else {
-        return;
-    };
-    let prev_power = station.power.clone();
-
+    global_modifiers: &crate::modifiers::ModifierSet,
+) -> crate::PowerBudgetCache {
     let solar_intensity = content
         .solar_system
         .bodies
@@ -266,8 +251,9 @@ fn compute_power_budget(
     let mut consumed_kw = 0.0_f32;
     let mut has_power_infrastructure = false;
     let mut consumers: Vec<(usize, u8, f32)> = Vec::new();
-    let mut batteries: Vec<(usize, crate::BatteryDef, f32, f32)> = Vec::new();
-    let mut wear_targets: Vec<(usize, f32)> = Vec::new();
+    let mut battery_entries: Vec<(usize, crate::BatteryDef, f32)> = Vec::new();
+    let mut solar_wear_targets: Vec<(usize, f32)> = Vec::new();
+    let mut wear_band_snapshot: Vec<(usize, u8)> = Vec::new();
 
     for (module_index, module) in station.modules.iter().enumerate() {
         if !module.enabled {
@@ -297,12 +283,16 @@ fn compute_power_budget(
                 generated_kw += power_mods.resolve_with_f32(
                     crate::modifiers::StatId::PowerOutput,
                     solar_def.base_output_kw,
-                    &state.modifiers,
+                    global_modifiers,
                 );
                 consumed_kw += def.power_consumption_per_run;
                 if def.wear_per_run > 0.0 {
-                    wear_targets.push((module_index, def.wear_per_run));
+                    solar_wear_targets.push((module_index, def.wear_per_run));
                 }
+                wear_band_snapshot.push((
+                    module_index,
+                    crate::wear::wear_band(module.wear.wear, &content.constants),
+                ));
             }
             crate::ModuleBehaviorDef::Battery(battery_def) => {
                 has_power_infrastructure = true;
@@ -318,21 +308,14 @@ fn compute_power_budget(
                 let efficiency = battery_mods.resolve_with_f32(
                     crate::modifiers::StatId::PowerOutput,
                     1.0,
-                    &state.modifiers,
+                    global_modifiers,
                 );
-                let current_charge =
-                    if let crate::ModuleKindState::Battery(ref battery_state) = module.kind_state {
-                        battery_state.charge_kwh
-                    } else {
-                        0.0
-                    };
-                batteries.push((
-                    module_index,
-                    battery_def.clone(),
-                    current_charge,
-                    efficiency,
-                ));
+                battery_entries.push((module_index, battery_def.clone(), efficiency));
                 consumed_kw += def.power_consumption_per_run;
+                wear_band_snapshot.push((
+                    module_index,
+                    crate::wear::wear_band(module.wear.wear, &content.constants),
+                ));
             }
             _ => {
                 consumed_kw += def.power_consumption_per_run;
@@ -343,35 +326,150 @@ fn compute_power_budget(
         }
     }
 
+    // Pre-sort consumers by priority so we don't need to sort every tick.
+    consumers.sort_by_key(|&(_, priority, _)| priority);
+
+    let enabled_count = station.modules.iter().filter(|m| m.enabled).count();
+
+    crate::PowerBudgetCache {
+        generated_kw,
+        consumed_kw,
+        has_power_infrastructure,
+        consumers,
+        battery_entries,
+        solar_wear_targets,
+        wear_band_snapshot,
+        global_modifier_count: global_modifiers.len(),
+        module_enabled_snapshot: (station.modules.len(), enabled_count),
+        ..Default::default()
+    }
+}
+
+/// Ensure the power budget cache is up-to-date for a station.
+/// Rebuilds if explicitly invalidated, global modifiers changed,
+/// or module count/enabled state diverged (catches direct mutations in tests).
+fn ensure_power_cache(state: &mut GameState, station_id: &StationId, content: &GameContent) {
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+    let enabled_count = station.modules.iter().filter(|m| m.enabled).count();
+    let needs_rebuild = !station.power_budget_cache.is_valid()
+        || station.power_budget_cache.global_modifier_count != state.modifiers.len()
+        || station.power_budget_cache.module_enabled_snapshot
+            != (station.modules.len(), enabled_count);
+
+    if needs_rebuild {
+        let mut cache = rebuild_power_cache(station, content, &state.modifiers);
+        cache.mark_valid();
+        if let Some(station) = state.stations.get_mut(station_id) {
+            station.power_budget_cache = cache;
+        }
+    }
+}
+
+/// Apply solar wear and check for band transitions that would invalidate the cache.
+fn apply_solar_wear_and_check_bands(
+    state: &mut GameState,
+    station_id: &StationId,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+    let wear_targets = station.power_budget_cache.solar_wear_targets.clone();
+    for (module_idx, wear_per_run) in &wear_targets {
+        apply_wear(state, station_id, *module_idx, *wear_per_run, events);
+    }
+
+    // Check if any power-related module crossed a wear band boundary.
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+    let band_changed =
+        station
+            .power_budget_cache
+            .wear_band_snapshot
+            .iter()
+            .any(|&(module_index, cached_band)| {
+                module_index < station.modules.len()
+                    && crate::wear::wear_band(
+                        station.modules[module_index].wear.wear,
+                        &content.constants,
+                    ) != cached_band
+            });
+    if band_changed {
+        if let Some(station) = state.stations.get_mut(station_id) {
+            station.power_budget_cache.invalidate();
+        }
+    }
+}
+
+/// Compute the power budget for a station, store it in `PowerState`, and
+/// mark modules as `power_stalled` when there is a deficit.
+///
+/// Uses a cached generation/consumption summary when available. The cache
+/// is rebuilt only when modules change (install/uninstall/enable/disable)
+/// or when a power-relevant module crosses a wear band boundary.
+/// Battery buffering and stall logic run every tick regardless.
+fn compute_power_budget(
+    state: &mut GameState,
+    station_id: &StationId,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+    let prev_power = station.power.clone();
+
+    ensure_power_cache(state, station_id, content);
+
+    // Read cached values and build per-tick battery list with live charge.
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+    let generated_kw = station.power_budget_cache.generated_kw;
+    let consumed_kw = station.power_budget_cache.consumed_kw;
+    let has_power_infrastructure = station.power_budget_cache.has_power_infrastructure;
+    let consumers = station.power_budget_cache.consumers.clone();
+    let batteries: Vec<(usize, crate::BatteryDef, f32, f32)> = station
+        .power_budget_cache
+        .battery_entries
+        .iter()
+        .map(|(idx, def, eff)| {
+            let charge = match &station.modules[*idx].kind_state {
+                crate::ModuleKindState::Battery(bs) => bs.charge_kwh,
+                _ => 0.0,
+            };
+            (*idx, def.clone(), charge, *eff)
+        })
+        .collect();
+
     let raw_surplus = (generated_kw - consumed_kw).max(0.0);
     let raw_deficit = (consumed_kw - generated_kw).max(0.0);
 
     let (battery_discharge_kw, battery_charge_kw, battery_stored_kwh) =
         apply_battery_buffering(state, station_id, &batteries, raw_surplus, raw_deficit);
-
     let deficit_kw = (raw_deficit - battery_discharge_kw).max(0.0);
 
-    // Reset all power_stalled flags first.
+    // Apply stalls and update PowerState.
     let Some(station) = state.stations.get_mut(station_id) else {
         return;
     };
     for module in &mut station.modules {
         module.power_stalled = false;
     }
-
-    // Stall lowest-priority modules until budget balances.
     if deficit_kw > 0.0 && has_power_infrastructure {
-        consumers.sort_by_key(|&(_, priority, _)| priority);
-        let mut remaining_deficit = deficit_kw;
-        for (module_index, _, consumption) in &consumers {
-            if remaining_deficit <= 0.0 {
+        let mut remaining = deficit_kw;
+        for &(module_index, _, consumption) in &consumers {
+            if remaining <= 0.0 {
                 break;
             }
-            station.modules[*module_index].power_stalled = true;
-            remaining_deficit -= consumption;
+            station.modules[module_index].power_stalled = true;
+            remaining -= consumption;
         }
     }
-
     station.power = crate::PowerState {
         generated_kw,
         consumed_kw,
@@ -393,12 +491,7 @@ fn compute_power_budget(
         ));
     }
 
-    // Apply wear to solar arrays (and any other power infrastructure with wear).
-    // Note: solar arrays use base wear only — no heat multiplier — because they
-    // are power infrastructure ticked outside the module run loop.
-    for (module_idx, wear_per_run) in wear_targets {
-        apply_wear(state, station_id, module_idx, wear_per_run, events);
-    }
+    apply_solar_wear_and_check_bands(state, station_id, content, events);
 }
 
 /// Context extracted once per module, shared across the lifecycle.
@@ -489,26 +582,33 @@ fn apply_wear(
         let wear_before = module.wear.wear;
         module.wear.wear = (module.wear.wear + wear_per_run).min(1.0);
         let wear_after = module.wear.wear;
-
+        let module_id = module.id.clone();
+        let auto_disable = module.wear.wear >= 1.0;
+        if auto_disable {
+            module.enabled = false;
+        }
+        // Drop the module borrow before calling station methods.
         events.push(crate::emit(
             &mut state.counters,
             current_tick,
             Event::WearAccumulated {
                 station_id: station_id.clone(),
-                module_id: module.id.clone(),
+                module_id: module_id.clone(),
                 wear_before,
                 wear_after,
             },
         ));
-        if module.wear.wear >= 1.0 {
-            let mid = module.id.clone();
-            module.enabled = false;
+        if auto_disable {
+            let Some(station) = state.stations.get_mut(station_id) else {
+                return;
+            };
+            station.invalidate_power_cache();
             events.push(crate::emit(
                 &mut state.counters,
                 current_tick,
                 Event::ModuleAutoDisabled {
                     station_id: station_id.clone(),
-                    module_id: mid,
+                    module_id,
                 },
             ));
         }
@@ -855,6 +955,7 @@ mod framework_tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: crate::ModuleTypeIndex::default(),
+                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
