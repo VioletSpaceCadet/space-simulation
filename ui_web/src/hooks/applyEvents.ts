@@ -856,6 +856,8 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   SimEventExpired: noOp, // SE-05 will add proper handler
   ShipModuleFitted: handleShipModuleFitted,
   ShipModuleUnfitted: handleShipModuleUnfitted,
+  RefuelComplete: noOp,
+  RefuelAborted: noOp,
 };
 
 export function applyEvents(

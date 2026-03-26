@@ -19,6 +19,7 @@ mod mining;
 mod performance;
 mod power;
 mod refinery;
+mod refuel;
 mod research;
 mod survey;
 mod thermal;

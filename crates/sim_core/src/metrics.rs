@@ -15,7 +15,7 @@ use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
 /// v11: Replace per-module-type fields with dynamic `per_module_metrics` `BTreeMap`.
-pub const METRICS_VERSION: u32 = 11;
+pub const METRICS_VERSION: u32 = 12;
 
 /// A typed metric value extracted from a [`MetricsSnapshot`] field.
 #[derive(Clone, Copy, Debug)]
@@ -122,6 +122,7 @@ pub struct MetricsSnapshot {
     pub fleet_transiting: u32,
     pub fleet_surveying: u32,
     pub fleet_depositing: u32,
+    pub fleet_refueling: u32,
 
     // Exploration
     pub scan_sites_remaining: u32,
@@ -220,6 +221,7 @@ impl MetricsSnapshot {
             ("fleet_transiting", U32(self.fleet_transiting)),
             ("fleet_surveying", U32(self.fleet_surveying)),
             ("fleet_depositing", U32(self.fleet_depositing)),
+            ("fleet_refueling", U32(self.fleet_refueling)),
         ]
     }
 
@@ -282,6 +284,7 @@ impl MetricsSnapshot {
             ("fleet_transiting", U32),
             ("fleet_surveying", U32),
             ("fleet_depositing", U32),
+            ("fleet_refueling", U32),
             // Exploration & Research
             ("scan_sites_remaining", U32),
             ("asteroids_discovered", U32),
@@ -473,6 +476,7 @@ struct MetricsAccumulator {
     fleet_transiting: u32,
     fleet_surveying: u32,
     fleet_depositing: u32,
+    fleet_refueling: u32,
     ship_cargo_sum: f32,
     ship_count: u32,
 }
@@ -612,6 +616,7 @@ impl MetricsAccumulator {
                 self.fleet_surveying += 1;
             }
             Some(TaskKind::Deposit { .. }) => self.fleet_depositing += 1,
+            Some(TaskKind::Refuel { .. }) => self.fleet_refueling += 1,
         }
     }
 
@@ -719,6 +724,7 @@ impl MetricsAccumulator {
             fleet_transiting: self.fleet_transiting,
             fleet_surveying: self.fleet_surveying,
             fleet_depositing: self.fleet_depositing,
+            fleet_refueling: self.fleet_refueling,
             scan_sites_remaining: state.scan_sites.len() as u32,
             asteroids_discovered: state.asteroids.len() as u32,
             asteroids_depleted,

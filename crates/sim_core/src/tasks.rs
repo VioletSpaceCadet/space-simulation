@@ -32,7 +32,7 @@ pub(crate) fn resolve_task(
         TaskKind::Deposit { ref station, .. } => {
             resolve_deposit(state, ship_id, station, content, events);
         }
-        TaskKind::Idle => {}
+        TaskKind::Idle | TaskKind::Refuel { .. } => {}
     }
 }
 
@@ -662,4 +662,230 @@ pub(crate) fn resolve_deep_scan(
             target: Some(asteroid_id.0.clone()),
         },
     ));
+}
+
+// ---------------------------------------------------------------------------
+// Refuel resolution (ongoing task — runs every tick)
+// ---------------------------------------------------------------------------
+
+/// Resolve all ongoing refuel tasks. Runs every tick before scheduled tasks.
+/// Uses pro-rata allocation when multiple ships refuel at the same station.
+pub(crate) fn resolve_refuels(
+    state: &mut GameState,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    use std::collections::BTreeMap;
+
+    // Group refueling ships by station
+    let mut station_groups: BTreeMap<StationId, Vec<ShipId>> = BTreeMap::new();
+    for ship in state.ships.values() {
+        if let Some(TaskState {
+            kind: TaskKind::Refuel { ref station_id, .. },
+            ..
+        }) = &ship.task
+        {
+            station_groups
+                .entry(station_id.clone())
+                .or_default()
+                .push(ship.id.clone());
+        }
+    }
+
+    for (station_id, ship_ids) in &station_groups {
+        resolve_station_refuels(state, content, events, station_id, ship_ids);
+    }
+}
+
+/// Get total LH2 (kg) in a station's inventory.
+fn station_lh2_kg(state: &GameState, station_id: &StationId) -> f32 {
+    state.stations.get(station_id).map_or(0.0, |s| {
+        s.inventory
+            .iter()
+            .filter_map(|item| match item {
+                InventoryItem::Material { element, kg, .. } if element == "LH2" => Some(*kg),
+                _ => None,
+            })
+            .sum()
+    })
+}
+
+/// Process refueling for all ships at a single station.
+fn resolve_station_refuels(
+    state: &mut GameState,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+    station_id: &StationId,
+    ship_ids: &[ShipId],
+) {
+    let current_tick = state.meta.tick;
+    let rate = content.constants.refuel_kg_per_tick;
+    let available_lh2 = station_lh2_kg(state, station_id);
+
+    // Each ship requests min(rate, remaining_need)
+    let requests: Vec<(ShipId, f32)> = ship_ids
+        .iter()
+        .filter_map(|sid| {
+            let ship = state.ships.get(sid)?;
+            let target = match &ship.task {
+                Some(TaskState {
+                    kind: TaskKind::Refuel { target_kg, .. },
+                    ..
+                }) => *target_kg,
+                _ => return None,
+            };
+            let need = (target - ship.propellant_kg).max(0.0);
+            Some((sid.clone(), need.min(rate)))
+        })
+        .collect();
+
+    let total_requested: f32 = requests.iter().map(|(_, r)| r).sum();
+
+    if total_requested <= 0.0 {
+        complete_all(state, events, current_tick, station_id, ship_ids);
+        return;
+    }
+
+    if available_lh2 <= content.constants.min_meaningful_kg {
+        abort_all(state, events, current_tick, station_id, ship_ids);
+        return;
+    }
+
+    // Pro-rata allocation and LH2 transfer
+    let total_consumed = allocate_and_transfer(
+        state,
+        events,
+        current_tick,
+        station_id,
+        &requests,
+        total_requested,
+        available_lh2,
+    );
+
+    // Deduct LH2 from station inventory
+    if total_consumed > 0.0 {
+        deduct_station_lh2(state, content, station_id, total_consumed);
+    }
+}
+
+fn complete_all(
+    state: &mut GameState,
+    events: &mut Vec<EventEnvelope>,
+    tick: u64,
+    station_id: &StationId,
+    ship_ids: &[ShipId],
+) {
+    for ship_id in ship_ids {
+        if let Some(ship) = state.ships.get_mut(ship_id) {
+            ship.task = None;
+        }
+        events.push(crate::emit(
+            &mut state.counters,
+            tick,
+            Event::RefuelComplete {
+                ship_id: ship_id.clone(),
+                station_id: station_id.clone(),
+                kg_transferred: 0.0,
+            },
+        ));
+    }
+}
+
+fn abort_all(
+    state: &mut GameState,
+    events: &mut Vec<EventEnvelope>,
+    tick: u64,
+    station_id: &StationId,
+    ship_ids: &[ShipId],
+) {
+    for ship_id in ship_ids {
+        if let Some(ship) = state.ships.get_mut(ship_id) {
+            ship.task = None;
+        }
+        events.push(crate::emit(
+            &mut state.counters,
+            tick,
+            Event::RefuelAborted {
+                ship_id: ship_id.clone(),
+                station_id: station_id.clone(),
+                reason: "station_empty".to_string(),
+            },
+        ));
+    }
+}
+
+fn allocate_and_transfer(
+    state: &mut GameState,
+    events: &mut Vec<EventEnvelope>,
+    tick: u64,
+    station_id: &StationId,
+    requests: &[(ShipId, f32)],
+    total_requested: f32,
+    available_lh2: f32,
+) -> f32 {
+    let mut total_consumed = 0.0_f32;
+    for (ship_id, requested) in requests {
+        let allocated = if total_requested <= available_lh2 {
+            *requested
+        } else {
+            requested / total_requested * available_lh2
+        };
+        if allocated <= 0.0 {
+            continue;
+        }
+
+        let Some(ship) = state.ships.get_mut(ship_id) else {
+            continue;
+        };
+        ship.propellant_kg += allocated;
+        total_consumed += allocated;
+
+        let target = match &ship.task {
+            Some(TaskState {
+                kind: TaskKind::Refuel { target_kg, .. },
+                ..
+            }) => *target_kg,
+            _ => continue,
+        };
+        if ship.propellant_kg >= target {
+            ship.propellant_kg = ship.propellant_kg.min(ship.propellant_capacity_kg);
+            ship.task = None;
+            events.push(crate::emit(
+                &mut state.counters,
+                tick,
+                Event::RefuelComplete {
+                    ship_id: ship_id.clone(),
+                    station_id: station_id.clone(),
+                    kg_transferred: allocated,
+                },
+            ));
+        }
+    }
+    total_consumed
+}
+
+fn deduct_station_lh2(
+    state: &mut GameState,
+    content: &GameContent,
+    station_id: &StationId,
+    amount: f32,
+) {
+    if let Some(station) = state.stations.get_mut(station_id) {
+        let mut remaining = amount;
+        for item in &mut station.inventory {
+            if remaining <= 0.0 {
+                break;
+            }
+            if let InventoryItem::Material { element, kg, .. } = item {
+                if element == "LH2" {
+                    let deduct = remaining.min(*kg);
+                    *kg -= deduct;
+                    remaining -= deduct;
+                }
+            }
+        }
+        station
+            .inventory
+            .retain(|item| item.mass_kg() > content.constants.min_meaningful_kg);
+    }
 }

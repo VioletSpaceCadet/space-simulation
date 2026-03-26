@@ -394,6 +394,7 @@ mod tests {
             fleet_transiting: 1,
             fleet_surveying: 0,
             fleet_depositing: 0,
+            fleet_refueling: 0,
             scan_sites_remaining: 10,
             asteroids_discovered: 5 + index as u32,
             asteroids_depleted: 2,

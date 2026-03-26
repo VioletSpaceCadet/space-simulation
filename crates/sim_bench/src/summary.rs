@@ -220,6 +220,7 @@ mod tests {
             fleet_transiting: 0,
             fleet_surveying: 0,
             fleet_depositing: 0,
+            fleet_refueling: 0,
             scan_sites_remaining: 0,
             asteroids_discovered: 0,
             asteroids_depleted: 0,

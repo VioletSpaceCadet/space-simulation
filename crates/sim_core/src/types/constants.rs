@@ -131,6 +131,9 @@ pub struct Constants {
     /// Reference ship mass (kg) for fuel cost scaling. Ships heavier than this burn more.
     #[serde(default = "default_reference_mass_kg")]
     pub reference_mass_kg: f32,
+    /// LH2 transfer rate (kg/minute) during refueling. Derived to per-tick.
+    #[serde(default = "default_refuel_kg_per_minute")]
+    pub refuel_kg_per_minute: f32,
     // Bottleneck detection (used by daemon analytics)
     /// Station storage usage fraction above which bottleneck detection flags `StorageFull`.
     #[serde(default = "default_bottleneck_storage_threshold_pct")]
@@ -153,6 +156,8 @@ pub struct Constants {
     pub deposit_ticks: u64,
     #[serde(skip_deserializing, default)]
     pub station_power_available_per_tick: f32,
+    #[serde(skip_deserializing, default)]
+    pub refuel_kg_per_tick: f32,
 }
 
 impl Constants {
@@ -196,6 +201,7 @@ impl Constants {
             self.rate_per_minute_to_per_tick(self.mining_rate_kg_per_minute);
         self.station_power_available_per_tick =
             self.rate_per_minute_to_per_tick(self.station_power_available_per_minute);
+        self.refuel_kg_per_tick = self.rate_per_minute_to_per_tick(self.refuel_kg_per_minute);
     }
 }
 
@@ -290,6 +296,9 @@ fn default_fuel_cost_per_au() -> f32 {
 }
 fn default_reference_mass_kg() -> f32 {
     15_000.0 // reference mass for fuel scaling
+}
+fn default_refuel_kg_per_minute() -> f32 {
+    16.67 // ~1000 kg/hr → at 60 min/tick = 1000 kg/tick
 }
 fn default_bottleneck_storage_threshold_pct() -> f32 {
     0.95
