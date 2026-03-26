@@ -37,7 +37,11 @@ pub fn tick(
         apply_commands(state, commands, content, rng, &mut events)
     );
     // Ongoing tasks (Refuel) run every tick, before scheduled task resolution.
-    crate::tasks::resolve_refuels(state, content, &mut events);
+    timed!(
+        timings,
+        resolve_ship_tasks,
+        crate::tasks::resolve_refuels(state, content, &mut events)
+    );
     timed!(
         timings,
         resolve_ship_tasks,
@@ -290,7 +294,7 @@ fn resolve_ship_tasks(
         .filter(|ship| {
             matches!(&ship.task, Some(task)
                 if task.eta_tick == current_tick
-                && !matches!(task.kind, TaskKind::Idle))
+                && !matches!(task.kind, TaskKind::Idle | TaskKind::Refuel { .. }))
         })
         .map(|ship| ship.id.clone())
         .collect();

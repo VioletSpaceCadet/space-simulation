@@ -871,11 +871,16 @@ fn deduct_station_lh2(
     amount: f32,
 ) {
     if let Some(station) = state.stations.get_mut(station_id) {
+        let mut remaining = amount;
         for item in &mut station.inventory {
+            if remaining <= 0.0 {
+                break;
+            }
             if let InventoryItem::Material { element, kg, .. } = item {
                 if element == "LH2" {
-                    *kg -= amount.min(*kg);
-                    break;
+                    let deduct = remaining.min(*kg);
+                    *kg -= deduct;
+                    remaining -= deduct;
                 }
             }
         }

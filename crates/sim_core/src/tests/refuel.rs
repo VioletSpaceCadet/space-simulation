@@ -139,3 +139,53 @@ fn refuel_station_lh2_depleted() {
         .sum();
     assert!(station_lh2 < 1.0);
 }
+
+#[test]
+fn refuel_concurrent_pro_rata() {
+    let content = content_with_refuel();
+    let mut state = base_state(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    let ship1_id = ShipId("ship_0001".to_string());
+    let ship2_id = ShipId("ship_0002".to_string());
+
+    // Add a second ship
+    let mut ship2 = state.ships.get(&ship1_id).unwrap().clone();
+    ship2.id = ship2_id.clone();
+    state.ships.insert(ship2_id.clone(), ship2);
+
+    // Both ships need fuel, station has limited LH2
+    for ship_id in [&ship1_id, &ship2_id] {
+        let ship = state.ships.get_mut(ship_id).unwrap();
+        ship.propellant_kg = 0.0;
+        ship.propellant_capacity_kg = 1000.0;
+        ship.task = Some(TaskState {
+            kind: TaskKind::Refuel {
+                station_id: station_id.clone(),
+                target_kg: 1000.0,
+            },
+            started_tick: 0,
+            eta_tick: 0,
+        });
+    }
+
+    // Station has 60 kg LH2 — each ship requests 100 (rate), total 200 > 60
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.inventory.push(InventoryItem::Material {
+        element: "LH2".to_string(),
+        kg: 60.0,
+        quality: 1.0,
+        thermal: None,
+    });
+
+    let mut events = Vec::new();
+    crate::tasks::resolve_refuels(&mut state, &content, &mut events);
+
+    // Pro-rata: each gets 30 kg (60 * 100/200)
+    let ship1 = state.ships.get(&ship1_id).unwrap();
+    let ship2 = state.ships.get(&ship2_id).unwrap();
+    assert!((ship1.propellant_kg - 30.0).abs() < 1.0);
+    assert!((ship2.propellant_kg - 30.0).abs() < 1.0);
+    // Both still refueling
+    assert!(ship1.task.is_some());
+    assert!(ship2.task.is_some());
+}
