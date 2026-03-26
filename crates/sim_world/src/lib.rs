@@ -1398,6 +1398,7 @@ mod tests {
             },
             modifiers: sim_core::modifiers::ModifierSet::default(),
             events: sim_core::sim_events::SimEventState::default(),
+            propellant_consumed_total: 0.0,
             body_cache: AHashMap::default(),
         };
         validate_state(&state, &content);
