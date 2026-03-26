@@ -75,6 +75,19 @@ fn maybe_transit(
     }
 }
 
+/// Check if ship should opportunistically refuel (below threshold, at station with LH2).
+fn should_opportunistic_refuel(ship: &ShipState, state: &GameState, content: &GameContent) -> bool {
+    if content.constants.fuel_cost_per_au <= 0.0 || ship.propellant_capacity_kg <= 0.0 {
+        return false;
+    }
+    let fuel_pct = ship.propellant_kg / ship.propellant_capacity_kg;
+    if fuel_pct >= content.constants.autopilot_refuel_threshold_pct {
+        return false;
+    }
+    // Only refuel if at a station with LH2
+    try_refuel(ship, state, content).is_some()
+}
+
 fn maybe_assign_refuel(
     ship: &ShipState,
     ship_id: &ShipId,
@@ -996,6 +1009,12 @@ impl AutopilotBehavior for ShipTaskScheduler {
         for ship_id in idle_ships {
             let ship = &state.ships[&ship_id];
             let ship_speed = ship.ticks_per_au(content.constants.ticks_per_au);
+
+            // Opportunistic refuel: if below threshold and at a station with LH2, top off first
+            if should_opportunistic_refuel(ship, state, content) {
+                maybe_assign_refuel(ship, &ship_id, state, content, next_id, &mut commands);
+                continue;
+            }
 
             // Iterate configurable priority order from content.autopilot.task_priority.
             let mut assigned = false;
