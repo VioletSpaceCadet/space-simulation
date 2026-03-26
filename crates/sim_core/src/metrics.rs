@@ -15,7 +15,7 @@ use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
 /// v11: Replace per-module-type fields with dynamic `per_module_metrics` `BTreeMap`.
-pub const METRICS_VERSION: u32 = 12;
+pub const METRICS_VERSION: u32 = 13;
 
 /// A typed metric value extracted from a [`MetricsSnapshot`] field.
 #[derive(Clone, Copy, Debug)]
@@ -124,6 +124,11 @@ pub struct MetricsSnapshot {
     pub fleet_depositing: u32,
     pub fleet_refueling: u32,
 
+    // Propulsion
+    pub fleet_propellant_kg: f32,
+    pub fleet_propellant_pct: f32,
+    pub propellant_consumed_total: f32,
+
     // Exploration
     pub scan_sites_remaining: u32,
     pub asteroids_discovered: u32,
@@ -213,7 +218,7 @@ impl MetricsSnapshot {
     }
 
     fn fleet_field_values(&self) -> Vec<(&'static str, MetricValue)> {
-        use MetricValue::U32;
+        use MetricValue::{F32, U32};
         vec![
             ("fleet_total", U32(self.fleet_total)),
             ("fleet_idle", U32(self.fleet_idle)),
@@ -222,6 +227,12 @@ impl MetricsSnapshot {
             ("fleet_surveying", U32(self.fleet_surveying)),
             ("fleet_depositing", U32(self.fleet_depositing)),
             ("fleet_refueling", U32(self.fleet_refueling)),
+            ("fleet_propellant_kg", F32(self.fleet_propellant_kg)),
+            ("fleet_propellant_pct", F32(self.fleet_propellant_pct)),
+            (
+                "propellant_consumed_total",
+                F32(self.propellant_consumed_total),
+            ),
         ]
     }
 
@@ -285,6 +296,9 @@ impl MetricsSnapshot {
             ("fleet_surveying", U32),
             ("fleet_depositing", U32),
             ("fleet_refueling", U32),
+            ("fleet_propellant_kg", F32),
+            ("fleet_propellant_pct", F32),
+            ("propellant_consumed_total", F32),
             // Exploration & Research
             ("scan_sites_remaining", U32),
             ("asteroids_discovered", U32),
@@ -477,6 +491,8 @@ struct MetricsAccumulator {
     fleet_surveying: u32,
     fleet_depositing: u32,
     fleet_refueling: u32,
+    fleet_propellant_sum: f32,
+    fleet_propellant_capacity_sum: f32,
     ship_cargo_sum: f32,
     ship_count: u32,
 }
@@ -608,6 +624,9 @@ impl MetricsAccumulator {
         }
         self.ship_count += 1;
 
+        self.fleet_propellant_sum += ship.propellant_kg;
+        self.fleet_propellant_capacity_sum += ship.propellant_capacity_kg;
+
         match ship.task.as_ref().map(|t| &t.kind) {
             None | Some(TaskKind::Idle) => self.fleet_idle += 1,
             Some(TaskKind::Mine { .. }) => self.fleet_mining += 1,
@@ -725,6 +744,14 @@ impl MetricsAccumulator {
             fleet_surveying: self.fleet_surveying,
             fleet_depositing: self.fleet_depositing,
             fleet_refueling: self.fleet_refueling,
+            fleet_propellant_kg: self.fleet_propellant_sum,
+            fleet_propellant_pct: if self.fleet_propellant_capacity_sum > 0.0 {
+                self.fleet_propellant_sum / self.fleet_propellant_capacity_sum
+            } else {
+                0.0
+            },
+            #[allow(clippy::cast_possible_truncation)]
+            propellant_consumed_total: state.propellant_consumed_total as f32,
             scan_sites_remaining: state.scan_sites.len() as u32,
             asteroids_discovered: state.asteroids.len() as u32,
             asteroids_depleted,
