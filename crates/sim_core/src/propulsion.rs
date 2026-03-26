@@ -19,8 +19,13 @@ pub fn compute_transit_fuel_from_abs(
     if distance_um == 0 {
         return 0.0;
     }
+    debug_assert!(
+        constants.reference_mass_kg > 0.0,
+        "reference_mass_kg must be positive"
+    );
     let distance_au = distance_um as f32 / 1_000_000.0;
-    distance_au * constants.fuel_cost_per_au * (total_mass_kg / constants.reference_mass_kg)
+    let ref_mass = constants.reference_mass_kg.max(f32::EPSILON);
+    distance_au * constants.fuel_cost_per_au * (total_mass_kg / ref_mass)
 }
 
 /// Fuel cost (kg) for a ship to transit between two positions.
