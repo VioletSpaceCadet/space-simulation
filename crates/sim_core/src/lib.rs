@@ -10,6 +10,7 @@ mod id;
 pub mod instrumentation;
 pub mod metrics;
 pub mod modifiers;
+pub mod propulsion;
 mod research;
 pub mod sim_events;
 pub mod spatial;

@@ -119,6 +119,9 @@ fn replenish_test_content() -> GameContent {
             events_enabled: false,
             event_global_cooldown_ticks: 200,
             event_history_capacity: 100,
+            // Propulsion
+            fuel_cost_per_au: 500.0,
+            reference_mass_kg: 15_000.0,
             // Bottleneck detection
             bottleneck_storage_threshold_pct: 0.95,
             bottleneck_slag_ratio_threshold: 0.5,
