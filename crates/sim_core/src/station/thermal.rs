@@ -395,6 +395,18 @@ fn check_overheat_zones(
         return;
     };
 
+    let has_enable_transitions = transitions.iter().any(|&(_, old_zone, new_zone, _, _)| {
+        // Entering critical/damage disables; leaving critical/damage may re-enable.
+        new_zone == OverheatZone::Critical
+            || new_zone == OverheatZone::Damage
+            || ((old_zone == OverheatZone::Critical || old_zone == OverheatZone::Damage)
+                && new_zone != OverheatZone::Critical
+                && new_zone != OverheatZone::Damage)
+    });
+    if has_enable_transitions {
+        station.invalidate_power_cache();
+    }
+
     for (module_index, old_zone, new_zone, temp_mk, max_temp_mk) in transitions {
         let module = &mut station.modules[module_index];
         let module_id = module.id.clone();
@@ -572,6 +584,7 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: crate::ModuleTypeIndex::default(),
+                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()

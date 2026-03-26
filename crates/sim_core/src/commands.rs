@@ -104,6 +104,7 @@ pub(crate) fn handle_install_module(
         manufacturing_priority: 0,
     });
     station.rebuild_module_index(content);
+    station.invalidate_power_cache();
 
     events.push(crate::emit(
         &mut state.counters,
@@ -150,6 +151,7 @@ pub(crate) fn handle_uninstall_module(
     });
     station.invalidate_volume_cache();
     station.rebuild_module_index(content);
+    station.invalidate_power_cache();
 
     events.push(crate::emit(
         &mut state.counters,
@@ -179,6 +181,7 @@ pub(crate) fn handle_set_module_enabled(
         return false;
     };
     module.enabled = enabled;
+    station.invalidate_power_cache();
     events.push(crate::emit(
         &mut state.counters,
         current_tick,

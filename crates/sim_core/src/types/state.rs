@@ -279,6 +279,52 @@ pub struct PowerState {
     pub battery_stored_kwh: f32,
 }
 
+/// Cached power generation/consumption summary. Avoids re-iterating all modules
+/// and looking up defs every tick when nothing has changed. Battery buffering and
+/// stall logic still run every tick using the cached values.
+#[derive(Debug, Clone, Default)]
+pub struct PowerBudgetCache {
+    /// When false, the cache must be rebuilt before use.
+    pub(crate) valid: bool,
+    /// Sum of solar generation (after wear + solar intensity + modifiers).
+    pub generated_kw: f32,
+    /// Sum of all enabled modules' `power_consumption_per_run`.
+    pub consumed_kw: f32,
+    /// Whether any solar array or battery module exists (gates stall logic).
+    pub has_power_infrastructure: bool,
+    /// `(module_index, priority, consumption_kw)` for stall ordering.
+    pub consumers: Vec<(usize, u8, f32)>,
+    /// `(module_index, battery_def, efficiency)` for battery buffering.
+    pub battery_entries: Vec<(usize, crate::BatteryDef, f32)>,
+    /// `(module_index, wear_per_run)` for solar array wear application.
+    pub solar_wear_targets: Vec<(usize, f32)>,
+    /// Snapshot of wear bands for power-related modules. If any band changes,
+    /// the cache is automatically invalidated.
+    pub(crate) wear_band_snapshot: Vec<(usize, u8)>,
+    /// Snapshot of global modifier generation at cache time.
+    pub(crate) global_modifier_generation: u64,
+    /// Snapshot of `(module_count, enabled_count)` at cache time. Detects direct
+    /// state mutations that bypass command handlers.
+    pub(crate) module_enabled_snapshot: (usize, usize),
+}
+
+impl PowerBudgetCache {
+    /// Returns true if the cache is valid and can be reused.
+    pub fn is_valid(&self) -> bool {
+        self.valid
+    }
+
+    /// Mark the cache as needing rebuild.
+    pub fn invalidate(&mut self) {
+        self.valid = false;
+    }
+
+    /// Mark the cache as freshly built.
+    pub fn mark_valid(&mut self) {
+        self.valid = true;
+    }
+}
+
 /// Pre-computed index of module indices by subsystem type.
 /// Rebuilt on module install/uninstall. Each subsystem iterates only its
 /// matching indices instead of scanning all modules every tick.
@@ -323,6 +369,10 @@ pub struct StationState {
     /// Pre-computed module-type → indices mapping. Rebuilt on install/uninstall.
     #[serde(skip, default)]
     pub module_type_index: ModuleTypeIndex,
+    /// Cached power generation/consumption values. Avoids re-iterating modules
+    /// when nothing power-relevant has changed.
+    #[serde(skip, default)]
+    pub power_budget_cache: PowerBudgetCache,
 }
 
 impl StationState {
@@ -339,6 +389,12 @@ impl StationState {
     /// Invalidate the cached volume. Call after any inventory mutation.
     pub fn invalidate_volume_cache(&mut self) {
         self.cached_inventory_volume_m3 = None;
+    }
+
+    /// Invalidate the power budget cache. Call after module enable/disable,
+    /// install/uninstall, or any change that affects power generation or consumption.
+    pub fn invalidate_power_cache(&mut self) {
+        self.power_budget_cache.invalidate();
     }
 
     /// Rebuild the module type index from the current modules list and content defs.

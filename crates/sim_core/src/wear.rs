@@ -14,6 +14,17 @@ pub fn wear_efficiency(wear: f32, constants: &Constants) -> f32 {
     }
 }
 
+/// Returns a discrete band index for the given wear level.
+/// 0 = nominal, 1 = degraded, 2 = critical. Used for cache invalidation:
+/// the power budget only needs recomputation when a module crosses a band boundary.
+pub fn wear_band(wear: f32, constants: &Constants) -> u8 {
+    if wear >= constants.wear_band_critical_threshold {
+        2
+    } else {
+        u8::from(wear >= constants.wear_band_degraded_threshold)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
