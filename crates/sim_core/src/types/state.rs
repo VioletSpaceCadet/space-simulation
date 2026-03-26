@@ -301,8 +301,8 @@ pub struct PowerBudgetCache {
     /// Snapshot of wear bands for power-related modules. If any band changes,
     /// the cache is automatically invalidated.
     pub(crate) wear_band_snapshot: Vec<(usize, u8)>,
-    /// Snapshot of global modifier count at cache time.
-    pub(crate) global_modifier_count: usize,
+    /// Snapshot of global modifier generation at cache time.
+    pub(crate) global_modifier_generation: u64,
     /// Snapshot of `(module_count, enabled_count)` at cache time. Detects direct
     /// state mutations that bypass command handlers.
     pub(crate) module_enabled_snapshot: (usize, usize),

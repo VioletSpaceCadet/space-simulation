@@ -339,7 +339,7 @@ fn rebuild_power_cache(
         battery_entries,
         solar_wear_targets,
         wear_band_snapshot,
-        global_modifier_count: global_modifiers.len(),
+        global_modifier_generation: global_modifiers.generation(),
         module_enabled_snapshot: (station.modules.len(), enabled_count),
         ..Default::default()
     }
@@ -354,7 +354,7 @@ fn ensure_power_cache(state: &mut GameState, station_id: &StationId, content: &G
     };
     let enabled_count = station.modules.iter().filter(|m| m.enabled).count();
     let needs_rebuild = !station.power_budget_cache.is_valid()
-        || station.power_budget_cache.global_modifier_count != state.modifiers.len()
+        || station.power_budget_cache.global_modifier_generation != state.modifiers.generation()
         || station.power_budget_cache.module_enabled_snapshot
             != (station.modules.len(), enabled_count);
 
@@ -429,12 +429,13 @@ fn compute_power_budget(
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
-    let generated_kw = station.power_budget_cache.generated_kw;
-    let consumed_kw = station.power_budget_cache.consumed_kw;
-    let has_power_infrastructure = station.power_budget_cache.has_power_infrastructure;
-    let consumers = station.power_budget_cache.consumers.clone();
-    let batteries: Vec<(usize, crate::BatteryDef, f32, f32)> = station
-        .power_budget_cache
+    let cache = &station.power_budget_cache;
+    let generated_kw = cache.generated_kw;
+    let consumed_kw = cache.consumed_kw;
+    let has_power_infrastructure = cache.has_power_infrastructure;
+
+    // Build per-tick battery list with live charge values.
+    let batteries: Vec<(usize, crate::BatteryDef, f32, f32)> = cache
         .battery_entries
         .iter()
         .map(|(idx, def, eff)| {
@@ -445,6 +446,9 @@ fn compute_power_budget(
             (*idx, def.clone(), charge, *eff)
         })
         .collect();
+
+    // Clone consumer list for stall logic (small vec — typically 5-8 entries).
+    let consumers = cache.consumers.clone();
 
     let raw_surplus = (generated_kw - consumed_kw).max(0.0);
     let raw_deficit = (consumed_kw - generated_kw).max(0.0);

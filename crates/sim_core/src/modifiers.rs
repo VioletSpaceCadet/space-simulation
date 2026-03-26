@@ -128,9 +128,22 @@ impl Modifier {
 // ModifierSet
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ModifierSet {
     modifiers: Vec<Modifier>,
+    /// Monotonically increasing counter, bumped on every add/remove.
+    /// Used by caches to detect modifier changes (including same-tick
+    /// add+remove that leaves `len()` unchanged).
+    #[serde(skip, default)]
+    generation: u64,
+}
+
+/// Equality compares only the modifiers, not the generation counter
+/// (which is a transient cache-invalidation aid, not semantic state).
+impl PartialEq for ModifierSet {
+    fn eq(&self, other: &Self) -> bool {
+        self.modifiers == other.modifiers
+    }
 }
 
 impl ModifierSet {
@@ -141,16 +154,32 @@ impl ModifierSet {
 
     pub fn add(&mut self, modifier: Modifier) {
         self.modifiers.push(modifier);
+        self.generation += 1;
     }
 
     /// Remove all modifiers originating from the given source.
     pub fn remove_by_source(&mut self, source: &ModifierSource) {
+        let before = self.modifiers.len();
         self.modifiers.retain(|m| m.source != *source);
+        if self.modifiers.len() != before {
+            self.generation += 1;
+        }
     }
 
     /// Remove all modifiers whose source matches the predicate.
     pub fn remove_where(&mut self, predicate: impl Fn(&ModifierSource) -> bool) {
+        let before = self.modifiers.len();
         self.modifiers.retain(|m| !predicate(&m.source));
+        if self.modifiers.len() != before {
+            self.generation += 1;
+        }
+    }
+
+    /// Returns a monotonically increasing generation counter that changes
+    /// whenever modifiers are added or removed.
+    #[must_use]
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
 
     /// Resolve a stat using only this set's modifiers.
