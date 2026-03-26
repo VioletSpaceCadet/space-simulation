@@ -27,6 +27,7 @@ mod thermal_determinism;
 mod transit;
 mod wear;
 
+mod crew;
 mod determinism_canary;
 mod manufacturing;
 mod replenish;
