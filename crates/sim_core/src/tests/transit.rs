@@ -69,6 +69,8 @@ fn transit_moves_ship_and_starts_next_task() {
                 fitted_modules: vec![],
                 propellant_kg: 0.0,
                 propellant_capacity_kg: 0.0,
+                crew: Default::default(),
+                leaders: Vec::new(),
             },
         )]
         .into_iter()
@@ -83,6 +85,8 @@ fn transit_moves_ship_and_starts_next_task() {
                 power_available_per_tick: 100.0,
                 modules: vec![],
                 modifiers: crate::modifiers::ModifierSet::default(),
+                crew: Default::default(),
+                leaders: Vec::new(),
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),
@@ -258,6 +262,8 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 fitted_modules: vec![],
                 propellant_kg: 0.0,
                 propellant_capacity_kg: 0.0,
+                crew: Default::default(),
+                leaders: Vec::new(),
             },
         )]
         .into_iter()
@@ -272,6 +278,8 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 power_available_per_tick: 100.0,
                 modules: vec![],
                 modifiers: crate::modifiers::ModifierSet::default(),
+                crew: Default::default(),
+                leaders: Vec::new(),
                 power: PowerState::default(),
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),
@@ -393,6 +401,8 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         fitted_modules: vec![],
         propellant_kg: 0.0,
         propellant_capacity_kg: 0.0,
+        crew: Default::default(),
+        leaders: Vec::new(),
     };
     let ship_fast = ShipState {
         id: ShipId("ship_fast".to_string()),
@@ -407,6 +417,8 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         fitted_modules: vec![],
         propellant_kg: 0.0,
         propellant_capacity_kg: 0.0,
+        crew: Default::default(),
+        leaders: Vec::new(),
     };
     let ship_slow = ShipState {
         id: ShipId("ship_slow".to_string()),
@@ -421,6 +433,8 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         fitted_modules: vec![],
         propellant_kg: 0.0,
         propellant_capacity_kg: 0.0,
+        crew: Default::default(),
+        leaders: Vec::new(),
     };
 
     let global = 2133;

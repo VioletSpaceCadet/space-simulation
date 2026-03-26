@@ -1001,6 +1001,8 @@ mod tests {
             power_available_per_tick: 100.0,
             modules,
             modifiers: crate::modifiers::ModifierSet::default(),
+            crew: Default::default(),
+            leaders: Vec::new(),
             power: crate::PowerState::default(),
             cached_inventory_volume_m3: None,
             module_type_index: crate::ModuleTypeIndex::default(),
@@ -1022,6 +1024,8 @@ mod tests {
             fitted_modules: vec![],
             propellant_kg: 0.0,
             propellant_capacity_kg: 0.0,
+            crew: Default::default(),
+            leaders: Vec::new(),
         }
     }
 
@@ -1263,6 +1267,8 @@ mod tests {
                 wear: crate::WearState::default(),
                 power_stalled: false,
                 module_priority: 0,
+                assigned_crew: Default::default(),
+                crew_satisfied: true,
                 thermal: None,
             }],
         );
@@ -1439,6 +1445,8 @@ mod tests {
                 wear: crate::WearState::default(),
                 power_stalled: false,
                 module_priority: 0,
+                assigned_crew: Default::default(),
+                crew_satisfied: true,
                 thermal: None,
             }],
         );
@@ -1555,6 +1563,8 @@ mod tests {
                     wear: crate::WearState { wear: 0.3 },
                     power_stalled: false,
                     module_priority: 0,
+                    assigned_crew: Default::default(),
+                    crew_satisfied: true,
                     thermal: None,
                 },
                 ModuleState {
@@ -1570,6 +1580,8 @@ mod tests {
                     wear: crate::WearState { wear: 0.7 },
                     power_stalled: false,
                     module_priority: 0,
+                    assigned_crew: Default::default(),
+                    crew_satisfied: true,
                     thermal: None,
                 },
             ],
@@ -1633,6 +1645,8 @@ mod tests {
             wear: crate::WearState::default(),
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
             thermal: None,
         });
         state.stations.insert(station.id.clone(), station);
@@ -1702,6 +1716,8 @@ mod tests {
                     wear: crate::WearState::default(),
                     power_stalled: false,
                     module_priority: 0,
+                    assigned_crew: Default::default(),
+                    crew_satisfied: true,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 1_800_000,
                         thermal_group: None,
@@ -1723,6 +1739,8 @@ mod tests {
                     wear: crate::WearState::default(),
                     power_stalled: false,
                     module_priority: 0,
+                    assigned_crew: Default::default(),
+                    crew_satisfied: true,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 2_400_000,
                         thermal_group: None,
@@ -1744,6 +1762,8 @@ mod tests {
                     wear: crate::WearState::default(),
                     power_stalled: false,
                     module_priority: 0,
+                    assigned_crew: Default::default(),
+                    crew_satisfied: true,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 2_800_000,
                         thermal_group: None,
@@ -1813,6 +1833,8 @@ mod tests {
                 wear: crate::WearState::default(),
                 power_stalled: false,
                 module_priority: 0,
+                assigned_crew: Default::default(),
+                crew_satisfied: true,
                 thermal: None,
             }],
         );

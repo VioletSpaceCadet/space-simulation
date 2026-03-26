@@ -80,6 +80,8 @@ fn test_refinery_skips_when_below_threshold() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
     station.inventory.push(InventoryItem::Ore {

@@ -730,6 +730,8 @@ fn build_initial_ship(
         fitted_modules,
         propellant_kg: 0.0,
         propellant_capacity_kg: 0.0,
+        crew: std::collections::BTreeMap::new(),
+        leaders: Vec::new(),
     };
     if content.hulls.contains_key(&hull_id) {
         sim_core::recompute_ship_stats(&mut ship, content);
@@ -756,6 +758,8 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         power_available_per_tick: c.station_power_available_per_tick,
         modules: vec![],
         modifiers: sim_core::modifiers::ModifierSet::default(),
+        crew: std::collections::BTreeMap::new(),
+        leaders: Vec::new(),
         power: PowerState::default(),
         cached_inventory_volume_m3: None,
         module_type_index: sim_core::ModuleTypeIndex::default(),
@@ -1371,6 +1375,8 @@ mod tests {
                     power_available_per_tick: 100.0,
                     modules: vec![],
                     modifiers: sim_core::modifiers::ModifierSet::default(),
+                    crew: std::collections::BTreeMap::new(),
+                    leaders: Vec::new(),
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: sim_core::ModuleTypeIndex::default(),

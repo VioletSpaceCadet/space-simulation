@@ -3,10 +3,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AlertSeverity, AnomalyTag, AsteroidId, BehaviorType, ComponentId, CompositionVec, DataKind,
-    ElementId, EventId, FittedModule, HullId, InventoryItem, ModuleDefId, ModuleInstanceId,
-    ModuleItemId, PowerState, RecipeId, ResearchDomain, ShipId, SiteId, StationId, TechId,
-    TradeItemSpec,
+    AlertSeverity, AnomalyTag, AsteroidId, BehaviorType, ComponentId, CompositionVec, CrewRole,
+    DataKind, ElementId, EventId, FittedModule, HullId, InventoryItem, ModuleDefId,
+    ModuleInstanceId, ModuleItemId, PowerState, RecipeId, ResearchDomain, ShipId, SiteId,
+    StationId, TechId, TradeItemSpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -293,5 +293,25 @@ pub enum Event {
         ship_id: ShipId,
         station_id: StationId,
         reason: String,
+    },
+    CrewAssigned {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        role: CrewRole,
+        count: u32,
+    },
+    CrewUnassigned {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        role: CrewRole,
+        count: u32,
+    },
+    ModuleUnderstaffed {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+    },
+    ModuleFullyStaffed {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
     },
 }

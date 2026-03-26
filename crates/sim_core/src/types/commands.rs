@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    CommandId, ComponentId, ModuleDefId, ModuleInstanceId, ModuleItemId, PrincipalId, RecipeId,
-    ShipId, StationId, TaskKind, TechId, TradeItemSpec,
+    CommandId, ComponentId, CrewRole, ModuleDefId, ModuleInstanceId, ModuleItemId, PrincipalId,
+    RecipeId, ShipId, StationId, TaskKind, TechId, TradeItemSpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -87,5 +87,17 @@ pub enum Command {
         ship_id: ShipId,
         slot_index: usize,
         station_id: StationId,
+    },
+    AssignCrew {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        role: CrewRole,
+        count: u32,
+    },
+    UnassignCrew {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        role: CrewRole,
+        count: u32,
     },
 }

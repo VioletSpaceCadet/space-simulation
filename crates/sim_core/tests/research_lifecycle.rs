@@ -69,6 +69,8 @@ fn full_research_lifecycle() {
             wear: WearState::default(),
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
             thermal: None,
         });
 
@@ -142,6 +144,8 @@ fn research_lifecycle_no_data_means_no_unlock() {
             wear: WearState::default(),
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
             thermal: None,
         });
 

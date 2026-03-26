@@ -89,6 +89,8 @@ fn state_with_heating(content: &GameContent) -> GameState {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 
@@ -208,6 +210,8 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
         wear: WearState::default(),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
         thermal: None,
     });
 

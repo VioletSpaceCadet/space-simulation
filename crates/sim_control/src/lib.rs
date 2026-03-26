@@ -242,6 +242,8 @@ mod tests {
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
                 module_priority: 0,
+                assigned_crew: Default::default(),
+                crew_satisfied: true,
                 thermal: None,
             });
 
@@ -407,6 +409,8 @@ mod tests {
                 fitted_modules: vec![],
                 propellant_kg: 0.0,
                 propellant_capacity_kg: 0.0,
+                crew: Default::default(),
+                leaders: Vec::new(),
             },
         );
 
@@ -475,6 +479,8 @@ mod tests {
                 wear: sim_core::WearState { wear: 1.0 },
                 power_stalled: false,
                 module_priority: 0,
+                assigned_crew: Default::default(),
+                crew_satisfied: true,
                 thermal: None,
             });
 
@@ -643,6 +649,8 @@ mod tests {
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
                 module_priority: 0,
+                assigned_crew: Default::default(),
+                crew_satisfied: true,
                 thermal: None,
             });
 
@@ -684,6 +692,8 @@ mod tests {
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
                 module_priority: 0,
+                assigned_crew: Default::default(),
+                crew_satisfied: true,
                 thermal: None,
             });
 
@@ -738,6 +748,8 @@ mod tests {
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
                 module_priority: 0,
+                assigned_crew: Default::default(),
+                crew_satisfied: true,
                 thermal: None,
             });
 
@@ -823,6 +835,8 @@ mod tests {
                 wear: sim_core::WearState::default(),
                 power_stalled: false,
                 module_priority: 0,
+                assigned_crew: Default::default(),
+                crew_satisfied: true,
                 thermal: None,
             });
 
@@ -1041,6 +1055,8 @@ mod tests {
             wear: sim_core::WearState::default(),
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
             thermal: None,
         });
 
@@ -1488,6 +1504,8 @@ mod tests {
             thermal: None,
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
         });
         // No H2O in inventory → needs_water = true
 
@@ -1696,6 +1714,8 @@ mod tests {
             thermal: None,
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
         });
         // Add H2O above threshold (500 kg) → should NOT trigger volatile targeting
         station.inventory.push(InventoryItem::Material {
@@ -1789,6 +1809,8 @@ mod tests {
             wear: sim_core::WearState::default(),
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
             thermal: None,
         });
     }
@@ -1809,6 +1831,8 @@ mod tests {
             wear: sim_core::WearState::default(),
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
             thermal: None,
         });
     }
@@ -1958,6 +1982,8 @@ mod tests {
             wear: sim_core::WearState { wear: 1.0 },
             power_stalled: false,
             module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
             thermal: None,
         });
         // LH2 = 0 (below threshold)

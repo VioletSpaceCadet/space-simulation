@@ -48,6 +48,8 @@ pub fn test_module(def_id: &str, kind_state: ModuleKindState) -> ModuleState {
         thermal: None,
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
     }
 }
 
@@ -558,6 +560,8 @@ pub fn base_state(content: &GameContent) -> GameState {
                 fitted_modules: vec![],
                 propellant_kg: 0.0,
                 propellant_capacity_kg: 0.0,
+                crew: Default::default(),
+                leaders: Vec::new(),
             },
         )]
         .into_iter()
@@ -572,6 +576,8 @@ pub fn base_state(content: &GameContent) -> GameState {
                 power_available_per_tick: 100.0,
                 modules: vec![],
                 modifiers: crate::modifiers::ModifierSet::default(),
+                crew: Default::default(),
+                leaders: Vec::new(),
                 power: crate::PowerState::default(),
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),
@@ -707,6 +713,8 @@ fn smelter_module(temp_mk: u32) -> ModuleState {
         }),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
     }
 }
 
@@ -724,6 +732,8 @@ fn radiator_module() -> ModuleState {
         }),
         power_stalled: false,
         module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
     }
 }
 

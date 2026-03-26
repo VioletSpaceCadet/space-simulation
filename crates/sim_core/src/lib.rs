@@ -63,8 +63,8 @@ pub use types::{
 pub use types::{FittedModule, ShipState, TaskKind};
 // -- types: module state --
 pub use types::{
-    AssemblerState, BatteryState, LabState, MaintenanceState, ModuleKindState, ModuleState,
-    ProcessorState, RadiatorState, SensorArrayState, SolarArrayState, WearState,
+    is_crew_satisfied, AssemblerState, BatteryState, LabState, MaintenanceState, ModuleKindState,
+    ModuleState, ProcessorState, RadiatorState, SensorArrayState, SolarArrayState, WearState,
 };
 // -- types: thermal state --
 pub use types::{MaterialThermalProps, ThermalState};
