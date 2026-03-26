@@ -982,11 +982,171 @@ impl AutopilotBehavior for ShipTaskScheduler {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Crew assignment — assign available crew to understaffed modules by priority
+// ---------------------------------------------------------------------------
+
+struct CrewAssignment;
+
+impl AutopilotBehavior for CrewAssignment {
+    fn name(&self) -> &'static str {
+        "crew_assignment"
+    }
+
+    fn generate(
+        &self,
+        state: &GameState,
+        content: &GameContent,
+        owner: &PrincipalId,
+        next_id: &mut u64,
+    ) -> Vec<CommandEnvelope> {
+        let mut commands = Vec::new();
+        let tick = state.meta.tick;
+
+        for station in state.stations.values() {
+            // Sort modules by priority desc, then ID asc
+            let mut module_order: Vec<usize> = (0..station.modules.len()).collect();
+            module_order.sort_by(|&a, &b| {
+                station.modules[b]
+                    .module_priority
+                    .cmp(&station.modules[a].module_priority)
+                    .then_with(|| station.modules[a].id.0.cmp(&station.modules[b].id.0))
+            });
+
+            // Track available crew (station.crew minus already-assigned)
+            let mut available: std::collections::BTreeMap<sim_core::CrewRole, u32> =
+                station.crew.clone();
+            for module in &station.modules {
+                for (role, &count) in &module.assigned_crew {
+                    let entry = available.entry(role.clone()).or_insert(0);
+                    *entry = entry.saturating_sub(count);
+                }
+            }
+
+            for &module_index in &module_order {
+                let module = &station.modules[module_index];
+                if !module.enabled {
+                    continue;
+                }
+                let Some(def) = content.module_defs.get(&module.def_id) else {
+                    continue;
+                };
+                if def.crew_requirement.is_empty() || module.crew_satisfied {
+                    continue;
+                }
+                // Try to assign missing crew roles
+                for (role, &needed) in &def.crew_requirement {
+                    let assigned = module.assigned_crew.get(role).copied().unwrap_or(0);
+                    if assigned >= needed {
+                        continue;
+                    }
+                    let gap = needed - assigned;
+                    let can_assign = available.get(role).copied().unwrap_or(0).min(gap);
+                    if can_assign > 0 {
+                        commands.push(make_cmd(
+                            owner,
+                            tick,
+                            next_id,
+                            Command::AssignCrew {
+                                station_id: station.id.clone(),
+                                module_id: module.id.clone(),
+                                role: role.clone(),
+                                count: can_assign,
+                            },
+                        ));
+                        *available.entry(role.clone()).or_insert(0) -= can_assign;
+                    }
+                }
+            }
+        }
+        commands
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Crew recruitment — import crew when demand exceeds supply
+// ---------------------------------------------------------------------------
+
+struct CrewRecruitment;
+
+impl AutopilotBehavior for CrewRecruitment {
+    fn name(&self) -> &'static str {
+        "crew_recruitment"
+    }
+
+    fn generate(
+        &self,
+        state: &GameState,
+        content: &GameContent,
+        owner: &PrincipalId,
+        next_id: &mut u64,
+    ) -> Vec<CommandEnvelope> {
+        let mut commands = Vec::new();
+        let tick = state.meta.tick;
+
+        if tick < sim_core::trade_unlock_tick(&content.constants) {
+            return commands;
+        }
+
+        for station in state.stations.values() {
+            // Compute demand: sum of crew_requirement for all enabled modules
+            let mut demand: std::collections::BTreeMap<sim_core::CrewRole, u32> =
+                std::collections::BTreeMap::new();
+            for module in &station.modules {
+                if !module.enabled {
+                    continue;
+                }
+                let Some(def) = content.module_defs.get(&module.def_id) else {
+                    continue;
+                };
+                for (role, &count) in &def.crew_requirement {
+                    *demand.entry(role.clone()).or_insert(0) += count;
+                }
+            }
+
+            // Compare demand vs supply, recruit shortfalls
+            for (role, needed) in &demand {
+                let supply = station.crew.get(role).copied().unwrap_or(0);
+                if supply >= *needed {
+                    continue;
+                }
+                let shortfall = needed - supply;
+                // Check pricing and balance
+                let item_spec = TradeItemSpec::Crew {
+                    role: role.clone(),
+                    count: shortfall,
+                };
+                let Some(cost) = trade::compute_import_cost(&item_spec, &content.pricing, content)
+                else {
+                    continue;
+                };
+                // Budget guard: only recruit if we can afford it with margin
+                let budget_cap = state.balance * content.constants.autopilot_budget_cap_fraction;
+                if cost > budget_cap {
+                    continue;
+                }
+                commands.push(make_cmd(
+                    owner,
+                    tick,
+                    next_id,
+                    Command::Import {
+                        station_id: station.id.clone(),
+                        item_spec,
+                    },
+                ));
+            }
+        }
+        commands
+    }
+}
+
 /// Creates the default behavior chain in the exact order required for determinism.
 pub(crate) fn default_behaviors() -> Vec<Box<dyn AutopilotBehavior>> {
     vec![
         Box::new(StationModuleManager),
         Box::new(LabAssignment),
+        Box::new(CrewAssignment),
+        Box::new(CrewRecruitment),
         Box::new(ThrusterImport),
         Box::new(SlagJettison),
         Box::new(MaterialExport),
