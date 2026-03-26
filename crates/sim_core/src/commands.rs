@@ -740,7 +740,7 @@ pub(crate) fn apply_ship_assignments(
 }
 
 /// Attempt to deduct transit fuel from a ship. Returns `true` if successful.
-/// Skips fuel deduction when propulsion is not configured (fuel_cost_per_au == 0).
+/// Skips fuel deduction when propulsion is not configured (`fuel_cost_per_au` == 0).
 fn deduct_transit_fuel(
     state: &mut GameState,
     content: &GameContent,
