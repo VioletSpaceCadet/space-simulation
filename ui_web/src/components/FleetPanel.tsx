@@ -12,13 +12,19 @@ import { ShipDetail } from './fleet/ShipDetail';
 import { TaskProgress } from './fleet/TaskProgress';
 
 function fuelColor(pct: number): string {
-  if (pct > 0.5) return '#4ade80'; // green
-  if (pct > 0.2) return '#facc15'; // yellow
-  return '#ef4444'; // red
+  if (pct > 0.5) {
+    return '#4ade80';
+  }
+  if (pct > 0.2) {
+    return '#facc15';
+  }
+  return '#ef4444';
 }
 
 function FuelGauge({ pct, kg }: { pct: number; kg: number }) {
-  if (pct <= 0) return <span className="text-faint">n/a</span>;
+  if (pct <= 0) {
+    return <span className="text-faint">n/a</span>;
+  }
   const widthPct = Math.round(pct * 100);
   return (
     <div className="flex items-center gap-1.5" title={`${formatKg(kg)} kg LH2`}>
