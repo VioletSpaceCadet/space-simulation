@@ -38,6 +38,7 @@ pub enum StatId {
     // Station
     CoolingRate,
     HeatGeneration,
+    PowerConsumption,
     PowerOutput,
     SolarOutput,
 
