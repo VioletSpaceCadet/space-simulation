@@ -43,6 +43,11 @@ pub(super) fn apply_boiloff(
     let minutes_per_tick = content.constants.minutes_per_tick;
     let current_tick = state.meta.tick;
 
+    // Resolve global boiloff rate modifier (e.g. tech_cryo_insulation).
+    let boiloff_rate_mult = state
+        .modifiers
+        .resolve_f32(crate::modifiers::StatId::BoiloffRate, 1.0);
+
     let Some(station) = state.stations.get_mut(station_id) else {
         return;
     };
@@ -89,7 +94,9 @@ pub(super) fn apply_boiloff(
         };
 
         #[allow(clippy::cast_possible_truncation)]
-        let loss = ((f64::from(*kg) * base_rate * multiplier) as f32).min(*kg);
+        let loss = ((f64::from(*kg) * base_rate * multiplier * f64::from(boiloff_rate_mult))
+            as f32)
+            .min(*kg);
         if loss > content.constants.min_meaningful_kg {
             *kg -= loss;
             losses.push((element.clone(), loss));
@@ -326,6 +333,56 @@ mod tests {
         assert!(
             lh2_loss > lox_loss,
             "LH2 ({lh2_loss} lost) should boil faster than LOX ({lox_loss} lost)"
+        );
+    }
+
+    #[test]
+    fn test_boiloff_reduced_by_tech_modifier() {
+        let content = boiloff_content();
+
+        // Run without modifier
+        let mut state_baseline = state_with_lh2(&content, 10_000.0);
+        let mut rng = make_rng();
+        tick(&mut state_baseline, &[], &content, &mut rng, None);
+
+        let station_id = crate::StationId("station_earth_orbit".to_string());
+        let baseline_remaining: f32 = state_baseline.stations[&station_id]
+            .inventory
+            .iter()
+            .filter_map(|i| match i {
+                InventoryItem::Material { element, kg, .. } if element == "LH2" => Some(*kg),
+                _ => None,
+            })
+            .sum();
+        let baseline_loss = 10_000.0 - baseline_remaining;
+
+        // Run with -75% boiloff rate modifier
+        let mut state_tech = state_with_lh2(&content, 10_000.0);
+        state_tech.modifiers.add(crate::modifiers::Modifier {
+            stat: crate::modifiers::StatId::BoiloffRate,
+            op: crate::modifiers::ModifierOp::PctAdditive,
+            value: -0.75,
+            source: crate::modifiers::ModifierSource::Tech("tech_cryo_insulation".into()),
+            condition: None,
+        });
+        let mut rng = make_rng();
+        tick(&mut state_tech, &[], &content, &mut rng, None);
+
+        let tech_remaining: f32 = state_tech.stations[&station_id]
+            .inventory
+            .iter()
+            .filter_map(|i| match i {
+                InventoryItem::Material { element, kg, .. } if element == "LH2" => Some(*kg),
+                _ => None,
+            })
+            .sum();
+        let tech_loss = 10_000.0 - tech_remaining;
+
+        // With -75%, loss should be ~25% of baseline
+        let ratio = tech_loss / baseline_loss;
+        assert!(
+            (ratio - 0.25).abs() < 0.01,
+            "tech loss should be ~25% of baseline: baseline_loss={baseline_loss}, tech_loss={tech_loss}, ratio={ratio}"
         );
     }
 

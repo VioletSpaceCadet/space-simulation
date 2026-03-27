@@ -148,6 +148,27 @@
           "value": -0.4
         }
       ]
+    },
+    {
+      "id": "tech_cryo_insulation",
+      "name": "Cryo Insulation",
+      "prereqs": [],
+      "domain_requirements": {
+        "Materials": 300.0,
+        "Manufacturing": 50.0
+      },
+      "accepted_data": [
+        "AssayData",
+        "ManufacturingData"
+      ],
+      "effects": [
+        {
+          "type": "StatModifier",
+          "stat": "boiloff_rate",
+          "op": "pct_additive",
+          "value": -0.75
+        }
+      ]
     }
   ]
 }
