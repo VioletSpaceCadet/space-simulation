@@ -11,6 +11,34 @@ import { ModuleCard } from './fleet/ModuleCard';
 import { ShipDetail } from './fleet/ShipDetail';
 import { TaskProgress } from './fleet/TaskProgress';
 
+function fuelColor(pct: number): string {
+  if (pct > 0.5) {
+    return '#4ade80';
+  }
+  if (pct > 0.2) {
+    return '#facc15';
+  }
+  return '#ef4444';
+}
+
+function FuelGauge({ pct, kg }: { pct: number; kg: number }) {
+  if (pct <= 0) {
+    return <span className="text-faint">n/a</span>;
+  }
+  const widthPct = Math.round(pct * 100);
+  return (
+    <div className="flex items-center gap-1.5" title={`${formatKg(kg)} kg LH2`}>
+      <div className="w-12 h-2 rounded-full bg-[#1a1a2e] overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${widthPct}%`, backgroundColor: fuelColor(pct) }}
+        />
+      </div>
+      <span className="text-xs text-faint">{widthPct}%</span>
+    </div>
+  );
+}
+
 function taskLabel(task: ShipState['task']): string {
   if (!task) {return 'idle';}
   const key = getTaskKind(task) ?? 'idle';
@@ -25,20 +53,26 @@ interface ShipRow {
   parent_body: string
   task: string
   cargo_kg: number
+  fuel_pct: number
   ship: ShipState
 }
 
 function ShipsTable(
   { ships, displayTick, hulls }: { ships: ShipState[]; displayTick: number; hulls: Record<string, HullDef> },
 ) {
-  const rows: ShipRow[] = ships.map((ship) => ({
-    id: ship.id,
-    hull: ship.hull_id ? (hulls[ship.hull_id]?.name ?? ship.hull_id) : 'unknown',
-    parent_body: ship.position.parent_body,
-    task: taskLabel(ship.task),
-    cargo_kg: totalInventoryKg(ship.inventory),
-    ship,
-  }));
+  const rows: ShipRow[] = ships.map((ship) => {
+    const cap = ship.propellant_capacity_kg ?? 0;
+    const fuel = ship.propellant_kg ?? 0;
+    return {
+      id: ship.id,
+      hull: ship.hull_id ? (hulls[ship.hull_id]?.name ?? ship.hull_id) : 'unknown',
+      parent_body: ship.position.parent_body,
+      task: taskLabel(ship.task),
+      cargo_kg: totalInventoryKg(ship.inventory),
+      fuel_pct: cap > 0 ? fuel / cap : 0,
+      ship,
+    };
+  });
 
   const columns: ColumnDef<ShipRow>[] = [
     { key: 'id', label: 'ID', render: (r) => r.id },
@@ -46,6 +80,7 @@ function ShipsTable(
     { key: 'parent_body', label: 'Location', render: (r) => r.parent_body },
     { key: 'task', label: 'Task', render: (r) => r.task },
     { key: 'progress', label: 'Progress', sortable: false, render: (r) => <TaskProgress task={r.ship.task} displayTick={displayTick} /> },
+    { key: 'fuel_pct', label: 'Fuel', render: (r) => <FuelGauge pct={r.fuel_pct} kg={r.ship.propellant_kg ?? 0} /> },
     { key: 'cargo_kg', label: 'Cargo', render: (r) => r.cargo_kg === 0
       ? <span className="text-faint">empty</span>
       : <span className="text-cargo">{formatKg(r.cargo_kg)} kg</span>
