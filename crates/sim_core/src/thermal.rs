@@ -117,16 +117,18 @@ pub const SOLIDIFICATION_HYSTERESIS_MK: u32 = 50_000; // 50K
 /// to prevent oscillation. The buffer drains before temperature drops further.
 ///
 /// Elements without thermal properties (`melting_point_mk = None`) are unaffected.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 pub fn update_phase(props: &mut MaterialThermalProps, element: &ElementDef, kg: f32, heat_j: i64) {
     let Some(melting_point_mk) = element.melting_point_mk else {
         // Non-thermal element: just apply heat as temperature change.
         if let Some(specific_heat) = element.specific_heat_j_per_kg_k {
             let capacity = f64::from(specific_heat) * f64::from(kg);
             if capacity > 0.0 {
-                let delta_mk = (heat_j as f64 / capacity * 1000.0)
-                    .clamp(f64::from(i32::MIN), f64::from(i32::MAX))
-                    as i32;
-                props.temp_mk = (props.temp_mk as i64 + i64::from(delta_mk)).max(0) as u32;
+                apply_temp_change(props, heat_j, capacity);
             }
         }
         return;
@@ -134,7 +136,8 @@ pub fn update_phase(props: &mut MaterialThermalProps, element: &ElementDef, kg: 
 
     let latent_heat_per_kg = element.latent_heat_j_per_kg.unwrap_or(0);
     let specific_heat = element.specific_heat_j_per_kg_k.unwrap_or(449);
-    let total_latent = i64::from(latent_heat_per_kg) * i64::from(kg as u32);
+    let kg_u32 = kg.max(0.0) as u32; // safe: kg is non-negative mass
+    let total_latent = i64::from(latent_heat_per_kg) * i64::from(kg_u32);
     let capacity_j_per_k = f64::from(specific_heat) * f64::from(kg);
 
     if capacity_j_per_k <= 0.0 {
@@ -196,6 +199,7 @@ pub fn update_phase(props: &mut MaterialThermalProps, element: &ElementDef, kg: 
     }
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 fn temp_distance_to_heat(from_mk: u32, to_mk: u32, capacity_j_per_k: f64) -> i64 {
     if to_mk <= from_mk {
         return 0;
@@ -204,10 +208,16 @@ fn temp_distance_to_heat(from_mk: u32, to_mk: u32, capacity_j_per_k: f64) -> i64
     (delta_k * capacity_j_per_k).round() as i64
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 fn apply_temp_change(props: &mut MaterialThermalProps, heat_j: i64, capacity_j_per_k: f64) {
     let delta_mk = (heat_j as f64 / capacity_j_per_k * 1000.0)
         .clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32;
-    props.temp_mk = (props.temp_mk as i64 + i64::from(delta_mk)).max(0) as u32;
+    let new_temp = (i64::from(props.temp_mk) + i64::from(delta_mk)).max(0);
+    props.temp_mk = new_temp as u32;
 }
 
 #[cfg(test)]
