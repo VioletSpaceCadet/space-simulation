@@ -313,6 +313,10 @@ fn rebuild_power_cache(
     let mut solar_wear_targets: Vec<(usize, f32)> = Vec::new();
     let mut wear_band_snapshot: Vec<(usize, u8)> = Vec::new();
 
+    // Resolve global power consumption multiplier (e.g. tech_electrolysis_efficiency).
+    let power_consumption_mult =
+        global_modifiers.resolve_f32(crate::modifiers::StatId::PowerConsumption, 1.0);
+
     for (module_index, module) in station.modules.iter().enumerate() {
         if !module.enabled {
             continue;
@@ -343,7 +347,7 @@ fn rebuild_power_cache(
                     solar_def.base_output_kw,
                     global_modifiers,
                 );
-                consumed_kw += def.power_consumption_per_run;
+                consumed_kw += def.power_consumption_per_run * power_consumption_mult;
                 if def.wear_per_run > 0.0 {
                     solar_wear_targets.push((module_index, def.wear_per_run));
                 }
@@ -369,16 +373,17 @@ fn rebuild_power_cache(
                     global_modifiers,
                 );
                 battery_entries.push((module_index, battery_def.clone(), efficiency));
-                consumed_kw += def.power_consumption_per_run;
+                consumed_kw += def.power_consumption_per_run * power_consumption_mult;
                 wear_band_snapshot.push((
                     module_index,
                     crate::wear::wear_band(module.wear.wear, &content.constants),
                 ));
             }
             _ => {
-                consumed_kw += def.power_consumption_per_run;
+                let effective_consumption = def.power_consumption_per_run * power_consumption_mult;
+                consumed_kw += effective_consumption;
                 if let Some(priority) = def.power_priority() {
-                    consumers.push((module_index, priority, def.power_consumption_per_run));
+                    consumers.push((module_index, priority, effective_consumption));
                 }
             }
         }

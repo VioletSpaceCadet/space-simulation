@@ -127,6 +127,27 @@
           "value": 0.5
         }
       ]
+    },
+    {
+      "id": "tech_electrolysis_efficiency",
+      "name": "Electrolysis Efficiency",
+      "prereqs": [],
+      "domain_requirements": {
+        "Materials": 250.0,
+        "Manufacturing": 100.0
+      },
+      "accepted_data": [
+        "AssayData",
+        "ManufacturingData"
+      ],
+      "effects": [
+        {
+          "type": "StatModifier",
+          "stat": "power_consumption",
+          "op": "pct_additive",
+          "value": -0.4
+        }
+      ]
     }
   ]
 }

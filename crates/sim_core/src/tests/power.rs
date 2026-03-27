@@ -360,6 +360,123 @@ fn solar_tech_modifier_does_not_affect_battery() {
     );
 }
 
+// --- PowerConsumption modifier tests ---
+
+#[test]
+fn power_consumption_reduced_by_tech_modifier() {
+    let content = solar_array_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Add a refinery consuming 10 kW
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("refinery_inst_0001".to_string()),
+        def_id: "module_basic_iron_refinery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+            selected_recipe: None,
+        }),
+        wear: WearState::default(),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
+        thermal: None,
+    });
+
+    // Add -40% power consumption modifier
+    state.modifiers.add(crate::modifiers::Modifier {
+        stat: crate::modifiers::StatId::PowerConsumption,
+        op: crate::modifiers::ModifierOp::PctAdditive,
+        value: -0.4,
+        source: crate::modifiers::ModifierSource::Tech("tech_electrolysis_efficiency".into()),
+        condition: None,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // 10 kW * (1 - 0.4) = 6 kW consumed
+    assert!(
+        (station.power.consumed_kw - 6.0).abs() < 0.01,
+        "consumed_kw should be 6.0 with -40% modifier, got {}",
+        station.power.consumed_kw
+    );
+}
+
+#[test]
+fn power_consumption_modifier_prevents_stall() {
+    // Without modifier: 15 kW solar, 10 + 8 = 18 kW consumption → deficit → stall
+    // With -40% modifier: 15 kW solar, (10 + 8) * 0.6 = 10.8 kW consumption → surplus → no stall
+    let content = stall_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("refinery_inst_0001".to_string()),
+        def_id: "module_basic_iron_refinery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+            selected_recipe: None,
+        }),
+        wear: WearState::default(),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
+        thermal: None,
+    });
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("sensor_inst_0001".to_string()),
+        def_id: "module_sensor_array".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::SensorArray(SensorArrayState::default()),
+        wear: WearState::default(),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
+        thermal: None,
+    });
+
+    // Add -40% power consumption modifier
+    state.modifiers.add(crate::modifiers::Modifier {
+        stat: crate::modifiers::StatId::PowerConsumption,
+        op: crate::modifiers::ModifierOp::PctAdditive,
+        value: -0.4,
+        source: crate::modifiers::ModifierSource::Tech("tech_electrolysis_efficiency".into()),
+        condition: None,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // (10 + 8) * 0.6 = 10.8 kW < 15 kW → no deficit, no stall
+    assert!(
+        station.power.deficit_kw.abs() < f32::EPSILON,
+        "should have no deficit with -40% consumption, got {}",
+        station.power.deficit_kw
+    );
+    assert!(
+        !station.modules[1].power_stalled,
+        "refinery should not be stalled with reduced consumption"
+    );
+    assert!(
+        !station.modules[2].power_stalled,
+        "sensor should not be stalled with reduced consumption"
+    );
+}
+
 // --- Power stalling tests ---
 
 fn stall_content() -> GameContent {
