@@ -53,7 +53,8 @@ function buildTaskStub(taskKind: string, target: string | null, tick: number): T
   };
 }
 
-/** Convert a TradeItemSpec (serde-tagged union) into an InventoryItem for the UI. */
+/** Convert a TradeItemSpec (serde-tagged union) into an InventoryItem for the UI.
+ * Returns null for Crew imports (crew goes to station roster, not inventory). */
 function tradeItemToInventory(itemSpec: TradeItemSpec) {
   if ('Material' in itemSpec) {
     const { element, kg } = itemSpec.Material;
@@ -62,6 +63,9 @@ function tradeItemToInventory(itemSpec: TradeItemSpec) {
   if ('Component' in itemSpec) {
     const { component_id, count } = itemSpec.Component;
     return { kind: 'Component' as const, component_id, count, quality: 1.0 };
+  }
+  if ('Crew' in itemSpec) {
+    return null; // Crew imports add to station.crew, not inventory
   }
   const { module_def_id } = itemSpec.Module;
   return { kind: 'Module' as const, item_id: `imported_${module_def_id}_${Date.now()}`, module_def_id };
@@ -573,6 +577,19 @@ function handleItemImported(state: SimState, event: EventPayload<'ItemImported'>
   if (!state.stations[event.station_id]) {return updatedState;}
   const station = state.stations[event.station_id];
   const newItem = tradeItemToInventory(event.item_spec);
+  if (!newItem) {
+    // Crew import: add to station.crew roster
+    if ('Crew' in event.item_spec) {
+      const { role, count } = event.item_spec.Crew;
+      const crew = { ...(station.crew ?? {}) };
+      crew[role] = (crew[role] ?? 0) + count;
+      return {
+        ...updatedState,
+        stations: { ...updatedState.stations, [event.station_id]: { ...station, crew } },
+      };
+    }
+    return updatedState;
+  }
   const stationInv = [...station.inventory];
   let merged = false;
   if (newItem.kind === 'Material') {

@@ -959,6 +959,7 @@ pub fn load_or_build_state(
         loaded.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
         for station in loaded.stations.values_mut() {
             station.rebuild_module_index(content);
+            station.init_crew_satisfaction(content);
         }
         let rng = ChaCha8Rng::seed_from_u64(loaded.meta.seed);
         validate_state(&loaded, content);
@@ -1186,6 +1187,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         validate_content(&content);
@@ -1279,6 +1281,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         validate_content(&content);
@@ -1779,6 +1782,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         content.fitting_templates.insert(

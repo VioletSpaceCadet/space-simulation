@@ -1268,6 +1268,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         )]
         .into_iter()
@@ -1447,6 +1448,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         )]
         .into_iter()
@@ -1565,6 +1567,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         )]
         .into_iter()
@@ -1651,6 +1654,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         let mut state = empty_state();
@@ -1723,6 +1727,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
 
@@ -1842,6 +1847,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
 

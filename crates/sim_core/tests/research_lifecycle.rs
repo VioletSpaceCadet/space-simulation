@@ -35,6 +35,7 @@ fn full_research_lifecycle() {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -117,6 +118,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 

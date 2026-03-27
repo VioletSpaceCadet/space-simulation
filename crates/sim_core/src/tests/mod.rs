@@ -163,6 +163,7 @@ fn refinery_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     )]
     .into_iter()
@@ -237,6 +238,7 @@ fn assembler_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     )]
     .into_iter()
@@ -301,6 +303,7 @@ fn maintenance_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
     content

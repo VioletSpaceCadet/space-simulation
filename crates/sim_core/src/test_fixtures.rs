@@ -662,6 +662,7 @@ pub fn thermal_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -691,6 +692,7 @@ pub fn thermal_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 

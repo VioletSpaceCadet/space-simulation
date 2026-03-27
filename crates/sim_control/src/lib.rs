@@ -94,6 +94,7 @@ mod tests {
             power_stall_priority: None,
             roles: roles.into_iter().map(String::from).collect(),
             crew_requirement: Default::default(),
+            required_tech: None,
         };
         content.module_defs.insert(
             "module_electrolysis_unit".to_string(),
@@ -286,6 +287,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         let mut state = autopilot_state(&content);
@@ -591,6 +593,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -806,6 +809,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         content.constants.station_power_available_per_tick = 0.0;
@@ -1005,6 +1009,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec!["shipyard".to_string()],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
 
@@ -2114,6 +2119,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         // Add fitting template
@@ -2204,6 +2210,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         content.fitting_templates.insert(

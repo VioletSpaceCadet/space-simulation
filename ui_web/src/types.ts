@@ -289,6 +289,7 @@ export type TradeItemSpec =
   | { Material: { element: string; kg: number } }
   | { Component: { component_id: string; count: number } }
   | { Module: { module_def_id: string } }
+  | { Crew: { role: string; count: number } }
 
 export type AlertSeverity = 'Warning' | 'Critical'
 

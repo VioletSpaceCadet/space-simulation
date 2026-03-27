@@ -165,11 +165,6 @@ impl TradeItemSpec {
             Self::Module { .. } => 1.0,
         }
     }
-
-    /// Returns true if this is a crew trade item.
-    pub fn is_crew(&self) -> bool {
-        matches!(self, Self::Crew { .. })
-    }
 }
 
 // ---------------------------------------------------------------------------

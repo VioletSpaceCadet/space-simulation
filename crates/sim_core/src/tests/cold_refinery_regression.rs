@@ -447,6 +447,7 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 

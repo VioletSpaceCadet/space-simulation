@@ -6,6 +6,7 @@ const tradeItemSpecSchema = z.union([
   z.object({ Material: z.object({ element: z.string(), kg: z.number() }) }),
   z.object({ Component: z.object({ component_id: z.string(), count: z.number() }) }),
   z.object({ Module: z.object({ module_def_id: z.string() }) }),
+  z.object({ Crew: z.object({ role: z.string(), count: z.number() }) }),
 ]);
 
 const powerStateSchema = z.object({

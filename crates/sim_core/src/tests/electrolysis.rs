@@ -88,6 +88,7 @@ fn electrolysis_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -110,6 +111,7 @@ fn electrolysis_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -496,6 +498,7 @@ fn test_full_chain_ore_to_propellant() {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 

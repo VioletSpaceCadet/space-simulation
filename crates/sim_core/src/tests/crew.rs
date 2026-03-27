@@ -48,6 +48,7 @@ fn crew_content() -> GameContent {
             ship_modifiers: Vec::new(),
             power_stall_priority: None,
             roles: vec![],
+            required_tech: None,
             crew_requirement: BTreeMap::from([(CrewRole("operator".to_string()), 1)]),
         },
     );
