@@ -89,6 +89,7 @@ fn electrolysis_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 
@@ -112,6 +113,7 @@ fn electrolysis_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 
@@ -499,6 +501,7 @@ fn test_full_chain_ore_to_propellant() {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 

@@ -303,7 +303,14 @@
     "power_stall_priority": 3,
     "crew_requirement": {
       "operator": 1
-    }
+    },
+    "ports": [
+      {
+        "id": "molten_out",
+        "direction": "Output",
+        "accepts": "AnyMolten"
+      }
+    ]
   },
   {
     "id": "module_basic_radiator",

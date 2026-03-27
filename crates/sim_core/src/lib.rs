@@ -79,8 +79,9 @@ pub use types::{
 // -- types: module & recipe definitions --
 pub use types::{
     AssemblerDef, BatteryDef, InputAmount, InputFilter, LabDef, MaintenanceDef, ModuleBehaviorDef,
-    ModuleDef, OutputSpec, ProcessorDef, QualityFormula, RadiatorDef, RecipeDef, RecipeInput,
-    RecipeThermalReq, SensorArrayDef, SolarArrayDef, YieldFormula,
+    ModuleDef, ModulePort, OutputSpec, PortDirection, PortFilter, ProcessorDef, QualityFormula,
+    RadiatorDef, RecipeDef, RecipeInput, RecipeThermalReq, SensorArrayDef, SolarArrayDef,
+    YieldFormula,
 };
 // -- types: commands & events --
 pub use types::{Command, CommandEnvelope, Event, EventEnvelope};

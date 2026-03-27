@@ -663,6 +663,7 @@ pub fn thermal_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 
@@ -693,6 +694,7 @@ pub fn thermal_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 

@@ -165,6 +165,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         content
