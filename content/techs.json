@@ -119,7 +119,6 @@
         "ManufacturingData",
         "SurveyData"
       ],
-      "difficulty": 400.0,
       "effects": [
         {
           "type": "StatModifier",
