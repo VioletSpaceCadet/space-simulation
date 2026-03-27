@@ -1,0 +1,7 @@
+{
+  "name": "thermal_30d",
+  "ticks": 720,
+  "metrics_every": 6,
+  "seeds": [1, 2, 3],
+  "state": "./content/dev_base_state.json"
+}
