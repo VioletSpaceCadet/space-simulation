@@ -169,6 +169,29 @@
           "value": -0.75
         }
       ]
+    },
+    {
+      "id": "tech_efficient_propulsion",
+      "name": "Efficient Propulsion",
+      "prereqs": [
+        "tech_ship_construction"
+      ],
+      "domain_requirements": {
+        "Propulsion": 300.0,
+        "Survey": 100.0
+      },
+      "accepted_data": [
+        "TransitData",
+        "SurveyData"
+      ],
+      "effects": [
+        {
+          "type": "StatModifier",
+          "stat": "fuel_efficiency",
+          "op": "pct_additive",
+          "value": -0.33
+        }
+      ]
     }
   ]
 }
