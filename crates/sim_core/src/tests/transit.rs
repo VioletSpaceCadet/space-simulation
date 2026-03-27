@@ -610,3 +610,60 @@ fn transit_rejected_when_insufficient_fuel() {
         .iter()
         .any(|e| matches!(&e.event, Event::InsufficientPropellant { .. })));
 }
+
+#[test]
+fn transit_fuel_reduced_by_efficiency_modifier() {
+    let (content, mut state) = spatial_transit_setup();
+    let ship_id = crate::ShipId("ship_0001".to_string());
+    let destination = crate::Position {
+        parent_body: crate::BodyId("zone_b".to_string()),
+        radius_au_um: crate::RadiusAuMicro(0),
+        angle_mdeg: crate::AngleMilliDeg(0),
+    };
+
+    // Run baseline transit
+    let before_baseline = state.ships.get(&ship_id).unwrap().propellant_kg;
+    let assignments = vec![(
+        ship_id.clone(),
+        TaskKind::Transit {
+            destination: destination.clone(),
+            total_ticks: 100,
+            then: Box::new(TaskKind::Idle),
+        },
+    )];
+    let mut events = Vec::new();
+    crate::commands::apply_ship_assignments(&mut state, &content, assignments, 0, &mut events);
+    let after_baseline = state.ships.get(&ship_id).unwrap().propellant_kg;
+    let baseline_cost = before_baseline - after_baseline;
+
+    // Reset ship state and add -33% fuel efficiency modifier
+    let (_, mut state2) = spatial_transit_setup();
+    state2.modifiers.add(crate::modifiers::Modifier {
+        stat: crate::modifiers::StatId::FuelEfficiency,
+        op: crate::modifiers::ModifierOp::PctAdditive,
+        value: -0.33,
+        source: crate::modifiers::ModifierSource::Tech("tech_efficient_propulsion".into()),
+        condition: None,
+    });
+
+    let before_tech = state2.ships.get(&ship_id).unwrap().propellant_kg;
+    let assignments = vec![(
+        ship_id.clone(),
+        TaskKind::Transit {
+            destination,
+            total_ticks: 100,
+            then: Box::new(TaskKind::Idle),
+        },
+    )];
+    let mut events = Vec::new();
+    crate::commands::apply_ship_assignments(&mut state2, &content, assignments, 0, &mut events);
+    let after_tech = state2.ships.get(&ship_id).unwrap().propellant_kg;
+    let tech_cost = before_tech - after_tech;
+
+    // With -33%, cost should be ~67% of baseline
+    let ratio = tech_cost / baseline_cost;
+    assert!(
+        (ratio - 0.67).abs() < 0.02,
+        "tech fuel cost should be ~67% of baseline: baseline={baseline_cost}, tech={tech_cost}, ratio={ratio}"
+    );
+}

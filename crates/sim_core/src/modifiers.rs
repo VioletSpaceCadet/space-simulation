@@ -32,6 +32,7 @@ pub enum StatId {
 
     // Ship
     CargoCapacity,
+    FuelEfficiency,
     PropellantCapacity,
     ShipSpeed,
 

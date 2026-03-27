@@ -949,13 +949,18 @@ fn deduct_transit_fuel(
         return false;
     };
     let position = ship.position.clone();
-    let fuel_cost = crate::propulsion::compute_transit_fuel(
+    let base_fuel_cost = crate::propulsion::compute_transit_fuel(
         ship,
         &position,
         destination,
         content,
         &state.body_cache,
     );
+    // Apply global fuel efficiency modifier (e.g. tech_efficient_propulsion).
+    let fuel_cost = base_fuel_cost
+        * state
+            .modifiers
+            .resolve_f32(crate::modifiers::StatId::FuelEfficiency, 1.0);
 
     if fuel_cost <= 0.0 {
         return true; // co-located, no fuel needed
