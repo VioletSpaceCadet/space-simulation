@@ -326,12 +326,12 @@ fn rebuild_power_cache(
                 has_power_infrastructure = true;
                 let mut power_mods = crate::modifiers::ModifierSet::new();
                 power_mods.add(crate::modifiers::Modifier::pct_mult(
-                    crate::modifiers::StatId::PowerOutput,
+                    crate::modifiers::StatId::SolarOutput,
                     f64::from(solar_intensity),
                     crate::modifiers::ModifierSource::Environment,
                 ));
                 power_mods.add(crate::modifiers::Modifier::pct_mult(
-                    crate::modifiers::StatId::PowerOutput,
+                    crate::modifiers::StatId::SolarOutput,
                     f64::from(crate::wear::wear_efficiency(
                         module.wear.wear,
                         &content.constants,
@@ -339,7 +339,7 @@ fn rebuild_power_cache(
                     crate::modifiers::ModifierSource::Wear,
                 ));
                 generated_kw += power_mods.resolve_with_f32(
-                    crate::modifiers::StatId::PowerOutput,
+                    crate::modifiers::StatId::SolarOutput,
                     solar_def.base_output_kw,
                     global_modifiers,
                 );

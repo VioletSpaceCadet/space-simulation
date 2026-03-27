@@ -288,6 +288,78 @@ fn power_budget_disabled_modules_excluded() {
     );
 }
 
+#[test]
+fn solar_output_boosted_by_tech_modifier() {
+    let content = solar_array_content();
+    let mut state = state_with_solar_array(&content);
+
+    // Add a SolarOutput modifier simulating an unlocked tech
+    state.modifiers.add(crate::modifiers::Modifier {
+        stat: crate::modifiers::StatId::SolarOutput,
+        op: crate::modifiers::ModifierOp::PctAdditive,
+        value: 0.5,
+        source: crate::modifiers::ModifierSource::Tech("tech_solar_efficiency".into()),
+        condition: None,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    let station = state
+        .stations
+        .get(&StationId("station_earth_orbit".to_string()))
+        .unwrap();
+    // Base 50 kW * (1 + 0.5) = 75 kW
+    assert!(
+        (station.power.generated_kw - 75.0).abs() < 0.01,
+        "solar output should be 75.0 with +50% tech modifier, got {}",
+        station.power.generated_kw
+    );
+}
+
+#[test]
+fn solar_tech_modifier_does_not_affect_battery() {
+    let content = battery_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Add battery at full capacity
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("battery_inst_0001".to_string()),
+        def_id: "module_basic_battery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 95.0 }),
+        wear: WearState::default(),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
+        thermal: None,
+    });
+
+    // Add SolarOutput modifier — should NOT affect battery capacity
+    state.modifiers.add(crate::modifiers::Modifier {
+        stat: crate::modifiers::StatId::SolarOutput,
+        op: crate::modifiers::ModifierOp::PctAdditive,
+        value: 0.5,
+        source: crate::modifiers::ModifierSource::Tech("tech_solar_efficiency".into()),
+        condition: None,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // Battery capacity should still be 100 kWh (no SolarOutput effect on battery)
+    // With 95 kWh stored, headroom = 5 kWh, charge limited to 5 kW
+    assert!(
+        (station.power.battery_charge_kw - 5.0).abs() < f32::EPSILON,
+        "battery charge should be 5 kW (headroom limited, unaffected by solar tech), got {}",
+        station.power.battery_charge_kw
+    );
+}
+
 // --- Power stalling tests ---
 
 fn stall_content() -> GameContent {

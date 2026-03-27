@@ -39,6 +39,7 @@ pub enum StatId {
     CoolingRate,
     HeatGeneration,
     PowerOutput,
+    SolarOutput,
 
     // Maintenance
     RepairRate,

@@ -106,6 +106,27 @@
         "ManufacturingData"
       ],
       "effects": []
+    },
+    {
+      "id": "tech_solar_efficiency",
+      "name": "Solar Efficiency",
+      "prereqs": [],
+      "domain_requirements": {
+        "Manufacturing": 200.0,
+        "Survey": 50.0
+      },
+      "accepted_data": [
+        "ManufacturingData",
+        "SurveyData"
+      ],
+      "effects": [
+        {
+          "type": "StatModifier",
+          "stat": "solar_output",
+          "op": "pct_additive",
+          "value": 0.5
+        }
+      ]
     }
   ]
 }
