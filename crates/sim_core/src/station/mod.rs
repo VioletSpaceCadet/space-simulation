@@ -290,6 +290,32 @@ fn apply_battery_buffering(
     (discharge_kw, charge_kw, stored_kwh)
 }
 
+/// Compute wear + environment + tech-adjusted solar output for one array.
+fn resolve_solar_output(
+    solar_def: &crate::SolarArrayDef,
+    wear: f32,
+    solar_intensity: f32,
+    constants: &crate::Constants,
+    global_modifiers: &crate::modifiers::ModifierSet,
+) -> f32 {
+    let mut power_mods = crate::modifiers::ModifierSet::new();
+    power_mods.add(crate::modifiers::Modifier::pct_mult(
+        crate::modifiers::StatId::SolarOutput,
+        f64::from(solar_intensity),
+        crate::modifiers::ModifierSource::Environment,
+    ));
+    power_mods.add(crate::modifiers::Modifier::pct_mult(
+        crate::modifiers::StatId::SolarOutput,
+        f64::from(crate::wear::wear_efficiency(wear, constants)),
+        crate::modifiers::ModifierSource::Wear,
+    ));
+    power_mods.resolve_with_f32(
+        crate::modifiers::StatId::SolarOutput,
+        solar_def.base_output_kw,
+        global_modifiers,
+    )
+}
+
 /// Rebuild the cached power generation/consumption summary for a station.
 /// Iterates all modules, looks up defs, computes wear-adjusted generation.
 /// Only called when `power_budget_cache.is_valid()` is false.
@@ -332,23 +358,11 @@ fn rebuild_power_cache(
         match &def.behavior {
             crate::ModuleBehaviorDef::SolarArray(solar_def) => {
                 has_power_infrastructure = true;
-                let mut power_mods = crate::modifiers::ModifierSet::new();
-                power_mods.add(crate::modifiers::Modifier::pct_mult(
-                    crate::modifiers::StatId::SolarOutput,
-                    f64::from(solar_intensity),
-                    crate::modifiers::ModifierSource::Environment,
-                ));
-                power_mods.add(crate::modifiers::Modifier::pct_mult(
-                    crate::modifiers::StatId::SolarOutput,
-                    f64::from(crate::wear::wear_efficiency(
-                        module.wear.wear,
-                        &content.constants,
-                    )),
-                    crate::modifiers::ModifierSource::Wear,
-                ));
-                generated_kw += power_mods.resolve_with_f32(
-                    crate::modifiers::StatId::SolarOutput,
-                    solar_def.base_output_kw,
+                generated_kw += resolve_solar_output(
+                    solar_def,
+                    module.wear.wear,
+                    solar_intensity,
+                    &content.constants,
                     global_modifiers,
                 );
                 consumed_kw += def.power_consumption_per_run * power_consumption_mult;
