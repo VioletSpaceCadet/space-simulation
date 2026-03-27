@@ -317,6 +317,10 @@ fn rebuild_power_cache(
     let power_consumption_mult =
         global_modifiers.resolve_f32(crate::modifiers::StatId::PowerConsumption, 1.0);
 
+    // Resolve global battery capacity multiplier (e.g. tech_battery_storage).
+    let battery_capacity_mult =
+        global_modifiers.resolve_f32(crate::modifiers::StatId::BatteryCapacity, 1.0);
+
     for (module_index, module) in station.modules.iter().enumerate() {
         if !module.enabled {
             continue;
@@ -372,7 +376,9 @@ fn rebuild_power_cache(
                     1.0,
                     global_modifiers,
                 );
-                battery_entries.push((module_index, battery_def.clone(), efficiency));
+                let mut scaled_battery = battery_def.clone();
+                scaled_battery.capacity_kwh *= battery_capacity_mult;
+                battery_entries.push((module_index, scaled_battery, efficiency));
                 consumed_kw += def.power_consumption_per_run * power_consumption_mult;
                 wear_band_snapshot.push((
                     module_index,
