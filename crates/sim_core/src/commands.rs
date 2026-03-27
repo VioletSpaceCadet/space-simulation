@@ -81,17 +81,12 @@ pub(crate) fn handle_install_module(
     };
     station.invalidate_volume_cache();
 
-    let module_id_str = format!("module_inst_{:04}", state.counters.next_module_instance_id);
-    state.counters.next_module_instance_id += 1;
-    let module_id = crate::ModuleInstanceId(module_id_str);
-
     let Some(def) = content.module_defs.get(&module_def_id) else {
         return false;
     };
-    // Check tech gate — reject installation if required tech isn't unlocked
+    // Check tech gate before allocating a module instance ID
     if let Some(ref tech_id) = def.required_tech {
         if !state.research.unlocked.contains(tech_id) {
-            // Put the module back in inventory
             let Some(station) = state.stations.get_mut(station_id) else {
                 return false;
             };
@@ -100,6 +95,7 @@ pub(crate) fn handle_install_module(
                 module_def_id,
             });
             station.invalidate_volume_cache();
+            let module_id = crate::ModuleInstanceId(format!("pending_{}", tech_id.0));
             events.push(crate::emit(
                 &mut state.counters,
                 current_tick,
@@ -112,6 +108,10 @@ pub(crate) fn handle_install_module(
             return false;
         }
     }
+
+    let module_id_str = format!("module_inst_{:04}", state.counters.next_module_instance_id);
+    state.counters.next_module_instance_id += 1;
+    let module_id = crate::ModuleInstanceId(module_id_str);
     let (kind_state, behavior_type, thermal) = default_module_state(def, content);
 
     let Some(station) = state.stations.get_mut(station_id) else {
