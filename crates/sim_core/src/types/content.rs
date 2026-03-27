@@ -582,6 +582,9 @@ pub struct ModuleDef {
     /// Crew roles required to operate this module. Empty = no crew needed.
     #[serde(default)]
     pub crew_requirement: BTreeMap<CrewRole, u32>,
+    /// Tech required to install/import this module. `None` = always available.
+    #[serde(default)]
+    pub required_tech: Option<crate::TechId>,
 }
 
 impl ModuleDef {

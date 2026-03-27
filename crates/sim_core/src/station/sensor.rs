@@ -92,6 +92,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         content

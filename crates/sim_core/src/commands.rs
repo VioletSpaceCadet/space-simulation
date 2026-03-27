@@ -88,6 +88,30 @@ pub(crate) fn handle_install_module(
     let Some(def) = content.module_defs.get(&module_def_id) else {
         return false;
     };
+    // Check tech gate — reject installation if required tech isn't unlocked
+    if let Some(ref tech_id) = def.required_tech {
+        if !state.research.unlocked.contains(tech_id) {
+            // Put the module back in inventory
+            let Some(station) = state.stations.get_mut(station_id) else {
+                return false;
+            };
+            station.inventory.push(InventoryItem::Module {
+                item_id,
+                module_def_id,
+            });
+            station.invalidate_volume_cache();
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                crate::Event::ModuleAwaitingTech {
+                    station_id: station_id.clone(),
+                    module_id,
+                    tech_id: tech_id.clone(),
+                },
+            ));
+            return false;
+        }
+    }
     let (kind_state, behavior_type, thermal) = default_module_state(def, content);
 
     let Some(station) = state.stations.get_mut(station_id) else {
@@ -501,7 +525,7 @@ pub(crate) fn handle_set_module_priority(
     true
 }
 
-/// Assign crew of a given role to a module. Validates available crew and role requirement.
+/// Assign crew of a given role to a module. Validates available crew, role requirement, and cap.
 pub(crate) fn handle_assign_crew(
     state: &mut GameState,
     content: &GameContent,
@@ -511,11 +535,13 @@ pub(crate) fn handle_assign_crew(
     count: u32,
     events: &mut Vec<crate::EventEnvelope>,
 ) -> bool {
+    if count == 0 {
+        return false;
+    }
     let current_tick = state.meta.tick;
     let Some(station) = state.stations.get(station_id) else {
         return false;
     };
-    // Validate module exists and role is in its requirement
     let module_index = station.modules.iter().position(|m| &m.id == module_id);
     let Some(module_index) = module_index else {
         return false;
@@ -524,14 +550,26 @@ pub(crate) fn handle_assign_crew(
     let Some(def) = content.module_defs.get(def_id) else {
         return false;
     };
-    if !def.crew_requirement.contains_key(role) {
+    let Some(&needed) = def.crew_requirement.get(role) else {
+        return false;
+    };
+    // Cap: don't assign more than the requirement
+    let already_assigned = station.modules[module_index]
+        .assigned_crew
+        .get(role)
+        .copied()
+        .unwrap_or(0);
+    let max_assignable = needed.saturating_sub(already_assigned);
+    let actual_count = count.min(max_assignable);
+    if actual_count == 0 {
         return false;
     }
     // Check available crew
     let available = station.available_crew(role);
-    if available < count {
+    if available < actual_count {
         return false;
     }
+    let count = actual_count;
 
     let station = state
         .stations
@@ -581,6 +619,9 @@ pub(crate) fn handle_unassign_crew(
     count: u32,
     events: &mut Vec<crate::EventEnvelope>,
 ) -> bool {
+    if count == 0 {
+        return false;
+    }
     let current_tick = state.meta.tick;
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
@@ -605,6 +646,7 @@ pub(crate) fn handle_unassign_crew(
         module.crew_satisfied =
             crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement);
     }
+    let now_satisfied = module.crew_satisfied;
     let module_id = module.id.clone();
     events.push(crate::emit(
         &mut state.counters,
@@ -616,10 +658,6 @@ pub(crate) fn handle_unassign_crew(
             count,
         },
     ));
-    let now_satisfied = station
-        .modules
-        .iter()
-        .any(|m| m.id == module_id && m.crew_satisfied);
     if was_satisfied && !now_satisfied {
         events.push(crate::emit(
             &mut state.counters,
@@ -1010,6 +1048,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         content
@@ -1224,6 +1263,7 @@ mod tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
 

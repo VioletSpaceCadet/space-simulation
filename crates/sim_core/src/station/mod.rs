@@ -982,6 +982,7 @@ mod framework_tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         content
@@ -1132,6 +1133,7 @@ mod framework_tests {
                 power_stall_priority: None,
                 roles: vec![],
                 crew_requirement: Default::default(),
+                required_tech: None,
             },
         );
         assert!(extract_context(&state, &station_id, 0, &content2).is_none());

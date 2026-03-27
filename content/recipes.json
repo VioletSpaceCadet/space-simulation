@@ -3,23 +3,36 @@
     "id": "recipe_basic_iron",
     "inputs": [
       {
-        "filter": { "ItemKind": "Ore" },
-        "amount": { "Kg": 1000.0 }
+        "filter": {
+          "ItemKind": "Ore"
+        },
+        "amount": {
+          "Kg": 1000.0
+        }
       }
     ],
     "outputs": [
       {
         "Material": {
           "element": "Fe",
-          "yield_formula": { "ElementFraction": { "element": "Fe" } },
+          "yield_formula": {
+            "ElementFraction": {
+              "element": "Fe"
+            }
+          },
           "quality_formula": {
-            "ElementFractionTimesMultiplier": { "element": "Fe", "multiplier": 1.0 }
+            "ElementFractionTimesMultiplier": {
+              "element": "Fe",
+              "multiplier": 1.0
+            }
           }
         }
       },
       {
         "Slag": {
-          "yield_formula": { "FixedFraction": 1.0 }
+          "yield_formula": {
+            "FixedFraction": 1.0
+          }
         }
       }
     ],
@@ -29,23 +42,35 @@
     "id": "recipe_electrolysis",
     "inputs": [
       {
-        "filter": { "Element": "H2O" },
-        "amount": { "Kg": 1000.0 }
+        "filter": {
+          "Element": "H2O"
+        },
+        "amount": {
+          "Kg": 1000.0
+        }
       }
     ],
     "outputs": [
       {
         "Material": {
           "element": "LH2",
-          "yield_formula": { "FixedFraction": 0.111 },
-          "quality_formula": { "Fixed": 1.0 }
+          "yield_formula": {
+            "FixedFraction": 0.111
+          },
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       },
       {
         "Material": {
           "element": "LOX",
-          "yield_formula": { "FixedFraction": 0.889 },
-          "quality_formula": { "Fixed": 1.0 }
+          "yield_formula": {
+            "FixedFraction": 0.889
+          },
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -55,23 +80,36 @@
     "id": "recipe_extract_water",
     "inputs": [
       {
-        "filter": { "ItemKind": "Ore" },
-        "amount": { "Kg": 1000.0 }
+        "filter": {
+          "ItemKind": "Ore"
+        },
+        "amount": {
+          "Kg": 1000.0
+        }
       }
     ],
     "outputs": [
       {
         "Material": {
           "element": "H2O",
-          "yield_formula": { "ElementFraction": { "element": "H2O" } },
+          "yield_formula": {
+            "ElementFraction": {
+              "element": "H2O"
+            }
+          },
           "quality_formula": {
-            "ElementFractionTimesMultiplier": { "element": "H2O", "multiplier": 1.0 }
+            "ElementFractionTimesMultiplier": {
+              "element": "H2O",
+              "multiplier": 1.0
+            }
           }
         }
       },
       {
         "Slag": {
-          "yield_formula": { "FixedFraction": 1.0 }
+          "yield_formula": {
+            "FixedFraction": 1.0
+          }
         }
       }
     ],
@@ -81,15 +119,21 @@
     "id": "recipe_basic_repair_kit",
     "inputs": [
       {
-        "filter": { "Element": "Fe" },
-        "amount": { "Kg": 200.0 }
+        "filter": {
+          "Element": "Fe"
+        },
+        "amount": {
+          "Kg": 200.0
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "repair_kit",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -99,24 +143,44 @@
     "id": "recipe_basic_mining_shuttle",
     "inputs": [
       {
-        "filter": { "Element": "Fe" },
-        "amount": { "Kg": 10000.0 }
+        "filter": {
+          "Element": "Fe"
+        },
+        "amount": {
+          "Kg": 10000.0
+        }
       },
       {
-        "filter": { "Component": "thruster" },
-        "amount": { "Count": 8 }
+        "filter": {
+          "Component": "thruster"
+        },
+        "amount": {
+          "Count": 8
+        }
       },
       {
-        "filter": { "Module": "module_cargo_expander" },
-        "amount": { "Count": 1 }
+        "filter": {
+          "Module": "module_cargo_expander"
+        },
+        "amount": {
+          "Count": 1
+        }
       },
       {
-        "filter": { "Module": "module_propellant_tank" },
-        "amount": { "Count": 1 }
+        "filter": {
+          "Module": "module_propellant_tank"
+        },
+        "amount": {
+          "Count": 1
+        }
       },
       {
-        "filter": { "Module": "module_mining_laser" },
-        "amount": { "Count": 1 }
+        "filter": {
+          "Module": "module_mining_laser"
+        },
+        "amount": {
+          "Count": 1
+        }
       }
     ],
     "outputs": [
@@ -132,23 +196,36 @@
     "id": "recipe_smelt_iron",
     "inputs": [
       {
-        "filter": { "ItemKind": "Ore" },
-        "amount": { "Kg": 500.0 }
+        "filter": {
+          "ItemKind": "Ore"
+        },
+        "amount": {
+          "Kg": 500.0
+        }
       }
     ],
     "outputs": [
       {
         "Material": {
           "element": "Fe",
-          "yield_formula": { "ElementFraction": { "element": "Fe" } },
+          "yield_formula": {
+            "ElementFraction": {
+              "element": "Fe"
+            }
+          },
           "quality_formula": {
-            "ElementFractionTimesMultiplier": { "element": "Fe", "multiplier": 1.0 }
+            "ElementFractionTimesMultiplier": {
+              "element": "Fe",
+              "multiplier": 1.0
+            }
           }
         }
       },
       {
         "Slag": {
-          "yield_formula": { "FixedFraction": 1.0 }
+          "yield_formula": {
+            "FixedFraction": 1.0
+          }
         }
       }
     ],
@@ -165,15 +242,21 @@
     "id": "recipe_fe_plate",
     "inputs": [
       {
-        "filter": { "Element": "Fe" },
-        "amount": { "Kg": 500.0 }
+        "filter": {
+          "Element": "Fe"
+        },
+        "amount": {
+          "Kg": 500.0
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "fe_plate",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -183,15 +266,21 @@
     "id": "recipe_structural_beam",
     "inputs": [
       {
-        "filter": { "Component": "fe_plate" },
-        "amount": { "Count": 3 }
+        "filter": {
+          "Component": "fe_plate"
+        },
+        "amount": {
+          "Count": 3
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "structural_beam",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -201,19 +290,29 @@
     "id": "recipe_hull_panel",
     "inputs": [
       {
-        "filter": { "Component": "structural_beam" },
-        "amount": { "Count": 2 }
+        "filter": {
+          "Component": "structural_beam"
+        },
+        "amount": {
+          "Count": 2
+        }
       },
       {
-        "filter": { "Component": "fe_plate" },
-        "amount": { "Count": 2 }
+        "filter": {
+          "Component": "fe_plate"
+        },
+        "amount": {
+          "Count": 2
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "hull_panel",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -224,19 +323,29 @@
     "id": "recipe_advanced_repair_kit",
     "inputs": [
       {
-        "filter": { "Component": "fe_plate" },
-        "amount": { "Count": 1 }
+        "filter": {
+          "Component": "fe_plate"
+        },
+        "amount": {
+          "Count": 1
+        }
       },
       {
-        "filter": { "Component": "repair_kit" },
-        "amount": { "Count": 1 }
+        "filter": {
+          "Component": "repair_kit"
+        },
+        "amount": {
+          "Count": 1
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "advanced_repair_kit",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -246,19 +355,29 @@
     "id": "recipe_mining_laser",
     "inputs": [
       {
-        "filter": { "Component": "fe_plate" },
-        "amount": { "Count": 4 }
+        "filter": {
+          "Component": "fe_plate"
+        },
+        "amount": {
+          "Count": 4
+        }
       },
       {
-        "filter": { "Component": "structural_beam" },
-        "amount": { "Count": 1 }
+        "filter": {
+          "Component": "structural_beam"
+        },
+        "amount": {
+          "Count": 1
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "module_mining_laser",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -268,19 +387,29 @@
     "id": "recipe_cargo_expander",
     "inputs": [
       {
-        "filter": { "Component": "fe_plate" },
-        "amount": { "Count": 2 }
+        "filter": {
+          "Component": "fe_plate"
+        },
+        "amount": {
+          "Count": 2
+        }
       },
       {
-        "filter": { "Component": "structural_beam" },
-        "amount": { "Count": 1 }
+        "filter": {
+          "Component": "structural_beam"
+        },
+        "amount": {
+          "Count": 1
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "module_cargo_expander",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -290,19 +419,29 @@
     "id": "recipe_survey_scanner",
     "inputs": [
       {
-        "filter": { "Component": "fe_plate" },
-        "amount": { "Count": 2 }
+        "filter": {
+          "Component": "fe_plate"
+        },
+        "amount": {
+          "Count": 2
+        }
       },
       {
-        "filter": { "Component": "thruster" },
-        "amount": { "Count": 1 }
+        "filter": {
+          "Component": "thruster"
+        },
+        "amount": {
+          "Count": 1
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "module_survey_scanner",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -312,19 +451,29 @@
     "id": "recipe_basic_engine",
     "inputs": [
       {
-        "filter": { "Component": "fe_plate" },
-        "amount": { "Count": 3 }
+        "filter": {
+          "Component": "fe_plate"
+        },
+        "amount": {
+          "Count": 3
+        }
       },
       {
-        "filter": { "Component": "thruster" },
-        "amount": { "Count": 2 }
+        "filter": {
+          "Component": "thruster"
+        },
+        "amount": {
+          "Count": 2
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "module_basic_engine",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
@@ -334,22 +483,74 @@
     "id": "recipe_propellant_tank",
     "inputs": [
       {
-        "filter": { "Component": "fe_plate" },
-        "amount": { "Count": 3 }
+        "filter": {
+          "Component": "fe_plate"
+        },
+        "amount": {
+          "Count": 3
+        }
       },
       {
-        "filter": { "Component": "structural_beam" },
-        "amount": { "Count": 1 }
+        "filter": {
+          "Component": "structural_beam"
+        },
+        "amount": {
+          "Count": 1
+        }
       }
     ],
     "outputs": [
       {
         "Component": {
           "component_id": "module_propellant_tank",
-          "quality_formula": { "Fixed": 1.0 }
+          "quality_formula": {
+            "Fixed": 1.0
+          }
         }
       }
     ],
     "efficiency": 1.0
+  },
+  {
+    "id": "recipe_automated_iron",
+    "inputs": [
+      {
+        "filter": {
+          "ItemKind": "Ore"
+        },
+        "amount": {
+          "Kg": 1000.0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "Material": {
+          "element": "Fe",
+          "yield_formula": {
+            "ElementFraction": {
+              "element": "Fe"
+            }
+          },
+          "quality_formula": {
+            "ElementFractionTimesMultiplier": {
+              "element": "Fe",
+              "multiplier": 1.0
+            }
+          }
+        }
+      },
+      {
+        "Slag": {
+          "yield_formula": {
+            "FixedFraction": 1.0
+          }
+        }
+      }
+    ],
+    "efficiency": 0.85,
+    "tags": [
+      "automated"
+    ]
   }
 ]

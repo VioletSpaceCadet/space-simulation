@@ -90,6 +90,7 @@ fn production_like_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -117,6 +118,7 @@ fn production_like_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -144,6 +146,7 @@ fn production_like_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -171,6 +174,7 @@ fn production_like_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -224,6 +228,7 @@ fn production_like_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -269,6 +274,7 @@ fn production_like_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -296,6 +302,7 @@ fn production_like_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -614,6 +621,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
             power_stall_priority: None,
             roles: vec!["shipyard".to_string()],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 

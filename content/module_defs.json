@@ -491,22 +491,13 @@
       "Processor": {
         "processing_interval_minutes": 60,
         "recipes": [
-          "recipe_basic_iron"
+          "recipe_automated_iron"
         ]
       }
     },
     "power_stall_priority": 3,
     "crew_requirement": {},
-    "ship_modifiers": [
-      {
-        "stat": "processing_yield",
-        "op": "pct_multiplicative",
-        "value": 0.85,
-        "source": {
-          "equipment": "module_automated_refinery"
-        }
-      }
-    ]
+    "required_tech": "tech_automation_basic"
   },
   {
     "id": "module_automated_assembler",
@@ -527,6 +518,7 @@
       }
     },
     "power_stall_priority": 2,
-    "crew_requirement": {}
+    "crew_requirement": {},
+    "required_tech": "tech_automation_basic"
   }
 ]

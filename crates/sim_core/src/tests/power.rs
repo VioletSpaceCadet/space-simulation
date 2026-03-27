@@ -20,6 +20,7 @@ fn solar_array_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
     content.module_defs.insert(
@@ -42,6 +43,7 @@ fn solar_array_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
     content
@@ -167,6 +169,7 @@ fn power_budget_deficit_when_insufficient() {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -319,6 +322,7 @@ fn stall_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
     content
@@ -525,6 +529,7 @@ fn battery_content() -> GameContent {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
     content
@@ -596,6 +601,7 @@ fn battery_discharges_to_cover_deficit() {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -691,6 +697,7 @@ fn battery_partial_discharge_then_stall() {
             power_stall_priority: None,
             roles: vec![],
             crew_requirement: Default::default(),
+            required_tech: None,
         },
     );
 
@@ -877,6 +884,7 @@ fn power_priority_fallback_uses_behavior_type() {
         power_stall_priority: None,
         roles: vec![],
         crew_requirement: Default::default(),
+        required_tech: None,
     };
     assert_eq!(def.power_priority(), Some(3), "Processor default is 3");
 }
@@ -901,6 +909,7 @@ fn power_priority_content_override_takes_precedence() {
         power_stall_priority: Some(7),
         roles: vec![],
         crew_requirement: Default::default(),
+        required_tech: None,
     };
     assert_eq!(
         def.power_priority(),
