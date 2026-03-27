@@ -50,6 +50,7 @@ fn crew_content() -> GameContent {
             roles: vec![],
             required_tech: None,
             crew_requirement: BTreeMap::from([(CrewRole("operator".to_string()), 1)]),
+            ports: Vec::new(),
         },
     );
     content.crew_roles.insert(

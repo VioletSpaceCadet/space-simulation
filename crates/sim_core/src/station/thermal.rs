@@ -537,6 +537,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         content
@@ -761,6 +762,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
 
@@ -838,6 +840,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         let station = state.stations.get_mut(station_id).unwrap();
@@ -1363,6 +1366,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         content

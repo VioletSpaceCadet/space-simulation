@@ -164,6 +164,7 @@ fn refinery_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     )]
     .into_iter()
@@ -239,6 +240,7 @@ fn assembler_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     )]
     .into_iter()
@@ -304,6 +306,7 @@ fn maintenance_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
     content

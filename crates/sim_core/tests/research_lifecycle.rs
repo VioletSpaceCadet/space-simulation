@@ -36,6 +36,7 @@ fn full_research_lifecycle() {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 
@@ -119,6 +120,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 

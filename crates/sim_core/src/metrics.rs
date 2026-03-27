@@ -1269,6 +1269,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         )]
         .into_iter()
@@ -1449,6 +1450,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         )]
         .into_iter()
@@ -1568,6 +1570,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         )]
         .into_iter()
@@ -1655,6 +1658,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         let mut state = empty_state();
@@ -1728,6 +1732,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
 
@@ -1848,6 +1853,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
 

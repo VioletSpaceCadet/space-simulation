@@ -1188,6 +1188,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         validate_content(&content);
@@ -1282,6 +1283,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         validate_content(&content);
@@ -1409,6 +1411,72 @@ mod tests {
         assert!(
             inner_belt.unwrap().zone.is_some(),
             "inner_belt should have a zone"
+        );
+    }
+
+    #[test]
+    fn test_module_ports_load_from_content() {
+        let content_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../content");
+        let content = load_content(content_dir.to_str().unwrap()).unwrap();
+
+        // Smelter should have a molten_out port
+        let smelter = content.module_defs.get("module_basic_smelter");
+        assert!(smelter.is_some(), "smelter should exist");
+        let smelter = smelter.unwrap();
+        assert_eq!(smelter.ports.len(), 1, "smelter should have 1 port");
+        assert_eq!(smelter.ports[0].id, "molten_out");
+        assert_eq!(smelter.ports[0].direction, sim_core::PortDirection::Output);
+        assert_eq!(smelter.ports[0].accepts, sim_core::PortFilter::AnyMolten);
+    }
+
+    #[test]
+    fn test_module_without_ports_has_empty_vec() {
+        let content_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../content");
+        let content = load_content(content_dir.to_str().unwrap()).unwrap();
+
+        // Basic iron refinery has no ports
+        let refinery = content.module_defs.get("module_basic_iron_refinery");
+        assert!(refinery.is_some(), "refinery should exist");
+        assert!(
+            refinery.unwrap().ports.is_empty(),
+            "refinery should have no ports (backward compat)"
+        );
+    }
+
+    #[test]
+    fn test_port_types_serialize_round_trip() {
+        use sim_core::{ModulePort, PortDirection, PortFilter};
+
+        let ports = vec![
+            ModulePort {
+                id: "molten_in".to_string(),
+                direction: PortDirection::Input,
+                accepts: PortFilter::AnyMolten,
+            },
+            ModulePort {
+                id: "fe_out".to_string(),
+                direction: PortDirection::Output,
+                accepts: PortFilter::Element("Fe".to_string()),
+            },
+            ModulePort {
+                id: "liquid_in".to_string(),
+                direction: PortDirection::Input,
+                accepts: PortFilter::Phase(sim_core::Phase::Liquid),
+            },
+        ];
+
+        let json = serde_json::to_string(&ports).unwrap();
+        let deserialized: Vec<ModulePort> = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.len(), 3);
+        assert_eq!(deserialized[0].direction, PortDirection::Input);
+        assert_eq!(deserialized[0].accepts, PortFilter::AnyMolten);
+        assert_eq!(
+            deserialized[1].accepts,
+            PortFilter::Element("Fe".to_string())
+        );
+        assert_eq!(
+            deserialized[2].accepts,
+            PortFilter::Phase(sim_core::Phase::Liquid)
         );
     }
 
@@ -1783,6 +1851,7 @@ mod tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         content.fitting_templates.insert(

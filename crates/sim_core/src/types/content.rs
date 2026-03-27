@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     AlertSeverity, AnomalyTag, AssemblerState, BatteryState, BehaviorType, BodyId, ComponentId,
     Constants, CrewRole, DataKind, ElementId, FittedModule, HullId, ItemKind, LabState,
-    MaintenanceState, ModuleKindState, NodeId, PricingTable, ProcessorState, RadiatorState,
+    MaintenanceState, ModuleKindState, NodeId, Phase, PricingTable, ProcessorState, RadiatorState,
     RecipeId, ResearchDomain, SensorArrayState, SlotType, SolarArrayState, TechId, ThermalGroupId,
 };
 
@@ -549,6 +549,36 @@ pub struct SlotDef {
 }
 
 // ---------------------------------------------------------------------------
+// Module port types
+// ---------------------------------------------------------------------------
+
+/// Direction of a module port (input receives, output sends).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PortDirection {
+    Input,
+    Output,
+}
+
+/// Filter describing what a port accepts or emits.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PortFilter {
+    /// Any molten (liquid-phase) material.
+    AnyMolten,
+    /// A specific element by ID.
+    Element(ElementId),
+    /// Any material in the given phase.
+    Phase(Phase),
+}
+
+/// A declared input/output port on a module definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModulePort {
+    pub id: String,
+    pub direction: PortDirection,
+    pub accepts: PortFilter,
+}
+
+// ---------------------------------------------------------------------------
 // Module definitions
 // ---------------------------------------------------------------------------
 
@@ -585,6 +615,9 @@ pub struct ModuleDef {
     /// Tech required to install/import this module. `None` = always available.
     #[serde(default)]
     pub required_tech: Option<crate::TechId>,
+    /// Declared input/output ports for directed material flow. Empty = no ports.
+    #[serde(default)]
+    pub ports: Vec<ModulePort>,
 }
 
 impl ModuleDef {

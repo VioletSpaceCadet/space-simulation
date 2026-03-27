@@ -988,6 +988,7 @@ mod framework_tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         content
@@ -1139,6 +1140,7 @@ mod framework_tests {
                 roles: vec![],
                 crew_requirement: Default::default(),
                 required_tech: None,
+                ports: Vec::new(),
             },
         );
         assert!(extract_context(&state, &station_id, 0, &content2).is_none());

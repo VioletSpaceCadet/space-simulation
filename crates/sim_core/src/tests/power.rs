@@ -21,6 +21,7 @@ fn solar_array_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
     content.module_defs.insert(
@@ -44,6 +45,7 @@ fn solar_array_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
     content
@@ -170,6 +172,7 @@ fn power_budget_deficit_when_insufficient() {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 
@@ -512,6 +515,7 @@ fn stall_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
     content
@@ -719,6 +723,7 @@ fn battery_content() -> GameContent {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
     content
@@ -791,6 +796,7 @@ fn battery_discharges_to_cover_deficit() {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 
@@ -887,6 +893,7 @@ fn battery_partial_discharge_then_stall() {
             roles: vec![],
             crew_requirement: Default::default(),
             required_tech: None,
+            ports: Vec::new(),
         },
     );
 
@@ -1074,6 +1081,7 @@ fn power_priority_fallback_uses_behavior_type() {
         roles: vec![],
         crew_requirement: Default::default(),
         required_tech: None,
+        ports: Vec::new(),
     };
     assert_eq!(def.power_priority(), Some(3), "Processor default is 3");
 }
@@ -1099,6 +1107,7 @@ fn power_priority_content_override_takes_precedence() {
         roles: vec![],
         crew_requirement: Default::default(),
         required_tech: None,
+        ports: Vec::new(),
     };
     assert_eq!(
         def.power_priority(),
