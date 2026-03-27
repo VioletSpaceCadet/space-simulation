@@ -192,6 +192,25 @@
           "value": -0.33
         }
       ]
+    },
+    {
+      "id": "tech_battery_storage",
+      "name": "Advanced Battery Storage",
+      "prereqs": [],
+      "domain_requirements": {
+        "Manufacturing": 250.0
+      },
+      "accepted_data": [
+        "ManufacturingData"
+      ],
+      "effects": [
+        {
+          "type": "StatModifier",
+          "stat": "battery_capacity",
+          "op": "pct_additive",
+          "value": 1.0
+        }
+      ]
     }
   ]
 }

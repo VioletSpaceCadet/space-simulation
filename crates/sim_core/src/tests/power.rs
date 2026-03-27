@@ -1061,6 +1061,49 @@ fn battery_not_stalled_by_power_system() {
 }
 
 #[test]
+fn battery_capacity_doubled_by_tech_modifier() {
+    let content = battery_content();
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Battery with 95 kWh stored (base capacity 100 kWh → headroom 5 kWh)
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("battery_inst_0001".to_string()),
+        def_id: "module_basic_battery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 95.0 }),
+        wear: WearState::default(),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
+        thermal: None,
+    });
+
+    // Add +100% battery capacity modifier (2x capacity → 200 kWh)
+    state.modifiers.add(crate::modifiers::Modifier {
+        stat: crate::modifiers::StatId::BatteryCapacity,
+        op: crate::modifiers::ModifierOp::PctAdditive,
+        value: 1.0,
+        source: crate::modifiers::ModifierSource::Tech("tech_battery_storage".into()),
+        condition: None,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // With 2x capacity (200 kWh), headroom = 200 - 95 = 105 kWh
+    // Charge limited by charge_rate (20 kW), not headroom
+    assert!(
+        (station.power.battery_charge_kw - 20.0).abs() < f32::EPSILON,
+        "with doubled capacity, charge should be rate-limited at 20 kW, got {}",
+        station.power.battery_charge_kw
+    );
+}
+
+#[test]
 fn power_priority_fallback_uses_behavior_type() {
     let def = ModuleDef {
         id: "test_processor".to_string(),

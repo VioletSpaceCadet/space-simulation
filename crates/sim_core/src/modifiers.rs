@@ -37,6 +37,7 @@ pub enum StatId {
     ShipSpeed,
 
     // Station
+    BatteryCapacity,
     BoiloffRate,
     CoolingRate,
     HeatGeneration,
