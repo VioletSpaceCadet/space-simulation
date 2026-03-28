@@ -975,6 +975,205 @@ pub(crate) fn handle_remove_thermal_link(
     }
 }
 
+/// Transfer molten material between two thermal container modules along a link.
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+pub(crate) fn handle_transfer_molten(
+    state: &mut GameState,
+    content: &GameContent,
+    station_id: &StationId,
+    from_module_id: &crate::ModuleInstanceId,
+    to_module_id: &crate::ModuleInstanceId,
+    element: &str,
+    kg: f32,
+    events: &mut Vec<EventEnvelope>,
+) {
+    if kg <= 0.0 {
+        return;
+    }
+
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+
+    // Verify a thermal link exists between these modules
+    let has_link = station
+        .thermal_links
+        .iter()
+        .any(|link| link.from_module_id == *from_module_id && link.to_module_id == *to_module_id);
+    if !has_link {
+        return;
+    }
+
+    // Find source and destination module indices
+    let from_idx = station.modules.iter().position(|m| m.id == *from_module_id);
+    let to_idx = station.modules.iter().position(|m| m.id == *to_module_id);
+    let (Some(from_idx), Some(to_idx)) = (from_idx, to_idx) else {
+        return;
+    };
+
+    // Verify both are thermal containers
+    let is_from_container = matches!(
+        station.modules[from_idx].kind_state,
+        crate::ModuleKindState::ThermalContainer(_)
+    );
+    let is_to_container = matches!(
+        station.modules[to_idx].kind_state,
+        crate::ModuleKindState::ThermalContainer(_)
+    );
+    if !is_from_container || !is_to_container {
+        return;
+    }
+
+    // Check destination capacity
+    let to_def = content.module_defs.get(&station.modules[to_idx].def_id);
+    let capacity_kg = to_def
+        .and_then(|d| match &d.behavior {
+            crate::ModuleBehaviorDef::ThermalContainer(tc) => Some(tc.capacity_kg),
+            _ => None,
+        })
+        .unwrap_or(0.0);
+
+    let station = state
+        .stations
+        .get_mut(station_id)
+        .expect("station verified");
+
+    // Extract material from source container
+    let crate::ModuleKindState::ThermalContainer(ref mut from_container) =
+        station.modules[from_idx].kind_state
+    else {
+        return;
+    };
+
+    // Find liquid material of the requested element
+    let item_idx = from_container.held_items.iter().position(|item| {
+        matches!(
+            item,
+            crate::InventoryItem::Material {
+                element: e,
+                thermal: Some(props),
+                ..
+            } if e == element && props.phase == crate::Phase::Liquid
+        )
+    });
+    let Some(item_idx) = item_idx else {
+        return; // no liquid material of this element
+    };
+
+    // Extract the transfer amount from the source container
+    let source_item = &from_container.held_items[item_idx];
+    let (source_kg_val, quality_val, thermal_props) = match source_item {
+        crate::InventoryItem::Material {
+            kg: source_kg,
+            quality,
+            thermal,
+            ..
+        } => (*source_kg, *quality, thermal.clone()),
+        _ => return,
+    };
+
+    let transfer_kg = kg.min(source_kg_val);
+
+    let transferred_item = crate::InventoryItem::Material {
+        element: element.to_string(),
+        kg: transfer_kg,
+        quality: quality_val,
+        thermal: thermal_props,
+    };
+
+    // Update or remove source item
+    if transfer_kg >= source_kg_val {
+        from_container.held_items.remove(item_idx);
+    } else if let crate::InventoryItem::Material {
+        kg: ref mut src_kg, ..
+    } = from_container.held_items[item_idx]
+    {
+        *src_kg -= transfer_kg;
+    }
+
+    let actual_kg = transfer_kg;
+
+    // Check if material freezes during transfer (below solidification point)
+    let froze = if let crate::InventoryItem::Material {
+        thermal: Some(ref props),
+        ..
+    } = transferred_item
+    {
+        if let Some(element_def) = content.elements.iter().find(|e| e.id == element) {
+            if let Some(melting_point) = element_def.melting_point_mk {
+                let solidification_point =
+                    melting_point.saturating_sub(crate::thermal::SOLIDIFICATION_HYSTERESIS_MK);
+                props.temp_mk <= solidification_point
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    if froze {
+        // Material solidified — put it back in source and emit PipeFreeze
+        let crate::ModuleKindState::ThermalContainer(ref mut from_container) =
+            station.modules[from_idx].kind_state
+        else {
+            return;
+        };
+        from_container.held_items.push(transferred_item);
+        events.push(crate::emit(
+            &mut state.counters,
+            state.meta.tick,
+            crate::Event::PipeFreeze {
+                station_id: station_id.clone(),
+                from_module_id: from_module_id.clone(),
+                to_module_id: to_module_id.clone(),
+                element: element.to_string(),
+            },
+        ));
+        return;
+    }
+
+    // Check destination capacity
+    let crate::ModuleKindState::ThermalContainer(ref dest_container) =
+        station.modules[to_idx].kind_state
+    else {
+        return;
+    };
+    let current_dest_kg: f32 = crate::tasks::inventory_mass_kg(&dest_container.held_items);
+    if current_dest_kg + actual_kg > capacity_kg {
+        // Over capacity — put material back in source
+        let crate::ModuleKindState::ThermalContainer(ref mut from_container) =
+            station.modules[from_idx].kind_state
+        else {
+            return;
+        };
+        from_container.held_items.push(transferred_item);
+        return;
+    }
+
+    // Place in destination
+    let crate::ModuleKindState::ThermalContainer(ref mut dest_container) =
+        station.modules[to_idx].kind_state
+    else {
+        return;
+    };
+    dest_container.held_items.push(transferred_item);
+
+    events.push(crate::emit(
+        &mut state.counters,
+        state.meta.tick,
+        crate::Event::MoltenTransferred {
+            station_id: station_id.clone(),
+            from_module_id: from_module_id.clone(),
+            to_module_id: to_module_id.clone(),
+            element: element.to_string(),
+            kg: actual_kg,
+        },
+    ));
+}
+
 /// Apply deferred ship task assignments collected during the command loop.
 pub(crate) fn apply_ship_assignments(
     state: &mut GameState,

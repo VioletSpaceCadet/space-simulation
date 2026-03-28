@@ -337,4 +337,17 @@ pub enum Event {
         to_module_id: ModuleInstanceId,
         to_port_id: String,
     },
+    MoltenTransferred {
+        station_id: StationId,
+        from_module_id: ModuleInstanceId,
+        to_module_id: ModuleInstanceId,
+        element: String,
+        kg: f32,
+    },
+    PipeFreeze {
+        station_id: StationId,
+        from_module_id: ModuleInstanceId,
+        to_module_id: ModuleInstanceId,
+        element: String,
+    },
 }

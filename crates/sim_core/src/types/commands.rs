@@ -114,4 +114,12 @@ pub enum Command {
         to_module_id: ModuleInstanceId,
         to_port_id: String,
     },
+    /// Transfer molten material along a thermal link.
+    TransferMolten {
+        station_id: StationId,
+        from_module_id: ModuleInstanceId,
+        to_module_id: ModuleInstanceId,
+        element: String,
+        kg: f32,
+    },
 }

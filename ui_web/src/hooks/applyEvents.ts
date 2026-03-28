@@ -910,6 +910,8 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   ModuleFullyStaffed: handleModuleFullyStaffed,
   ThermalLinkCreated: noOp,
   ThermalLinkRemoved: noOp,
+  MoltenTransferred: noOp,
+  PipeFreeze: noOp,
 };
 
 export function applyEvents(
