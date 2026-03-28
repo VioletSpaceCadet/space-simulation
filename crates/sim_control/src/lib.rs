@@ -233,7 +233,8 @@ mod tests {
                 power_stalled: false,
                 module_priority: 0,
                 assigned_crew: Default::default(),
-                crew_satisfied: true,
+                efficiency: 1.0,
+                prev_crew_satisfied: true,
                 thermal: None,
             });
 
@@ -464,7 +465,8 @@ mod tests {
                 power_stalled: false,
                 module_priority: 0,
                 assigned_crew: Default::default(),
-                crew_satisfied: true,
+                efficiency: 1.0,
+                prev_crew_satisfied: true,
                 thermal: None,
             });
 
@@ -627,7 +629,8 @@ mod tests {
                 power_stalled: false,
                 module_priority: 0,
                 assigned_crew: Default::default(),
-                crew_satisfied: true,
+                efficiency: 1.0,
+                prev_crew_satisfied: true,
                 thermal: None,
             });
 
@@ -670,7 +673,8 @@ mod tests {
                 power_stalled: false,
                 module_priority: 0,
                 assigned_crew: Default::default(),
-                crew_satisfied: true,
+                efficiency: 1.0,
+                prev_crew_satisfied: true,
                 thermal: None,
             });
 
@@ -726,7 +730,8 @@ mod tests {
                 power_stalled: false,
                 module_priority: 0,
                 assigned_crew: Default::default(),
-                crew_satisfied: true,
+                efficiency: 1.0,
+                prev_crew_satisfied: true,
                 thermal: None,
             });
 
@@ -806,7 +811,8 @@ mod tests {
                 power_stalled: false,
                 module_priority: 0,
                 assigned_crew: Default::default(),
-                crew_satisfied: true,
+                efficiency: 1.0,
+                prev_crew_satisfied: true,
                 thermal: None,
             });
 
@@ -885,7 +891,8 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         });
 
@@ -1121,7 +1128,8 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         });
 
@@ -1571,7 +1579,8 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
         });
         rebuild_station_indexes(&mut state, &content);
         // No H2O in inventory → needs_water = true
@@ -1782,7 +1791,8 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
         });
         rebuild_station_indexes(&mut state, &content);
         // Add H2O above threshold (500 kg) → should NOT trigger volatile targeting
@@ -1882,7 +1892,8 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         });
     }
@@ -1904,7 +1915,8 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         });
     }
@@ -2058,7 +2070,8 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         });
         rebuild_station_indexes(&mut state, &content);

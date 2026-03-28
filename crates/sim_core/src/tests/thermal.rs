@@ -16,7 +16,8 @@ fn thermal_state_none_round_trip() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     };
 
@@ -46,7 +47,8 @@ fn thermal_state_some_round_trip() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: Some(thermal.clone()),
     };
 

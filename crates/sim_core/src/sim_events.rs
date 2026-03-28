@@ -1752,7 +1752,8 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
         });
     }
 

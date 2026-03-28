@@ -116,7 +116,8 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -135,7 +136,8 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -491,7 +493,8 @@ fn test_full_chain_ore_to_propellant() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -510,7 +513,8 @@ fn test_full_chain_ore_to_propellant() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -529,7 +533,8 @@ fn test_full_chain_ore_to_propellant() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
