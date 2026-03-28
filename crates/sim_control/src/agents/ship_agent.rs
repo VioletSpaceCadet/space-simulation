@@ -28,11 +28,10 @@ impl ShipAgent {
         }
     }
 
-    /// Validate and potentially clear the current objective.
-    /// Returns false if the objective was invalidated (ship should go idle).
-    fn validate_objective(&mut self, state: &GameState) -> bool {
+    /// Validate the current objective and clear it if the target no longer exists.
+    fn validate_objective(&mut self, state: &GameState) {
         let Some(objective) = &self.objective else {
-            return true; // No objective = nothing to invalidate
+            return;
         };
 
         let valid = match objective {
@@ -52,7 +51,6 @@ impl ShipAgent {
         if !valid {
             self.objective = None;
         }
-        valid
     }
 
     /// Convert the current objective to a `TaskKind`, wrapping with transit if needed.
@@ -437,6 +435,41 @@ mod tests {
         let mut agent = ShipAgent::new(test_ship_id());
         agent.objective = Some(ShipObjective::Mine {
             asteroid_id: test_asteroid_id(),
+        });
+        let mut next_id = 1;
+
+        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        assert!(commands.is_empty());
+        assert!(agent.objective.is_none());
+    }
+
+    #[test]
+    fn test_survey_invalidated_when_site_missing() {
+        let (state, content) = setup_state_with_ship();
+        // No scan sites in state
+
+        let owner = PrincipalId("principal_autopilot".to_string());
+        let mut agent = ShipAgent::new(test_ship_id());
+        agent.objective = Some(ShipObjective::Survey {
+            site_id: SiteId("nonexistent_site".to_string()),
+        });
+        let mut next_id = 1;
+
+        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        assert!(commands.is_empty());
+        assert!(agent.objective.is_none());
+    }
+
+    #[test]
+    fn test_deposit_invalidated_when_station_missing() {
+        let (mut state, content) = setup_state_with_ship();
+        // Remove all stations
+        state.stations.clear();
+
+        let owner = PrincipalId("principal_autopilot".to_string());
+        let mut agent = ShipAgent::new(test_ship_id());
+        agent.objective = Some(ShipObjective::Deposit {
+            station_id: StationId("nonexistent_station".to_string()),
         });
         let mut next_id = 1;
 
