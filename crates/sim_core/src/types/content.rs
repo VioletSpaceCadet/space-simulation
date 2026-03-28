@@ -186,6 +186,9 @@ pub struct CrewRoleDef {
     pub id: CrewRole,
     pub name: String,
     pub recruitment_cost: f64,
+    /// Ongoing salary cost per game-hour. Deducted each tick.
+    #[serde(default)]
+    pub salary_per_hour: f64,
 }
 
 // ---------------------------------------------------------------------------

@@ -50,6 +50,7 @@ fn crew_content() -> GameContent {
             id: CrewRole("operator".to_string()),
             name: "Operator".to_string(),
             recruitment_cost: 50000.0,
+            salary_per_hour: 25.0,
         },
     );
     content

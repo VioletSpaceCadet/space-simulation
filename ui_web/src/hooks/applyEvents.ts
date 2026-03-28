@@ -912,6 +912,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   ThermalLinkRemoved: noOp,
   MoltenTransferred: noOp,
   PipeFreeze: noOp,
+  StationBankrupt: noOp,
 };
 
 export function applyEvents(

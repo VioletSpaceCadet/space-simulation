@@ -36,6 +36,7 @@ pub fn tick(
         apply_commands,
         apply_commands(state, commands, content, rng, &mut events)
     );
+    deduct_crew_salaries(state, content, &mut events);
     // Ongoing tasks (Refuel) run every tick, before scheduled task resolution.
     timed!(
         timings,
@@ -439,5 +440,45 @@ fn replenish_scan_sites(
                 template_id: template.id.clone(),
             },
         ));
+    }
+}
+
+/// Deduct crew salaries from the balance. Emits `StationBankrupt` on the
+/// zero-crossing transition (once, not every tick while bankrupt).
+fn deduct_crew_salaries(
+    state: &mut GameState,
+    content: &GameContent,
+    events: &mut Vec<crate::EventEnvelope>,
+) {
+    let hours_per_tick = content.constants.minutes_per_tick as f64 / 60.0;
+    let current_tick = state.meta.tick;
+
+    // Collect total salary across all stations
+    let mut total_salary = 0.0_f64;
+    let station_ids: Vec<crate::StationId> = state.stations.keys().cloned().collect();
+    for station_id in &station_ids {
+        let station = &state.stations[station_id];
+        for (role, &count) in &station.crew {
+            if let Some(role_def) = content.crew_roles.get(role) {
+                total_salary += role_def.salary_per_hour * f64::from(count) * hours_per_tick;
+            }
+        }
+    }
+
+    if total_salary > 0.0 {
+        let was_positive = state.balance >= 0.0;
+        state.balance -= total_salary;
+        if was_positive && state.balance < 0.0 {
+            // Emit bankrupt event for the first station (balance is global)
+            if let Some(station_id) = station_ids.first() {
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    crate::Event::StationBankrupt {
+                        station_id: station_id.clone(),
+                    },
+                ));
+            }
+        }
     }
 }
