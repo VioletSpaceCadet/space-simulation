@@ -323,6 +323,24 @@ fn apply_commands(
                 };
                 commands::handle_remove_thermal_link(state, &link, station_id, events);
             }
+            Command::TransferMolten {
+                station_id,
+                from_module_id,
+                to_module_id,
+                element,
+                kg,
+            } => {
+                commands::handle_transfer_molten(
+                    state,
+                    content,
+                    station_id,
+                    from_module_id,
+                    to_module_id,
+                    element,
+                    *kg,
+                    events,
+                );
+            }
         }
     }
 

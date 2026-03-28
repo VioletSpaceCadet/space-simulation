@@ -421,6 +421,21 @@ export const eventSchemas = {
     to_module_id: z.string(),
     to_port_id: z.string(),
   }),
+
+  MoltenTransferred: z.object({
+    station_id: z.string(),
+    from_module_id: z.string(),
+    to_module_id: z.string(),
+    element: z.string(),
+    kg: z.number(),
+  }),
+
+  PipeFreeze: z.object({
+    station_id: z.string(),
+    from_module_id: z.string(),
+    to_module_id: z.string(),
+    element: z.string(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;
