@@ -48,7 +48,10 @@ impl ShipAssignmentBridge {
         }
 
         // Use first assignable ship's position as reference for distance sorting.
-        let reference_pos = &state.ships[&assignable[0]].position;
+        let Some(first_ship) = state.ships.get(&assignable[0]) else {
+            return;
+        };
+        let reference_pos = &first_ship.position;
 
         let deep_scan_unlocked = state
             .research
@@ -115,7 +118,9 @@ impl ShipAssignmentBridge {
 
         // --- Assign objectives using shared iterators ---
         for ship_id in assignable {
-            let ship = &state.ships[&ship_id];
+            let Some(ship) = state.ships.get(&ship_id) else {
+                continue;
+            };
 
             // Skip ships that would refuel — don't consume iterator slots.
             if should_opportunistic_refuel(ship, state, content) {
@@ -438,6 +443,87 @@ mod tests {
             agents[&ship_id].objective,
             Some(ShipObjective::Survey { ref site_id }) if site_id.0 == "site_1"
         ));
+    }
+
+    #[test]
+    fn deep_scan_assigned_when_tech_unlocked() {
+        let (mut state, mut content, mut agents) = setup();
+        let owner = test_owner();
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut agents, ship_id.clone());
+        state.scan_sites.clear();
+
+        // Set up deep scan: unlock tech, add target config, add eligible asteroid
+        let tech_id = TechId("tech_deep_scan".to_string());
+        content.autopilot.deep_scan_tech = "tech_deep_scan".to_string();
+        content.autopilot.deep_scan_targets = vec![sim_core::DeepScanTargetConfig {
+            tag: "IronRich".to_string(),
+            min_confidence: 0.5,
+        }];
+        state.research.unlocked.insert(tech_id);
+
+        // Asteroid with matching tag beliefs and unknown composition
+        let asteroid_id = make_asteroid_id("asteroid_scan");
+        state.asteroids.insert(
+            asteroid_id.clone(),
+            AsteroidState {
+                id: asteroid_id.clone(),
+                position: test_position(),
+                true_composition: std::collections::HashMap::new(),
+                anomaly_tags: vec![],
+                mass_kg: 500.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(sim_core::AnomalyTag("IronRich".to_string()), 0.9)],
+                    composition: None, // Unknown — eligible for deep scan
+                },
+            },
+        );
+
+        ShipAssignmentBridge::assign_objectives(&mut agents, &state, &content, &owner);
+
+        assert!(matches!(
+            agents[&ship_id].objective,
+            Some(ShipObjective::DeepScan { ref asteroid_id }) if asteroid_id.0 == "asteroid_scan"
+        ));
+    }
+
+    #[test]
+    fn deep_scan_skipped_when_tech_not_unlocked() {
+        let (mut state, mut content, mut agents) = setup();
+        let owner = test_owner();
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut agents, ship_id.clone());
+        state.scan_sites.clear();
+
+        // Configure deep scan but do NOT unlock the tech
+        content.autopilot.deep_scan_tech = "tech_deep_scan".to_string();
+        content.autopilot.deep_scan_targets = vec![sim_core::DeepScanTargetConfig {
+            tag: "IronRich".to_string(),
+            min_confidence: 0.5,
+        }];
+
+        let asteroid_id = make_asteroid_id("asteroid_scan");
+        state.asteroids.insert(
+            asteroid_id.clone(),
+            AsteroidState {
+                id: asteroid_id,
+                position: test_position(),
+                true_composition: std::collections::HashMap::new(),
+                anomaly_tags: vec![],
+                mass_kg: 500.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(sim_core::AnomalyTag("IronRich".to_string()), 0.9)],
+                    composition: None,
+                },
+            },
+        );
+
+        ShipAssignmentBridge::assign_objectives(&mut agents, &state, &content, &owner);
+
+        // No deep scan tech → no assignment (no mine candidates either)
+        assert!(agents[&ship_id].objective.is_none());
     }
 
     #[test]
