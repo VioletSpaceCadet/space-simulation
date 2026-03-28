@@ -45,7 +45,7 @@ impl CommandSource for AutopilotController {
         next_command_id: &mut u64,
     ) -> Vec<CommandEnvelope> {
         let mut commands = Vec::new();
-        for behavior in &self.behaviors {
+        for behavior in &mut self.behaviors {
             commands.extend(behavior.generate(state, content, &self.owner, next_command_id));
         }
         commands
