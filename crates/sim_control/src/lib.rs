@@ -1,4 +1,6 @@
+mod agents;
 mod behaviors;
+mod objectives;
 
 use behaviors::{AutopilotBehavior, AUTOPILOT_OWNER};
 use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};
