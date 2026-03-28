@@ -6,7 +6,7 @@
       "name": "Deep Scan v1",
       "prereqs": [],
       "domain_requirements": {
-        "Survey": 100.0
+        "Survey": 20.0
       },
       "accepted_data": [
         "SurveyData"
@@ -26,8 +26,8 @@
       "name": "Advanced Refining",
       "prereqs": [],
       "domain_requirements": {
-        "Materials": 150.0,
-        "Manufacturing": 50.0
+        "Materials": 30.0,
+        "Manufacturing": 10.0
       },
       "accepted_data": [
         "AssayData",
@@ -47,7 +47,7 @@
       "name": "Ship Construction",
       "prereqs": [],
       "domain_requirements": {
-        "Manufacturing": 200.0
+        "Manufacturing": 40.0
       },
       "accepted_data": [
         "ManufacturingData",
@@ -66,7 +66,7 @@
         "tech_ship_construction"
       ],
       "domain_requirements": {
-        "Propulsion": 150.0
+        "Propulsion": 30.0
       },
       "accepted_data": [
         "TransitData"
@@ -85,7 +85,7 @@
       "name": "Advanced Manufacturing",
       "prereqs": [],
       "domain_requirements": {
-        "Manufacturing": 200.0
+        "Manufacturing": 50.0
       },
       "accepted_data": [
         "ManufacturingData"
@@ -99,8 +99,8 @@
         "tech_advanced_manufacturing"
       ],
       "domain_requirements": {
-        "Manufacturing": 500.0,
-        "Materials": 200.0
+        "Manufacturing": 100.0,
+        "Materials": 40.0
       },
       "accepted_data": [
         "ManufacturingData"
@@ -112,8 +112,8 @@
       "name": "Solar Efficiency",
       "prereqs": [],
       "domain_requirements": {
-        "Manufacturing": 200.0,
-        "Survey": 50.0
+        "Manufacturing": 10.0,
+        "Survey": 5.0
       },
       "accepted_data": [
         "ManufacturingData",
@@ -133,8 +133,8 @@
       "name": "Electrolysis Efficiency",
       "prereqs": [],
       "domain_requirements": {
-        "Materials": 250.0,
-        "Manufacturing": 100.0
+        "Materials": 15.0,
+        "Manufacturing": 5.0
       },
       "accepted_data": [
         "AssayData",
@@ -154,8 +154,8 @@
       "name": "Cryo Insulation",
       "prereqs": [],
       "domain_requirements": {
-        "Materials": 300.0,
-        "Manufacturing": 50.0
+        "Materials": 20.0,
+        "Manufacturing": 5.0
       },
       "accepted_data": [
         "AssayData",
@@ -177,8 +177,8 @@
         "tech_ship_construction"
       ],
       "domain_requirements": {
-        "Propulsion": 300.0,
-        "Survey": 100.0
+        "Propulsion": 20.0,
+        "Survey": 10.0
       },
       "accepted_data": [
         "TransitData",
@@ -198,7 +198,7 @@
       "name": "Advanced Battery Storage",
       "prereqs": [],
       "domain_requirements": {
-        "Manufacturing": 250.0
+        "Manufacturing": 15.0
       },
       "accepted_data": [
         "ManufacturingData"
