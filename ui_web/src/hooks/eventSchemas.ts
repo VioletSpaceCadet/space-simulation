@@ -405,6 +405,22 @@ export const eventSchemas = {
     station_id: z.string(),
     module_id: z.string(),
   }),
+
+  ThermalLinkCreated: z.object({
+    station_id: z.string(),
+    from_module_id: z.string(),
+    from_port_id: z.string(),
+    to_module_id: z.string(),
+    to_port_id: z.string(),
+  }),
+
+  ThermalLinkRemoved: z.object({
+    station_id: z.string(),
+    from_module_id: z.string(),
+    from_port_id: z.string(),
+    to_module_id: z.string(),
+    to_port_id: z.string(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

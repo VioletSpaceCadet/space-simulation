@@ -100,4 +100,18 @@ pub enum Command {
         role: CrewRole,
         count: u32,
     },
+    CreateThermalLink {
+        station_id: StationId,
+        from_module_id: ModuleInstanceId,
+        from_port_id: String,
+        to_module_id: ModuleInstanceId,
+        to_port_id: String,
+    },
+    RemoveThermalLink {
+        station_id: StationId,
+        from_module_id: ModuleInstanceId,
+        from_port_id: String,
+        to_module_id: ModuleInstanceId,
+        to_port_id: String,
+    },
 }

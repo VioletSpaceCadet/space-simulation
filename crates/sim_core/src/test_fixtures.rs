@@ -580,6 +580,7 @@ pub fn base_state(content: &GameContent) -> GameState {
                 modifiers: crate::modifiers::ModifierSet::default(),
                 crew: Default::default(),
                 leaders: Vec::new(),
+                thermal_links: Vec::new(),
                 power: crate::PowerState::default(),
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),

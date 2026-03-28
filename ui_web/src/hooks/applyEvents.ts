@@ -908,6 +908,8 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   CrewUnassigned: handleCrewUnassigned,
   ModuleUnderstaffed: handleModuleUnderstaffed,
   ModuleFullyStaffed: handleModuleFullyStaffed,
+  ThermalLinkCreated: noOp,
+  ThermalLinkRemoved: noOp,
 };
 
 export function applyEvents(

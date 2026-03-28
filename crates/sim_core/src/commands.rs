@@ -888,6 +888,93 @@ pub(crate) fn handle_unfit_ship_module(
     true
 }
 
+/// Create a thermal link between two module ports on a station.
+pub(crate) fn handle_create_thermal_link(
+    state: &mut GameState,
+    content: &GameContent,
+    link: &crate::ThermalLink,
+    station_id: &StationId,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+
+    // Validate both modules exist and look up their defs
+    let Some(from_module) = station.modules.iter().find(|m| m.id == link.from_module_id) else {
+        return;
+    };
+    let Some(to_module) = station.modules.iter().find(|m| m.id == link.to_module_id) else {
+        return;
+    };
+    let Some(from_def) = content.module_defs.get(&from_module.def_id) else {
+        return;
+    };
+    let Some(to_def) = content.module_defs.get(&to_module.def_id) else {
+        return;
+    };
+
+    // Validate ports exist and have correct directions
+    let from_port = from_def.ports.iter().find(|p| p.id == link.from_port_id);
+    let to_port = to_def.ports.iter().find(|p| p.id == link.to_port_id);
+    match (from_port, to_port) {
+        (Some(fp), Some(tp))
+            if fp.direction == crate::PortDirection::Output
+                && tp.direction == crate::PortDirection::Input => {}
+        _ => return,
+    }
+
+    // Check for duplicate
+    let station = state
+        .stations
+        .get_mut(station_id)
+        .expect("station verified above");
+    if station.thermal_links.contains(link) {
+        return;
+    }
+
+    station.thermal_links.push(link.clone());
+    events.push(crate::emit(
+        &mut state.counters,
+        state.meta.tick,
+        crate::Event::ThermalLinkCreated {
+            station_id: station_id.clone(),
+            from_module_id: link.from_module_id.clone(),
+            from_port_id: link.from_port_id.clone(),
+            to_module_id: link.to_module_id.clone(),
+            to_port_id: link.to_port_id.clone(),
+        },
+    ));
+}
+
+/// Remove a thermal link between two module ports on a station.
+pub(crate) fn handle_remove_thermal_link(
+    state: &mut GameState,
+    link: &crate::ThermalLink,
+    station_id: &StationId,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return;
+    };
+
+    let before_len = station.thermal_links.len();
+    station.thermal_links.retain(|l| l != link);
+    if station.thermal_links.len() < before_len {
+        events.push(crate::emit(
+            &mut state.counters,
+            state.meta.tick,
+            crate::Event::ThermalLinkRemoved {
+                station_id: station_id.clone(),
+                from_module_id: link.from_module_id.clone(),
+                from_port_id: link.from_port_id.clone(),
+                to_module_id: link.to_module_id.clone(),
+                to_port_id: link.to_port_id.clone(),
+            },
+        ));
+    }
+}
+
 /// Apply deferred ship task assignments collected during the command loop.
 pub(crate) fn apply_ship_assignments(
     state: &mut GameState,

@@ -401,6 +401,23 @@ impl ModuleTypeIndex {
     }
 }
 
+/// An explicit connection between two module ports for directed material flow.
+///
+/// Links are station-level config with deterministic ordering by
+/// `(from_module_id, to_module_id)`. No routing or pathfinding — just direct
+/// point-to-point connections.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ThermalLink {
+    /// Module providing the output.
+    pub from_module_id: ModuleInstanceId,
+    /// Port ID on the source module (must be Output direction).
+    pub from_port_id: String,
+    /// Module receiving the input.
+    pub to_module_id: ModuleInstanceId,
+    /// Port ID on the destination module (must be Input direction).
+    pub to_port_id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StationState {
     pub id: StationId,
@@ -418,6 +435,9 @@ pub struct StationState {
     /// Station leaders (reserved for Phase 2 leader system).
     #[serde(default)]
     pub leaders: Vec<LeaderId>,
+    /// Explicit module-to-module connections for material flow.
+    #[serde(default)]
+    pub thermal_links: Vec<ThermalLink>,
     /// Computed fresh each tick -- not persisted across ticks.
     #[serde(skip_deserializing, default)]
     pub power: PowerState,
