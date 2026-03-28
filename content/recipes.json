@@ -552,5 +552,42 @@
     "tags": [
       "automated"
     ]
+  },
+  {
+    "id": "recipe_cast_fe_part",
+    "inputs": [
+      {
+        "filter": {
+          "Element": "Fe"
+        },
+        "amount": {
+          "Kg": 200.0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "cast_fe_part",
+          "quality_formula": {
+            "Fixed": 1.0
+          }
+        }
+      }
+    ],
+    "efficiency": 0.95,
+    "thermal_req": {
+      "min_temp_mk": 1750000,
+      "optimal_min_mk": 1800000,
+      "optimal_max_mk": 1950000,
+      "max_temp_mk": 2200000,
+      "heat_per_run_j": -30000000,
+      "efficiency_floor": 0.7,
+      "quality_floor": 0.3,
+      "quality_at_max": 0.5
+    },
+    "tags": [
+      "casting"
+    ]
   }
 ]

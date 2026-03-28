@@ -112,7 +112,13 @@ export type ModuleKindState =
   | { SolarArray: SensorArrayState }
   | { Battery: BatteryState }
   | { Radiator: Record<string, never> }
+  | { ThermalContainer: ThermalContainerState }
   | 'Storage'
+  | 'Equipment'
+
+export interface ThermalContainerState {
+  held_items: InventoryItem[]
+}
 
 export interface WearState {
   wear: number

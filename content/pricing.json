@@ -229,6 +229,42 @@
       "importable": true,
       "exportable": true,
       "category": "module"
+    },
+    "module_basic_smelter": {
+      "base_price_per_unit": 5000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_basic_radiator": {
+      "base_price_per_unit": 1500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_crucible": {
+      "base_price_per_unit": 3000000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "module_casting_mold": {
+      "base_price_per_unit": 4500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
+    "cast_fe_part": {
+      "base_price_per_unit": 2000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "advanced_repair_kit": {
+      "base_price_per_unit": 8000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "component"
     }
   }
 }

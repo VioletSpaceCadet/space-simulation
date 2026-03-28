@@ -559,5 +559,40 @@
         "accepts": "AnyMolten"
       }
     ]
+  },
+  {
+    "id": "module_casting_mold",
+    "name": "Casting Mold",
+    "mass_kg": 4000.0,
+    "volume_m3": 8.0,
+    "power_consumption_per_run": 20.0,
+    "wear_per_run": 0.012,
+    "behavior": {
+      "Processor": {
+        "processing_interval_minutes": 120,
+        "recipes": [
+          "recipe_cast_fe_part"
+        ]
+      }
+    },
+    "thermal": {
+      "heat_capacity_j_per_k": 60000.0,
+      "passive_cooling_coefficient": 3.0,
+      "max_temp_mk": 2500000,
+      "operating_min_mk": 1750000,
+      "operating_max_mk": 2200000,
+      "thermal_group": "default"
+    },
+    "power_stall_priority": 3,
+    "crew_requirement": {
+      "operator": 1
+    },
+    "ports": [
+      {
+        "id": "molten_in",
+        "direction": "Input",
+        "accepts": "AnyMolten"
+      }
+    ]
   }
 ]
