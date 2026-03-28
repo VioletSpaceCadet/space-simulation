@@ -450,7 +450,7 @@ fn deduct_crew_salaries(
     content: &GameContent,
     events: &mut Vec<crate::EventEnvelope>,
 ) {
-    let hours_per_tick = content.constants.minutes_per_tick as f64 / 60.0;
+    let hours_per_tick = f64::from(content.constants.minutes_per_tick) / 60.0;
     let current_tick = state.meta.tick;
 
     // Collect total salary across all stations
