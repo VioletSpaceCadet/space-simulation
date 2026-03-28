@@ -264,7 +264,7 @@ pub(crate) fn deposit_priority(
 }
 
 /// Geometric mean of per-domain ratios (accumulated / required), clamped to [0, 1].
-fn compute_sufficiency(tech: &TechDef, progress: Option<&DomainProgress>) -> f32 {
+pub(crate) fn compute_sufficiency(tech: &TechDef, progress: Option<&DomainProgress>) -> f32 {
     if tech.domain_requirements.is_empty() {
         return 1.0;
     }
@@ -283,7 +283,7 @@ fn compute_sufficiency(tech: &TechDef, progress: Option<&DomainProgress>) -> f32
 
 /// Builds the list of export candidates for a station in priority order.
 /// Reads component and element export config from `autopilot`.
-fn build_export_candidates(
+pub(crate) fn build_export_candidates(
     station: &StationState,
     autopilot: &sim_core::AutopilotConfig,
     batch_size_kg: f32,
