@@ -1,0 +1,7 @@
+{
+  "name": "epic5_research",
+  "ticks": 10000,
+  "metrics_every": 100,
+  "seeds": [42, 123, 456, 789, 1024],
+  "state": "./content/dev_base_state.json"
+}
