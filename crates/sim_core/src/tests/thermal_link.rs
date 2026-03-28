@@ -77,6 +77,8 @@ fn link_state(content: &GameContent) -> GameState {
         crew_satisfied: true,
     });
 
+    station.rebuild_module_index(&content);
+
     state
 }
 

@@ -158,8 +158,9 @@ pub(crate) fn handle_uninstall_module(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    let pos = station.modules.iter().position(|m| &m.id == module_id);
-    let Some(pos) = pos else { return false };
+    let Some(pos) = station.module_index_by_id(module_id) else {
+        return false;
+    };
     let module = station.modules.remove(pos);
 
     let item_id = crate::ModuleItemId(format!(
@@ -542,8 +543,7 @@ pub(crate) fn handle_assign_crew(
     let Some(station) = state.stations.get(station_id) else {
         return false;
     };
-    let module_index = station.modules.iter().position(|m| &m.id == module_id);
-    let Some(module_index) = module_index else {
+    let Some(module_index) = station.module_index_by_id(module_id) else {
         return false;
     };
     let def_id = &station.modules[module_index].def_id;
@@ -901,12 +901,14 @@ pub(crate) fn handle_create_thermal_link(
     };
 
     // Validate both modules exist and look up their defs
-    let Some(from_module) = station.modules.iter().find(|m| m.id == link.from_module_id) else {
+    let Some(&from_idx) = station.module_id_index.get(&link.from_module_id) else {
         return;
     };
-    let Some(to_module) = station.modules.iter().find(|m| m.id == link.to_module_id) else {
+    let Some(&to_idx) = station.module_id_index.get(&link.to_module_id) else {
         return;
     };
+    let from_module = &station.modules[from_idx];
+    let to_module = &station.modules[to_idx];
     let Some(from_def) = content.module_defs.get(&from_module.def_id) else {
         return;
     };
@@ -1005,9 +1007,10 @@ pub(crate) fn handle_transfer_molten(
     }
 
     // Find source and destination module indices
-    let from_idx = station.modules.iter().position(|m| m.id == *from_module_id);
-    let to_idx = station.modules.iter().position(|m| m.id == *to_module_id);
-    let (Some(from_idx), Some(to_idx)) = (from_idx, to_idx) else {
+    let (Some(from_idx), Some(to_idx)) = (
+        station.module_index_by_id(from_module_id),
+        station.module_index_by_id(to_module_id),
+    ) else {
         return;
     };
 

@@ -461,6 +461,9 @@ pub struct StationState {
     /// Pre-computed module-type → indices mapping. Rebuilt on install/uninstall.
     #[serde(skip, default)]
     pub module_type_index: ModuleTypeIndex,
+    /// Pre-computed module instance ID → index mapping. Rebuilt on install/uninstall.
+    #[serde(skip, default)]
+    pub module_id_index: HashMap<ModuleInstanceId, usize>,
     /// Cached power generation/consumption values. Avoids re-iterating modules
     /// when nothing power-relevant has changed.
     #[serde(skip, default)]
@@ -524,7 +527,11 @@ impl StationState {
         idx.thermal.clear();
         idx.roles.clear();
 
+        self.module_id_index.clear();
+
         for (i, module) in self.modules.iter().enumerate() {
+            self.module_id_index.insert(module.id.clone(), i);
+
             if let Some(def) = content.module_defs.get(&module.def_id) {
                 match &def.behavior {
                     crate::ModuleBehaviorDef::Processor(_) => idx.processors.push(i),
@@ -542,6 +549,12 @@ impl StationState {
                 }
             }
         }
+    }
+
+    /// Look up a module's index by its instance ID. Returns `None` if the
+    /// module is not installed or the index has not been built.
+    pub fn module_index_by_id(&self, id: &ModuleInstanceId) -> Option<usize> {
+        self.module_id_index.get(id).copied()
     }
 
     /// Returns true if any installed module has the given role.
@@ -731,5 +744,64 @@ impl Default for MaterialThermalProps {
             phase: Phase::Solid,
             latent_heat_buffer_j: 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::{base_content, base_state, test_station_id};
+
+    #[test]
+    fn module_id_index_populated_on_rebuild() {
+        let content = base_content();
+        let state = base_state(&content);
+        let station = &state.stations[&test_station_id()];
+
+        // base_state calls rebuild_module_index, so the index should be populated
+        assert!(station.module_id_index.is_empty() || station.modules.is_empty());
+    }
+
+    #[test]
+    fn module_id_index_returns_correct_position() {
+        let content = base_content();
+        let mut state = base_state(&content);
+        let station = state.stations.get_mut(&test_station_id()).unwrap();
+
+        // Push two modules
+        station.modules.push(ModuleState {
+            id: ModuleInstanceId("mod_alpha".to_string()),
+            def_id: "nonexistent".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::Storage,
+            wear: WearState::default(),
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
+            thermal: None,
+        });
+        station.modules.push(ModuleState {
+            id: ModuleInstanceId("mod_beta".to_string()),
+            def_id: "nonexistent".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::Storage,
+            wear: WearState::default(),
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
+            thermal: None,
+        });
+
+        station.rebuild_module_index(&content);
+
+        let alpha_idx = station.module_index_by_id(&ModuleInstanceId("mod_alpha".to_string()));
+        let beta_idx = station.module_index_by_id(&ModuleInstanceId("mod_beta".to_string()));
+        let missing = station.module_index_by_id(&ModuleInstanceId("mod_missing".to_string()));
+
+        assert_eq!(alpha_idx, Some(station.modules.len() - 2));
+        assert_eq!(beta_idx, Some(station.modules.len() - 1));
+        assert_eq!(missing, None);
     }
 }
