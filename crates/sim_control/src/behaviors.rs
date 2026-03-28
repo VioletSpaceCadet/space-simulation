@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+
 use sim_core::{
     compute_entity_absolute, inventory_volume_m3, is_co_located, mine_duration, trade,
     travel_ticks, AsteroidId, AsteroidState, Command, CommandEnvelope, CommandId, ComponentId,
     DomainProgress, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
-    ModuleBehaviorDef, ModuleKindState, Position, PrincipalId, ShipId, ShipState, SiteId,
-    StationState, TaskKind, TechDef, TechId, TradeItemSpec,
+    ModuleBehaviorDef, ModuleKindState, Position, PrincipalId, ResearchDomain, ShipId, ShipState,
+    SiteId, StationState, TaskKind, TechDef, TechId, TradeItemSpec,
 };
 
 pub(crate) const AUTOPILOT_OWNER: &str = "principal_autopilot";
@@ -13,7 +15,7 @@ pub(crate) const AUTOPILOT_OWNER: &str = "principal_autopilot";
 pub(crate) trait AutopilotBehavior: Send {
     fn name(&self) -> &'static str;
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -338,7 +340,7 @@ impl AutopilotBehavior for StationModuleManager {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -398,7 +400,16 @@ impl AutopilotBehavior for StationModuleManager {
 }
 
 /// Auto-assigns unassigned labs to the highest-priority eligible tech.
-pub(crate) struct LabAssignment;
+/// Caches eligible techs per domain; rebuilt only when the unlocked set changes.
+#[derive(Default)]
+pub(crate) struct LabAssignment {
+    /// domain → eligible tech IDs (prereqs met, not yet unlocked, needs this domain).
+    cached_eligible: HashMap<ResearchDomain, Vec<TechId>>,
+    /// Number of unlocked techs when cache was last built.
+    last_unlocked_count: usize,
+    /// Whether the cache has been initialized at all.
+    initialized: bool,
+}
 
 impl AutopilotBehavior for LabAssignment {
     fn name(&self) -> &'static str {
@@ -406,12 +417,41 @@ impl AutopilotBehavior for LabAssignment {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
         next_id: &mut u64,
     ) -> Vec<CommandEnvelope> {
+        // Rebuild eligible tech cache when unlocked set changes.
+        // Uses len() as proxy — safe because research.unlocked is append-only
+        // (techs are never un-unlocked). If tech removal is ever added, switch
+        // to a generation counter on ResearchState.
+        let unlocked_count = state.research.unlocked.len();
+        if !self.initialized || unlocked_count != self.last_unlocked_count {
+            self.cached_eligible.clear();
+            for tech in &content.techs {
+                if state.research.unlocked.contains(&tech.id) {
+                    continue;
+                }
+                if !tech
+                    .prereqs
+                    .iter()
+                    .all(|p| state.research.unlocked.contains(p))
+                {
+                    continue;
+                }
+                for domain in tech.domain_requirements.keys() {
+                    self.cached_eligible
+                        .entry(domain.clone())
+                        .or_default()
+                        .push(tech.id.clone());
+                }
+            }
+            self.last_unlocked_count = unlocked_count;
+            self.initialized = true;
+        }
+
         let mut commands = Vec::new();
 
         for station in state.stations.values() {
@@ -434,22 +474,19 @@ impl AutopilotBehavior for LabAssignment {
                     continue;
                 };
 
-                // Find eligible techs that need this lab's domain
-                let mut candidates: Vec<(TechId, f32)> = content
-                    .techs
+                // Score cached eligible techs by sufficiency (current evidence)
+                let eligible = self
+                    .cached_eligible
+                    .get(&lab_def.domain)
+                    .map_or(&[][..], |v| v.as_slice());
+                let mut candidates: Vec<(TechId, f32)> = eligible
                     .iter()
-                    .filter(|tech| {
-                        !state.research.unlocked.contains(&tech.id)
-                            && tech
-                                .prereqs
-                                .iter()
-                                .all(|p| state.research.unlocked.contains(p))
-                            && tech.domain_requirements.contains_key(&lab_def.domain)
-                    })
-                    .map(|tech| {
+                    .filter(|tech_id| !state.research.unlocked.contains(tech_id))
+                    .filter_map(|tech_id| {
+                        let tech = content.techs.iter().find(|t| t.id == *tech_id)?;
                         let sufficiency =
-                            compute_sufficiency(tech, state.research.evidence.get(&tech.id));
-                        (tech.id.clone(), sufficiency)
+                            compute_sufficiency(tech, state.research.evidence.get(tech_id));
+                        Some((tech_id.clone(), sufficiency))
                     })
                     .collect();
                 // Highest sufficiency first (closest to unlock), then by ID for determinism
@@ -482,7 +519,7 @@ impl AutopilotBehavior for ThrusterImport {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -607,7 +644,7 @@ impl AutopilotBehavior for SlagJettison {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -649,7 +686,7 @@ impl AutopilotBehavior for MaterialExport {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -705,7 +742,7 @@ impl AutopilotBehavior for PropellantPipeline {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -771,7 +808,7 @@ impl AutopilotBehavior for ShipFitting {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -925,7 +962,7 @@ impl AutopilotBehavior for ShipTaskScheduler {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -1061,7 +1098,7 @@ impl AutopilotBehavior for CrewAssignment {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -1142,7 +1179,7 @@ impl AutopilotBehavior for CrewRecruitment {
     }
 
     fn generate(
-        &self,
+        &mut self,
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
@@ -1211,7 +1248,7 @@ impl AutopilotBehavior for CrewRecruitment {
 pub(crate) fn default_behaviors() -> Vec<Box<dyn AutopilotBehavior>> {
     vec![
         Box::new(StationModuleManager),
-        Box::new(LabAssignment),
+        Box::new(LabAssignment::default()),
         Box::new(CrewAssignment),
         Box::new(CrewRecruitment),
         Box::new(ThrusterImport),
@@ -1232,6 +1269,17 @@ pub(crate) fn test_propellant_pipeline_commands(
     next_id: &mut u64,
 ) -> Vec<CommandEnvelope> {
     PropellantPipeline.generate(state, content, owner, next_id)
+}
+
+/// Test-accessible wrapper for LabAssignment behavior.
+#[cfg(test)]
+pub(crate) fn test_lab_assignment_commands(
+    state: &GameState,
+    content: &GameContent,
+    owner: &PrincipalId,
+    next_id: &mut u64,
+) -> Vec<CommandEnvelope> {
+    LabAssignment::default().generate(state, content, owner, next_id)
 }
 
 // Test-accessible wrapper for collect_deep_scan_candidates

@@ -45,7 +45,7 @@ impl CommandSource for AutopilotController {
         next_command_id: &mut u64,
     ) -> Vec<CommandEnvelope> {
         let mut commands = Vec::new();
-        for behavior in &self.behaviors {
+        for behavior in &mut self.behaviors {
             commands.extend(behavior.generate(state, content, &self.owner, next_command_id));
         }
         commands
@@ -868,6 +868,114 @@ mod tests {
                 } if t.0 == "tech_ship_construction"
             )),
             "autopilot should assign engineering lab to tech_ship_construction"
+        );
+    }
+
+    #[test]
+    fn test_lab_assignment_cache_rebuilds_on_tech_unlock() {
+        let mut content = base_content();
+        content.techs.clear();
+        // Two techs: basic (no prereqs) and advanced (requires basic)
+        content.techs.push(sim_core::TechDef {
+            id: TechId("tech_basic".to_string()),
+            name: "Basic".to_string(),
+            prereqs: vec![],
+            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Manufacturing, 10.0)]),
+            accepted_data: vec![sim_core::DataKind::ManufacturingData],
+            effects: vec![],
+        });
+        content.techs.push(sim_core::TechDef {
+            id: TechId("tech_advanced".to_string()),
+            name: "Advanced".to_string(),
+            prereqs: vec![TechId("tech_basic".to_string())],
+            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Manufacturing, 50.0)]),
+            accepted_data: vec![sim_core::DataKind::ManufacturingData],
+            effects: vec![],
+        });
+        content.module_defs.insert(
+            "module_mfg_lab".to_string(),
+            sim_core::ModuleDef {
+                id: "module_mfg_lab".to_string(),
+                name: "Mfg Lab".to_string(),
+                mass_kg: 4000.0,
+                volume_m3: 8.0,
+                power_consumption_per_run: 12.0,
+                wear_per_run: 0.005,
+                behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
+                    domain: sim_core::ResearchDomain::Manufacturing,
+                    data_consumption_per_run: 10.0,
+                    research_points_per_run: 5.0,
+                    accepted_data: vec![sim_core::DataKind::ManufacturingData],
+                    research_interval_minutes: 1,
+                    research_interval_ticks: 1,
+                }),
+                thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
+                power_stall_priority: None,
+                roles: vec![],
+                crew_requirement: Default::default(),
+                required_tech: None,
+                ports: Vec::new(),
+            },
+        );
+        content.constants.station_power_available_per_tick = 0.0;
+
+        let mut state = base_state(&content);
+        state.scan_sites.clear();
+        let station_id = StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.power_available_per_tick = 0.0;
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("lab_inst_001".to_string()),
+            def_id: "module_mfg_lab".to_string(),
+            enabled: true,
+            kind_state: sim_core::ModuleKindState::Lab(sim_core::LabState {
+                ticks_since_last_run: 0,
+                assigned_tech: None,
+                starved: false,
+            }),
+            wear: sim_core::WearState::default(),
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            crew_satisfied: true,
+            thermal: None,
+        });
+
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+
+        // First call: only tech_basic is eligible (tech_advanced prereq not met)
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+        assert!(
+            commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                sim_core::Command::AssignLabTech { tech_id: Some(ref t), .. }
+                if t.0 == "tech_basic"
+            )),
+            "should assign to tech_basic (only eligible tech)"
+        );
+
+        // Unlock tech_basic — now tech_advanced becomes eligible
+        state
+            .research
+            .unlocked
+            .insert(TechId("tech_basic".to_string()));
+        // Clear lab assignment so it needs reassignment
+        let station = state.stations.get_mut(&station_id).unwrap();
+        if let sim_core::ModuleKindState::Lab(ref mut lab) = station.modules[0].kind_state {
+            lab.assigned_tech = Some(TechId("tech_basic".to_string()));
+        }
+
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+        assert!(
+            commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                sim_core::Command::AssignLabTech { tech_id: Some(ref t), .. }
+                if t.0 == "tech_advanced"
+            )),
+            "after unlocking tech_basic, cache should rebuild and assign to tech_advanced"
         );
     }
 
