@@ -127,7 +127,11 @@ pub(crate) fn handle_install_module(
         power_stalled: false,
         module_priority: 0,
         assigned_crew: std::collections::BTreeMap::new(),
-        crew_satisfied: def.crew_requirement.is_empty(),
+        efficiency: if def.crew_requirement.is_empty() {
+            1.0
+        } else {
+            0.0
+        },
     });
     station.rebuild_module_index(content);
     station.invalidate_power_cache();
@@ -575,14 +579,16 @@ pub(crate) fn handle_assign_crew(
         .stations
         .get_mut(station_id)
         .expect("station checked above");
+    let was_satisfied = crate::is_crew_satisfied(
+        &station.modules[module_index].assigned_crew,
+        &def.crew_requirement,
+    );
     let entry = station.modules[module_index]
         .assigned_crew
         .entry(role.clone())
         .or_insert(0);
     *entry += count;
-    // Check crew satisfaction transition
-    let was_satisfied = station.modules[module_index].crew_satisfied;
-    station.modules[module_index].crew_satisfied = crate::is_crew_satisfied(
+    let now_satisfied = crate::is_crew_satisfied(
         &station.modules[module_index].assigned_crew,
         &def.crew_requirement,
     );
@@ -596,7 +602,7 @@ pub(crate) fn handle_assign_crew(
             count,
         },
     ));
-    if !was_satisfied && station.modules[module_index].crew_satisfied {
+    if !was_satisfied && now_satisfied {
         events.push(crate::emit(
             &mut state.counters,
             current_tick,
@@ -633,20 +639,19 @@ pub(crate) fn handle_unassign_crew(
     if assigned < count {
         return false;
     }
-    let was_satisfied = module.crew_satisfied;
+    let def_id = module.def_id.clone();
+    let was_satisfied = content.module_defs.get(&def_id).map_or(true, |def| {
+        crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement)
+    });
     let new_assigned = assigned - count;
     if new_assigned == 0 {
         module.assigned_crew.remove(role);
     } else {
         module.assigned_crew.insert(role.clone(), new_assigned);
     }
-    // Check crew satisfaction transition
-    let def_id = &module.def_id;
-    if let Some(def) = content.module_defs.get(def_id.as_str()) {
-        module.crew_satisfied =
-            crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement);
-    }
-    let now_satisfied = module.crew_satisfied;
+    let now_satisfied = content.module_defs.get(&def_id).map_or(true, |def| {
+        crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement)
+    });
     let module_id = module.id.clone();
     events.push(crate::emit(
         &mut state.counters,

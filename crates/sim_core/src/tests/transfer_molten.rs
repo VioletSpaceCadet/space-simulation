@@ -72,7 +72,7 @@ fn transfer_state(content: &GameContent) -> GameState {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
     });
 
     // Crucible B: empty
@@ -90,7 +90,7 @@ fn transfer_state(content: &GameContent) -> GameState {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
     });
 
     // Create a thermal link from A to B

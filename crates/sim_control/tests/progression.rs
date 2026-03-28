@@ -462,7 +462,7 @@ fn sensor_data_generation_rate_at_mpt_60() {
         assigned_crew: [(sim_core::CrewRole("operator".to_string()), 1)]
             .into_iter()
             .collect(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 

@@ -1291,7 +1291,7 @@ mod tests {
                 power_stalled: false,
                 module_priority: 0,
                 assigned_crew: Default::default(),
-                crew_satisfied: true,
+                efficiency: 1.0,
                 thermal: None,
             }],
         );
@@ -1462,7 +1462,7 @@ mod tests {
                 power_stalled: false,
                 module_priority: 0,
                 assigned_crew: Default::default(),
-                crew_satisfied: true,
+                efficiency: 1.0,
                 thermal: None,
             }],
         );
@@ -1573,7 +1573,7 @@ mod tests {
                     power_stalled: false,
                     module_priority: 0,
                     assigned_crew: Default::default(),
-                    crew_satisfied: true,
+                    efficiency: 1.0,
                     thermal: None,
                 },
                 ModuleState {
@@ -1590,7 +1590,7 @@ mod tests {
                     power_stalled: false,
                     module_priority: 0,
                     assigned_crew: Default::default(),
-                    crew_satisfied: true,
+                    efficiency: 1.0,
                     thermal: None,
                 },
             ],
@@ -1646,7 +1646,7 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
             thermal: None,
         });
         state.stations.insert(station.id.clone(), station);
@@ -1711,7 +1711,7 @@ mod tests {
                     power_stalled: false,
                     module_priority: 0,
                     assigned_crew: Default::default(),
-                    crew_satisfied: true,
+                    efficiency: 1.0,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 1_800_000,
                         thermal_group: None,
@@ -1734,7 +1734,7 @@ mod tests {
                     power_stalled: false,
                     module_priority: 0,
                     assigned_crew: Default::default(),
-                    crew_satisfied: true,
+                    efficiency: 1.0,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 2_400_000,
                         thermal_group: None,
@@ -1757,7 +1757,7 @@ mod tests {
                     power_stalled: false,
                     module_priority: 0,
                     assigned_crew: Default::default(),
-                    crew_satisfied: true,
+                    efficiency: 1.0,
                     thermal: Some(crate::ThermalState {
                         temp_mk: 2_800_000,
                         thermal_group: None,
@@ -1821,7 +1821,7 @@ mod tests {
                 power_stalled: false,
                 module_priority: 0,
                 assigned_crew: Default::default(),
-                crew_satisfied: true,
+                efficiency: 1.0,
                 thermal: None,
             }],
         );

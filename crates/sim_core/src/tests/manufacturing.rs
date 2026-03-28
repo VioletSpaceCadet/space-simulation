@@ -199,7 +199,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -219,7 +219,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         power_stalled: false,
         module_priority: 5,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -239,7 +239,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         power_stalled: false,
         module_priority: 3,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 

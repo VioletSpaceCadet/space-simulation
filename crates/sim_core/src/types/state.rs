@@ -101,14 +101,14 @@ pub struct ModuleState {
     /// Crew assigned to this module, by role. Empty = no crew assigned.
     #[serde(default)]
     pub assigned_crew: BTreeMap<CrewRole, u32>,
-    /// Whether all `crew_requirement` roles are met by `assigned_crew`.
-    /// Recomputed each tick — not persisted.
-    #[serde(skip, default = "default_crew_satisfied")]
-    pub crew_satisfied: bool,
+    /// Combined efficiency multiplier (0.0–1.0). Product of power, crew, and
+    /// wear factors. Recomputed each tick — not persisted.
+    #[serde(skip, default = "default_efficiency")]
+    pub efficiency: f32,
 }
 
-fn default_crew_satisfied() -> bool {
-    true
+fn default_efficiency() -> f32 {
+    1.0
 }
 
 /// Check if assigned crew meets the crew requirement for a module.
@@ -120,6 +120,39 @@ pub fn is_crew_satisfied(
     requirement
         .iter()
         .all(|(role, &needed)| assigned.get(role).copied().unwrap_or(0) >= needed)
+}
+
+/// Compute crew factor as min(assigned/required) across all roles, capped at 1.0.
+/// Empty requirement = 1.0. Returns 0.0 if any required role has zero assigned.
+pub fn compute_crew_factor(
+    assigned: &BTreeMap<CrewRole, u32>,
+    requirement: &BTreeMap<CrewRole, u32>,
+) -> f32 {
+    if requirement.is_empty() {
+        return 1.0;
+    }
+    let mut min_factor = 1.0f32;
+    for (role, &needed) in requirement {
+        if needed == 0 {
+            continue;
+        }
+        let have = assigned.get(role).copied().unwrap_or(0);
+        min_factor = min_factor.min(have as f32 / needed as f32);
+    }
+    min_factor.min(1.0)
+}
+
+/// Compute the combined efficiency multiplier for a module.
+/// Product of: power factor (0 if stalled), crew factor, wear factor.
+pub fn compute_module_efficiency(
+    module: &ModuleState,
+    def: &crate::ModuleDef,
+    constants: &crate::Constants,
+) -> f32 {
+    let power_factor = if module.power_stalled { 0.0 } else { 1.0 };
+    let crew_factor = compute_crew_factor(&module.assigned_crew, &def.crew_requirement);
+    let wear_factor = crate::wear::wear_efficiency(module.wear.wear, constants);
+    power_factor * crew_factor * wear_factor
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -505,13 +538,12 @@ impl StationState {
         total.saturating_sub(assigned)
     }
 
-    /// Initialize `crew_satisfied` on all modules based on content requirements.
+    /// Initialize module efficiency based on crew and wear factors.
     /// Call after loading state to avoid spurious transition events on first tick.
-    pub fn init_crew_satisfaction(&mut self, content: &GameContent) {
+    pub fn init_module_efficiency(&mut self, content: &GameContent) {
         for module in &mut self.modules {
             if let Some(def) = content.module_defs.get(&module.def_id) {
-                module.crew_satisfied =
-                    is_crew_satisfied(&module.assigned_crew, &def.crew_requirement);
+                module.efficiency = compute_module_efficiency(module, def, &content.constants);
             }
         }
     }
@@ -768,7 +800,7 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
             thermal: None,
         });
         station.modules.push(ModuleState {
@@ -780,7 +812,7 @@ mod tests {
             power_stalled: false,
             module_priority: 0,
             assigned_crew: Default::default(),
-            crew_satisfied: true,
+            efficiency: 1.0,
             thermal: None,
         });
 
@@ -793,5 +825,68 @@ mod tests {
         assert_eq!(alpha_idx, Some(station.modules.len() - 2));
         assert_eq!(beta_idx, Some(station.modules.len() - 1));
         assert_eq!(missing, None);
+    }
+
+    #[test]
+    fn compute_crew_factor_empty_requirement() {
+        let assigned = BTreeMap::new();
+        let requirement = BTreeMap::new();
+        assert!((compute_crew_factor(&assigned, &requirement) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn compute_crew_factor_half_staffed() {
+        let assigned = BTreeMap::from([(CrewRole("op".to_string()), 1)]);
+        let requirement = BTreeMap::from([(CrewRole("op".to_string()), 2)]);
+        assert!((compute_crew_factor(&assigned, &requirement) - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn compute_crew_factor_fully_staffed() {
+        let assigned = BTreeMap::from([(CrewRole("op".to_string()), 2)]);
+        let requirement = BTreeMap::from([(CrewRole("op".to_string()), 2)]);
+        assert!((compute_crew_factor(&assigned, &requirement) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn compute_module_efficiency_combines_factors() {
+        let content = base_content();
+        let mut module = ModuleState {
+            id: ModuleInstanceId("test".to_string()),
+            def_id: "nonexistent".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::Storage,
+            wear: WearState::default(),
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            efficiency: 1.0,
+            thermal: None,
+        };
+        let def = crate::test_fixtures::ModuleDefBuilder::new("test")
+            .crew("operator", 2)
+            .build();
+
+        // No crew assigned, requires 2 operators → crew_factor = 0.0
+        let eff = compute_module_efficiency(&module, &def, &content.constants);
+        assert!((eff - 0.0).abs() < f32::EPSILON, "no crew = 0 efficiency");
+
+        // 1/2 crew → crew_factor = 0.5
+        module
+            .assigned_crew
+            .insert(CrewRole("operator".to_string()), 1);
+        let eff = compute_module_efficiency(&module, &def, &content.constants);
+        assert!(
+            (eff - 0.5).abs() < f32::EPSILON,
+            "half crew = 0.5 efficiency"
+        );
+
+        // Power stalled → 0.0 regardless of crew
+        module.power_stalled = true;
+        let eff = compute_module_efficiency(&module, &def, &content.constants);
+        assert!(
+            (eff - 0.0).abs() < f32::EPSILON,
+            "power stalled = 0 efficiency"
+        );
     }
 }

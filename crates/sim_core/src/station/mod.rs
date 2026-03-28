@@ -95,7 +95,8 @@ fn ensure_station_index(state: &mut GameState, station_id: &StationId, content: 
     }
 }
 
-/// Update `crew_satisfied` flags for all modules on a station, emitting transition events.
+/// Check crew factor transitions and emit Understaffed/FullyStaffed events.
+/// Uses `compute_crew_factor` to detect transitions across the 1.0 threshold.
 fn update_crew_satisfaction(
     state: &mut GameState,
     station_id: &StationId,
@@ -106,6 +107,7 @@ fn update_crew_satisfaction(
         return;
     };
     let current_tick = state.meta.tick;
+    // Detect crew factor transitions: was_satisfied (>= 1.0) vs now
     let mut transitions: Vec<(crate::ModuleInstanceId, bool, bool)> = Vec::new();
     for module in &station.modules {
         let Some(def) = content.module_defs.get(&module.def_id) else {
@@ -114,18 +116,22 @@ fn update_crew_satisfaction(
         if def.crew_requirement.is_empty() {
             continue;
         }
-        let new_satisfied = crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement);
-        if new_satisfied != module.crew_satisfied {
-            transitions.push((module.id.clone(), module.crew_satisfied, new_satisfied));
-        }
-    }
-    let station = state
-        .stations
-        .get_mut(station_id)
-        .expect("station checked above");
-    for (module_id, _was, now) in &transitions {
-        if let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) {
-            module.crew_satisfied = *now;
+        let crew_factor = crate::compute_crew_factor(&module.assigned_crew, &def.crew_requirement);
+        let now_satisfied = crew_factor >= 1.0;
+        // Use the stored efficiency to determine previous satisfaction:
+        // if efficiency included a crew factor < 1.0, it was unsatisfied.
+        // On first tick (efficiency = default 1.0), we treat as "was satisfied".
+        let wear_factor = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
+        let power_factor = if module.power_stalled { 0.0 } else { 1.0 };
+        // Derive previous crew factor from stored efficiency
+        let prev_crew_factor = if wear_factor > 0.0 && power_factor > 0.0 {
+            module.efficiency / (wear_factor * power_factor)
+        } else {
+            1.0 // can't determine; assume satisfied
+        };
+        let was_satisfied = prev_crew_factor >= 1.0;
+        if was_satisfied != now_satisfied {
+            transitions.push((module.id.clone(), was_satisfied, now_satisfied));
         }
     }
     for (module_id, was, now) in transitions {
@@ -151,6 +157,23 @@ fn update_crew_satisfaction(
     }
 }
 
+/// Compute and store efficiency for all modules on a station.
+/// Call after `compute_power_budget` so `power_stalled` flags are set.
+fn update_module_efficiencies(
+    state: &mut GameState,
+    station_id: &StationId,
+    content: &GameContent,
+) {
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return;
+    };
+    for module in &mut station.modules {
+        if let Some(def) = content.module_defs.get(&module.def_id) {
+            module.efficiency = crate::compute_module_efficiency(module, def, &content.constants);
+        }
+    }
+}
+
 pub(crate) fn tick_stations(
     state: &mut GameState,
     content: &GameContent,
@@ -163,13 +186,15 @@ pub(crate) fn tick_stations(
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
     let mut scratch_indices: Vec<usize> = Vec::new();
     for station_id in &station_ids {
-        // Update crew satisfaction flags and emit transition events
+        // Update crew satisfaction events (before efficiency recompute)
         update_crew_satisfaction(state, station_id, content, events);
         timed!(
             timings,
             power_budget,
             compute_power_budget(state, station_id, content, events)
         );
+        // Compute combined efficiency after power budget sets power_stalled flags
+        update_module_efficiencies(state, station_id, content);
         timed!(
             timings,
             processors,
@@ -631,15 +656,13 @@ fn extract_context<'a>(
     let station = state.stations.get(station_id)?;
     let module = &station.modules[module_idx];
 
-    if !module.enabled || module.power_stalled {
+    if !module.enabled || module.efficiency <= 0.0 {
         return None;
     }
 
     let def = content.module_defs.get(&module.def_id)?;
 
     let interval = def.behavior.interval_ticks()?;
-
-    let efficiency = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
 
     Some(ModuleTickContext {
         station_id: station_id.clone(),
@@ -649,7 +672,7 @@ fn extract_context<'a>(
         interval,
         power_needed: def.power_consumption_per_run,
         wear_per_run: def.wear_per_run,
-        efficiency,
+        efficiency: module.efficiency,
     })
 }
 
@@ -724,9 +747,8 @@ fn should_run(state: &mut GameState, ctx: &ModuleTickContext) -> bool {
     let Some(station) = state.stations.get(&ctx.station_id) else {
         return false;
     };
-    if !station.modules[ctx.module_idx].crew_satisfied {
-        return false;
-    }
+    // Efficiency already incorporates crew and wear factors (checked in extract_context).
+    // Here we only check per-run power availability.
     station.power_available_per_tick >= ctx.power_needed
 }
 
@@ -1035,7 +1057,7 @@ mod framework_tests {
                         power_stalled: false,
                         module_priority: 0,
                         assigned_crew: Default::default(),
-                        crew_satisfied: true,
+                        efficiency: 1.0,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
@@ -1115,7 +1137,7 @@ mod framework_tests {
     }
 
     #[test]
-    fn extract_context_returns_none_for_power_stalled() {
+    fn extract_context_returns_none_for_zero_efficiency() {
         let content = test_content_with_processor();
         let mut state = test_state_with_module(
             &content,
@@ -1127,7 +1149,8 @@ mod framework_tests {
             }),
         );
         let station_id = StationId("station_test".to_string());
-        state.stations.get_mut(&station_id).unwrap().modules[0].power_stalled = true;
+        // Simulate power stall via efficiency (power_stalled folds into efficiency)
+        state.stations.get_mut(&station_id).unwrap().modules[0].efficiency = 0.0;
         assert!(extract_context(&state, &station_id, 0, &content).is_none());
     }
 

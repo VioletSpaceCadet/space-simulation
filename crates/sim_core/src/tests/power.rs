@@ -46,7 +46,7 @@ fn state_with_solar_array(content: &GameContent) -> GameState {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
     state
@@ -104,7 +104,7 @@ fn power_budget_with_consumer() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -165,7 +165,7 @@ fn power_budget_deficit_when_insufficient() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -309,7 +309,7 @@ fn solar_tech_modifier_does_not_affect_battery() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -359,7 +359,7 @@ fn power_consumption_reduced_by_tech_modifier() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -407,7 +407,7 @@ fn power_consumption_modifier_prevents_stall() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -419,7 +419,7 @@ fn power_consumption_modifier_prevents_stall() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -501,7 +501,7 @@ fn power_stall_lowest_priority_first() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     };
 
@@ -522,7 +522,7 @@ fn power_stall_lowest_priority_first() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -534,7 +534,7 @@ fn power_stall_lowest_priority_first() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -582,7 +582,7 @@ fn power_stall_no_stalling_without_solar_arrays() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -618,7 +618,7 @@ fn power_stall_clears_when_power_restored() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -630,7 +630,7 @@ fn power_stall_clears_when_power_restored() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -699,7 +699,7 @@ fn battery_charges_from_surplus() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -757,7 +757,7 @@ fn battery_discharges_to_cover_deficit() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -774,7 +774,7 @@ fn battery_discharges_to_cover_deficit() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -844,7 +844,7 @@ fn battery_partial_discharge_then_stall() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -861,7 +861,7 @@ fn battery_partial_discharge_then_stall() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -904,7 +904,7 @@ fn battery_charge_limited_by_capacity() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -939,7 +939,7 @@ fn battery_wear_reduces_effective_capacity() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -979,7 +979,7 @@ fn battery_not_stalled_by_power_system() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -1010,7 +1010,7 @@ fn battery_capacity_doubled_by_tech_modifier() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -1069,7 +1069,7 @@ fn battery_discharge_rate_unchanged_by_capacity_modifier() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
     station.modules.push(ModuleState {
@@ -1086,7 +1086,7 @@ fn battery_discharge_rate_unchanged_by_capacity_modifier() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 

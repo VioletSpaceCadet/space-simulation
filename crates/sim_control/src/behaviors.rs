@@ -1147,7 +1147,9 @@ impl AutopilotBehavior for CrewAssignment {
                 let Some(def) = content.module_defs.get(&module.def_id) else {
                     continue;
                 };
-                if def.crew_requirement.is_empty() || module.crew_satisfied {
+                if def.crew_requirement.is_empty()
+                    || sim_core::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement)
+                {
                     continue;
                 }
                 // Try to assign missing crew roles

@@ -79,7 +79,7 @@ fn crew_state(content: &GameContent, crew_count: u32) -> GameState {
         } else {
             BTreeMap::new()
         },
-        crew_satisfied: crew_count > 0,
+        efficiency: if crew_count > 0 { 1.0 } else { 0.0 },
     });
     station
         .crew
@@ -168,7 +168,7 @@ fn empty_crew_requirement_always_satisfied() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: BTreeMap::new(),
-        crew_satisfied: true,
+        efficiency: 1.0,
     });
     // base_content modules have empty crew_requirement — always satisfied
     assert!(is_crew_satisfied(&BTreeMap::new(), &BTreeMap::new()));
@@ -341,8 +341,8 @@ fn crew_determinism() {
         "assigned crew should match"
     );
     assert_eq!(
-        station_a.modules[0].crew_satisfied, station_b.modules[0].crew_satisfied,
-        "crew_satisfied should match"
+        station_a.modules[0].efficiency, station_b.modules[0].efficiency,
+        "efficiency should match"
     );
 }
 

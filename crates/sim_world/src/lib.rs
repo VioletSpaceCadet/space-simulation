@@ -881,9 +881,10 @@ pub fn auto_assign_initial_crew(state: &mut GameState, content: &GameContent) {
                 .module_defs
                 .get(&station.modules[module_index].def_id)
             {
-                station.modules[module_index].crew_satisfied = sim_core::is_crew_satisfied(
-                    &station.modules[module_index].assigned_crew,
-                    &def.crew_requirement,
+                station.modules[module_index].efficiency = sim_core::compute_module_efficiency(
+                    &station.modules[module_index],
+                    def,
+                    &content.constants,
                 );
             }
         }
@@ -961,7 +962,7 @@ pub fn load_or_build_state(
         loaded.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
         for station in loaded.stations.values_mut() {
             station.rebuild_module_index(content);
-            station.init_crew_satisfaction(content);
+            station.init_module_efficiency(content);
         }
         let rng = ChaCha8Rng::seed_from_u64(loaded.meta.seed);
         validate_state(&loaded, content);

@@ -83,7 +83,7 @@ fn state_with_heating(content: &GameContent) -> GameState {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
@@ -204,7 +204,7 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
         power_stalled: false,
         module_priority: 0,
         assigned_crew: Default::default(),
-        crew_satisfied: true,
+        efficiency: 1.0,
         thermal: None,
     });
 
