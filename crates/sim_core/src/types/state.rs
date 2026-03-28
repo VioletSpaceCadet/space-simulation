@@ -504,7 +504,7 @@ pub struct StationState {
     /// Pre-computed module instance ID → index mapping. Rebuilt on install/uninstall.
     #[serde(skip, default)]
     pub module_id_index: HashMap<ModuleInstanceId, usize>,
-    /// Lazy inventory lookup index. Key = item identifier (element, component_id, or def_id).
+    /// Lazy inventory lookup index. Key = item identifier (element, `component_id`, or `def_id`).
     /// Value = positions in the inventory vec. Cleared on mutation, rebuilt on access.
     #[serde(skip, default)]
     pub inventory_index: HashMap<String, Vec<usize>>,
@@ -552,7 +552,7 @@ impl StationState {
         }
     }
 
-    /// Find the first inventory item matching a key (element, component_id, or module def_id).
+    /// Find the first inventory item matching a key (element, `component_id`, or module `def_id`).
     pub fn inventory_position_by_key(&mut self, key: &str) -> Option<usize> {
         self.ensure_inventory_index();
         self.inventory_index
