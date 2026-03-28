@@ -293,6 +293,36 @@ fn apply_commands(
                     state, content, station_id, module_id, role, *count, events,
                 );
             }
+            Command::CreateThermalLink {
+                station_id,
+                from_module_id,
+                from_port_id,
+                to_module_id,
+                to_port_id,
+            } => {
+                let link = crate::ThermalLink {
+                    from_module_id: from_module_id.clone(),
+                    from_port_id: from_port_id.clone(),
+                    to_module_id: to_module_id.clone(),
+                    to_port_id: to_port_id.clone(),
+                };
+                commands::handle_create_thermal_link(state, content, &link, station_id, events);
+            }
+            Command::RemoveThermalLink {
+                station_id,
+                from_module_id,
+                from_port_id,
+                to_module_id,
+                to_port_id,
+            } => {
+                let link = crate::ThermalLink {
+                    from_module_id: from_module_id.clone(),
+                    from_port_id: from_port_id.clone(),
+                    to_module_id: to_module_id.clone(),
+                    to_port_id: to_port_id.clone(),
+                };
+                commands::handle_remove_thermal_link(state, &link, station_id, events);
+            }
         }
     }
 

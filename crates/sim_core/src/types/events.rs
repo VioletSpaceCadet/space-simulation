@@ -323,4 +323,18 @@ pub enum Event {
         station_id: StationId,
         module_id: ModuleInstanceId,
     },
+    ThermalLinkCreated {
+        station_id: StationId,
+        from_module_id: ModuleInstanceId,
+        from_port_id: String,
+        to_module_id: ModuleInstanceId,
+        to_port_id: String,
+    },
+    ThermalLinkRemoved {
+        station_id: StationId,
+        from_module_id: ModuleInstanceId,
+        from_port_id: String,
+        to_module_id: ModuleInstanceId,
+        to_port_id: String,
+    },
 }

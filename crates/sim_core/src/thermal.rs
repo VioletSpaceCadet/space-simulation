@@ -136,8 +136,7 @@ pub fn update_phase(props: &mut MaterialThermalProps, element: &ElementDef, kg: 
 
     let latent_heat_per_kg = element.latent_heat_j_per_kg.unwrap_or(0);
     let specific_heat = element.specific_heat_j_per_kg_k.unwrap_or(449);
-    let kg_u32 = kg.max(0.0) as u32; // safe: kg is non-negative mass
-    let total_latent = i64::from(latent_heat_per_kg) * i64::from(kg_u32);
+    let total_latent = (f64::from(latent_heat_per_kg) * f64::from(kg)).round() as i64;
     let capacity_j_per_k = f64::from(specific_heat) * f64::from(kg);
 
     if capacity_j_per_k <= 0.0 {
@@ -175,8 +174,9 @@ pub fn update_phase(props: &mut MaterialThermalProps, element: &ElementDef, kg: 
             if remaining_heat >= 0 {
                 apply_temp_change(props, remaining_heat, capacity_j_per_k);
             } else {
+                // Energy to cool from current temp DOWN to solidification point
                 let heat_to_solidify =
-                    temp_distance_to_heat(props.temp_mk, solidification_point, capacity_j_per_k);
+                    temp_distance_to_heat(solidification_point, props.temp_mk, capacity_j_per_k);
                 let cooling = -remaining_heat;
                 if cooling <= heat_to_solidify {
                     apply_temp_change(props, remaining_heat, capacity_j_per_k);
