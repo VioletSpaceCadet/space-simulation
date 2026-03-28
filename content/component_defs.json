@@ -64,5 +64,11 @@
     "name": "Propellant Tank",
     "mass_kg": 600.0,
     "volume_m3": 3.0
+  },
+  {
+    "id": "cast_fe_part",
+    "name": "Cast Iron Part",
+    "mass_kg": 30.0,
+    "volume_m3": 0.05
   }
 ]
