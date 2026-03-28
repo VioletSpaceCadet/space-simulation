@@ -403,6 +403,8 @@ pub struct ModuleTypeIndex {
     pub maintenance: Vec<usize>,
     /// Modules with a `ThermalDef` (cross-cutting, any behavior type).
     pub thermal: Vec<usize>,
+    /// Role name → module indices. Rebuilt on module install/uninstall.
+    pub roles: BTreeMap<String, Vec<usize>>,
 }
 
 impl ModuleTypeIndex {
@@ -520,6 +522,7 @@ impl StationState {
         idx.labs.clear();
         idx.maintenance.clear();
         idx.thermal.clear();
+        idx.roles.clear();
 
         for (i, module) in self.modules.iter().enumerate() {
             if let Some(def) = content.module_defs.get(&module.def_id) {
@@ -534,8 +537,27 @@ impl StationState {
                 if def.thermal.is_some() {
                     idx.thermal.push(i);
                 }
+                for role in &def.roles {
+                    idx.roles.entry(role.clone()).or_default().push(i);
+                }
             }
         }
+    }
+
+    /// Returns true if any installed module has the given role.
+    pub fn has_role(&self, role: &str) -> bool {
+        self.module_type_index
+            .roles
+            .get(role)
+            .is_some_and(|indices| !indices.is_empty())
+    }
+
+    /// Returns module indices that have the given role.
+    pub fn modules_with_role(&self, role: &str) -> &[usize] {
+        self.module_type_index
+            .roles
+            .get(role)
+            .map_or(&[], |v| v.as_slice())
     }
 }
 
