@@ -449,6 +449,9 @@ impl StationAgent {
         };
 
         let threshold = content.constants.autopilot_slag_jettison_pct;
+        if station.cargo_capacity_m3 <= 0.0 {
+            return;
+        }
         let used_m3 = inventory_volume_m3(&station.inventory, content);
         let used_pct = used_m3 / station.cargo_capacity_m3;
 
@@ -487,15 +490,14 @@ impl StationAgent {
 
         let candidates = build_export_candidates(station, &content.autopilot, batch_size_kg);
         for candidate in candidates {
-            let revenue = match trade::compute_export_revenue(&candidate, &content.pricing, content)
+            if trade::compute_export_revenue(&candidate, &content.pricing, content)
+                .is_none_or(|rev| rev < min_revenue)
             {
-                Some(rev) if rev >= min_revenue => rev,
-                _ => continue,
-            };
+                continue;
+            }
             if !trade::has_enough_for_export(&station.inventory, &candidate) {
                 continue;
             }
-            let _ = revenue;
             commands.push(make_cmd(
                 owner,
                 state.meta.tick,
