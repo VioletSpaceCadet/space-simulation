@@ -4,7 +4,7 @@
 //! trade import, and determinism.
 
 use super::*;
-use crate::test_fixtures::{base_content, base_state, test_station_id};
+use crate::test_fixtures::{base_content, base_state, test_station_id, ModuleDefBuilder};
 use std::collections::BTreeMap;
 
 /// Helper: create content with a processor module that requires 1 operator.
@@ -31,27 +31,18 @@ fn crew_content() -> GameContent {
     );
     content.module_defs.insert(
         "module_crew_processor".to_string(),
-        ModuleDef {
-            id: "module_crew_processor".to_string(),
-            name: "Crew Processor".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_crew_processor")
+            .name("Crew Processor")
+            .mass(1000.0)
+            .volume(5.0)
+            .power(10.0)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
                 recipes: vec![recipe_id],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            required_tech: None,
-            crew_requirement: BTreeMap::from([(CrewRole("operator".to_string()), 1)]),
-            ports: Vec::new(),
-        },
+            }))
+            .crew("operator", 1)
+            .build(),
     );
     content.crew_roles.insert(
         CrewRole("operator".to_string()),

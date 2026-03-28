@@ -1,5 +1,5 @@
 use super::*;
-use crate::test_fixtures::insert_recipe;
+use crate::test_fixtures::{insert_recipe, ModuleDefBuilder};
 
 fn heating_content() -> GameContent {
     let mut content = test_content();
@@ -46,27 +46,18 @@ fn heating_content() -> GameContent {
     let recipe_id = insert_recipe(&mut content, water_recipe);
     content.module_defs = [(
         "module_heating_unit".to_string(),
-        ModuleDef {
-            id: "module_heating_unit".to_string(),
-            name: "Heating Unit".to_string(),
-            mass_kg: 500.0,
-            volume_m3: 2.0,
-            power_consumption_per_run: 15.0,
-            wear_per_run: 0.01,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_heating_unit")
+            .name("Heating Unit")
+            .mass(500.0)
+            .volume(2.0)
+            .power(15.0)
+            .wear(0.01)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
                 recipes: vec![recipe_id],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     )]
     .into_iter()
     .collect();

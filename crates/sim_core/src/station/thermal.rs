@@ -579,6 +579,7 @@ fn overheat_zone_event(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_fixtures::ModuleDefBuilder;
     use crate::AHashMap;
     use crate::*;
     use std::collections::{HashMap, HashSet};
@@ -588,19 +589,18 @@ mod tests {
         let mut content = crate::test_fixtures::base_content();
         content.module_defs.insert(
             "module_smelter".to_string(),
-            ModuleDef {
-                id: "module_smelter".to_string(),
-                name: "Test Smelter".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 10.0,
-                power_consumption_per_run: 100.0,
-                wear_per_run: 0.02,
-                behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+            ModuleDefBuilder::new("module_smelter")
+                .name("Test Smelter")
+                .mass(5000.0)
+                .volume(10.0)
+                .power(100.0)
+                .wear(0.02)
+                .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                     processing_interval_minutes: 5,
                     processing_interval_ticks: 5,
                     recipes: vec![],
-                }),
-                thermal: Some(ThermalDef {
+                }))
+                .thermal(ThermalDef {
                     heat_capacity_j_per_k: 500.0,
                     passive_cooling_coefficient: 0.05,
                     max_temp_mk: 2_500_000,
@@ -608,15 +608,8 @@ mod tests {
                     operating_max_mk: None,
                     thermal_group: Some("smelting".to_string()),
                     idle_heat_generation_w: None,
-                }),
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                })
+                .build(),
         );
         content
     }
@@ -814,19 +807,18 @@ mod tests {
         // Add a second module def in a different group.
         content.module_defs.insert(
             "module_reactor".to_string(),
-            ModuleDef {
-                id: "module_reactor".to_string(),
-                name: "Test Reactor".to_string(),
-                mass_kg: 8000.0,
-                volume_m3: 15.0,
-                power_consumption_per_run: 50.0,
-                wear_per_run: 0.01,
-                behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+            ModuleDefBuilder::new("module_reactor")
+                .name("Test Reactor")
+                .mass(8000.0)
+                .volume(15.0)
+                .power(50.0)
+                .wear(0.01)
+                .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                     processing_interval_minutes: 10,
                     processing_interval_ticks: 10,
                     recipes: vec![],
-                }),
-                thermal: Some(ThermalDef {
+                }))
+                .thermal(ThermalDef {
                     heat_capacity_j_per_k: 1000.0,
                     passive_cooling_coefficient: 0.03,
                     max_temp_mk: 3_000_000,
@@ -834,15 +826,8 @@ mod tests {
                     operating_max_mk: None,
                     thermal_group: Some("reactor".to_string()),
                     idle_heat_generation_w: None,
-                }),
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                })
+                .build(),
         );
 
         let station_id = StationId("station_test".to_string());
@@ -896,15 +881,14 @@ mod tests {
         let def_id = format!("module_radiator_{radiator_id}");
         content.module_defs.insert(
             def_id.clone(),
-            ModuleDef {
-                id: def_id.clone(),
-                name: format!("Radiator {radiator_id}"),
-                mass_kg: 200.0,
-                volume_m3: 2.0,
-                power_consumption_per_run: 0.0,
-                wear_per_run: 0.0,
-                behavior: ModuleBehaviorDef::Radiator(RadiatorDef { cooling_capacity_w }),
-                thermal: Some(ThermalDef {
+            ModuleDefBuilder::new(&def_id)
+                .name(&format!("Radiator {radiator_id}"))
+                .mass(200.0)
+                .volume(2.0)
+                .behavior(ModuleBehaviorDef::Radiator(RadiatorDef {
+                    cooling_capacity_w,
+                }))
+                .thermal(ThermalDef {
                     heat_capacity_j_per_k: 100.0,
                     passive_cooling_coefficient: 0.0,
                     max_temp_mk: 5_000_000,
@@ -912,15 +896,8 @@ mod tests {
                     operating_max_mk: None,
                     thermal_group: Some("smelting".to_string()),
                     idle_heat_generation_w: None,
-                }),
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                })
+                .build(),
         );
         let station = state.stations.get_mut(station_id).unwrap();
         station.modules.push(ModuleState {
@@ -1418,19 +1395,18 @@ mod tests {
         let mut content = crate::test_fixtures::base_content();
         content.module_defs.insert(
             "module_smelter".to_string(),
-            ModuleDef {
-                id: "module_smelter".to_string(),
-                name: "Test Smelter".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 10.0,
-                power_consumption_per_run: 100.0,
-                wear_per_run: 0.02,
-                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+            ModuleDefBuilder::new("module_smelter")
+                .name("Test Smelter")
+                .mass(5000.0)
+                .volume(10.0)
+                .power(100.0)
+                .wear(0.02)
+                .behavior(ModuleBehaviorDef::Processor(crate::ProcessorDef {
                     processing_interval_minutes: 5,
                     processing_interval_ticks: 5,
                     recipes: vec![],
-                }),
-                thermal: Some(ThermalDef {
+                }))
+                .thermal(ThermalDef {
                     heat_capacity_j_per_k: 500.0,
                     passive_cooling_coefficient: 0.05,
                     max_temp_mk: 2_500_000,
@@ -1438,15 +1414,8 @@ mod tests {
                     operating_max_mk: None,
                     thermal_group: Some("smelting".to_string()),
                     idle_heat_generation_w: Some(idle_w),
-                }),
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                })
+                .build(),
         );
         content
     }

@@ -540,6 +540,7 @@ fn resolve_assembler_run(
 
 #[cfg(test)]
 mod assembler_component_tests {
+    use crate::test_fixtures::ModuleDefBuilder;
     use crate::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
@@ -585,28 +586,18 @@ mod assembler_component_tests {
         let recipe_id = crate::test_fixtures::insert_recipe(&mut content, hull_plate_recipe);
         content.module_defs.insert(
             "module_shipyard".to_string(),
-            ModuleDef {
-                id: "module_shipyard".to_string(),
-                name: "Shipyard".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 20.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.0,
-                behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+            ModuleDefBuilder::new("module_shipyard")
+                .name("Shipyard")
+                .mass(5000.0)
+                .volume(20.0)
+                .power(10.0)
+                .behavior(ModuleBehaviorDef::Assembler(AssemblerDef {
                     assembly_interval_minutes: 1,
                     assembly_interval_ticks: 1,
                     recipes: vec![recipe_id],
                     max_stock: HashMap::new(),
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         content
     }
@@ -946,28 +937,18 @@ mod assembler_component_tests {
         let recipe_id = crate::test_fixtures::insert_recipe(&mut content, ship_recipe);
         content.module_defs.insert(
             "module_shipyard".to_string(),
-            ModuleDef {
-                id: "module_shipyard".to_string(),
-                name: "Shipyard".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 20.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.0,
-                behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+            ModuleDefBuilder::new("module_shipyard")
+                .name("Shipyard")
+                .mass(5000.0)
+                .volume(20.0)
+                .power(10.0)
+                .behavior(ModuleBehaviorDef::Assembler(AssemblerDef {
                     assembly_interval_minutes: 1,
                     assembly_interval_ticks: 1,
                     recipes: vec![recipe_id],
                     max_stock: HashMap::new(),
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         content
     }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_fixtures::ModuleDefBuilder;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
@@ -84,27 +85,18 @@ fn trade_content() -> GameContent {
     ];
     content.module_defs = [(
         "module_basic_iron_refinery".to_string(),
-        ModuleDef {
-            id: "module_basic_iron_refinery".to_string(),
-            name: "Basic Iron Refinery".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.01,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_basic_iron_refinery")
+            .name("Basic Iron Refinery")
+            .mass(1000.0)
+            .volume(5.0)
+            .power(10.0)
+            .wear(0.01)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 10,
                 processing_interval_ticks: 10,
                 recipes: vec![],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     )]
     .into_iter()
     .collect();

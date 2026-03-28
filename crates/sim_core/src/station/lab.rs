@@ -135,6 +135,7 @@ fn execute(
 
 #[cfg(test)]
 mod tests {
+    use crate::test_fixtures::ModuleDefBuilder;
     use crate::AHashMap;
     use crate::*;
     use std::collections::{HashMap, HashSet};
@@ -143,30 +144,21 @@ mod tests {
         let mut content = crate::test_fixtures::base_content();
         content.module_defs.insert(
             "module_exploration_lab".to_string(),
-            ModuleDef {
-                id: "module_exploration_lab".to_string(),
-                name: "Exploration Lab".to_string(),
-                mass_kg: 3500.0,
-                volume_m3: 7.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.005,
-                behavior: ModuleBehaviorDef::Lab(LabDef {
+            ModuleDefBuilder::new("module_exploration_lab")
+                .name("Exploration Lab")
+                .mass(3500.0)
+                .volume(7.0)
+                .power(10.0)
+                .wear(0.005)
+                .behavior(ModuleBehaviorDef::Lab(LabDef {
                     domain: ResearchDomain::Survey,
                     data_consumption_per_run: 8.0,
                     research_points_per_run: 4.0,
                     accepted_data: vec![DataKind::SurveyData],
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         content
     }

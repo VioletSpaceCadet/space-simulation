@@ -1,52 +1,34 @@
 use super::*;
+use crate::test_fixtures::ModuleDefBuilder;
 
 fn solar_array_content() -> GameContent {
     let mut content = test_content();
     content.module_defs.insert(
         "module_basic_solar_array".to_string(),
-        ModuleDef {
-            id: "module_basic_solar_array".to_string(),
-            name: "Basic Solar Array".to_string(),
-            mass_kg: 1500.0,
-            volume_m3: 12.0,
-            power_consumption_per_run: 0.0,
-            wear_per_run: 0.002,
-            behavior: ModuleBehaviorDef::SolarArray(SolarArrayDef {
+        ModuleDefBuilder::new("module_basic_solar_array")
+            .name("Basic Solar Array")
+            .mass(1500.0)
+            .volume(12.0)
+            .wear(0.002)
+            .behavior(ModuleBehaviorDef::SolarArray(SolarArrayDef {
                 base_output_kw: 50.0,
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
     content.module_defs.insert(
         "module_basic_iron_refinery".to_string(),
-        ModuleDef {
-            id: "module_basic_iron_refinery".to_string(),
-            name: "Basic Iron Refinery".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 10.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.01,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_basic_iron_refinery")
+            .name("Basic Iron Refinery")
+            .mass(5000.0)
+            .volume(10.0)
+            .power(10.0)
+            .wear(0.01)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 60,
                 processing_interval_ticks: 60,
                 recipes: vec![],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
     content
 }
@@ -153,27 +135,17 @@ fn power_budget_deficit_when_insufficient() {
     // Make a high-power consumer
     content.module_defs.insert(
         "module_power_hungry".to_string(),
-        ModuleDef {
-            id: "module_power_hungry".to_string(),
-            name: "Power Hungry".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 80.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_power_hungry")
+            .name("Power Hungry")
+            .mass(1000.0)
+            .volume(5.0)
+            .power(80.0)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 60,
                 processing_interval_ticks: 60,
                 recipes: vec![],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     let mut state = state_with_solar_array(&content);
@@ -495,28 +467,19 @@ fn stall_content() -> GameContent {
     // Add a sensor array (lowest priority, 8 kW)
     content.module_defs.insert(
         "module_sensor_array".to_string(),
-        ModuleDef {
-            id: "module_sensor_array".to_string(),
-            name: "Sensor Array".to_string(),
-            mass_kg: 2500.0,
-            volume_m3: 6.0,
-            power_consumption_per_run: 8.0,
-            wear_per_run: 0.003,
-            behavior: ModuleBehaviorDef::SensorArray(SensorArrayDef {
+        ModuleDefBuilder::new("module_sensor_array")
+            .name("Sensor Array")
+            .mass(2500.0)
+            .volume(6.0)
+            .power(8.0)
+            .wear(0.003)
+            .behavior(ModuleBehaviorDef::SensorArray(SensorArrayDef {
                 data_kind: crate::DataKind::SurveyData,
                 action_key: "sensor_scan".to_string(),
                 scan_interval_minutes: 120,
                 scan_interval_ticks: 120,
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
     content
 }
@@ -704,27 +667,17 @@ fn battery_content() -> GameContent {
     let mut content = solar_array_content();
     content.module_defs.insert(
         "module_basic_battery".to_string(),
-        ModuleDef {
-            id: "module_basic_battery".to_string(),
-            name: "Basic Battery".to_string(),
-            mass_kg: 2000.0,
-            volume_m3: 4.0,
-            power_consumption_per_run: 0.0,
-            wear_per_run: 0.001,
-            behavior: ModuleBehaviorDef::Battery(BatteryDef {
+        ModuleDefBuilder::new("module_basic_battery")
+            .name("Basic Battery")
+            .mass(2000.0)
+            .volume(4.0)
+            .wear(0.001)
+            .behavior(ModuleBehaviorDef::Battery(BatteryDef {
                 capacity_kwh: 100.0,
                 charge_rate_kw: 20.0,
                 discharge_rate_kw: 30.0,
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
     content
 }
@@ -777,27 +730,17 @@ fn battery_discharges_to_cover_deficit() {
     // Add a high-power consumer (80 kW demand vs 50 kW solar = 30 kW deficit)
     content.module_defs.insert(
         "module_power_hungry".to_string(),
-        ModuleDef {
-            id: "module_power_hungry".to_string(),
-            name: "Power Hungry".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 80.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_power_hungry")
+            .name("Power Hungry")
+            .mass(1000.0)
+            .volume(5.0)
+            .power(80.0)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 60,
                 processing_interval_ticks: 60,
                 recipes: vec![],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     let mut state = state_with_solar_array(&content);
@@ -874,27 +817,17 @@ fn battery_partial_discharge_then_stall() {
     // 80 kW consumer vs 50 kW solar = 30 kW deficit
     content.module_defs.insert(
         "module_power_hungry".to_string(),
-        ModuleDef {
-            id: "module_power_hungry".to_string(),
-            name: "Power Hungry".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 80.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_power_hungry")
+            .name("Power Hungry")
+            .mass(1000.0)
+            .volume(5.0)
+            .power(80.0)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 60,
                 processing_interval_ticks: 60,
                 recipes: vec![],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     let mut state = state_with_solar_array(&content);
@@ -1109,27 +1042,17 @@ fn battery_discharge_rate_unchanged_by_capacity_modifier() {
     // High-power consumer: 80 kW demand vs 50 kW solar = 30 kW deficit
     content.module_defs.insert(
         "module_power_hungry".to_string(),
-        ModuleDef {
-            id: "module_power_hungry".to_string(),
-            name: "Power Hungry".to_string(),
-            mass_kg: 1000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 80.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_power_hungry")
+            .name("Power Hungry")
+            .mass(1000.0)
+            .volume(5.0)
+            .power(80.0)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 60,
                 processing_interval_ticks: 60,
                 recipes: vec![],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     let mut state = state_with_solar_array(&content);
@@ -1190,53 +1113,16 @@ fn battery_discharge_rate_unchanged_by_capacity_modifier() {
 
 #[test]
 fn power_priority_fallback_uses_behavior_type() {
-    let def = ModuleDef {
-        id: "test_processor".to_string(),
-        name: "Test".to_string(),
-        mass_kg: 0.0,
-        volume_m3: 0.0,
-        power_consumption_per_run: 0.0,
-        wear_per_run: 0.0,
-        behavior: ModuleBehaviorDef::Processor(ProcessorDef {
-            processing_interval_minutes: 1,
-            processing_interval_ticks: 1,
-            recipes: vec![],
-        }),
-        thermal: None,
-        compatible_slots: Vec::new(),
-        ship_modifiers: Vec::new(),
-        power_stall_priority: None,
-        roles: vec![],
-        crew_requirement: Default::default(),
-        required_tech: None,
-        ports: Vec::new(),
-    };
+    let def = ModuleDefBuilder::new("test_processor").name("Test").build();
     assert_eq!(def.power_priority(), Some(3), "Processor default is 3");
 }
 
 #[test]
 fn power_priority_content_override_takes_precedence() {
-    let def = ModuleDef {
-        id: "test_processor".to_string(),
-        name: "Test".to_string(),
-        mass_kg: 0.0,
-        volume_m3: 0.0,
-        power_consumption_per_run: 0.0,
-        wear_per_run: 0.0,
-        behavior: ModuleBehaviorDef::Processor(ProcessorDef {
-            processing_interval_minutes: 1,
-            processing_interval_ticks: 1,
-            recipes: vec![],
-        }),
-        thermal: None,
-        compatible_slots: Vec::new(),
-        ship_modifiers: Vec::new(),
-        power_stall_priority: Some(7),
-        roles: vec![],
-        crew_requirement: Default::default(),
-        required_tech: None,
-        ports: Vec::new(),
-    };
+    let def = ModuleDefBuilder::new("test_processor")
+        .name("Test")
+        .power_stall_priority(7)
+        .build();
     assert_eq!(
         def.power_priority(),
         Some(7),

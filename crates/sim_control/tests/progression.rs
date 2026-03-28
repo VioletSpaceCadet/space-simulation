@@ -8,7 +8,7 @@
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use sim_control::{AutopilotController, CommandSource};
-use sim_core::test_fixtures::{base_content, base_state};
+use sim_core::test_fixtures::{base_content, base_state, ModuleDefBuilder};
 use sim_core::*;
 use std::collections::HashMap;
 
@@ -71,115 +71,75 @@ fn production_like_content() -> GameContent {
     // Sensor array: generates ScanData every 2 hours
     content.module_defs.insert(
         "module_sensor_array".to_string(),
-        ModuleDef {
-            id: "module_sensor_array".to_string(),
-            name: "Sensor Array".to_string(),
-            mass_kg: 2500.0,
-            volume_m3: 6.0,
-            power_consumption_per_run: 8.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::SensorArray(SensorArrayDef {
+        ModuleDefBuilder::new("module_sensor_array")
+            .name("Sensor Array")
+            .mass(2500.0)
+            .volume(6.0)
+            .power(8.0)
+            .behavior(ModuleBehaviorDef::SensorArray(SensorArrayDef {
                 data_kind: DataKind::SurveyData,
                 action_key: "sensor_scan".to_string(),
                 scan_interval_minutes: 120,
                 scan_interval_ticks: 2, // 120 / 60
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     // Exploration lab: consumes ScanData, produces Exploration evidence
     content.module_defs.insert(
         "module_exploration_lab".to_string(),
-        ModuleDef {
-            id: "module_exploration_lab".to_string(),
-            name: "Exploration Lab".to_string(),
-            mass_kg: 3500.0,
-            volume_m3: 7.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Lab(LabDef {
+        ModuleDefBuilder::new("module_exploration_lab")
+            .name("Exploration Lab")
+            .mass(3500.0)
+            .volume(7.0)
+            .power(10.0)
+            .behavior(ModuleBehaviorDef::Lab(LabDef {
                 domain: ResearchDomain::Survey,
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
                 accepted_data: vec![DataKind::SurveyData],
                 research_interval_minutes: 60,
                 research_interval_ticks: 1, // 60 / 60
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     // Materials lab: consumes MiningData/EngineeringData, produces Materials evidence
     content.module_defs.insert(
         "module_materials_lab".to_string(),
-        ModuleDef {
-            id: "module_materials_lab".to_string(),
-            name: "Materials Lab".to_string(),
-            mass_kg: 4000.0,
-            volume_m3: 8.0,
-            power_consumption_per_run: 12.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Lab(LabDef {
+        ModuleDefBuilder::new("module_materials_lab")
+            .name("Materials Lab")
+            .mass(4000.0)
+            .volume(8.0)
+            .power(12.0)
+            .behavior(ModuleBehaviorDef::Lab(LabDef {
                 domain: ResearchDomain::Materials,
                 data_consumption_per_run: 10.0,
                 research_points_per_run: 5.0,
                 accepted_data: vec![DataKind::AssayData, DataKind::ManufacturingData],
                 research_interval_minutes: 60,
                 research_interval_ticks: 1,
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     // Engineering lab: consumes EngineeringData, produces Engineering evidence
     content.module_defs.insert(
         "module_engineering_lab".to_string(),
-        ModuleDef {
-            id: "module_engineering_lab".to_string(),
-            name: "Engineering Lab".to_string(),
-            mass_kg: 4000.0,
-            volume_m3: 8.0,
-            power_consumption_per_run: 12.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Lab(LabDef {
+        ModuleDefBuilder::new("module_engineering_lab")
+            .name("Engineering Lab")
+            .mass(4000.0)
+            .volume(8.0)
+            .power(12.0)
+            .behavior(ModuleBehaviorDef::Lab(LabDef {
                 domain: ResearchDomain::Manufacturing,
                 data_consumption_per_run: 10.0,
                 research_points_per_run: 5.0,
                 accepted_data: vec![DataKind::ManufacturingData],
                 research_interval_minutes: 60,
                 research_interval_ticks: 1,
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     // Processor recipe: Ore → Fe + Slag
@@ -214,27 +174,17 @@ fn production_like_content() -> GameContent {
     // Processor (refinery): every 1 hour
     content.module_defs.insert(
         "module_basic_iron_refinery".to_string(),
-        ModuleDef {
-            id: "module_basic_iron_refinery".to_string(),
-            name: "Basic Iron Refinery".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 10.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_basic_iron_refinery")
+            .name("Basic Iron Refinery")
+            .mass(5000.0)
+            .volume(10.0)
+            .power(10.0)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 60,
                 processing_interval_ticks: 1,
                 recipes: vec![RecipeId("recipe_basic_iron".to_string())],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     // Assembler recipe: Fe → Repair Kit
@@ -260,57 +210,37 @@ fn production_like_content() -> GameContent {
     // Assembler (repair kits): every 6 hours — generates EngineeringData
     content.module_defs.insert(
         "module_basic_assembler".to_string(),
-        ModuleDef {
-            id: "module_basic_assembler".to_string(),
-            name: "Basic Assembler".to_string(),
-            mass_kg: 3000.0,
-            volume_m3: 8.0,
-            power_consumption_per_run: 8.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+        ModuleDefBuilder::new("module_basic_assembler")
+            .name("Basic Assembler")
+            .mass(3000.0)
+            .volume(8.0)
+            .power(8.0)
+            .behavior(ModuleBehaviorDef::Assembler(AssemblerDef {
                 assembly_interval_minutes: 360,
                 assembly_interval_ticks: 6,
                 recipes: vec![RecipeId("recipe_basic_repair_kit".to_string())],
                 max_stock: HashMap::from([(ComponentId("repair_kit".to_string()), 50)]),
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     // Maintenance bay
     content.module_defs.insert(
         "module_maintenance_bay".to_string(),
-        ModuleDef {
-            id: "module_maintenance_bay".to_string(),
-            name: "Maintenance Bay".to_string(),
-            mass_kg: 2000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 5.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Maintenance(MaintenanceDef {
+        ModuleDefBuilder::new("module_maintenance_bay")
+            .name("Maintenance Bay")
+            .mass(2000.0)
+            .volume(5.0)
+            .power(5.0)
+            .behavior(ModuleBehaviorDef::Maintenance(MaintenanceDef {
                 repair_interval_minutes: 60,
                 repair_interval_ticks: 1,
                 wear_reduction_per_run: 0.2,
                 repair_kit_cost: 1,
                 repair_threshold: 0.1,
                 maintenance_component_id: "repair_kit".to_string(),
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     // Component def for repair_kit
@@ -609,28 +539,19 @@ fn ships_built_after_tech_unlock_and_trade_available() {
     // Add shipyard assembler: 20160 min = 336 ticks, needs 10000kg Fe + 8 thrusters
     content.module_defs.insert(
         "module_shipyard".to_string(),
-        ModuleDef {
-            id: "module_shipyard".to_string(),
-            name: "Shipyard".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 20.0,
-            power_consumption_per_run: 25.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+        ModuleDefBuilder::new("module_shipyard")
+            .name("Shipyard")
+            .mass(5000.0)
+            .volume(20.0)
+            .power(25.0)
+            .behavior(ModuleBehaviorDef::Assembler(AssemblerDef {
                 assembly_interval_minutes: 20160,
                 assembly_interval_ticks: 336, // 20160 / 60
                 recipes: vec![RecipeId("recipe_basic_mining_shuttle".to_string())],
                 max_stock: HashMap::new(),
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec!["shipyard".to_string()],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .roles(vec!["shipyard"])
+            .build(),
     );
 
     // Add thruster component def
