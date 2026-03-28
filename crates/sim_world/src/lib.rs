@@ -764,6 +764,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         power: PowerState::default(),
         cached_inventory_volume_m3: None,
         module_type_index: sim_core::ModuleTypeIndex::default(),
+        module_id_index: std::collections::HashMap::new(),
         power_budget_cache: sim_core::PowerBudgetCache::default(),
     };
     let (ship_id, ship) = build_initial_ship(content, c, &earth_orbit_pos);
@@ -1512,6 +1513,7 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: sim_core::ModuleTypeIndex::default(),
+                    module_id_index: std::collections::HashMap::new(),
                     power_budget_cache: sim_core::PowerBudgetCache::default(),
                 },
             )]

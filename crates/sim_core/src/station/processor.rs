@@ -758,9 +758,9 @@ mod tests {
     // ── Thermal recipe gating integration tests ──────────────────────
 
     use crate::{
-        Counters, InputFilter, MetaState, ModuleDef, ModuleInstanceId, ModuleState, PowerState,
-        ProcessorDef, ProcessorState, RecipeId, RecipeInput, RecipeThermalReq, StationState,
-        ThermalDef, ThermalState, WearState,
+        Counters, InputFilter, MetaState, ModuleInstanceId, ModuleState, PowerState, ProcessorDef,
+        ProcessorState, RecipeId, RecipeInput, RecipeThermalReq, StationState, ThermalDef,
+        ThermalState, WearState,
     };
     use std::collections::HashSet;
 
@@ -879,6 +879,7 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: HashMap::new(),
                     power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
@@ -1269,6 +1270,7 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: HashMap::new(),
                     power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
@@ -1393,6 +1395,7 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: HashMap::new(),
                     power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
@@ -1558,6 +1561,7 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: HashMap::new(),
                     power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
@@ -1716,6 +1720,7 @@ mod tests {
                     power: PowerState::default(),
                     cached_inventory_volume_m3: None,
                     module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: HashMap::new(),
                     power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]

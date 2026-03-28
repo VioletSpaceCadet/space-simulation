@@ -101,6 +101,8 @@ fn transfer_state(content: &GameContent) -> GameState {
         to_port_id: "molten_in".to_string(),
     });
 
+    station.rebuild_module_index(&content);
+
     state
 }
 

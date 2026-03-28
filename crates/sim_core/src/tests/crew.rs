@@ -90,6 +90,7 @@ fn crew_state(content: &GameContent, crew_count: u32) -> GameState {
         quality: 1.0,
         thermal: None,
     });
+    station.rebuild_module_index(content);
     state
 }
 

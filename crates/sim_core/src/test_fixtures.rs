@@ -710,6 +710,7 @@ pub fn base_state(content: &GameContent) -> GameState {
                 power: crate::PowerState::default(),
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),
+                module_id_index: std::collections::HashMap::new(),
                 power_budget_cache: crate::PowerBudgetCache::default(),
             },
         )]
