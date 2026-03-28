@@ -667,3 +667,42 @@ fn transit_fuel_reduced_by_efficiency_modifier() {
         "tech fuel cost should be ~67% of baseline: baseline={baseline_cost}, tech={tech_cost}, ratio={ratio}"
     );
 }
+
+#[test]
+fn transit_fuel_modifier_does_not_affect_colocated() {
+    let (content, mut state) = spatial_transit_setup();
+    let ship_id = crate::ShipId("ship_0001".to_string());
+
+    // Add fuel efficiency modifier
+    state.modifiers.add(crate::modifiers::Modifier {
+        stat: crate::modifiers::StatId::FuelEfficiency,
+        op: crate::modifiers::ModifierOp::PctAdditive,
+        value: -0.33,
+        source: crate::modifiers::ModifierSource::Tech("tech_efficient_propulsion".into()),
+        condition: None,
+    });
+
+    // Transit to same zone (co-located) — should be free
+    let before = state.ships.get(&ship_id).unwrap().propellant_kg;
+    let destination = crate::Position {
+        parent_body: crate::BodyId("zone_a".to_string()),
+        radius_au_um: crate::RadiusAuMicro(0),
+        angle_mdeg: crate::AngleMilliDeg(0),
+    };
+    let assignments = vec![(
+        ship_id.clone(),
+        TaskKind::Transit {
+            destination,
+            total_ticks: 1,
+            then: Box::new(TaskKind::Idle),
+        },
+    )];
+    let mut events = Vec::new();
+    crate::commands::apply_ship_assignments(&mut state, &content, assignments, 0, &mut events);
+
+    let after = state.ships.get(&ship_id).unwrap().propellant_kg;
+    assert!(
+        (after - before).abs() < f32::EPSILON,
+        "co-located transit should cost no fuel even with modifier: before={before}, after={after}"
+    );
+}

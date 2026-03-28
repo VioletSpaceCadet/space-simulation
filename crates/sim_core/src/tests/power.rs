@@ -1104,6 +1104,91 @@ fn battery_capacity_doubled_by_tech_modifier() {
 }
 
 #[test]
+fn battery_discharge_rate_unchanged_by_capacity_modifier() {
+    let mut content = battery_content();
+    // High-power consumer: 80 kW demand vs 50 kW solar = 30 kW deficit
+    content.module_defs.insert(
+        "module_power_hungry".to_string(),
+        ModuleDef {
+            id: "module_power_hungry".to_string(),
+            name: "Power Hungry".to_string(),
+            mass_kg: 1000.0,
+            volume_m3: 5.0,
+            power_consumption_per_run: 80.0,
+            wear_per_run: 0.0,
+            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                processing_interval_minutes: 60,
+                processing_interval_ticks: 60,
+                recipes: vec![],
+            }),
+            thermal: None,
+            compatible_slots: Vec::new(),
+            ship_modifiers: Vec::new(),
+            power_stall_priority: None,
+            roles: vec![],
+            crew_requirement: Default::default(),
+            required_tech: None,
+            ports: Vec::new(),
+        },
+    );
+
+    let mut state = state_with_solar_array(&content);
+    let station_id = StationId("station_earth_orbit".to_string());
+    let station = state.stations.get_mut(&station_id).unwrap();
+
+    // Battery with 50 kWh charge, discharge_rate = 30 kW
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("battery_inst_0001".to_string()),
+        def_id: "module_basic_battery".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Battery(BatteryState { charge_kwh: 50.0 }),
+        wear: WearState::default(),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
+        thermal: None,
+    });
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("hungry_inst_0001".to_string()),
+        def_id: "module_power_hungry".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::Processor(ProcessorState {
+            threshold_kg: 0.0,
+            ticks_since_last_run: 0,
+            stalled: false,
+            selected_recipe: None,
+        }),
+        wear: WearState::default(),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        crew_satisfied: true,
+        thermal: None,
+    });
+
+    // Add +100% battery capacity modifier
+    state.modifiers.add(crate::modifiers::Modifier {
+        stat: crate::modifiers::StatId::BatteryCapacity,
+        op: crate::modifiers::ModifierOp::PctAdditive,
+        value: 1.0,
+        source: crate::modifiers::ModifierSource::Tech("tech_battery_storage".into()),
+        condition: None,
+    });
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    let station = state.stations.get(&station_id).unwrap();
+    // Deficit = 80 - 50 = 30 kW, discharge rate = 30 kW (unchanged by capacity modifier)
+    assert!(
+        (station.power.battery_discharge_kw - 30.0).abs() < f32::EPSILON,
+        "discharge rate should be 30 kW (unchanged by capacity modifier), got {}",
+        station.power.battery_discharge_kw
+    );
+}
+
+#[test]
 fn power_priority_fallback_uses_behavior_type() {
     let def = ModuleDef {
         id: "test_processor".to_string(),
