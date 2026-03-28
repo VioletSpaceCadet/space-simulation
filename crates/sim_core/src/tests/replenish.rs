@@ -172,7 +172,6 @@ fn empty_sites_state(content: &GameContent) -> GameState {
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),
                 module_id_index: HashMap::new(),
-                inventory_index: HashMap::new(),
                 power_budget_cache: crate::PowerBudgetCache::default(),
             },
         )]

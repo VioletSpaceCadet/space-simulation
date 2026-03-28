@@ -504,10 +504,6 @@ pub struct StationState {
     /// Pre-computed module instance ID → index mapping. Rebuilt on install/uninstall.
     #[serde(skip, default)]
     pub module_id_index: HashMap<ModuleInstanceId, usize>,
-    /// Lazy inventory lookup index. Key = item identifier (element, `component_id`, or `def_id`).
-    /// Value = positions in the inventory vec. Cleared on mutation, rebuilt on access.
-    #[serde(skip, default)]
-    pub inventory_index: HashMap<String, Vec<usize>>,
     /// Cached power generation/consumption values. Avoids re-iterating modules
     /// when nothing power-relevant has changed.
     #[serde(skip, default)]
@@ -528,36 +524,6 @@ impl StationState {
     /// Invalidate the cached volume. Call after any inventory mutation.
     pub fn invalidate_volume_cache(&mut self) {
         self.cached_inventory_volume_m3 = None;
-    }
-
-    /// Invalidate the inventory index. Call after any inventory mutation.
-    pub fn invalidate_inventory_index(&mut self) {
-        self.inventory_index.clear();
-    }
-
-    /// Ensure the inventory index is built, rebuilding if empty.
-    fn ensure_inventory_index(&mut self) {
-        if !self.inventory_index.is_empty() {
-            return;
-        }
-        for (i, item) in self.inventory.iter().enumerate() {
-            let key = match item {
-                InventoryItem::Material { element, .. } => element.clone(),
-                InventoryItem::Component { component_id, .. } => component_id.0.clone(),
-                InventoryItem::Module { module_def_id, .. } => module_def_id.clone(),
-                InventoryItem::Ore { lot_id, .. } => lot_id.0.clone(),
-                InventoryItem::Slag { .. } => "slag".to_string(),
-            };
-            self.inventory_index.entry(key).or_default().push(i);
-        }
-    }
-
-    /// Find the first inventory item matching a key (element, `component_id`, or module `def_id`).
-    pub fn inventory_position_by_key(&mut self, key: &str) -> Option<usize> {
-        self.ensure_inventory_index();
-        self.inventory_index
-            .get(key)
-            .and_then(|positions| positions.first().copied())
     }
 
     /// Invalidate the power budget cache. Call after module enable/disable,
