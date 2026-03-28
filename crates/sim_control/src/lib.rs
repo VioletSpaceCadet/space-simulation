@@ -2,8 +2,13 @@ mod agents;
 mod behaviors;
 mod objectives;
 
+use std::collections::BTreeMap;
+
+use agents::ship_agent::ShipAgent;
+use agents::ship_assignment::ShipAssignmentBridge;
+use agents::Agent;
 use behaviors::{AutopilotBehavior, AUTOPILOT_OWNER};
-use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};
+use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId, ShipId};
 
 pub trait CommandSource {
     fn generate_commands(
@@ -14,12 +19,12 @@ pub trait CommandSource {
     ) -> Vec<CommandEnvelope>;
 }
 
-/// Drives ships automatically via a registry of behaviors:
-/// station management, lab assignment, thruster import, slag jettison,
-/// material export, propellant pipeline, and ship task scheduling
-/// (Deposit > Mine > `DeepScan` > Survey).
+/// Drives ships automatically via flat behaviors (station management, labs,
+/// crew, exports, etc.) plus hierarchical ship agents that convert objectives
+/// into tactical commands.
 pub struct AutopilotController {
     behaviors: Vec<Box<dyn AutopilotBehavior>>,
+    ship_agents: BTreeMap<ShipId, ShipAgent>,
     /// Cached owner ID — avoids per-tick String allocation.
     owner: PrincipalId,
 }
@@ -28,6 +33,7 @@ impl AutopilotController {
     pub fn new() -> Self {
         Self {
             behaviors: behaviors::default_behaviors(),
+            ship_agents: BTreeMap::new(),
             owner: PrincipalId(AUTOPILOT_OWNER.to_string()),
         }
     }
@@ -47,9 +53,30 @@ impl CommandSource for AutopilotController {
         next_command_id: &mut u64,
     ) -> Vec<CommandEnvelope> {
         let mut commands = Vec::new();
+
+        // 1. Run flat behaviors (station management, labs, crew, etc.)
         for behavior in &mut self.behaviors {
             commands.extend(behavior.generate(state, content, &self.owner, next_command_id));
         }
+
+        // 2. Sync ship agent lifecycle — create for new ships, remove for deleted
+        for (ship_id, ship) in &state.ships {
+            if ship.owner == self.owner && !self.ship_agents.contains_key(ship_id) {
+                self.ship_agents
+                    .insert(ship_id.clone(), ShipAgent::new(ship_id.clone()));
+            }
+        }
+        self.ship_agents
+            .retain(|id, _| state.ships.contains_key(id));
+
+        // 3. Bridge assigns objectives to idle ship agents
+        ShipAssignmentBridge::assign_objectives(&mut self.ship_agents, state, content, &self.owner);
+
+        // 4. Ship agents run in BTreeMap order (deterministic by ShipId, AD2)
+        for agent in self.ship_agents.values_mut() {
+            commands.extend(agent.generate(state, content, &self.owner, next_command_id));
+        }
+
         commands
     }
 }

@@ -1,6 +1,5 @@
 use sim_core::{AsteroidId, SiteId, StationId};
 
-#[allow(dead_code)] // Used starting in VIO-446/VIO-447
 /// Objective issued by a station agent (or assignment bridge) to a ship agent.
 ///
 /// Ship agents receive an objective and autonomously handle the tactical
@@ -14,7 +13,9 @@ pub(crate) enum ShipObjective {
     /// Survey a specific scan site.
     Survey { site_id: SiteId },
     /// Deposit cargo at a specific station.
+    #[allow(dead_code)] // Assigned by StationAgent in VIO-449
     Deposit { station_id: StationId },
     /// No objective — ship is idle and available for assignment.
+    #[allow(dead_code)] // Used by StationAgent in VIO-449
     Idle,
 }
