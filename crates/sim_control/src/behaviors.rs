@@ -986,17 +986,25 @@ impl AutopilotBehavior for ShipTaskScheduler {
         let mut next_deep_scan = deep_scan_candidates.iter();
 
         // Sort survey sites by distance from reference position (nearest first).
-        let mut sorted_sites: Vec<&sim_core::ScanSite> = state.scan_sites.iter().collect();
-        if !sorted_sites.is_empty() {
+        // Pre-compute distances (Schwartzian transform) to avoid per-comparison lookups.
+        let sorted_sites: Vec<&sim_core::ScanSite> = if state.scan_sites.is_empty() {
+            Vec::new()
+        } else {
             let ref_abs = compute_entity_absolute(reference_pos, &state.body_cache);
-            sorted_sites.sort_by(|a, b| {
-                let da = ref_abs
-                    .distance_squared(compute_entity_absolute(&a.position, &state.body_cache));
-                let db = ref_abs
-                    .distance_squared(compute_entity_absolute(&b.position, &state.body_cache));
-                da.cmp(&db).then_with(|| a.id.0.cmp(&b.id.0))
-            });
-        }
+            let mut decorated: Vec<(u128, &sim_core::ScanSite)> = state
+                .scan_sites
+                .iter()
+                .map(|site| {
+                    let dist = ref_abs.distance_squared(compute_entity_absolute(
+                        &site.position,
+                        &state.body_cache,
+                    ));
+                    (dist, site)
+                })
+                .collect();
+            decorated.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.id.0.cmp(&b.1.id.0)));
+            decorated.into_iter().map(|(_, site)| site).collect()
+        };
         let mut next_site = sorted_sites.iter();
 
         // Determine if we need volatile-rich mining (for H2O or propellant pipeline)
@@ -1013,25 +1021,21 @@ impl AutopilotBehavior for ShipTaskScheduler {
                     && total_element_inventory(state, propellant_element)
                         < content.constants.autopilot_lh2_threshold_kg));
 
-        let mut mine_candidates: Vec<&AsteroidState> = state
+        // Pre-compute mining values (Schwartzian transform) to avoid per-comparison lookups.
+        let sort_element = if needs_volatiles {
+            volatile_element
+        } else {
+            primary_element
+        };
+        let mut mine_decorated: Vec<(f32, &AsteroidState)> = state
             .asteroids
             .values()
             .filter(|a| a.mass_kg > 0.0 && a.knowledge.composition.is_some())
+            .map(|a| (element_mining_value(a, sort_element), a))
             .collect();
-        if needs_volatiles {
-            // Prioritize volatile-rich asteroids when volatile inventory is low
-            mine_candidates.sort_by(|a, b| {
-                element_mining_value(b, volatile_element)
-                    .total_cmp(&element_mining_value(a, volatile_element))
-                    .then_with(|| a.id.0.cmp(&b.id.0))
-            });
-        } else {
-            mine_candidates.sort_by(|a, b| {
-                element_mining_value(b, primary_element)
-                    .total_cmp(&element_mining_value(a, primary_element))
-                    .then_with(|| a.id.0.cmp(&b.id.0))
-            });
-        }
+        mine_decorated.sort_by(|a, b| b.0.total_cmp(&a.0).then_with(|| a.1.id.0.cmp(&b.1.id.0)));
+        let mine_candidates: Vec<&AsteroidState> =
+            mine_decorated.into_iter().map(|(_, a)| a).collect();
         let mut next_mine = mine_candidates.iter();
 
         for ship_id in idle_ships {
