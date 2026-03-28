@@ -444,7 +444,11 @@ fn resolve_assembler_run(
                     QualityFormula::ElementFractionTimesMultiplier { .. } => 1.0,
                 };
 
-                let produced_count = 1_u32;
+                #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+                let produced_count = (1.0_f32 * ctx.efficiency).floor() as u32;
+                if produced_count == 0 {
+                    continue;
+                }
 
                 if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                     let existing = station.inventory.iter_mut().find(|i| {

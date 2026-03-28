@@ -179,14 +179,14 @@ struct ProcessorRunCtx<'a> {
 }
 
 fn build_processor_modifiers(
-    wear_efficiency: f32,
+    module_efficiency: f32,
     thermal_efficiency: f32,
     thermal_quality: f32,
 ) -> crate::modifiers::ModifierSet {
     let mut mods = crate::modifiers::ModifierSet::new();
     mods.add(crate::modifiers::Modifier::pct_mult(
         crate::modifiers::StatId::ProcessingYield,
-        f64::from(wear_efficiency),
+        f64::from(module_efficiency),
         crate::modifiers::ModifierSource::Wear,
     ));
     mods.add(crate::modifiers::Modifier::pct_mult(
