@@ -2,7 +2,6 @@ pub(crate) mod ship_agent;
 pub(crate) mod ship_assignment;
 
 use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};
-#[allow(dead_code)] // Used starting in VIO-448
 /// A decision-making agent that receives context and emits commands.
 ///
 /// Agents are scoped — they see relevant state but only act within their
@@ -10,6 +9,7 @@ use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};
 /// to allow incremental migration.
 pub(crate) trait Agent: Send {
     /// Human-readable name for logging/debugging.
+    #[allow(dead_code)] // Used for logging in future tickets
     fn name(&self) -> &'static str;
 
     /// Generate commands for this tick.

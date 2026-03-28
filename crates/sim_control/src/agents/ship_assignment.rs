@@ -21,10 +21,8 @@ use super::ship_agent::ShipAgent;
 ///
 /// Runs BEFORE ship agents in execution order. Replaced by
 /// `StationAgent::assign_ship_objectives()` in Phase B (VIO-451).
-#[allow(dead_code)] // Wired into AutopilotController in VIO-448
 pub(crate) struct ShipAssignmentBridge;
 
-#[allow(dead_code)] // Wired into AutopilotController in VIO-448
 impl ShipAssignmentBridge {
     /// Assign objectives to idle ship agents that have no current objective.
     ///

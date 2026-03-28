@@ -94,6 +94,7 @@ pub(crate) fn should_opportunistic_refuel(
     try_refuel(ship, state, content).is_some()
 }
 
+#[allow(dead_code)] // Legacy helper, removed in VIO-453
 fn maybe_assign_refuel(
     ship: &ShipState,
     ship_id: &ShipId,
@@ -892,7 +893,7 @@ impl AutopilotBehavior for ShipFitting {
     }
 }
 
-/// Try to assign a mine task from the next best asteroid.
+#[allow(dead_code)] // Legacy helper, removed in VIO-453
 fn try_mine<'a>(
     ship: &ShipState,
     next_mine: &mut impl Iterator<Item = &'a &'a AsteroidState>,
@@ -914,7 +915,7 @@ fn try_mine<'a>(
     ))
 }
 
-/// Try to assign a deep scan task if tech is unlocked and candidates remain.
+#[allow(dead_code)] // Legacy helper, removed in VIO-453
 fn try_deep_scan<'a>(
     ship: &ShipState,
     deep_scan_unlocked: bool,
@@ -940,7 +941,7 @@ fn try_deep_scan<'a>(
     ))
 }
 
-/// Try to assign a survey task from the next nearest unscanned site.
+#[allow(dead_code)] // Legacy helper, removed in VIO-453
 fn try_survey<'a>(
     ship: &ShipState,
     next_site: &mut impl Iterator<Item = &'a &'a sim_core::ScanSite>,
@@ -962,6 +963,10 @@ fn try_survey<'a>(
 }
 
 /// Ship task scheduling with configurable priority from `content.autopilot.task_priority`.
+///
+/// Legacy: replaced by `ShipAssignmentBridge` + `ShipAgent` in VIO-448.
+/// Retained until VIO-453 cleanup.
+#[allow(dead_code)]
 pub(crate) struct ShipTaskScheduler;
 
 impl AutopilotBehavior for ShipTaskScheduler {
@@ -1270,7 +1275,6 @@ pub(crate) fn default_behaviors() -> Vec<Box<dyn AutopilotBehavior>> {
         Box::new(MaterialExport),
         Box::new(PropellantPipeline),
         Box::new(ShipFitting),
-        Box::new(ShipTaskScheduler),
     ]
 }
 

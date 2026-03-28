@@ -13,13 +13,11 @@ use super::Agent;
 /// opportunistic refueling, deposit priority, and objective invalidation.
 /// It does NOT pick its own target — the station layer (or assignment bridge)
 /// assigns objectives.
-#[allow(dead_code)] // Wired into AutopilotController in VIO-448
 pub(crate) struct ShipAgent {
     pub(crate) ship_id: ShipId,
     pub(crate) objective: Option<ShipObjective>,
 }
 
-#[allow(dead_code)] // Wired into AutopilotController in VIO-448
 impl ShipAgent {
     pub(crate) fn new(ship_id: ShipId) -> Self {
         Self {
@@ -181,6 +179,19 @@ impl Agent for ShipAgent {
 
         // Convert objective to task
         if let Some(task_kind) = self.objective_to_task(ship, state, content) {
+            return vec![make_cmd(
+                &ship.owner,
+                state.meta.tick,
+                next_id,
+                Command::AssignShipTask {
+                    ship_id: self.ship_id.clone(),
+                    task_kind,
+                },
+            )];
+        }
+
+        // Fallback: try refueling when idle with nothing else to do
+        if let Some(task_kind) = crate::behaviors::try_refuel(ship, state, content) {
             return vec![make_cmd(
                 &ship.owner,
                 state.meta.tick,
