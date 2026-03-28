@@ -147,7 +147,7 @@ pub(crate) fn try_refuel(
 }
 
 /// Returns idle autopilot ships. `BTreeMap` iteration is already sorted by ID.
-fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
+pub(crate) fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
     state
         .ships
         .values()
@@ -165,7 +165,7 @@ fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<ShipId> {
 /// Returns asteroid IDs above confidence threshold with unknown composition,
 /// sorted by distance from `reference_pos` (nearest first), with ID tiebreak for determinism.
 /// Targets are read from `content.autopilot.deep_scan_targets`.
-fn collect_deep_scan_candidates(
+pub(crate) fn collect_deep_scan_candidates(
     state: &GameState,
     content: &GameContent,
     reference_pos: &Position,
@@ -197,7 +197,7 @@ fn collect_deep_scan_candidates(
 }
 
 /// Check if any station has a module with the given role installed.
-fn station_has_module_with_role(state: &GameState, role: &str) -> bool {
+pub(crate) fn station_has_module_with_role(state: &GameState, role: &str) -> bool {
     state
         .stations
         .values()
@@ -205,7 +205,7 @@ fn station_has_module_with_role(state: &GameState, role: &str) -> bool {
 }
 
 /// Total inventory of a specific element across all stations.
-fn total_element_inventory(state: &GameState, element: &str) -> f32 {
+pub(crate) fn total_element_inventory(state: &GameState, element: &str) -> f32 {
     state
         .stations
         .values()
@@ -220,7 +220,7 @@ fn total_element_inventory(state: &GameState, element: &str) -> f32 {
 }
 
 /// Mining value for sorting: `mass_kg × element_fraction`.
-fn element_mining_value(asteroid: &AsteroidState, element: &str) -> f32 {
+pub(crate) fn element_mining_value(asteroid: &AsteroidState, element: &str) -> f32 {
     asteroid.mass_kg
         * asteroid
             .knowledge

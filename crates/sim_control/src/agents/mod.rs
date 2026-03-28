@@ -1,4 +1,5 @@
 pub(crate) mod ship_agent;
+pub(crate) mod ship_assignment;
 
 use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};
 #[allow(dead_code)] // Used starting in VIO-448
