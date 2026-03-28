@@ -640,18 +640,20 @@ pub(crate) fn handle_unassign_crew(
         return false;
     }
     let def_id = module.def_id.clone();
-    let was_satisfied = content.module_defs.get(&def_id).map_or(true, |def| {
-        crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement)
-    });
+    let was_satisfied = content
+        .module_defs
+        .get(&def_id)
+        .is_none_or(|def| crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement));
     let new_assigned = assigned - count;
     if new_assigned == 0 {
         module.assigned_crew.remove(role);
     } else {
         module.assigned_crew.insert(role.clone(), new_assigned);
     }
-    let now_satisfied = content.module_defs.get(&def_id).map_or(true, |def| {
-        crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement)
-    });
+    let now_satisfied = content
+        .module_defs
+        .get(&def_id)
+        .is_none_or(|def| crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement));
     let module_id = module.id.clone();
     events.push(crate::emit(
         &mut state.counters,
