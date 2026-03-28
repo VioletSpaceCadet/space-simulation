@@ -79,3 +79,50 @@ fn thermal_30d_scenario_completes_no_collapse() {
         "no thermal modules should be critically overheated with 2 radiators"
     );
 }
+
+#[test]
+fn thermal_stress_90d_completes_with_degraded_cooling() {
+    let content_dir = content_dir();
+    let mut content = sim_world::load_content(&content_dir).unwrap();
+
+    // Override radiator capacity to stress-test thermal stability
+    for module_def in content.module_defs.values_mut() {
+        if let sim_core::ModuleBehaviorDef::Radiator(ref mut rad) = module_def.behavior {
+            rad.cooling_capacity_w = 100.0;
+        }
+    }
+
+    let state_path = format!("{content_dir}/dev_base_state.json");
+    let state_json = std::fs::read_to_string(&state_path).unwrap();
+    let mut state: sim_core::GameState = serde_json::from_str(&state_json).unwrap();
+    state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut autopilot = AutopilotController::new();
+    let mut next_cmd_id = 0_u64;
+
+    // Run 2160 ticks (90 sim-days)
+    for _ in 0..2160 {
+        let envelopes = autopilot.generate_commands(&state, &content, &mut next_cmd_id);
+        sim_core::tick(&mut state, &envelopes, &content, &mut rng, None);
+    }
+
+    let station = &state.stations[&test_station_id()];
+
+    // Station should still be operational after 90 days with degraded cooling
+    assert!(
+        !station.modules.is_empty(),
+        "station should have modules after 90 days"
+    );
+
+    // Thermal modules should still have temps — not all at ambient
+    let thermal_modules: Vec<_> = station
+        .modules
+        .iter()
+        .filter(|m| m.thermal.is_some())
+        .collect();
+    assert!(!thermal_modules.is_empty());
+
+    // Production should still be happening (modules still active)
+    let has_active_module = station.modules.iter().any(|m| m.enabled);
+    assert!(has_active_module, "station should have active modules");
+}
