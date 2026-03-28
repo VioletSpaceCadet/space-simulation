@@ -110,6 +110,13 @@ mod tests {
         );
     }
 
+    /// Rebuild module indexes for all stations (needed after adding modules in tests).
+    fn rebuild_station_indexes(state: &mut sim_core::GameState, content: &sim_core::GameContent) {
+        for station in state.stations.values_mut() {
+            station.rebuild_module_index(content);
+        }
+    }
+
     fn autopilot_state(content: &sim_core::GameContent) -> sim_core::GameState {
         let mut state = base_state(content);
         state.scan_sites.clear();
@@ -1088,6 +1095,7 @@ mod tests {
         state.balance = 10_000_000.0;
         state.meta.tick = sim_core::trade_unlock_tick(&content.constants);
 
+        rebuild_station_indexes(&mut state, &content);
         (content, state)
     }
 
@@ -1517,6 +1525,7 @@ mod tests {
             assigned_crew: Default::default(),
             crew_satisfied: true,
         });
+        rebuild_station_indexes(&mut state, &content);
         // No H2O in inventory → needs_water = true
 
         // Add both Fe-rich and H2O-rich asteroids
@@ -1883,6 +1892,7 @@ mod tests {
         let mut state = autopilot_state(&content);
         add_electrolysis_module(&mut state, false);
         add_heating_module(&mut state, false);
+        rebuild_station_indexes(&mut state, &content);
         // LH2 = 0 (below threshold of 5000)
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
@@ -1925,6 +1935,7 @@ mod tests {
         content.constants.autopilot_lh2_threshold_kg = 1000.0;
         let mut state = autopilot_state(&content);
         add_electrolysis_module(&mut state, true);
+        rebuild_station_indexes(&mut state, &content);
         add_lh2_inventory(&mut state, 3000.0); // > 2x threshold (2000)
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
