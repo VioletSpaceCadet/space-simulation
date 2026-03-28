@@ -350,4 +350,8 @@ pub enum Event {
         to_module_id: ModuleInstanceId,
         element: String,
     },
+    /// Emitted when balance crosses below zero (transition only, not every tick).
+    StationBankrupt {
+        station_id: StationId,
+    },
 }

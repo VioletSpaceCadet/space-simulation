@@ -2,21 +2,25 @@
   {
     "id": "operator",
     "name": "Operator",
-    "recruitment_cost": 50000.0
+    "recruitment_cost": 50000.0,
+    "salary_per_hour": 25.0
   },
   {
     "id": "technician",
     "name": "Technician",
-    "recruitment_cost": 75000.0
+    "recruitment_cost": 75000.0,
+    "salary_per_hour": 37.5
   },
   {
     "id": "scientist",
     "name": "Scientist",
-    "recruitment_cost": 100000.0
+    "recruitment_cost": 100000.0,
+    "salary_per_hour": 50.0
   },
   {
     "id": "pilot",
     "name": "Pilot",
-    "recruitment_cost": 80000.0
+    "recruitment_cost": 80000.0,
+    "salary_per_hour": 40.0
   }
 ]
