@@ -28,7 +28,7 @@ pub(crate) trait AutopilotBehavior: Send {
 // ---------------------------------------------------------------------------
 
 /// Allocates a command ID and builds a `CommandEnvelope`.
-fn make_cmd(
+pub(crate) fn make_cmd(
     owner: &PrincipalId,
     tick: u64,
     next_id: &mut u64,
@@ -46,7 +46,7 @@ fn make_cmd(
 }
 
 /// Wraps `task` in a Transit if `from` and `to` are not co-located; else returns `task` as-is.
-fn maybe_transit(
+pub(crate) fn maybe_transit(
     task: TaskKind,
     from: &Position,
     to: &Position,
@@ -78,7 +78,11 @@ fn maybe_transit(
 }
 
 /// Check if ship should opportunistically refuel (below threshold, at station with LH2).
-fn should_opportunistic_refuel(ship: &ShipState, state: &GameState, content: &GameContent) -> bool {
+pub(crate) fn should_opportunistic_refuel(
+    ship: &ShipState,
+    state: &GameState,
+    content: &GameContent,
+) -> bool {
     if content.constants.fuel_cost_per_au <= 0.0 || ship.propellant_capacity_kg <= 0.0 {
         return false;
     }
@@ -112,7 +116,11 @@ fn maybe_assign_refuel(
 }
 
 /// Try to issue a Refuel task if ship is at a station with LH2.
-fn try_refuel(ship: &ShipState, state: &GameState, content: &GameContent) -> Option<TaskKind> {
+pub(crate) fn try_refuel(
+    ship: &ShipState,
+    state: &GameState,
+    content: &GameContent,
+) -> Option<TaskKind> {
     if content.constants.fuel_cost_per_au <= 0.0 {
         return None;
     }
@@ -224,7 +232,7 @@ fn element_mining_value(asteroid: &AsteroidState, element: &str) -> f32 {
 }
 
 /// Priority 1: if ship has ore, return a Deposit (or Transit→Deposit) task to the nearest station.
-fn deposit_priority(
+pub(crate) fn deposit_priority(
     ship: &ShipState,
     state: &GameState,
     content: &GameContent,
