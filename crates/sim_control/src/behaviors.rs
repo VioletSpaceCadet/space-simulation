@@ -424,6 +424,9 @@ impl AutopilotBehavior for LabAssignment {
         next_id: &mut u64,
     ) -> Vec<CommandEnvelope> {
         // Rebuild eligible tech cache when unlocked set changes.
+        // Uses len() as proxy — safe because research.unlocked is append-only
+        // (techs are never un-unlocked). If tech removal is ever added, switch
+        // to a generation counter on ResearchState.
         let unlocked_count = state.research.unlocked.len();
         if !self.initialized || unlocked_count != self.last_unlocked_count {
             self.cached_eligible.clear();
@@ -472,8 +475,10 @@ impl AutopilotBehavior for LabAssignment {
                 };
 
                 // Score cached eligible techs by sufficiency (current evidence)
-                let empty = Vec::new();
-                let eligible = self.cached_eligible.get(&lab_def.domain).unwrap_or(&empty);
+                let eligible = self
+                    .cached_eligible
+                    .get(&lab_def.domain)
+                    .map_or(&[][..], |v| v.as_slice());
                 let mut candidates: Vec<(TechId, f32)> = eligible
                     .iter()
                     .filter(|tech_id| !state.research.unlocked.contains(tech_id))
