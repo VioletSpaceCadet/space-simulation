@@ -8,13 +8,13 @@ use crate::AHashMap;
 use crate::{AngleMilliDeg, BodyId, Position, RadiusAuMicro};
 use crate::{
     AnomalyTag, AsteroidId, AsteroidTemplateDef, AutopilotConfig, BodyType, Constants, Counters,
-    DataKind, ElementDef, GameContent, GameState, HullId, InitialStationDef, InputAmount,
-    InputFilter, ItemKind, LotId, MetaState, ModuleDef, ModuleInstanceId, ModuleKindState,
-    ModuleState, NodeDef, NodeId, OrbitalBodyDef, OutputSpec, PricingTable, PrincipalId,
-    ProcessorDef, ProcessorState, QualityFormula, RadiatorDef, RadiatorState, RecipeDef, RecipeId,
-    RecipeThermalReq, ResearchState, ScanSite, ShipId, ShipState, SiteId, SolarSystemDef,
-    StationId, StationState, TechDef, TechEffect, TechId, ThermalDef, ThermalState, WearState,
-    YieldFormula,
+    CrewRole, DataKind, ElementDef, GameContent, GameState, HullId, InitialStationDef, InputAmount,
+    InputFilter, ItemKind, LotId, MetaState, ModuleBehaviorDef, ModuleDef, ModuleInstanceId,
+    ModuleKindState, ModulePort, ModuleState, NodeDef, NodeId, OrbitalBodyDef, OutputSpec,
+    PricingTable, PrincipalId, ProcessorDef, ProcessorState, QualityFormula, RadiatorDef,
+    RadiatorState, RecipeDef, RecipeId, RecipeThermalReq, ResearchState, ScanSite, ShipId,
+    ShipState, SiteId, SlotType, SolarSystemDef, StationId, StationState, TechDef, TechEffect,
+    TechId, ThermalDef, ThermalState, WearState, YieldFormula,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -76,6 +76,127 @@ pub fn test_position() -> Position {
         parent_body: BodyId("test_body".to_string()),
         radius_au_um: RadiusAuMicro(0),
         angle_mdeg: AngleMilliDeg(0),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ModuleDef test builder
+// ---------------------------------------------------------------------------
+
+/// Builder for `ModuleDef` with sensible test defaults.
+///
+/// All optional fields default to empty/none. Use chainable methods to set
+/// only the fields relevant to your test:
+///
+/// ```ignore
+/// ModuleDefBuilder::new("my_processor")
+///     .behavior(ModuleBehaviorDef::Processor(ProcessorDef { ... }))
+///     .power(10.0)
+///     .crew("operator", 1)
+///     .build()
+/// ```
+pub struct ModuleDefBuilder {
+    def: ModuleDef,
+}
+
+impl ModuleDefBuilder {
+    /// Create a builder with test defaults: zero mass/volume/power/wear,
+    /// empty Processor behavior, no thermal/crew/ports.
+    pub fn new(id: &str) -> Self {
+        Self {
+            def: ModuleDef {
+                id: id.to_string(),
+                name: id.to_string(),
+                mass_kg: 0.0,
+                volume_m3: 0.0,
+                power_consumption_per_run: 0.0,
+                wear_per_run: 0.0,
+                behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+                    processing_interval_minutes: 1,
+                    processing_interval_ticks: 1,
+                    recipes: vec![],
+                }),
+                thermal: None,
+                compatible_slots: Vec::new(),
+                ship_modifiers: Vec::new(),
+                power_stall_priority: None,
+                roles: vec![],
+                crew_requirement: BTreeMap::new(),
+                required_tech: None,
+                ports: Vec::new(),
+            },
+        }
+    }
+
+    pub fn name(mut self, name: &str) -> Self {
+        self.def.name = name.to_string();
+        self
+    }
+
+    pub fn mass(mut self, kg: f32) -> Self {
+        self.def.mass_kg = kg;
+        self
+    }
+
+    pub fn volume(mut self, m3: f32) -> Self {
+        self.def.volume_m3 = m3;
+        self
+    }
+
+    pub fn power(mut self, watts: f32) -> Self {
+        self.def.power_consumption_per_run = watts;
+        self
+    }
+
+    pub fn wear(mut self, per_run: f32) -> Self {
+        self.def.wear_per_run = per_run;
+        self
+    }
+
+    pub fn behavior(mut self, behavior: ModuleBehaviorDef) -> Self {
+        self.def.behavior = behavior;
+        self
+    }
+
+    pub fn thermal(mut self, thermal: ThermalDef) -> Self {
+        self.def.thermal = Some(thermal);
+        self
+    }
+
+    pub fn compatible_slots(mut self, slots: Vec<SlotType>) -> Self {
+        self.def.compatible_slots = slots;
+        self
+    }
+
+    pub fn power_stall_priority(mut self, priority: u8) -> Self {
+        self.def.power_stall_priority = Some(priority);
+        self
+    }
+
+    pub fn roles(mut self, roles: Vec<&str>) -> Self {
+        self.def.roles = roles.into_iter().map(String::from).collect();
+        self
+    }
+
+    pub fn crew(mut self, role: &str, count: u32) -> Self {
+        self.def
+            .crew_requirement
+            .insert(CrewRole(role.to_string()), count);
+        self
+    }
+
+    pub fn required_tech(mut self, tech_id: &str) -> Self {
+        self.def.required_tech = Some(crate::TechId(tech_id.to_string()));
+        self
+    }
+
+    pub fn ports(mut self, ports: Vec<ModulePort>) -> Self {
+        self.def.ports = ports;
+        self
+    }
+
+    pub fn build(self) -> ModuleDef {
+        self.def
     }
 }
 
