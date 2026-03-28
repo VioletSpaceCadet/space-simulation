@@ -80,6 +80,8 @@ pub(crate) fn handle_install_module(
         return false;
     };
     station.invalidate_volume_cache();
+    station.invalidate_inventory_index();
+    station.invalidate_inventory_index();
 
     let Some(def) = content.module_defs.get(&module_def_id) else {
         return false;
@@ -95,6 +97,7 @@ pub(crate) fn handle_install_module(
                 module_def_id,
             });
             station.invalidate_volume_cache();
+            station.invalidate_inventory_index();
             let module_id = crate::ModuleInstanceId(format!("pending_{}", tech_id.0));
             events.push(crate::emit(
                 &mut state.counters,
@@ -182,6 +185,7 @@ pub(crate) fn handle_uninstall_module(
         module_def_id: module.def_id.clone(),
     });
     station.invalidate_volume_cache();
+    station.invalidate_inventory_index();
     station.rebuild_module_index(content);
     station.invalidate_power_cache();
 
@@ -410,6 +414,7 @@ pub(crate) fn handle_import(
     };
     trade::merge_into_inventory(&mut station.inventory, new_items);
     station.invalidate_volume_cache();
+    station.invalidate_inventory_index();
 
     events.push(crate::emit(
         &mut state.counters,
@@ -458,6 +463,7 @@ pub(crate) fn handle_export(
         return false;
     }
     station.invalidate_volume_cache();
+    station.invalidate_inventory_index();
     state.balance += revenue;
     state.export_revenue_total += revenue;
     state.export_count += 1;
@@ -500,6 +506,7 @@ pub(crate) fn handle_jettison_slag(
         .inventory
         .retain(|i| !matches!(i, InventoryItem::Slag { .. }));
     station.invalidate_volume_cache();
+    station.invalidate_inventory_index();
     if jettisoned_kg > 0.0 {
         events.push(crate::emit(
             &mut state.counters,
@@ -747,7 +754,7 @@ pub(crate) fn handle_fit_ship_module(
     let Some(ship) = state.ships.get(ship_id) else {
         return false;
     };
-    let Some(station) = state.stations.get(station_id) else {
+    let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
     if ship.position != station.position {
@@ -784,10 +791,9 @@ pub(crate) fn handle_fit_ship_module(
         return false;
     }
     // Station must have an InventoryItem::Module with matching module_def_id
-    let item_pos = station.inventory.iter().position(|item| {
-        matches!(item, InventoryItem::Module { module_def_id: def_id, .. } if *def_id == module_def_id.0)
-    });
-    let Some(pos) = item_pos else { return false };
+    let Some(pos) = station.inventory_position_by_key(&module_def_id.0) else {
+        return false;
+    };
 
     // Execute: remove module from station inventory
     let Some(station) = state.stations.get_mut(station_id) else {
@@ -795,6 +801,8 @@ pub(crate) fn handle_fit_ship_module(
     };
     station.inventory.remove(pos);
     station.invalidate_volume_cache();
+    station.invalidate_inventory_index();
+    station.invalidate_inventory_index();
 
     // Add FittedModule to ship
     let Some(ship) = state.ships.get_mut(ship_id) else {
@@ -882,6 +890,7 @@ pub(crate) fn handle_unfit_ship_module(
         module_def_id: removed.module_def_id.0.clone(),
     });
     station.invalidate_volume_cache();
+    station.invalidate_inventory_index();
 
     events.push(crate::emit(
         &mut state.counters,
