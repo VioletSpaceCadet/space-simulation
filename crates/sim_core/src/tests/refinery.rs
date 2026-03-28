@@ -82,6 +82,7 @@ fn test_refinery_skips_when_below_threshold() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
     station.inventory.push(InventoryItem::Ore {

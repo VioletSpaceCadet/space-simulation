@@ -132,6 +132,7 @@ pub(crate) fn handle_install_module(
         } else {
             0.0
         },
+        prev_crew_satisfied: def.crew_requirement.is_empty(),
     });
     station.rebuild_module_index(content);
     station.invalidate_power_cache();

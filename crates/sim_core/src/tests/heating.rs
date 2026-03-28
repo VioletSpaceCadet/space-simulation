@@ -84,6 +84,7 @@ fn state_with_heating(content: &GameContent) -> GameState {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -205,6 +206,7 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 

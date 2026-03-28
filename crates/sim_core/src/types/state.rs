@@ -105,10 +105,17 @@ pub struct ModuleState {
     /// wear factors. Recomputed each tick — not persisted.
     #[serde(skip, default = "default_efficiency")]
     pub efficiency: f32,
+    /// Tracks previous crew satisfaction for transition event detection.
+    #[serde(skip, default = "default_prev_crew_satisfied")]
+    pub prev_crew_satisfied: bool,
 }
 
 fn default_efficiency() -> f32 {
     1.0
+}
+
+fn default_prev_crew_satisfied() -> bool {
+    true
 }
 
 /// Check if assigned crew meets the crew requirement for a module.
@@ -544,6 +551,8 @@ impl StationState {
         for module in &mut self.modules {
             if let Some(def) = content.module_defs.get(&module.def_id) {
                 module.efficiency = compute_module_efficiency(module, def, &content.constants);
+                module.prev_crew_satisfied =
+                    is_crew_satisfied(&module.assigned_crew, &def.crew_requirement);
             }
         }
     }
@@ -801,6 +810,7 @@ mod tests {
             module_priority: 0,
             assigned_crew: Default::default(),
             efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         });
         station.modules.push(ModuleState {
@@ -813,6 +823,7 @@ mod tests {
             module_priority: 0,
             assigned_crew: Default::default(),
             efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         });
 
@@ -861,6 +872,7 @@ mod tests {
             module_priority: 0,
             assigned_crew: Default::default(),
             efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         };
         let def = crate::test_fixtures::ModuleDefBuilder::new("test")

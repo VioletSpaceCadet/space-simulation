@@ -463,6 +463,7 @@ fn sensor_data_generation_rate_at_mpt_60() {
             .into_iter()
             .collect(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 

@@ -866,6 +866,7 @@ mod tests {
                         module_priority: 0,
                         assigned_crew: Default::default(),
                         efficiency: 1.0,
+                        prev_crew_satisfied: true,
                         thermal: Some(ThermalState {
                             temp_mk,
                             thermal_group: Some("smelting".to_string()),
@@ -1243,6 +1244,7 @@ mod tests {
                             module_priority: 0,
                             assigned_crew: Default::default(),
                             efficiency: 1.0,
+                            prev_crew_satisfied: true,
                         },
                         // High-priority processor
                         ModuleState {
@@ -1261,6 +1263,7 @@ mod tests {
                             module_priority: 10,
                             assigned_crew: Default::default(),
                             efficiency: 1.0,
+                            prev_crew_satisfied: true,
                         },
                     ],
                     modifiers: crate::modifiers::ModifierSet::default(),
@@ -1387,6 +1390,7 @@ mod tests {
                         module_priority: 0,
                         assigned_crew: Default::default(),
                         efficiency: 1.0,
+                        prev_crew_satisfied: true,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
                     crew: Default::default(),
@@ -1553,6 +1557,7 @@ mod tests {
                         module_priority: 0,
                         assigned_crew: Default::default(),
                         efficiency: 1.0,
+                        prev_crew_satisfied: true,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
                     crew: Default::default(),
@@ -1712,6 +1717,7 @@ mod tests {
                         module_priority: 0,
                         assigned_crew: Default::default(),
                         efficiency: 1.0,
+                        prev_crew_satisfied: true,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),
                     crew: Default::default(),

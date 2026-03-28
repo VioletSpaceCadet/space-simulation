@@ -228,6 +228,7 @@ fn non_thermal_storage_module_has_thermal_none() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -288,6 +289,7 @@ fn non_thermal_lab_module_has_thermal_none() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -316,6 +318,7 @@ fn non_thermal_sensor_array_has_thermal_none() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -344,6 +347,7 @@ fn non_thermal_solar_array_has_thermal_none() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -370,6 +374,7 @@ fn non_thermal_battery_has_thermal_none() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
         thermal: None,
     });
 
@@ -469,6 +474,7 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
     });
 
     let mut rng = make_rng();

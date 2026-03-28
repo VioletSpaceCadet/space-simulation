@@ -50,6 +50,7 @@ pub fn test_module(def_id: &str, kind_state: ModuleKindState) -> ModuleState {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
     }
 }
 
@@ -833,6 +834,7 @@ fn smelter_module(temp_mk: u32) -> ModuleState {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
     }
 }
 
@@ -852,6 +854,7 @@ fn radiator_module() -> ModuleState {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
     }
 }
 

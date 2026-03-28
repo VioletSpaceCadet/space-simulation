@@ -226,6 +226,7 @@ fn test_select_recipe_updates_processor_state() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
     });
 
     // SelectRecipe with a valid recipe ID.
@@ -280,6 +281,7 @@ fn test_select_recipe_out_of_bounds_rejected() {
         module_priority: 0,
         assigned_crew: Default::default(),
         efficiency: 1.0,
+        prev_crew_satisfied: true,
     });
 
     // SelectRecipe with a recipe ID not in this module's list (should be rejected).

@@ -123,6 +123,7 @@ mod tests {
                         module_priority: 0,
                         assigned_crew: Default::default(),
                         efficiency: 1.0,
+                        prev_crew_satisfied: true,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),

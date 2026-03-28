@@ -95,8 +95,8 @@ fn ensure_station_index(state: &mut GameState, station_id: &StationId, content: 
     }
 }
 
-/// Check crew factor transitions and emit Understaffed/FullyStaffed events.
-/// Uses `compute_crew_factor` to detect transitions across the 1.0 threshold.
+/// Check crew satisfaction transitions and emit Understaffed/FullyStaffed events.
+/// Compares current `is_crew_satisfied` against `prev_crew_satisfied` stored on each module.
 fn update_crew_satisfaction(
     state: &mut GameState,
     station_id: &StationId,
@@ -107,7 +107,6 @@ fn update_crew_satisfaction(
         return;
     };
     let current_tick = state.meta.tick;
-    // Detect crew factor transitions: was_satisfied (>= 1.0) vs now
     let mut transitions: Vec<(crate::ModuleInstanceId, bool, bool)> = Vec::new();
     for module in &station.modules {
         let Some(def) = content.module_defs.get(&module.def_id) else {
@@ -116,22 +115,20 @@ fn update_crew_satisfaction(
         if def.crew_requirement.is_empty() {
             continue;
         }
-        let crew_factor = crate::compute_crew_factor(&module.assigned_crew, &def.crew_requirement);
-        let now_satisfied = crew_factor >= 1.0;
-        // Use the stored efficiency to determine previous satisfaction:
-        // if efficiency included a crew factor < 1.0, it was unsatisfied.
-        // On first tick (efficiency = default 1.0), we treat as "was satisfied".
-        let wear_factor = crate::wear::wear_efficiency(module.wear.wear, &content.constants);
-        let power_factor = if module.power_stalled { 0.0 } else { 1.0 };
-        // Derive previous crew factor from stored efficiency
-        let prev_crew_factor = if wear_factor > 0.0 && power_factor > 0.0 {
-            module.efficiency / (wear_factor * power_factor)
-        } else {
-            1.0 // can't determine; assume satisfied
-        };
-        let was_satisfied = prev_crew_factor >= 1.0;
-        if was_satisfied != now_satisfied {
-            transitions.push((module.id.clone(), was_satisfied, now_satisfied));
+        let now_satisfied = crate::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement);
+        if now_satisfied != module.prev_crew_satisfied {
+            transitions.push((module.id.clone(), module.prev_crew_satisfied, now_satisfied));
+        }
+    }
+    if !transitions.is_empty() {
+        let station = state
+            .stations
+            .get_mut(station_id)
+            .expect("station checked above");
+        for (module_id, _, now) in &transitions {
+            if let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) {
+                module.prev_crew_satisfied = *now;
+            }
         }
     }
     for (module_id, was, now) in transitions {
@@ -1058,6 +1055,7 @@ mod framework_tests {
                         module_priority: 0,
                         assigned_crew: Default::default(),
                         efficiency: 1.0,
+                        prev_crew_satisfied: true,
                         thermal: None,
                     }],
                     modifiers: crate::modifiers::ModifierSet::default(),

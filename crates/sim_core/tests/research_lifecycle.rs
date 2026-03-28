@@ -62,6 +62,7 @@ fn full_research_lifecycle() {
             module_priority: 0,
             assigned_crew: Default::default(),
             efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         });
 
@@ -129,6 +130,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
             module_priority: 0,
             assigned_crew: Default::default(),
             efficiency: 1.0,
+            prev_crew_satisfied: true,
             thermal: None,
         });
 
