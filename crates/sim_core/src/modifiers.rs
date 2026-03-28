@@ -7,6 +7,7 @@
 //! 4. **Override** — replaces result entirely (last wins)
 
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 // ---------------------------------------------------------------------------
 // StatId — every modifiable game stat
@@ -137,7 +138,7 @@ impl Modifier {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ModifierSet {
-    modifiers: Vec<Modifier>,
+    modifiers: SmallVec<[Modifier; 2]>,
     /// Monotonically increasing counter, bumped on every add/remove.
     /// Used by caches to detect modifier changes (including same-tick
     /// add+remove that leaves `len()` unchanged).
@@ -251,8 +252,8 @@ fn resolve_pipeline<'a>(
 ) -> f64 {
     let mut flat_sum: f64 = 0.0;
     let mut pct_add_sum: f64 = 0.0;
-    let mut pct_mults: Vec<(ModifierSource, f64)> = Vec::new();
-    let mut overrides: Vec<(ModifierSource, f64)> = Vec::new();
+    let mut pct_mults: Vec<(&'a ModifierSource, f64)> = Vec::new();
+    let mut overrides: Vec<(&'a ModifierSource, f64)> = Vec::new();
 
     for modifier in modifiers {
         if modifier.stat != stat {
@@ -262,17 +263,17 @@ fn resolve_pipeline<'a>(
             ModifierOp::Flat => flat_sum += modifier.value,
             ModifierOp::PctAdditive => pct_add_sum += modifier.value,
             ModifierOp::PctMultiplicative => {
-                pct_mults.push((modifier.source.clone(), modifier.value));
+                pct_mults.push((&modifier.source, modifier.value));
             }
             ModifierOp::Override => {
-                overrides.push((modifier.source.clone(), modifier.value));
+                overrides.push((&modifier.source, modifier.value));
             }
         }
     }
 
     // Sort by source for deterministic ordering.
-    pct_mults.sort_by(|a, b| a.0.cmp(&b.0));
-    overrides.sort_by(|a, b| a.0.cmp(&b.0));
+    pct_mults.sort_by(|a, b| a.0.cmp(b.0));
+    overrides.sort_by(|a, b| a.0.cmp(b.0));
 
     // Phase 1: flat
     let mut result = base + flat_sum;
