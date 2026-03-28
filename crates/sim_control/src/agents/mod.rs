@@ -1,5 +1,6 @@
 pub(crate) mod ship_agent;
 pub(crate) mod ship_assignment;
+pub(crate) mod station_agent;
 
 use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};
 /// A decision-making agent that receives context and emits commands.
