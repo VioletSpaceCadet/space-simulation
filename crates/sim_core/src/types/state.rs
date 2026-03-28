@@ -753,16 +753,6 @@ mod tests {
     use crate::test_fixtures::{base_content, base_state, test_station_id};
 
     #[test]
-    fn module_id_index_populated_on_rebuild() {
-        let content = base_content();
-        let state = base_state(&content);
-        let station = &state.stations[&test_station_id()];
-
-        // base_state calls rebuild_module_index, so the index should be populated
-        assert!(station.module_id_index.is_empty() || station.modules.is_empty());
-    }
-
-    #[test]
     fn module_id_index_returns_correct_position() {
         let content = base_content();
         let mut state = base_state(&content);

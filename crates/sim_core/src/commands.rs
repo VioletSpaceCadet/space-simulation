@@ -901,10 +901,10 @@ pub(crate) fn handle_create_thermal_link(
     };
 
     // Validate both modules exist and look up their defs
-    let Some(&from_idx) = station.module_id_index.get(&link.from_module_id) else {
+    let Some(from_idx) = station.module_index_by_id(&link.from_module_id) else {
         return;
     };
-    let Some(&to_idx) = station.module_id_index.get(&link.to_module_id) else {
+    let Some(to_idx) = station.module_index_by_id(&link.to_module_id) else {
         return;
     };
     let from_module = &station.modules[from_idx];
