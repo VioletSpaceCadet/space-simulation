@@ -1,23 +1,21 @@
 //! Crucible (ThermalContainer) module tests (VIO-224).
 
 use super::*;
-use crate::test_fixtures::{make_rng, test_station_id, thermal_content};
+use crate::test_fixtures::{make_rng, test_station_id, thermal_content, ModuleDefBuilder};
 
 fn crucible_content() -> GameContent {
     let mut content = thermal_content();
     content.module_defs.insert(
         "module_crucible".to_string(),
-        ModuleDef {
-            id: "module_crucible".to_string(),
-            name: "Crucible".to_string(),
-            mass_kg: 3000.0,
-            volume_m3: 6.0,
-            power_consumption_per_run: 0.0,
-            wear_per_run: 0.001,
-            behavior: ModuleBehaviorDef::ThermalContainer(ThermalContainerDef {
+        ModuleDefBuilder::new("module_crucible")
+            .name("Crucible")
+            .mass(3000.0)
+            .volume(6.0)
+            .wear(0.001)
+            .behavior(ModuleBehaviorDef::ThermalContainer(ThermalContainerDef {
                 capacity_kg: 1000.0,
-            }),
-            thermal: Some(ThermalDef {
+            }))
+            .thermal(ThermalDef {
                 heat_capacity_j_per_k: 80_000.0,
                 passive_cooling_coefficient: 0.5,
                 max_temp_mk: 3_000_000,
@@ -25,14 +23,8 @@ fn crucible_content() -> GameContent {
                 operating_max_mk: None,
                 thermal_group: Some("default".to_string()),
                 idle_heat_generation_w: None,
-            }),
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: vec![
+            })
+            .ports(vec![
                 ModulePort {
                     id: "molten_in".to_string(),
                     direction: PortDirection::Input,
@@ -43,8 +35,8 @@ fn crucible_content() -> GameContent {
                     direction: PortDirection::Output,
                     accepts: PortFilter::AnyMolten,
                 },
-            ],
-        },
+            ])
+            .build(),
     );
     content
 }

@@ -195,6 +195,11 @@ impl ModuleDefBuilder {
         self
     }
 
+    pub fn ship_modifiers(mut self, modifiers: Vec<crate::modifiers::Modifier>) -> Self {
+        self.def.ship_modifiers = modifiers;
+        self
+    }
+
     pub fn build(self) -> ModuleDef {
         self.def
     }
@@ -758,19 +763,18 @@ pub fn thermal_content() -> GameContent {
     let smelt_recipe_id = insert_recipe(&mut content, test_smelt_recipe());
     content.module_defs.insert(
         "module_basic_smelter".to_string(),
-        ModuleDef {
-            id: "module_basic_smelter".to_string(),
-            name: "Basic Smelter".to_string(),
-            mass_kg: 6000.0,
-            volume_m3: 12.0,
-            power_consumption_per_run: 30.0,
-            wear_per_run: 0.015,
-            behavior: crate::ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_basic_smelter")
+            .name("Basic Smelter")
+            .mass(6000.0)
+            .volume(12.0)
+            .power(30.0)
+            .wear(0.015)
+            .behavior(crate::ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
                 recipes: vec![smelt_recipe_id],
-            }),
-            thermal: Some(ThermalDef {
+            }))
+            .thermal(ThermalDef {
                 heat_capacity_j_per_k: 50_000.0,
                 passive_cooling_coefficient: 5.0,
                 max_temp_mk: 2_500_000,
@@ -778,30 +782,21 @@ pub fn thermal_content() -> GameContent {
                 operating_max_mk: Some(2_100_000),
                 thermal_group: Some("default".to_string()),
                 idle_heat_generation_w: None,
-            }),
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            })
+            .build(),
     );
 
     content.module_defs.insert(
         "module_basic_radiator".to_string(),
-        ModuleDef {
-            id: "module_basic_radiator".to_string(),
-            name: "Basic Radiator".to_string(),
-            mass_kg: 800.0,
-            volume_m3: 15.0,
-            power_consumption_per_run: 0.0,
-            wear_per_run: 0.001,
-            behavior: crate::ModuleBehaviorDef::Radiator(RadiatorDef {
+        ModuleDefBuilder::new("module_basic_radiator")
+            .name("Basic Radiator")
+            .mass(800.0)
+            .volume(15.0)
+            .wear(0.001)
+            .behavior(crate::ModuleBehaviorDef::Radiator(RadiatorDef {
                 cooling_capacity_w: 500.0,
-            }),
-            thermal: Some(ThermalDef {
+            }))
+            .thermal(ThermalDef {
                 heat_capacity_j_per_k: 10_000.0,
                 passive_cooling_coefficient: 10.0,
                 max_temp_mk: 3_000_000,
@@ -809,15 +804,8 @@ pub fn thermal_content() -> GameContent {
                 operating_max_mk: None,
                 thermal_group: Some("default".to_string()),
                 idle_heat_generation_w: None,
-            }),
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            })
+            .build(),
     );
 
     content

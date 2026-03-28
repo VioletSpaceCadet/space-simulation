@@ -4,6 +4,7 @@
 //! Full integration tests with real content live in sim_bench/tests/.
 
 use super::*;
+use crate::test_fixtures::ModuleDefBuilder;
 
 /// Helper: count components of a given ID across a station's inventory.
 fn component_count(state: &GameState, station_id: &StationId, component_id_str: &str) -> u32 {
@@ -128,79 +129,49 @@ fn competing_demand_content() -> GameContent {
     // Module defs
     content.module_defs.insert(
         "module_plate_press".to_string(),
-        ModuleDef {
-            id: "module_plate_press".to_string(),
-            name: "Plate Press".to_string(),
-            mass_kg: 4000.0,
-            volume_m3: 8.0,
-            power_consumption_per_run: 15.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_plate_press")
+            .name("Plate Press")
+            .mass(4000.0)
+            .volume(8.0)
+            .power(15.0)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 2,
                 processing_interval_ticks: 2,
                 recipes: vec![recipe_fe_plate_id],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     content.module_defs.insert(
         "module_structural_assembler".to_string(),
-        ModuleDef {
-            id: "module_structural_assembler".to_string(),
-            name: "Structural Assembler".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 12.0,
-            power_consumption_per_run: 20.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+        ModuleDefBuilder::new("module_structural_assembler")
+            .name("Structural Assembler")
+            .mass(5000.0)
+            .volume(12.0)
+            .power(20.0)
+            .behavior(ModuleBehaviorDef::Assembler(AssemblerDef {
                 assembly_interval_minutes: 2,
                 assembly_interval_ticks: 2,
                 max_stock: HashMap::new(),
                 recipes: vec![recipe_structural_beam_id],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     content.module_defs.insert(
         "module_basic_assembler".to_string(),
-        ModuleDef {
-            id: "module_basic_assembler".to_string(),
-            name: "Basic Assembler".to_string(),
-            mass_kg: 3000.0,
-            volume_m3: 8.0,
-            power_consumption_per_run: 8.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+        ModuleDefBuilder::new("module_basic_assembler")
+            .name("Basic Assembler")
+            .mass(3000.0)
+            .volume(8.0)
+            .power(8.0)
+            .behavior(ModuleBehaviorDef::Assembler(AssemblerDef {
                 assembly_interval_minutes: 2,
                 assembly_interval_ticks: 2,
                 max_stock: HashMap::new(),
                 recipes: vec![recipe_advanced_repair_kit_id],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     content

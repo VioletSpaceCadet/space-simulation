@@ -1,7 +1,7 @@
 use super::*;
 use crate::test_fixtures::{
     base_content, base_state, insert_recipe, make_rng, test_module, test_position, test_ship_id,
-    test_station_id,
+    test_station_id, ModuleDefBuilder,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -148,27 +148,18 @@ fn refinery_content() -> GameContent {
     let recipe_id = insert_recipe(&mut content, iron_recipe);
     content.module_defs = [(
         "module_basic_iron_refinery".to_string(),
-        ModuleDef {
-            id: "module_basic_iron_refinery".to_string(),
-            name: "Basic Iron Refinery".to_string(),
-            mass_kg: 5000.0,
-            volume_m3: 10.0,
-            power_consumption_per_run: 10.0,
-            wear_per_run: 0.01,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_basic_iron_refinery")
+            .name("Basic Iron Refinery")
+            .mass(5000.0)
+            .volume(10.0)
+            .power(10.0)
+            .wear(0.01)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 2,
                 processing_interval_ticks: 2,
                 recipes: vec![recipe_id],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     )]
     .into_iter()
     .collect();
@@ -223,28 +214,19 @@ fn assembler_content() -> GameContent {
     let recipe_id = insert_recipe(&mut content, repair_kit_recipe);
     content.module_defs = [(
         "module_basic_assembler".to_string(),
-        ModuleDef {
-            id: "module_basic_assembler".to_string(),
-            name: "Basic Assembler".to_string(),
-            mass_kg: 3000.0,
-            volume_m3: 8.0,
-            power_consumption_per_run: 8.0,
-            wear_per_run: 0.008,
-            behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+        ModuleDefBuilder::new("module_basic_assembler")
+            .name("Basic Assembler")
+            .mass(3000.0)
+            .volume(8.0)
+            .power(8.0)
+            .wear(0.008)
+            .behavior(ModuleBehaviorDef::Assembler(AssemblerDef {
                 assembly_interval_minutes: 2,
                 assembly_interval_ticks: 2,
                 max_stock: HashMap::new(),
                 recipes: vec![recipe_id],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     )]
     .into_iter()
     .collect();
@@ -287,30 +269,20 @@ fn maintenance_content() -> GameContent {
     let mut content = refinery_content();
     content.module_defs.insert(
         "module_maintenance_bay".to_string(),
-        ModuleDef {
-            id: "module_maintenance_bay".to_string(),
-            name: "Maintenance Bay".to_string(),
-            mass_kg: 2000.0,
-            volume_m3: 5.0,
-            power_consumption_per_run: 5.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Maintenance(MaintenanceDef {
+        ModuleDefBuilder::new("module_maintenance_bay")
+            .name("Maintenance Bay")
+            .mass(2000.0)
+            .volume(5.0)
+            .power(5.0)
+            .behavior(ModuleBehaviorDef::Maintenance(MaintenanceDef {
                 repair_interval_minutes: 2,
                 repair_interval_ticks: 2,
                 wear_reduction_per_run: 0.2,
                 repair_kit_cost: 1,
                 repair_threshold: 0.0,
                 maintenance_component_id: "repair_kit".to_string(),
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
     content
 }

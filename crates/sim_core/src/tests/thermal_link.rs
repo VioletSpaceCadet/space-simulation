@@ -1,7 +1,9 @@
 //! Thermal link command tests (VIO-217).
 
 use super::*;
-use crate::test_fixtures::{base_state, make_rng, test_station_id, thermal_content};
+use crate::test_fixtures::{
+    base_state, make_rng, test_station_id, thermal_content, ModuleDefBuilder,
+};
 
 /// Set up content with a smelter (has molten_out port) and a module with an input port.
 fn link_content() -> GameContent {
@@ -19,31 +21,16 @@ fn link_content() -> GameContent {
     // Add a dummy module with an input port for testing
     content.module_defs.insert(
         "module_test_receiver".to_string(),
-        ModuleDef {
-            id: "module_test_receiver".to_string(),
-            name: "Test Receiver".to_string(),
-            mass_kg: 100.0,
-            volume_m3: 1.0,
-            power_consumption_per_run: 0.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
-                processing_interval_minutes: 1,
-                processing_interval_ticks: 1,
-                recipes: vec![],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: vec![ModulePort {
+        ModuleDefBuilder::new("module_test_receiver")
+            .name("Test Receiver")
+            .mass(100.0)
+            .volume(1.0)
+            .ports(vec![ModulePort {
                 id: "molten_in".to_string(),
                 direction: PortDirection::Input,
                 accepts: PortFilter::AnyMolten,
-            }],
-        },
+            }])
+            .build(),
     );
     content
 }

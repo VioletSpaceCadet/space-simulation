@@ -973,7 +973,7 @@ fn open_csv_file(
 mod tests {
     use super::*;
     use crate::{
-        test_fixtures::{base_content, test_position},
+        test_fixtures::{base_content, test_position, ModuleDefBuilder},
         AHashMap, AsteroidId, AsteroidKnowledge, AsteroidState, Counters, DataKind, DomainProgress,
         GameState, HullId, LotId, MetaState, ModuleInstanceId, ModuleState, PrincipalId,
         ProcessorState, ResearchDomain, ResearchState, ShipId, ShipState, StationId, StationState,
@@ -1251,27 +1251,18 @@ mod tests {
         let mut content = empty_content();
         content.module_defs = [(
             "module_basic_iron_refinery".to_string(),
-            crate::ModuleDef {
-                id: "module_basic_iron_refinery".to_string(),
-                name: "Basic Iron Refinery".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 10.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.01,
-                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+            ModuleDefBuilder::new("module_basic_iron_refinery")
+                .name("Basic Iron Refinery")
+                .mass(5000.0)
+                .volume(10.0)
+                .power(10.0)
+                .wear(0.01)
+                .behavior(ModuleBehaviorDef::Processor(crate::ProcessorDef {
                     processing_interval_minutes: 60,
                     processing_interval_ticks: 60,
                     recipes: vec![],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         )]
         .into_iter()
         .collect();
@@ -1432,27 +1423,18 @@ mod tests {
         let mut content = empty_content();
         content.module_defs = [(
             "module_basic_iron_refinery".to_string(),
-            crate::ModuleDef {
-                id: "module_basic_iron_refinery".to_string(),
-                name: "Basic Iron Refinery".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 10.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.01,
-                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+            ModuleDefBuilder::new("module_basic_iron_refinery")
+                .name("Basic Iron Refinery")
+                .mass(5000.0)
+                .volume(10.0)
+                .power(10.0)
+                .wear(0.01)
+                .behavior(ModuleBehaviorDef::Processor(crate::ProcessorDef {
                     processing_interval_minutes: 60,
                     processing_interval_ticks: 60,
                     recipes: vec![],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         )]
         .into_iter()
         .collect();
@@ -1552,27 +1534,18 @@ mod tests {
         let mut content = empty_content();
         content.module_defs = [(
             "module_basic_iron_refinery".to_string(),
-            crate::ModuleDef {
-                id: "module_basic_iron_refinery".to_string(),
-                name: "Basic Iron Refinery".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 10.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.01,
-                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+            ModuleDefBuilder::new("module_basic_iron_refinery")
+                .name("Basic Iron Refinery")
+                .mass(5000.0)
+                .volume(10.0)
+                .power(10.0)
+                .wear(0.01)
+                .behavior(ModuleBehaviorDef::Processor(crate::ProcessorDef {
                     processing_interval_minutes: 60,
                     processing_interval_ticks: 60,
                     recipes: vec![],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         )]
         .into_iter()
         .collect();
@@ -1640,27 +1613,16 @@ mod tests {
         let mut content = empty_content();
         content.module_defs.insert(
             "module_basic_battery".to_string(),
-            crate::ModuleDef {
-                id: "module_basic_battery".to_string(),
-                name: "Basic Battery".to_string(),
-                mass_kg: 2000.0,
-                volume_m3: 4.0,
-                power_consumption_per_run: 0.0,
-                wear_per_run: 0.0,
-                behavior: ModuleBehaviorDef::Battery(crate::BatteryDef {
+            ModuleDefBuilder::new("module_basic_battery")
+                .name("Basic Battery")
+                .mass(2000.0)
+                .volume(4.0)
+                .behavior(ModuleBehaviorDef::Battery(crate::BatteryDef {
                     capacity_kwh: 100.0,
                     charge_rate_kw: 20.0,
                     discharge_rate_kw: 30.0,
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         let mut state = empty_state();
 
@@ -1706,19 +1668,18 @@ mod tests {
         let mut content = empty_content();
         content.module_defs.insert(
             "module_smelter".to_string(),
-            crate::ModuleDef {
-                id: "module_smelter".to_string(),
-                name: "Smelter".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 10.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.01,
-                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+            ModuleDefBuilder::new("module_smelter")
+                .name("Smelter")
+                .mass(5000.0)
+                .volume(10.0)
+                .power(10.0)
+                .wear(0.01)
+                .behavior(ModuleBehaviorDef::Processor(crate::ProcessorDef {
                     processing_interval_minutes: 60,
                     processing_interval_ticks: 60,
                     recipes: vec![],
-                }),
-                thermal: Some(crate::ThermalDef {
+                }))
+                .thermal(crate::ThermalDef {
                     heat_capacity_j_per_k: 500.0,
                     passive_cooling_coefficient: 0.0,
                     max_temp_mk: 2_000_000,
@@ -1726,15 +1687,8 @@ mod tests {
                     operating_max_mk: None,
                     thermal_group: None,
                     idle_heat_generation_w: None,
-                }),
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                })
+                .build(),
         );
 
         let mut state = empty_state();
@@ -1835,27 +1789,18 @@ mod tests {
         let mut content = empty_content();
         content.module_defs.insert(
             "module_basic_iron_refinery".to_string(),
-            crate::ModuleDef {
-                id: "module_basic_iron_refinery".to_string(),
-                name: "Basic Iron Refinery".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 10.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.01,
-                behavior: ModuleBehaviorDef::Processor(crate::ProcessorDef {
+            ModuleDefBuilder::new("module_basic_iron_refinery")
+                .name("Basic Iron Refinery")
+                .mass(5000.0)
+                .volume(10.0)
+                .power(10.0)
+                .wear(0.01)
+                .behavior(ModuleBehaviorDef::Processor(crate::ProcessorDef {
                     processing_interval_minutes: 60,
                     processing_interval_ticks: 60,
                     recipes: vec![],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
 
         let mut state = empty_state();

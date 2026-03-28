@@ -58,7 +58,7 @@ mod tests {
     use super::*;
     use crate::behaviors::AUTOPILOT_OWNER;
     use sim_core::{
-        test_fixtures::{base_content, base_state, test_position},
+        test_fixtures::{base_content, base_state, test_position, ModuleDefBuilder},
         AnomalyTag, AsteroidId, AsteroidKnowledge, AsteroidState, Command, ComponentDef,
         ComponentId, InventoryItem, LotId, PricingEntry, ShipId, ShipState, SiteId, StationId,
         TaskKind, TechId, TradeItemSpec,
@@ -77,28 +77,7 @@ mod tests {
 
     /// Insert stub module defs with roles for autopilot tests.
     fn add_role_module_defs(content: &mut sim_core::GameContent) {
-        use sim_core::{ModuleBehaviorDef, ModuleDef, ProcessorDef};
-        let stub = |id: &str, roles: Vec<&str>| ModuleDef {
-            id: id.to_string(),
-            name: id.to_string(),
-            mass_kg: 0.0,
-            volume_m3: 0.0,
-            power_consumption_per_run: 0.0,
-            wear_per_run: 0.0,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
-                processing_interval_minutes: 1,
-                processing_interval_ticks: 1,
-                recipes: vec![],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: roles.into_iter().map(String::from).collect(),
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        };
+        let stub = |id: &str, roles: Vec<&str>| ModuleDefBuilder::new(id).roles(roles).build();
         content.module_defs.insert(
             "module_electrolysis_unit".to_string(),
             stub(
@@ -276,30 +255,22 @@ mod tests {
         let mut content = autopilot_content();
         content.module_defs.insert(
             "module_maintenance_bay".to_string(),
-            sim_core::ModuleDef {
-                id: "module_maintenance_bay".to_string(),
-                name: "Maintenance Bay".to_string(),
-                mass_kg: 2000.0,
-                volume_m3: 5.0,
-                power_consumption_per_run: 5.0,
-                wear_per_run: 0.0,
-                behavior: sim_core::ModuleBehaviorDef::Maintenance(sim_core::MaintenanceDef {
-                    repair_interval_minutes: 30,
-                    repair_interval_ticks: 30,
-                    wear_reduction_per_run: 0.2,
-                    repair_kit_cost: 1,
-                    repair_threshold: 0.0,
-                    maintenance_component_id: "repair_kit".to_string(),
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+            ModuleDefBuilder::new("module_maintenance_bay")
+                .name("Maintenance Bay")
+                .mass(2000.0)
+                .volume(5.0)
+                .power(5.0)
+                .behavior(sim_core::ModuleBehaviorDef::Maintenance(
+                    sim_core::MaintenanceDef {
+                        repair_interval_minutes: 30,
+                        repair_interval_ticks: 30,
+                        wear_reduction_per_run: 0.2,
+                        repair_kit_cost: 1,
+                        repair_threshold: 0.0,
+                        maintenance_component_id: "repair_kit".to_string(),
+                    },
+                ))
+                .build(),
         );
         let mut state = autopilot_state(&content);
 
@@ -583,30 +554,21 @@ mod tests {
         // Add lab module def
         content.module_defs.insert(
             "module_materials_lab".to_string(),
-            sim_core::ModuleDef {
-                id: "module_materials_lab".to_string(),
-                name: "Materials Lab".to_string(),
-                mass_kg: 1000.0,
-                volume_m3: 3.0,
-                power_consumption_per_run: 2.0,
-                wear_per_run: 0.01,
-                behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
+            ModuleDefBuilder::new("module_materials_lab")
+                .name("Materials Lab")
+                .mass(1000.0)
+                .volume(3.0)
+                .power(2.0)
+                .wear(0.01)
+                .behavior(sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
                     domain: sim_core::ResearchDomain::Materials,
                     data_consumption_per_run: 5.0,
                     research_points_per_run: 10.0,
                     accepted_data: vec![sim_core::DataKind::AssayData],
                     research_interval_minutes: 10,
                     research_interval_ticks: 10,
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         content.constants.station_power_available_per_tick = 0.0;
         let mut state = base_state(&content);
@@ -800,30 +762,21 @@ mod tests {
         });
         content.module_defs.insert(
             "module_engineering_lab".to_string(),
-            sim_core::ModuleDef {
-                id: "module_engineering_lab".to_string(),
-                name: "Engineering Lab".to_string(),
-                mass_kg: 4000.0,
-                volume_m3: 8.0,
-                power_consumption_per_run: 12.0,
-                wear_per_run: 0.005,
-                behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
+            ModuleDefBuilder::new("module_engineering_lab")
+                .name("Engineering Lab")
+                .mass(4000.0)
+                .volume(8.0)
+                .power(12.0)
+                .wear(0.005)
+                .behavior(sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
                     domain: sim_core::ResearchDomain::Manufacturing,
                     data_consumption_per_run: 10.0,
                     research_points_per_run: 5.0,
                     accepted_data: vec![sim_core::DataKind::ManufacturingData],
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         content.constants.station_power_available_per_tick = 0.0;
 
@@ -896,30 +849,21 @@ mod tests {
         });
         content.module_defs.insert(
             "module_mfg_lab".to_string(),
-            sim_core::ModuleDef {
-                id: "module_mfg_lab".to_string(),
-                name: "Mfg Lab".to_string(),
-                mass_kg: 4000.0,
-                volume_m3: 8.0,
-                power_consumption_per_run: 12.0,
-                wear_per_run: 0.005,
-                behavior: sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
+            ModuleDefBuilder::new("module_mfg_lab")
+                .name("Mfg Lab")
+                .mass(4000.0)
+                .volume(8.0)
+                .power(12.0)
+                .wear(0.005)
+                .behavior(sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
                     domain: sim_core::ResearchDomain::Manufacturing,
                     data_consumption_per_run: 10.0,
                     research_points_per_run: 5.0,
                     accepted_data: vec![sim_core::DataKind::ManufacturingData],
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         content.constants.station_power_available_per_tick = 0.0;
 
@@ -1111,28 +1055,22 @@ mod tests {
         // Add shipyard module def with a recipe requiring 4 thrusters
         content.module_defs.insert(
             "module_shipyard".to_string(),
-            sim_core::ModuleDef {
-                id: "module_shipyard".to_string(),
-                name: "Shipyard".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 20.0,
-                power_consumption_per_run: 25.0,
-                wear_per_run: 0.02,
-                behavior: sim_core::ModuleBehaviorDef::Assembler(sim_core::AssemblerDef {
-                    assembly_interval_minutes: 1440,
-                    assembly_interval_ticks: 1440,
-                    recipes: vec![sim_core::RecipeId("recipe_test_ship".to_string())],
-                    max_stock: HashMap::new(),
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec!["shipyard".to_string()],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+            ModuleDefBuilder::new("module_shipyard")
+                .name("Shipyard")
+                .mass(5000.0)
+                .volume(20.0)
+                .power(25.0)
+                .wear(0.02)
+                .behavior(sim_core::ModuleBehaviorDef::Assembler(
+                    sim_core::AssemblerDef {
+                        assembly_interval_minutes: 1440,
+                        assembly_interval_ticks: 1440,
+                        recipes: vec![sim_core::RecipeId("recipe_test_ship".to_string())],
+                        max_stock: HashMap::new(),
+                    },
+                ))
+                .roles(vec!["shipyard"])
+                .build(),
         );
 
         // Add thruster component def (needed for mass calculation)
@@ -2238,23 +2176,13 @@ mod tests {
         // Add equipment module def
         content.module_defs.insert(
             "module_cargo_expander".to_string(),
-            sim_core::ModuleDef {
-                id: "module_cargo_expander".to_string(),
-                name: "Cargo Expander".to_string(),
-                mass_kg: 400.0,
-                volume_m3: 2.0,
-                power_consumption_per_run: 0.0,
-                wear_per_run: 0.0,
-                behavior: sim_core::ModuleBehaviorDef::Equipment,
-                thermal: None,
-                compatible_slots: vec![SlotType("utility".to_string())],
-                ship_modifiers: vec![],
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+            ModuleDefBuilder::new("module_cargo_expander")
+                .name("Cargo Expander")
+                .mass(400.0)
+                .volume(2.0)
+                .behavior(sim_core::ModuleBehaviorDef::Equipment)
+                .compatible_slots(vec![SlotType("utility".to_string())])
+                .build(),
         );
         // Add fitting template
         content.fitting_templates.insert(
@@ -2330,23 +2258,13 @@ mod tests {
         );
         content.module_defs.insert(
             "module_cargo_expander".to_string(),
-            sim_core::ModuleDef {
-                id: "module_cargo_expander".to_string(),
-                name: "Cargo Expander".to_string(),
-                mass_kg: 400.0,
-                volume_m3: 2.0,
-                power_consumption_per_run: 0.0,
-                wear_per_run: 0.0,
-                behavior: sim_core::ModuleBehaviorDef::Equipment,
-                thermal: None,
-                compatible_slots: vec![SlotType("utility".to_string())],
-                ship_modifiers: vec![],
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+            ModuleDefBuilder::new("module_cargo_expander")
+                .name("Cargo Expander")
+                .mass(400.0)
+                .volume(2.0)
+                .behavior(sim_core::ModuleBehaviorDef::Equipment)
+                .compatible_slots(vec![SlotType("utility".to_string())])
+                .build(),
         );
         content.fitting_templates.insert(
             HullId("hull_general_purpose".to_string()),

@@ -697,6 +697,7 @@ fn slag_composition_from_avg(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_fixtures::ModuleDefBuilder;
     use crate::AHashMap;
     use crate::{AsteroidId, InventoryItem, LotId};
 
@@ -796,19 +797,18 @@ mod tests {
         let recipe_id = crate::test_fixtures::insert_recipe(&mut content, smelt_recipe);
         content.module_defs.insert(
             "module_smelter".to_string(),
-            ModuleDef {
-                id: "module_smelter".to_string(),
-                name: "Smelter".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 10.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.01,
-                behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+            ModuleDefBuilder::new("module_smelter")
+                .name("Smelter")
+                .mass(5000.0)
+                .volume(10.0)
+                .power(10.0)
+                .wear(0.01)
+                .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                     processing_interval_minutes: 1,
                     processing_interval_ticks: 1,
                     recipes: vec![recipe_id],
-                }),
-                thermal: Some(ThermalDef {
+                }))
+                .thermal(ThermalDef {
                     heat_capacity_j_per_k: 500.0,
                     passive_cooling_coefficient: 0.05,
                     max_temp_mk: 3_000_000,
@@ -816,15 +816,8 @@ mod tests {
                     operating_max_mk: None,
                     thermal_group: Some("smelting".to_string()),
                     idle_heat_generation_w: None,
-                }),
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                })
+                .build(),
         );
         content
     }
@@ -1185,27 +1178,17 @@ mod tests {
         let recipe_id = crate::test_fixtures::insert_recipe(&mut content, recipe);
         content.module_defs.insert(
             "module_refinery".to_string(),
-            crate::ModuleDef {
-                id: "module_refinery".to_string(),
-                name: "Refinery".to_string(),
-                mass_kg: 1000.0,
-                volume_m3: 5.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.0,
-                behavior: crate::ModuleBehaviorDef::Processor(crate::ProcessorDef {
+            ModuleDefBuilder::new("module_refinery")
+                .name("Refinery")
+                .mass(1000.0)
+                .volume(5.0)
+                .power(10.0)
+                .behavior(crate::ModuleBehaviorDef::Processor(crate::ProcessorDef {
                     processing_interval_minutes: 1,
                     processing_interval_ticks: 1,
                     recipes: vec![recipe_id],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         content
     }
@@ -1511,27 +1494,17 @@ mod tests {
         let recipe_id = crate::test_fixtures::insert_recipe(&mut content, recipe);
         content.module_defs.insert(
             "module_adv_refinery".to_string(),
-            crate::ModuleDef {
-                id: "module_adv_refinery".to_string(),
-                name: "Adv Refinery".to_string(),
-                mass_kg: 1000.0,
-                volume_m3: 5.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.0,
-                behavior: crate::ModuleBehaviorDef::Processor(crate::ProcessorDef {
+            ModuleDefBuilder::new("module_adv_refinery")
+                .name("Adv Refinery")
+                .mass(1000.0)
+                .volume(5.0)
+                .power(10.0)
+                .behavior(crate::ModuleBehaviorDef::Processor(crate::ProcessorDef {
                     processing_interval_minutes: 1,
                     processing_interval_ticks: 1,
                     recipes: vec![recipe_id],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
 
         let station_id = StationId("station_test".to_string());
@@ -1679,27 +1652,17 @@ mod tests {
         let recipe_id = crate::test_fixtures::insert_recipe(&mut content, recipe);
         content.module_defs.insert(
             "module_ingot_maker".to_string(),
-            crate::ModuleDef {
-                id: "module_ingot_maker".to_string(),
-                name: "Ingot Maker".to_string(),
-                mass_kg: 1000.0,
-                volume_m3: 5.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.0,
-                behavior: crate::ModuleBehaviorDef::Processor(crate::ProcessorDef {
+            ModuleDefBuilder::new("module_ingot_maker")
+                .name("Ingot Maker")
+                .mass(1000.0)
+                .volume(5.0)
+                .power(10.0)
+                .behavior(crate::ModuleBehaviorDef::Processor(crate::ProcessorDef {
                     processing_interval_minutes: 1,
                     processing_interval_ticks: 1,
                     recipes: vec![recipe_id],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
 
         let station_id = StationId("station_test".to_string());

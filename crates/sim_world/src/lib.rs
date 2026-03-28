@@ -1089,10 +1089,10 @@ impl RunSetupBuilder {
 mod tests {
     use super::*;
     use sim_core::{
-        test_fixtures::{base_content, minimal_content, test_position},
+        test_fixtures::{base_content, minimal_content, test_position, ModuleDefBuilder},
         AHashMap, AssemblerDef, AsteroidTemplateDef, Counters, GameState, InputAmount, InputFilter,
-        InventoryItem, ItemKind, MetaState, ModuleBehaviorDef, ModuleDef, NodeDef, NodeId,
-        OutputSpec, ProcessorDef, QualityFormula, RecipeDef, RecipeInput, ResearchState, StationId,
+        InventoryItem, ItemKind, MetaState, ModuleBehaviorDef, NodeDef, NodeId, OutputSpec,
+        ProcessorDef, QualityFormula, RecipeDef, RecipeInput, ResearchState, StationId,
         StationState, TechDef, TechId, YieldFormula,
     };
     use std::collections::HashMap;
@@ -1170,27 +1170,17 @@ mod tests {
         content.recipes.insert(recipe.id.clone(), recipe);
         content.module_defs.insert(
             "mod_test".to_string(),
-            ModuleDef {
-                id: "mod_test".to_string(),
-                name: "Test Module".to_string(),
-                mass_kg: 1000.0,
-                volume_m3: 5.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.0,
-                behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+            ModuleDefBuilder::new("mod_test")
+                .name("Test Module")
+                .mass(1000.0)
+                .volume(5.0)
+                .power(10.0)
+                .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                     processing_interval_minutes: 10,
                     processing_interval_ticks: 10,
                     recipes: vec![sim_core::RecipeId("recipe_test".to_string())],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         validate_content(&content);
     }
@@ -1264,28 +1254,18 @@ mod tests {
         content.recipes.insert(recipe.id.clone(), recipe);
         content.module_defs.insert(
             "mod_assembler_test".to_string(),
-            ModuleDef {
-                id: "mod_assembler_test".to_string(),
-                name: "Test Assembler".to_string(),
-                mass_kg: 1000.0,
-                volume_m3: 5.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.0,
-                behavior: ModuleBehaviorDef::Assembler(AssemblerDef {
+            ModuleDefBuilder::new("mod_assembler_test")
+                .name("Test Assembler")
+                .mass(1000.0)
+                .volume(5.0)
+                .power(10.0)
+                .behavior(ModuleBehaviorDef::Assembler(AssemblerDef {
                     assembly_interval_minutes: 10,
                     assembly_interval_ticks: 10,
                     max_stock: std::collections::HashMap::new(),
                     recipes: vec![sim_core::RecipeId("recipe_asm_test".to_string())],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         validate_content(&content);
     }
@@ -1853,23 +1833,13 @@ mod tests {
         // Add a valid module def
         content.module_defs.insert(
             "mod_valid".to_string(),
-            sim_core::ModuleDef {
-                id: "mod_valid".to_string(),
-                name: "Valid".to_string(),
-                mass_kg: 100.0,
-                volume_m3: 1.0,
-                power_consumption_per_run: 0.0,
-                wear_per_run: 0.0,
-                behavior: sim_core::ModuleBehaviorDef::Equipment,
-                thermal: None,
-                compatible_slots: vec![sim_core::SlotType("utility".to_string())],
-                ship_modifiers: vec![],
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+            ModuleDefBuilder::new("mod_valid")
+                .name("Valid")
+                .mass(100.0)
+                .volume(1.0)
+                .behavior(sim_core::ModuleBehaviorDef::Equipment)
+                .compatible_slots(vec![sim_core::SlotType("utility".to_string())])
+                .build(),
         );
         content.fitting_templates.insert(
             sim_core::HullId("hull_test".to_string()),

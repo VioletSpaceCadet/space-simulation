@@ -65,6 +65,7 @@ fn execute(
 
 #[cfg(test)]
 mod tests {
+    use crate::test_fixtures::ModuleDefBuilder;
     use crate::AHashMap;
     use crate::*;
     use std::collections::{HashMap, HashSet};
@@ -73,28 +74,19 @@ mod tests {
         let mut content = crate::test_fixtures::base_content();
         content.module_defs.insert(
             "module_sensor_array".to_string(),
-            ModuleDef {
-                id: "module_sensor_array".to_string(),
-                name: "Sensor Array".to_string(),
-                mass_kg: 2500.0,
-                volume_m3: 6.0,
-                power_consumption_per_run: 8.0,
-                wear_per_run: 0.003,
-                behavior: ModuleBehaviorDef::SensorArray(SensorArrayDef {
+            ModuleDefBuilder::new("module_sensor_array")
+                .name("Sensor Array")
+                .mass(2500.0)
+                .volume(6.0)
+                .power(8.0)
+                .wear(0.003)
+                .behavior(ModuleBehaviorDef::SensorArray(SensorArrayDef {
                     data_kind: DataKind::SurveyData,
                     action_key: "sensor_scan".to_string(),
                     scan_interval_minutes: 5,
                     scan_interval_ticks: 5,
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         content
     }

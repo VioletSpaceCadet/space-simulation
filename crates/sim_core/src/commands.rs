@@ -1283,7 +1283,7 @@ fn deduct_transit_fuel(
 mod tests {
     use super::*;
     use crate::modifiers::{ModifierSource, StatId};
-    use crate::test_fixtures::{base_content, base_state};
+    use crate::test_fixtures::{base_content, base_state, ModuleDefBuilder};
     use crate::{
         FittedModule, HullDef, HullId, InventoryItem, ModuleDefId, ModuleItemId, SlotDef, SlotType,
     };
@@ -1321,27 +1321,18 @@ mod tests {
         // Add an equipment module def compatible with utility slots
         content.module_defs.insert(
             "module_cargo_expander".to_string(),
-            crate::ModuleDef {
-                id: "module_cargo_expander".to_string(),
-                name: "Cargo Expander".to_string(),
-                mass_kg: 500.0,
-                volume_m3: 2.0,
-                power_consumption_per_run: 0.0,
-                wear_per_run: 0.0,
-                behavior: crate::ModuleBehaviorDef::Equipment,
-                thermal: None,
-                compatible_slots: vec![SlotType("utility".to_string())],
-                ship_modifiers: vec![crate::modifiers::Modifier::pct_mult(
+            ModuleDefBuilder::new("module_cargo_expander")
+                .name("Cargo Expander")
+                .mass(500.0)
+                .volume(2.0)
+                .behavior(crate::ModuleBehaviorDef::Equipment)
+                .compatible_slots(vec![SlotType("utility".to_string())])
+                .ship_modifiers(vec![crate::modifiers::Modifier::pct_mult(
                     StatId::CargoCapacity,
                     1.3,
                     ModifierSource::Equipment("cargo_expander".to_string()),
-                )],
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                )])
+                .build(),
         );
         content
     }
@@ -1537,27 +1528,18 @@ mod tests {
         // Add a mining laser equipment module
         content.module_defs.insert(
             "module_mining_laser".to_string(),
-            crate::ModuleDef {
-                id: "module_mining_laser".to_string(),
-                name: "Mining Laser".to_string(),
-                mass_kg: 800.0,
-                volume_m3: 3.0,
-                power_consumption_per_run: 0.0,
-                wear_per_run: 0.0,
-                behavior: crate::ModuleBehaviorDef::Equipment,
-                thermal: None,
-                compatible_slots: vec![SlotType("industrial".to_string())],
-                ship_modifiers: vec![crate::modifiers::Modifier::pct_mult(
+            ModuleDefBuilder::new("module_mining_laser")
+                .name("Mining Laser")
+                .mass(800.0)
+                .volume(3.0)
+                .behavior(crate::ModuleBehaviorDef::Equipment)
+                .compatible_slots(vec![SlotType("industrial".to_string())])
+                .ship_modifiers(vec![crate::modifiers::Modifier::pct_mult(
                     StatId::MiningRate,
                     1.2,
                     ModifierSource::Equipment("mining_laser".to_string()),
-                )],
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                )])
+                .build(),
         );
 
         let mut state = base_state(&content);

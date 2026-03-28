@@ -981,6 +981,7 @@ fn apply_run_result(
 #[cfg(test)]
 mod framework_tests {
     use super::*;
+    use crate::test_fixtures::ModuleDefBuilder;
     use crate::AHashMap;
     use crate::*;
     use std::collections::{HashMap, HashSet};
@@ -989,27 +990,18 @@ mod framework_tests {
         let mut content = crate::test_fixtures::base_content();
         content.module_defs.insert(
             "module_refinery".to_string(),
-            ModuleDef {
-                id: "module_refinery".to_string(),
-                name: "Refinery".to_string(),
-                mass_kg: 5000.0,
-                volume_m3: 10.0,
-                power_consumption_per_run: 10.0,
-                wear_per_run: 0.01,
-                behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+            ModuleDefBuilder::new("module_refinery")
+                .name("Refinery")
+                .mass(5000.0)
+                .volume(10.0)
+                .power(10.0)
+                .wear(0.01)
+                .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                     processing_interval_minutes: 5,
                     processing_interval_ticks: 5,
                     recipes: vec![],
-                }),
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+                }))
+                .build(),
         );
         content
     }
@@ -1146,23 +1138,12 @@ mod framework_tests {
         let mut content2 = content.clone();
         content2.module_defs.insert(
             "module_refinery".to_string(),
-            ModuleDef {
-                id: "module_refinery".to_string(),
-                name: "Storage".to_string(),
-                mass_kg: 1000.0,
-                volume_m3: 5.0,
-                power_consumption_per_run: 0.0,
-                wear_per_run: 0.0,
-                behavior: ModuleBehaviorDef::Storage { capacity_m3: 500.0 },
-                thermal: None,
-                compatible_slots: Vec::new(),
-                ship_modifiers: Vec::new(),
-                power_stall_priority: None,
-                roles: vec![],
-                crew_requirement: Default::default(),
-                required_tech: None,
-                ports: Vec::new(),
-            },
+            ModuleDefBuilder::new("module_refinery")
+                .name("Storage")
+                .mass(1000.0)
+                .volume(5.0)
+                .behavior(ModuleBehaviorDef::Storage { capacity_m3: 500.0 })
+                .build(),
         );
         assert!(extract_context(&state, &station_id, 0, &content2).is_none());
     }

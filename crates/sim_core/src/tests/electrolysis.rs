@@ -1,5 +1,5 @@
 use super::*;
-use crate::test_fixtures::insert_recipe;
+use crate::test_fixtures::{insert_recipe, ModuleDefBuilder};
 
 fn electrolysis_content() -> GameContent {
     let mut content = test_content();
@@ -70,51 +70,32 @@ fn electrolysis_content() -> GameContent {
     let recipe_id = insert_recipe(&mut content, electrolysis_recipe);
     content.module_defs.insert(
         "module_electrolysis_unit".to_string(),
-        ModuleDef {
-            id: "module_electrolysis_unit".to_string(),
-            name: "Electrolysis Unit".to_string(),
-            mass_kg: 800.0,
-            volume_m3: 3.0,
-            power_consumption_per_run: 25.0,
-            wear_per_run: 0.012,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_electrolysis_unit")
+            .name("Electrolysis Unit")
+            .mass(800.0)
+            .volume(3.0)
+            .power(25.0)
+            .wear(0.012)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
                 recipes: vec![recipe_id],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     // Solar array for power
     content.module_defs.insert(
         "module_basic_solar_array".to_string(),
-        ModuleDef {
-            id: "module_basic_solar_array".to_string(),
-            name: "Basic Solar Array".to_string(),
-            mass_kg: 1500.0,
-            volume_m3: 12.0,
-            power_consumption_per_run: 0.0,
-            wear_per_run: 0.002,
-            behavior: ModuleBehaviorDef::SolarArray(SolarArrayDef {
+        ModuleDefBuilder::new("module_basic_solar_array")
+            .name("Basic Solar Array")
+            .mass(1500.0)
+            .volume(12.0)
+            .wear(0.002)
+            .behavior(ModuleBehaviorDef::SolarArray(SolarArrayDef {
                 base_output_kw: 50.0,
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     content
@@ -482,27 +463,18 @@ fn test_full_chain_ore_to_propellant() {
     let water_recipe_id = insert_recipe(&mut content, water_recipe);
     content.module_defs.insert(
         "module_heating_unit".to_string(),
-        ModuleDef {
-            id: "module_heating_unit".to_string(),
-            name: "Heating Unit".to_string(),
-            mass_kg: 500.0,
-            volume_m3: 2.0,
-            power_consumption_per_run: 15.0,
-            wear_per_run: 0.01,
-            behavior: ModuleBehaviorDef::Processor(ProcessorDef {
+        ModuleDefBuilder::new("module_heating_unit")
+            .name("Heating Unit")
+            .mass(500.0)
+            .volume(2.0)
+            .power(15.0)
+            .wear(0.01)
+            .behavior(ModuleBehaviorDef::Processor(ProcessorDef {
                 processing_interval_minutes: 1,
                 processing_interval_ticks: 1,
                 recipes: vec![water_recipe_id],
-            }),
-            thermal: None,
-            compatible_slots: Vec::new(),
-            ship_modifiers: Vec::new(),
-            power_stall_priority: None,
-            roles: vec![],
-            crew_requirement: Default::default(),
-            required_tech: None,
-            ports: Vec::new(),
-        },
+            }))
+            .build(),
     );
 
     let mut state = test_state(&content);
