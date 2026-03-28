@@ -1,6 +1,7 @@
-use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};
+pub(crate) mod ship_agent;
 
-#[allow(dead_code)] // Used starting in VIO-446/VIO-448
+use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};
+#[allow(dead_code)] // Used starting in VIO-448
 /// A decision-making agent that receives context and emits commands.
 ///
 /// Agents are scoped — they see relevant state but only act within their
