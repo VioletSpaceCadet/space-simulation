@@ -93,6 +93,7 @@ fn transit_moves_ship_and_starts_next_task() {
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),
                 module_id_index: HashMap::new(),
+                inventory_index: HashMap::new(),
                 power_budget_cache: crate::PowerBudgetCache::default(),
             },
         )]
@@ -290,6 +291,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 cached_inventory_volume_m3: None,
                 module_type_index: crate::ModuleTypeIndex::default(),
                 module_id_index: HashMap::new(),
+                inventory_index: HashMap::new(),
                 power_budget_cache: crate::PowerBudgetCache::default(),
             },
         )]
