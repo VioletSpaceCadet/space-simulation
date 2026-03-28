@@ -28,6 +28,7 @@ mod transit;
 mod wear;
 
 mod crew;
+mod crucible;
 mod determinism_canary;
 mod manufacturing;
 mod replenish;

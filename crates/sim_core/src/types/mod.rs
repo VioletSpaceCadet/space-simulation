@@ -179,6 +179,7 @@ pub enum BehaviorType {
     Battery,
     Radiator,
     Equipment,
+    ThermalContainer,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

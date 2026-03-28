@@ -135,8 +135,86 @@ pub(crate) fn tick_thermal(
         }
     }
 
+    // Cool material held in thermal containers (crucibles).
+    tick_thermal_containers(state, station_id, content, dt_s, sink_temp_mk);
+
     // Check overheat zones for all thermal modules after temperature updates.
     check_overheat_zones(state, station_id, content, events);
+}
+
+/// Cool material held in thermal container modules (crucibles).
+///
+/// Each container module's held items lose heat toward sink temperature based on
+/// the module's passive cooling coefficient. Phase transitions occur if material
+/// cools below the solidification point.
+fn tick_thermal_containers(
+    state: &mut GameState,
+    station_id: &StationId,
+    content: &GameContent,
+    dt_s: f64,
+    sink_temp_mk: u32,
+) {
+    let Some(station) = state.stations.get(station_id) else {
+        return;
+    };
+
+    // Collect container module indices
+    let container_indices: Vec<usize> = station
+        .modules
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| matches!(m.kind_state, crate::ModuleKindState::ThermalContainer(_)))
+        .map(|(idx, _)| idx)
+        .collect();
+
+    if container_indices.is_empty() {
+        return;
+    }
+
+    let station = state
+        .stations
+        .get_mut(station_id)
+        .expect("station verified above");
+
+    for module_idx in container_indices {
+        let module = &station.modules[module_idx];
+        let Some(def) = content.module_defs.get(&module.def_id) else {
+            continue;
+        };
+        let Some(ref thermal_def) = def.thermal else {
+            continue;
+        };
+
+        let cooling_coeff = thermal_def.passive_cooling_coefficient;
+
+        let crate::ModuleKindState::ThermalContainer(ref mut container) =
+            station.modules[module_idx].kind_state
+        else {
+            continue;
+        };
+
+        // Apply Newton's law cooling to each held material with thermal props.
+        for item in &mut container.held_items {
+            if let crate::InventoryItem::Material {
+                element,
+                kg,
+                thermal: Some(ref mut props),
+                ..
+            } = item
+            {
+                // Convert mK to K for Newton's law: dQ = coeff(W/K) * dT(K) * dt(s)
+                let temp_diff_k = (f64::from(props.temp_mk) - f64::from(sink_temp_mk)) / 1000.0;
+                #[allow(clippy::cast_possible_truncation)]
+                let cooling_j = -(f64::from(cooling_coeff) * temp_diff_k * dt_s);
+
+                if let Some(element_def) = content.elements.iter().find(|e| e.id == *element) {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let heat = cooling_j.round() as i64;
+                    thermal::update_phase(props, element_def, *kg, heat);
+                }
+            }
+        }
+    }
 }
 
 /// Apply idle heat generation to a single module.
