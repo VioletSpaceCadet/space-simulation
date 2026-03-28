@@ -527,5 +527,37 @@
     "power_stall_priority": 2,
     "crew_requirement": {},
     "required_tech": "tech_automation_basic"
+  },
+  {
+    "id": "module_crucible",
+    "name": "Crucible",
+    "mass_kg": 3000.0,
+    "volume_m3": 6.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.001,
+    "behavior": {
+      "ThermalContainer": {
+        "capacity_kg": 1000.0
+      }
+    },
+    "thermal": {
+      "heat_capacity_j_per_k": 80000.0,
+      "passive_cooling_coefficient": 0.5,
+      "max_temp_mk": 3000000,
+      "thermal_group": "default"
+    },
+    "crew_requirement": {},
+    "ports": [
+      {
+        "id": "molten_in",
+        "direction": "Input",
+        "accepts": "AnyMolten"
+      },
+      {
+        "id": "molten_out",
+        "direction": "Output",
+        "accepts": "AnyMolten"
+      }
+    ]
   }
 ]

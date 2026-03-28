@@ -1445,6 +1445,21 @@ mod tests {
     }
 
     #[test]
+    fn test_crucible_loads_from_content() {
+        let content_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../content");
+        let content = load_content(content_dir.to_str().unwrap()).unwrap();
+
+        let crucible = content.module_defs.get("module_crucible");
+        assert!(crucible.is_some(), "crucible should exist in content");
+        let crucible = crucible.unwrap();
+        assert!(matches!(
+            crucible.behavior,
+            sim_core::ModuleBehaviorDef::ThermalContainer(_)
+        ));
+        assert_eq!(crucible.ports.len(), 2, "crucible should have 2 ports");
+    }
+
+    #[test]
     fn test_port_types_serialize_round_trip() {
         use sim_core::{ModulePort, PortDirection, PortFilter};
 

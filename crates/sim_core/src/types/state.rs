@@ -134,6 +134,7 @@ pub enum ModuleKindState {
     Battery(BatteryState),
     Radiator(RadiatorState),
     Equipment,
+    ThermalContainer(ThermalContainerState),
 }
 
 impl ModuleKindState {
@@ -159,7 +160,8 @@ impl ModuleKindState {
             | Self::SolarArray(_)
             | Self::Battery(_)
             | Self::Radiator(_)
-            | Self::Equipment => None,
+            | Self::Equipment
+            | Self::ThermalContainer(_) => None,
         }
     }
 }
@@ -217,6 +219,15 @@ pub struct LabState {
     pub assigned_tech: Option<TechId>,
     #[serde(default)]
     pub starved: bool,
+}
+
+/// Runtime state for a thermal container module (crucible).
+/// Holds molten material inventory separate from station inventory.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ThermalContainerState {
+    /// Material held in the container with thermal properties.
+    #[serde(default)]
+    pub held_items: Vec<InventoryItem>,
 }
 
 // ---------------------------------------------------------------------------

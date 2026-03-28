@@ -644,6 +644,8 @@ pub enum ModuleBehaviorDef {
     Radiator(RadiatorDef),
     /// Passive stat provider for ship fitting. No tick behavior.
     Equipment,
+    /// Thermal container: holds molten material at temperature.
+    ThermalContainer(ThermalContainerDef),
 }
 
 impl ModuleBehaviorDef {
@@ -661,6 +663,7 @@ impl ModuleBehaviorDef {
             Self::Battery(_) => "battery",
             Self::Radiator(_) => "radiator",
             Self::Equipment => "equipment",
+            Self::ThermalContainer(_) => "thermal_container",
         }
     }
 
@@ -676,7 +679,8 @@ impl ModuleBehaviorDef {
             | Self::SolarArray(_)
             | Self::Battery(_)
             | Self::Radiator(_)
-            | Self::Equipment => None,
+            | Self::Equipment
+            | Self::ThermalContainer(_) => None,
         }
     }
 
@@ -734,6 +738,10 @@ impl ModuleBehaviorDef {
                 BehaviorType::Radiator,
             ),
             Self::Equipment => (ModuleKindState::Equipment, BehaviorType::Equipment),
+            Self::ThermalContainer(_) => (
+                ModuleKindState::ThermalContainer(crate::ThermalContainerState::default()),
+                BehaviorType::ThermalContainer,
+            ),
         }
     }
 
@@ -750,7 +758,8 @@ impl ModuleBehaviorDef {
             | Self::SolarArray(_)
             | Self::Battery(_)
             | Self::Radiator(_)
-            | Self::Equipment => None,
+            | Self::Equipment
+            | Self::ThermalContainer(_) => None,
         }
     }
 }
@@ -835,6 +844,14 @@ pub struct ProcessorDef {
     #[serde(skip_deserializing, default)]
     pub processing_interval_ticks: u64,
     pub recipes: Vec<RecipeId>,
+}
+
+/// Definition for a thermal container module (e.g., crucible).
+/// Holds molten material at temperature with insulated cooling.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThermalContainerDef {
+    /// Maximum material capacity in kg.
+    pub capacity_kg: f32,
 }
 
 // ---------------------------------------------------------------------------
