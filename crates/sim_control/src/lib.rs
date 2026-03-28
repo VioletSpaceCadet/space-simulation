@@ -1736,7 +1736,12 @@ mod tests {
             assigned_crew: Default::default(),
             crew_satisfied: true,
         });
+        rebuild_station_indexes(&mut state, &content);
         // Add H2O above threshold (500 kg) → should NOT trigger volatile targeting
+        let station = state
+            .stations
+            .get_mut(&StationId("station_earth_orbit".to_string()))
+            .unwrap();
         station.inventory.push(InventoryItem::Material {
             element: "H2O".to_string(),
             kg: 600.0,
@@ -1967,6 +1972,7 @@ mod tests {
         content.constants.autopilot_lh2_threshold_kg = 1000.0;
         let mut state = autopilot_state(&content);
         add_electrolysis_module(&mut state, true);
+        rebuild_station_indexes(&mut state, &content);
         add_lh2_inventory(&mut state, 1500.0); // Between threshold (1000) and 2x (2000)
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
@@ -2007,6 +2013,7 @@ mod tests {
             crew_satisfied: true,
             thermal: None,
         });
+        rebuild_station_indexes(&mut state, &content);
         // LH2 = 0 (below threshold)
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
