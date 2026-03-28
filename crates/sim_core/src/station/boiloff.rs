@@ -387,6 +387,46 @@ mod tests {
     }
 
     #[test]
+    fn test_boiloff_modifier_does_not_affect_non_cryo() {
+        let content = boiloff_content();
+        let mut state = base_state(&content);
+        let station_id = crate::StationId("station_earth_orbit".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.inventory.push(InventoryItem::Material {
+            element: "Fe".to_string(),
+            kg: 1000.0,
+            quality: 1.0,
+            thermal: None,
+        });
+
+        // Add boiloff rate modifier — should not affect non-cryo Fe
+        state.modifiers.add(crate::modifiers::Modifier {
+            stat: crate::modifiers::StatId::BoiloffRate,
+            op: crate::modifiers::ModifierOp::PctAdditive,
+            value: -0.75,
+            source: crate::modifiers::ModifierSource::Tech("tech_cryo_insulation".into()),
+            condition: None,
+        });
+
+        let mut rng = make_rng();
+        tick(&mut state, &[], &content, &mut rng, None);
+
+        let remaining: f32 = state.stations[&station_id]
+            .inventory
+            .iter()
+            .filter_map(|i| match i {
+                InventoryItem::Material { element, kg, .. } if element == "Fe" => Some(*kg),
+                _ => None,
+            })
+            .sum();
+
+        assert!(
+            (remaining - 1000.0).abs() < 0.01,
+            "Fe should not boil off even with boiloff modifier: {remaining}"
+        );
+    }
+
+    #[test]
     fn test_temp_multiplier_piecewise() {
         let amb = 293_000;
         let hot_off = 100_000;
