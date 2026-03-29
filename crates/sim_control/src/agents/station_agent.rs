@@ -323,10 +323,11 @@ impl StationAgent {
             }
             // Salary projection: skip if hiring would cause bankruptcy within 30 days
             let hours_per_tick = f64::from(content.constants.minutes_per_tick) / 60.0;
-            let projection_ticks: u64 = 720; // ~30 days at mpt=60
-            let current_salary_per_tick: f64 = station
-                .crew
-                .iter()
+            let projection_ticks = content.constants.game_minutes_to_ticks(30 * 24 * 60);
+            let current_salary_per_tick: f64 = state
+                .stations
+                .values()
+                .flat_map(|s| s.crew.iter())
                 .map(|(r, &c)| {
                     content
                         .crew_roles
