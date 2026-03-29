@@ -1125,6 +1125,25 @@ impl AutopilotBehavior for CrewAssignment {
         let tick = state.meta.tick;
 
         for station in state.stations.values() {
+            // Early exit: skip if no module needs crew assignment.
+            // prev_crew_satisfied is true when all crew requirements are met.
+            let any_unsatisfied = station.modules.iter().any(|m| {
+                m.enabled
+                    && !m.prev_crew_satisfied
+                    && content
+                        .module_defs
+                        .get(&m.def_id)
+                        .is_some_and(|d| !d.crew_requirement.is_empty())
+            });
+            if !any_unsatisfied {
+                continue;
+            }
+
+            // Also skip if station has no crew at all (nothing to assign)
+            if station.crew.is_empty() {
+                continue;
+            }
+
             // Sort modules by priority desc, then ID asc
             let mut module_order: Vec<usize> = (0..station.modules.len()).collect();
             module_order.sort_by(|&a, &b| {
@@ -1139,22 +1158,21 @@ impl AutopilotBehavior for CrewAssignment {
                 station.crew.clone();
             for module in &station.modules {
                 for (role, &count) in &module.assigned_crew {
-                    let entry = available.entry(role.clone()).or_insert(0);
-                    *entry = entry.saturating_sub(count);
+                    if let Some(entry) = available.get_mut(role) {
+                        *entry = entry.saturating_sub(count);
+                    }
                 }
             }
 
             for &module_index in &module_order {
                 let module = &station.modules[module_index];
-                if !module.enabled {
+                if !module.enabled || module.prev_crew_satisfied {
                     continue;
                 }
                 let Some(def) = content.module_defs.get(&module.def_id) else {
                     continue;
                 };
-                if def.crew_requirement.is_empty()
-                    || sim_core::is_crew_satisfied(&module.assigned_crew, &def.crew_requirement)
-                {
+                if def.crew_requirement.is_empty() {
                     continue;
                 }
                 // Try to assign missing crew roles
@@ -1177,7 +1195,9 @@ impl AutopilotBehavior for CrewAssignment {
                                 count: can_assign,
                             },
                         ));
-                        *available.entry(role.clone()).or_insert(0) -= can_assign;
+                        if let Some(entry) = available.get_mut(role) {
+                            *entry -= can_assign;
+                        }
                     }
                 }
             }
@@ -1211,7 +1231,23 @@ impl AutopilotBehavior for CrewRecruitment {
             return commands;
         }
 
+        let hours_per_tick = f64::from(content.constants.minutes_per_tick) / 60.0;
+        let projection_ticks: u64 = 720; // ~30 days at mpt=60
+
         for station in state.stations.values() {
+            // Early exit: skip if all modules are crew-satisfied (no shortfall possible)
+            let any_unsatisfied = station.modules.iter().any(|m| {
+                m.enabled
+                    && !m.prev_crew_satisfied
+                    && content
+                        .module_defs
+                        .get(&m.def_id)
+                        .is_some_and(|d| !d.crew_requirement.is_empty())
+            });
+            if !any_unsatisfied {
+                continue;
+            }
+
             // Compute demand: sum of crew_requirement for all enabled modules
             let mut demand: std::collections::BTreeMap<sim_core::CrewRole, u32> =
                 std::collections::BTreeMap::new();
@@ -1226,6 +1262,18 @@ impl AutopilotBehavior for CrewRecruitment {
                     *demand.entry(role.clone()).or_insert(0) += count;
                 }
             }
+
+            // Pre-compute current salary once per station (not per role)
+            let current_salary_per_tick: f64 = station
+                .crew
+                .iter()
+                .map(|(r, &c)| {
+                    content
+                        .crew_roles
+                        .get(r)
+                        .map_or(0.0, |d| d.salary_per_hour * f64::from(c) * hours_per_tick)
+                })
+                .sum();
 
             // Compare demand vs supply, recruit shortfalls
             for (role, needed) in &demand {
@@ -1249,18 +1297,6 @@ impl AutopilotBehavior for CrewRecruitment {
                     continue;
                 }
                 // Salary projection: skip if hiring would cause bankruptcy within 30 days
-                let hours_per_tick = f64::from(content.constants.minutes_per_tick) / 60.0;
-                let projection_ticks: u64 = 720; // ~30 days at mpt=60
-                let current_salary_per_tick: f64 = station
-                    .crew
-                    .iter()
-                    .map(|(r, &c)| {
-                        content
-                            .crew_roles
-                            .get(r)
-                            .map_or(0.0, |d| d.salary_per_hour * f64::from(c) * hours_per_tick)
-                    })
-                    .sum();
                 let new_hire_salary_per_tick = content.crew_roles.get(role).map_or(0.0, |d| {
                     d.salary_per_hour * f64::from(shortfall) * hours_per_tick
                 });
