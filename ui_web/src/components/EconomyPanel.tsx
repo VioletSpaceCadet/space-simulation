@@ -99,10 +99,10 @@ export function EconomyPanel({ snapshot, events }: Props) {
   };
 
   const crewSalaryPerHour = useMemo(() => {
-    if (!snapshot) return 0;
+    if (!snapshot) { return 0; }
     let total = 0;
     for (const station of Object.values(snapshot.stations)) {
-      if (!station.crew) continue;
+      if (!station.crew) { continue; }
       for (const [role, count] of Object.entries(station.crew)) {
         total += (SALARY_RATES[role] ?? 0) * count;
       }
