@@ -321,6 +321,29 @@ impl StationAgent {
             if cost > budget_cap {
                 continue;
             }
+            // Salary projection: skip if hiring would cause bankruptcy within 30 days
+            let hours_per_tick = f64::from(content.constants.minutes_per_tick) / 60.0;
+            let projection_ticks = content.constants.game_minutes_to_ticks(30 * 24 * 60);
+            let current_salary_per_tick: f64 = state
+                .stations
+                .values()
+                .flat_map(|s| s.crew.iter())
+                .map(|(r, &c)| {
+                    content
+                        .crew_roles
+                        .get(r)
+                        .map_or(0.0, |d| d.salary_per_hour * f64::from(c) * hours_per_tick)
+                })
+                .sum();
+            let new_hire_salary_per_tick = content.crew_roles.get(role).map_or(0.0, |d| {
+                d.salary_per_hour * f64::from(shortfall) * hours_per_tick
+            });
+            let projected = state.balance
+                - cost
+                - (current_salary_per_tick + new_hire_salary_per_tick) * projection_ticks as f64;
+            if projected < 0.0 {
+                continue;
+            }
             commands.push(make_cmd(
                 owner,
                 tick,
@@ -932,6 +955,74 @@ mod tests {
             &commands[0].command,
             Command::JettisonSlag { station_id: sid } if *sid == station_id
         ));
+    }
+
+    #[test]
+    fn recruit_crew_skips_when_salary_would_bankrupt() {
+        use sim_core::test_fixtures::ModuleDefBuilder;
+
+        let mut content = base_content();
+        let role = sim_core::CrewRole("engineer".to_string());
+        content.crew_roles.insert(
+            role.clone(),
+            sim_core::CrewRoleDef {
+                id: role.clone(),
+                name: "Engineer".to_string(),
+                recruitment_cost: 100.0,
+                salary_per_hour: 1_000_000.0, // Absurdly high → guarantees bankruptcy
+            },
+        );
+        content.constants.trade_unlock_delay_minutes = 0;
+        content.pricing.items.insert(
+            "engineer".to_string(),
+            sim_core::PricingEntry {
+                base_price_per_unit: 10.0,
+                importable: true,
+                exportable: false,
+                category: String::new(),
+            },
+        );
+        // Module def requiring an engineer
+        let mut mod_def = ModuleDefBuilder::new("mod_crew_test")
+            .behavior(sim_core::ModuleBehaviorDef::Equipment)
+            .build();
+        mod_def.crew_requirement.insert(role.clone(), 1);
+        content
+            .module_defs
+            .insert("mod_crew_test".to_string(), mod_def);
+
+        let mut state = base_state(&content);
+        state.balance = 1000.0;
+        let owner = PrincipalId("principal_autopilot".to_string());
+        let station_id = state.stations.keys().next().unwrap().clone();
+
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("mod_1".to_string()),
+            def_id: "mod_crew_test".to_string(),
+            enabled: true,
+            kind_state: sim_core::ModuleKindState::Equipment,
+            wear: sim_core::WearState::default(),
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
+            thermal: None,
+        });
+        station.rebuild_module_index(&content);
+
+        let mut agent = StationAgent::new(station_id);
+        let mut next_id = 1;
+        let mut commands = Vec::new();
+
+        agent.recruit_crew(&state, &content, &owner, &mut next_id, &mut commands);
+
+        // Should produce NO import command because salary projection shows bankruptcy
+        assert!(
+            commands.is_empty(),
+            "should skip recruitment when salary would bankrupt: got {commands:?}"
+        );
     }
 
     // --- Ship assignment tests (ported from ShipAssignmentBridge) ---
