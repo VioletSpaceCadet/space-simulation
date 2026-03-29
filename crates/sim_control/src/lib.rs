@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use agents::ship_agent::ShipAgent;
 use agents::station_agent::StationAgent;
 use agents::Agent;
-use behaviors::AUTOPILOT_OWNER;
+use behaviors::{AutopilotBehavior, AUTOPILOT_OWNER};
 use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId, ShipId, StationId};
 
 pub trait CommandSource {
@@ -19,14 +19,13 @@ pub trait CommandSource {
     ) -> Vec<CommandEnvelope>;
 }
 
-/// Pure agent-based autopilot controller.
-///
-/// Station agents handle per-station decisions (modules, labs, crew, trade,
-/// ship objectives). Ship agents handle tactical execution (transit, mine,
-/// deposit, refuel).
+/// Drives ships automatically via flat behaviors (station management, labs,
+/// crew, exports, etc.) plus hierarchical ship agents that convert objectives
+/// into tactical commands.
 pub struct AutopilotController {
-    station_agents: BTreeMap<StationId, StationAgent>,
+    behaviors: Vec<Box<dyn AutopilotBehavior>>,
     ship_agents: BTreeMap<ShipId, ShipAgent>,
+    station_agents: BTreeMap<StationId, StationAgent>,
     /// Cached owner ID — avoids per-tick String allocation.
     owner: PrincipalId,
 }
@@ -34,8 +33,9 @@ pub struct AutopilotController {
 impl AutopilotController {
     pub fn new() -> Self {
         Self {
-            station_agents: BTreeMap::new(),
+            behaviors: behaviors::default_behaviors(),
             ship_agents: BTreeMap::new(),
+            station_agents: BTreeMap::new(),
             owner: PrincipalId(AUTOPILOT_OWNER.to_string()),
         }
     }
@@ -56,16 +56,12 @@ impl CommandSource for AutopilotController {
     ) -> Vec<CommandEnvelope> {
         let mut commands = Vec::new();
 
-        // 1. Sync agent lifecycle — create for new entities, remove for deleted
-        for station_id in state.stations.keys() {
-            if !self.station_agents.contains_key(station_id) {
-                self.station_agents
-                    .insert(station_id.clone(), StationAgent::new(station_id.clone()));
-            }
+        // 1. Run flat behaviors (station management, labs, crew, etc.)
+        for behavior in &mut self.behaviors {
+            commands.extend(behavior.generate(state, content, &self.owner, next_command_id));
         }
-        self.station_agents
-            .retain(|id, _| state.stations.contains_key(id));
 
+        // 2. Sync agent lifecycle — create for new entities, remove for deleted
         for (ship_id, ship) in &state.ships {
             if ship.owner == self.owner && !self.ship_agents.contains_key(ship_id) {
                 self.ship_agents
@@ -75,17 +71,21 @@ impl CommandSource for AutopilotController {
         self.ship_agents
             .retain(|id, _| state.ships.contains_key(id));
 
-        // 2. Station agents generate commands (modules, labs, crew, trade)
-        //    in BTreeMap order (deterministic by StationId)
-        for agent in self.station_agents.values_mut() {
-            commands.extend(agent.generate(state, content, &self.owner, next_command_id));
+        for station_id in state.stations.keys() {
+            if !self.station_agents.contains_key(station_id) {
+                self.station_agents
+                    .insert(station_id.clone(), StationAgent::new(station_id.clone()));
+            }
         }
+        self.station_agents
+            .retain(|id, _| state.stations.contains_key(id));
 
         // 3. Station agents assign objectives to co-located idle ships (AD1).
-        // Deduplication is per-station (each station has its own shared
+        // Note: deduplication is per-station (each station has its own shared
         // iterators). With multiple stations, two stations could theoretically
-        // assign the same asteroid. Acceptable for single-station game;
-        // multi-station deduplication belongs in the strategic layer.
+        // assign the same asteroid. This is acceptable — the current game has
+        // one station, and multi-station deduplication belongs in the strategic
+        // layer (future work).
         for station_agent in self.station_agents.values() {
             station_agent.assign_ship_objectives(
                 &mut self.ship_agents,
@@ -157,20 +157,6 @@ mod tests {
             station.power_available_per_tick = 0.0;
         }
         state
-    }
-
-    /// Test helper: runs StationAgent::manage_propellant() for the first station.
-    fn test_station_agent_propellant_commands(
-        state: &sim_core::GameState,
-        content: &sim_core::GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-    ) -> Vec<CommandEnvelope> {
-        let station_id = state.stations.keys().next().unwrap().clone();
-        let mut agent = agents::station_agent::StationAgent::new(station_id);
-        let mut commands = Vec::new();
-        agent.manage_propellant(state, content, owner, next_id, &mut commands);
-        commands
     }
 
     #[test]
@@ -1811,7 +1797,7 @@ mod tests {
         );
 
         let candidates =
-            crate::behaviors::collect_deep_scan_candidates(&state, &content, &test_position());
+            crate::behaviors::test_collect_deep_scan_candidates(&state, &content, &test_position());
         assert!(
             candidates.contains(&asteroid_id),
             "VolatileRich asteroids should be deep scan candidates"
@@ -2003,8 +1989,12 @@ mod tests {
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
 
-        let commands =
-            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
+        let commands = crate::behaviors::test_propellant_pipeline_commands(
+            &state,
+            &content,
+            &owner,
+            &mut next_id,
+        );
         assert!(
             commands.is_empty(),
             "should emit no commands when station has no electrolysis module"
@@ -2022,8 +2012,12 @@ mod tests {
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
-        let commands =
-            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
+        let commands = crate::behaviors::test_propellant_pipeline_commands(
+            &state,
+            &content,
+            &owner,
+            &mut next_id,
+        );
 
         let enables_electrolysis = commands.iter().any(|cmd| {
             matches!(
@@ -2061,8 +2055,12 @@ mod tests {
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
-        let commands =
-            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
+        let commands = crate::behaviors::test_propellant_pipeline_commands(
+            &state,
+            &content,
+            &owner,
+            &mut next_id,
+        );
 
         let disables = commands.iter().any(|cmd| {
             matches!(
@@ -2089,8 +2087,12 @@ mod tests {
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
-        let commands =
-            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
+        let commands = crate::behaviors::test_propellant_pipeline_commands(
+            &state,
+            &content,
+            &owner,
+            &mut next_id,
+        );
 
         assert!(
             commands.is_empty(),
@@ -2127,8 +2129,12 @@ mod tests {
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
-        let commands =
-            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
+        let commands = crate::behaviors::test_propellant_pipeline_commands(
+            &state,
+            &content,
+            &owner,
+            &mut next_id,
+        );
 
         assert!(
             commands.is_empty(),
