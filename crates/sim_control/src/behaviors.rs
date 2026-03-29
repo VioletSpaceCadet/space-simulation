@@ -1248,6 +1248,29 @@ impl AutopilotBehavior for CrewRecruitment {
                 if cost > budget_cap {
                     continue;
                 }
+                // Salary projection: skip if hiring would cause bankruptcy within 30 days
+                let hours_per_tick = f64::from(content.constants.minutes_per_tick) / 60.0;
+                let projection_ticks: u64 = 720; // ~30 days at mpt=60
+                let current_salary_per_tick: f64 = station
+                    .crew
+                    .iter()
+                    .map(|(r, &c)| {
+                        content
+                            .crew_roles
+                            .get(r)
+                            .map_or(0.0, |d| d.salary_per_hour * f64::from(c) * hours_per_tick)
+                    })
+                    .sum();
+                let new_hire_salary_per_tick = content.crew_roles.get(role).map_or(0.0, |d| {
+                    d.salary_per_hour * f64::from(shortfall) * hours_per_tick
+                });
+                let projected = state.balance
+                    - cost
+                    - (current_salary_per_tick + new_hire_salary_per_tick)
+                        * projection_ticks as f64;
+                if projected < 0.0 {
+                    continue;
+                }
                 commands.push(make_cmd(
                     owner,
                     tick,

@@ -70,6 +70,13 @@ interface Props {
   events: SimEvent[]
 }
 
+const SALARY_RATES: Record<string, number> = {
+  operator: 25,
+  technician: 37.5,
+  scientist: 50,
+  pilot: 40,
+};
+
 export function EconomyPanel({ snapshot, events }: Props) {
   const [pricing, setPricing] = useState<PricingTable | null>(null);
   const [importCategory, setImportCategory] = useState<ItemCategory>('Material');
@@ -90,6 +97,18 @@ export function EconomyPanel({ snapshot, events }: Props) {
       .then((data: PricingTable) => setPricing(data))
       .catch((err: unknown) => console.error('Failed to fetch pricing:', err));
   }, []);
+
+  const crewSalaryPerHour = useMemo(() => {
+    if (!snapshot) { return 0; }
+    let total = 0;
+    for (const station of Object.values(snapshot.stations)) {
+      if (!station.crew) { continue; }
+      for (const [role, count] of Object.entries(station.crew)) {
+        total += (SALARY_RATES[role] ?? 0) * count;
+      }
+    }
+    return total;
+  }, [snapshot]);
 
   const categorizedItems = useMemo(() => {
     if (!pricing) {return [];}
@@ -217,6 +236,11 @@ export function EconomyPanel({ snapshot, events }: Props) {
         <div className="text-accent font-bold text-lg">
           {snapshot ? formatCurrency(snapshot.balance) : '--'}
         </div>
+        {crewSalaryPerHour > 0 && (
+          <div className="text-[11px] text-faint mt-0.5">
+            Crew salaries: {formatCurrency(crewSalaryPerHour)}/hr
+          </div>
+        )}
       </div>
 
       {!pricing ? (
