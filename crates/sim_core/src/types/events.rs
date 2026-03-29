@@ -354,4 +354,10 @@ pub enum Event {
     StationBankrupt {
         station_id: StationId,
     },
+    /// Emitted when a module's combined efficiency changes from the previous tick.
+    ModuleEfficiencyChanged {
+        station_id: StationId,
+        module_id: ModuleInstanceId,
+        efficiency: f32,
+    },
 }

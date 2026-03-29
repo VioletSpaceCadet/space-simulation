@@ -440,6 +440,12 @@ export const eventSchemas = {
   StationBankrupt: z.object({
     station_id: z.string(),
   }),
+
+  ModuleEfficiencyChanged: z.object({
+    station_id: z.string(),
+    module_id: z.string(),
+    efficiency: z.number(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

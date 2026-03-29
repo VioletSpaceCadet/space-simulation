@@ -142,7 +142,7 @@ export interface ModuleState {
   thermal?: ThermalState
   module_priority?: number
   assigned_crew?: Record<string, number>
-  crew_satisfied?: boolean
+  efficiency?: number
 }
 
 export interface Position {
