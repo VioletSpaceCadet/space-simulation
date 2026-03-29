@@ -5,10 +5,10 @@ mod objectives;
 use std::collections::BTreeMap;
 
 use agents::ship_agent::ShipAgent;
-use agents::ship_assignment::ShipAssignmentBridge;
+use agents::station_agent::StationAgent;
 use agents::Agent;
 use behaviors::{AutopilotBehavior, AUTOPILOT_OWNER};
-use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId, ShipId};
+use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId, ShipId, StationId};
 
 pub trait CommandSource {
     fn generate_commands(
@@ -25,6 +25,7 @@ pub trait CommandSource {
 pub struct AutopilotController {
     behaviors: Vec<Box<dyn AutopilotBehavior>>,
     ship_agents: BTreeMap<ShipId, ShipAgent>,
+    station_agents: BTreeMap<StationId, StationAgent>,
     /// Cached owner ID — avoids per-tick String allocation.
     owner: PrincipalId,
 }
@@ -34,6 +35,7 @@ impl AutopilotController {
         Self {
             behaviors: behaviors::default_behaviors(),
             ship_agents: BTreeMap::new(),
+            station_agents: BTreeMap::new(),
             owner: PrincipalId(AUTOPILOT_OWNER.to_string()),
         }
     }
@@ -59,7 +61,7 @@ impl CommandSource for AutopilotController {
             commands.extend(behavior.generate(state, content, &self.owner, next_command_id));
         }
 
-        // 2. Sync ship agent lifecycle — create for new ships, remove for deleted
+        // 2. Sync agent lifecycle — create for new entities, remove for deleted
         for (ship_id, ship) in &state.ships {
             if ship.owner == self.owner && !self.ship_agents.contains_key(ship_id) {
                 self.ship_agents
@@ -69,8 +71,29 @@ impl CommandSource for AutopilotController {
         self.ship_agents
             .retain(|id, _| state.ships.contains_key(id));
 
-        // 3. Bridge assigns objectives to idle ship agents
-        ShipAssignmentBridge::assign_objectives(&mut self.ship_agents, state, content, &self.owner);
+        for station_id in state.stations.keys() {
+            if !self.station_agents.contains_key(station_id) {
+                self.station_agents
+                    .insert(station_id.clone(), StationAgent::new(station_id.clone()));
+            }
+        }
+        self.station_agents
+            .retain(|id, _| state.stations.contains_key(id));
+
+        // 3. Station agents assign objectives to co-located idle ships (AD1).
+        // Note: deduplication is per-station (each station has its own shared
+        // iterators). With multiple stations, two stations could theoretically
+        // assign the same asteroid. This is acceptable — the current game has
+        // one station, and multi-station deduplication belongs in the strategic
+        // layer (future work).
+        for station_agent in self.station_agents.values() {
+            station_agent.assign_ship_objectives(
+                &mut self.ship_agents,
+                state,
+                content,
+                &self.owner,
+            );
+        }
 
         // 4. Ship agents run in BTreeMap order (deterministic by ShipId, AD2)
         for agent in self.ship_agents.values_mut() {

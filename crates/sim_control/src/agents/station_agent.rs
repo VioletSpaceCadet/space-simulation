@@ -1,16 +1,20 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use sim_core::{
-    inventory_volume_m3, is_crew_satisfied, trade, Command, CommandEnvelope, ComponentId,
-    GameContent, GameState, InputAmount, InputFilter, InventoryItem, ModuleBehaviorDef,
-    ModuleKindState, PrincipalId, ResearchDomain, StationId, TechId, TradeItemSpec,
+    compute_entity_absolute, inventory_volume_m3, is_crew_satisfied, trade, AsteroidId, Command,
+    CommandEnvelope, ComponentId, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
+    ModuleBehaviorDef, ModuleKindState, PrincipalId, ResearchDomain, ShipId, SiteId, StationId,
+    TechId, TradeItemSpec,
 };
 
 use crate::behaviors::{
-    build_export_candidates, collect_idle_ships, compute_sufficiency, make_cmd,
-    total_element_inventory,
+    build_export_candidates, collect_deep_scan_candidates, collect_idle_ships, compute_sufficiency,
+    deposit_priority, element_mining_value, make_cmd, should_opportunistic_refuel,
+    station_has_module_with_role, total_element_inventory,
 };
+use crate::objectives::ShipObjective;
 
+use super::ship_agent::ShipAgent;
 use super::Agent;
 
 /// Per-station agent that consolidates all station-level behaviors into
@@ -21,7 +25,6 @@ use super::Agent;
 /// object — keeps it simple and avoids dynamic dispatch overhead.
 ///
 /// Created per `StationState`; removed when the station is removed from state.
-#[allow(dead_code)] // Wired into AutopilotController in VIO-452
 pub(crate) struct StationAgent {
     pub(crate) station_id: StationId,
     pub(crate) lab_cache: LabAssignmentCache,
@@ -32,7 +35,6 @@ pub(crate) struct StationAgent {
 /// Mirrors the cache from `LabAssignment` behavior but is scoped to a single
 /// station (AD6 from plan). Rebuilt when the set of unlocked techs changes.
 #[derive(Default)]
-#[allow(dead_code)] // Wired into AutopilotController in VIO-452
 pub(crate) struct LabAssignmentCache {
     /// domain → eligible tech IDs (prereqs met, not yet unlocked, needs this domain).
     pub(crate) cached_eligible: HashMap<ResearchDomain, Vec<TechId>>,
@@ -42,7 +44,6 @@ pub(crate) struct LabAssignmentCache {
     pub(crate) initialized: bool,
 }
 
-#[allow(dead_code)] // Wired into AutopilotController in VIO-452
 impl StationAgent {
     pub(crate) fn new(station_id: StationId) -> Self {
         Self {
@@ -639,16 +640,98 @@ impl StationAgent {
         }
     }
 
-    /// 10. Assign ship objectives to idle ships (absorbed from bridge in VIO-451).
-    #[allow(clippy::unused_self)]
-    fn assign_ship_objectives(
-        &mut self,
-        _state: &GameState,
-        _content: &GameContent,
-        _owner: &PrincipalId,
-        _next_id: &mut u64,
-        _commands: &mut Vec<CommandEnvelope>,
+    /// Assign objectives to idle ship agents at this station.
+    ///
+    /// Absorbs the `ShipAssignmentBridge` logic (VIO-451). Scoped to ships
+    /// co-located with this station. Uses shared-iterator deduplication (AD1)
+    /// so no two ships target the same asteroid or scan site.
+    ///
+    /// Called separately from `generate()` because it mutates ship agents,
+    /// not the command buffer.
+    pub(crate) fn assign_ship_objectives(
+        &self,
+        ship_agents: &mut BTreeMap<ShipId, ShipAgent>,
+        state: &GameState,
+        content: &GameContent,
+        owner: &PrincipalId,
     ) {
+        let Some(station) = state.stations.get(&self.station_id) else {
+            return;
+        };
+
+        // Collect idle ships at this station's position with no current objective.
+        let idle_ships = collect_idle_ships(state, owner);
+        let assignable: Vec<ShipId> = idle_ships
+            .into_iter()
+            .filter(|id| {
+                ship_agents.get(id).is_some_and(|a| a.objective.is_none())
+                    && state
+                        .ships
+                        .get(id)
+                        .is_some_and(|s| s.position == station.position)
+            })
+            .collect();
+
+        if assignable.is_empty() {
+            return;
+        }
+
+        let Some(first_ship) = state.ships.get(&assignable[0]) else {
+            return;
+        };
+        let reference_pos = &first_ship.position;
+
+        let deep_scan_unlocked = state
+            .research
+            .unlocked
+            .contains(&TechId(content.autopilot.deep_scan_tech.clone()));
+
+        // Pre-compute sorted candidate lists (Schwartzian transforms)
+        let deep_scan_candidates = collect_deep_scan_candidates(state, content, reference_pos);
+        let survey_candidates = collect_survey_candidates(state, reference_pos);
+        let mine_candidates = collect_mine_candidates(state, content);
+
+        let mut next_deep_scan = deep_scan_candidates.iter();
+        let mut next_site = survey_candidates.iter();
+        let mut next_mine = mine_candidates.iter();
+
+        // Assign objectives using shared iterators (AD1)
+        for ship_id in assignable {
+            let Some(ship) = state.ships.get(&ship_id) else {
+                continue;
+            };
+
+            if should_opportunistic_refuel(ship, state, content) {
+                continue;
+            }
+
+            if deposit_priority(ship, state, content).is_some() {
+                continue;
+            }
+
+            for priority in &content.autopilot.task_priority {
+                let objective = match priority.as_str() {
+                    "Mine" => next_mine.next().map(|id| ShipObjective::Mine {
+                        asteroid_id: id.clone(),
+                    }),
+                    "DeepScan" if deep_scan_unlocked => {
+                        next_deep_scan.next().map(|id| ShipObjective::DeepScan {
+                            asteroid_id: id.clone(),
+                        })
+                    }
+                    "Survey" => next_site.next().map(|id| ShipObjective::Survey {
+                        site_id: id.clone(),
+                    }),
+                    _ => None,
+                };
+                if let Some(obj) = objective {
+                    if let Some(agent) = ship_agents.get_mut(&ship_id) {
+                        agent.objective = Some(obj);
+                    }
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -690,10 +773,61 @@ impl Agent for StationAgent {
 
         self.manage_propellant(state, content, owner, next_id, &mut commands);
         self.fit_ships(state, content, owner, next_id, &mut commands);
-        self.assign_ship_objectives(state, content, owner, next_id, &mut commands);
+        // Ship assignment is called separately via assign_ship_objectives()
+        // because it mutates ship agents, not the command buffer.
 
         commands
     }
+}
+
+/// Survey sites sorted by distance from reference position (nearest first).
+fn collect_survey_candidates(state: &GameState, reference_pos: &sim_core::Position) -> Vec<SiteId> {
+    if state.scan_sites.is_empty() {
+        return Vec::new();
+    }
+    let ref_abs = compute_entity_absolute(reference_pos, &state.body_cache);
+    let mut decorated: Vec<(u128, SiteId)> = state
+        .scan_sites
+        .iter()
+        .map(|site| {
+            let dist = ref_abs
+                .distance_squared(compute_entity_absolute(&site.position, &state.body_cache));
+            (dist, site.id.clone())
+        })
+        .collect();
+    decorated.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1 .0.cmp(&b.1 .0)));
+    decorated.into_iter().map(|(_, id)| id).collect()
+}
+
+/// Mine candidates sorted by mining value (mass * element fraction), descending.
+/// Volatile detection determines which element to prioritize.
+fn collect_mine_candidates(state: &GameState, content: &GameContent) -> Vec<AsteroidId> {
+    let propellant_role = &content.autopilot.propellant_role;
+    let support_role = &content.autopilot.propellant_support_role;
+    let has_propellant_module = station_has_module_with_role(state, propellant_role);
+    let volatile_element = &content.autopilot.volatile_element;
+    let propellant_element = &content.autopilot.propellant_element;
+    let primary_element = &content.autopilot.primary_mining_element;
+    let needs_volatiles = station_has_module_with_role(state, support_role)
+        && (total_element_inventory(state, volatile_element)
+            < content.constants.autopilot_volatile_threshold_kg
+            || (has_propellant_module
+                && total_element_inventory(state, propellant_element)
+                    < content.constants.autopilot_lh2_threshold_kg));
+
+    let sort_element = if needs_volatiles {
+        volatile_element
+    } else {
+        primary_element
+    };
+    let mut decorated: Vec<(f32, AsteroidId)> = state
+        .asteroids
+        .values()
+        .filter(|a| a.mass_kg > 0.0 && a.knowledge.composition.is_some())
+        .map(|a| (element_mining_value(a, sort_element), a.id.clone()))
+        .collect();
+    decorated.sort_by(|a, b| b.0.total_cmp(&a.0).then_with(|| a.1 .0.cmp(&b.1 .0)));
+    decorated.into_iter().map(|(_, id)| id).collect()
 }
 
 #[cfg(test)]
@@ -798,5 +932,408 @@ mod tests {
             &commands[0].command,
             Command::JettisonSlag { station_id: sid } if *sid == station_id
         ));
+    }
+
+    // --- Ship assignment tests (ported from ShipAssignmentBridge) ---
+
+    use sim_core::test_fixtures::test_position;
+    use sim_core::{AsteroidKnowledge, AsteroidState, HullId, LotId, TaskKind, TaskState};
+
+    fn test_owner() -> PrincipalId {
+        PrincipalId("principal_autopilot".to_string())
+    }
+
+    fn make_ship_id(name: &str) -> ShipId {
+        ShipId(name.to_string())
+    }
+
+    fn make_asteroid_id(name: &str) -> AsteroidId {
+        AsteroidId(name.to_string())
+    }
+
+    fn assignment_setup() -> (GameState, GameContent, BTreeMap<ShipId, ShipAgent>) {
+        let content = base_content();
+        let state = base_state(&content);
+        let agents = BTreeMap::new();
+        (state, content, agents)
+    }
+
+    fn add_idle_ship(
+        state: &mut GameState,
+        agents: &mut BTreeMap<ShipId, ShipAgent>,
+        ship_id: ShipId,
+    ) {
+        use sim_core::ShipState;
+        let ship = ShipState {
+            id: ship_id.clone(),
+            owner: test_owner(),
+            position: test_position(),
+            inventory: vec![],
+            task: None,
+            hull_id: HullId("hull_general_purpose".to_string()),
+            fitted_modules: vec![],
+            modifiers: Default::default(),
+            propellant_kg: 0.0,
+            propellant_capacity_kg: 0.0,
+            cargo_capacity_m3: 100.0,
+            speed_ticks_per_au: None,
+            crew: std::collections::BTreeMap::new(),
+            leaders: vec![],
+        };
+        state.ships.insert(ship_id.clone(), ship);
+        agents.insert(ship_id.clone(), ShipAgent::new(ship_id));
+    }
+
+    fn add_mineable_asteroid(state: &mut GameState, asteroid_id: AsteroidId, fe_fraction: f32) {
+        state.asteroids.insert(
+            asteroid_id.clone(),
+            AsteroidState {
+                id: asteroid_id,
+                position: test_position(),
+                true_composition: std::collections::HashMap::new(),
+                anomaly_tags: vec![],
+                mass_kg: 1000.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![],
+                    composition: Some({
+                        let mut composition = std::collections::HashMap::new();
+                        composition.insert("Fe".to_string(), fe_fraction);
+                        composition
+                    }),
+                },
+            },
+        );
+    }
+
+    fn station_id_from_state(state: &GameState) -> StationId {
+        state.stations.keys().next().unwrap().clone()
+    }
+
+    #[test]
+    fn assign_no_idle_ships_no_assignments() {
+        let (state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+        let agent = StationAgent::new(station_id);
+
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(ship_agents.is_empty());
+    }
+
+    #[test]
+    fn assign_two_ships_two_asteroids_no_double_assignment() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_a = make_ship_id("ship_a");
+        let ship_b = make_ship_id("ship_b");
+        add_idle_ship(&mut state, &mut ship_agents, ship_a.clone());
+        add_idle_ship(&mut state, &mut ship_agents, ship_b.clone());
+
+        let asteroid_1 = make_asteroid_id("asteroid_1");
+        let asteroid_2 = make_asteroid_id("asteroid_2");
+        add_mineable_asteroid(&mut state, asteroid_1.clone(), 0.8);
+        add_mineable_asteroid(&mut state, asteroid_2.clone(), 0.5);
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        let obj_a = ship_agents[&ship_a]
+            .objective
+            .as_ref()
+            .expect("ship_a should have objective");
+        let obj_b = ship_agents[&ship_b]
+            .objective
+            .as_ref()
+            .expect("ship_b should have objective");
+
+        let id_a = match obj_a {
+            ShipObjective::Mine { asteroid_id } => asteroid_id.clone(),
+            other => panic!("expected Mine, got {other:?}"),
+        };
+        let id_b = match obj_b {
+            ShipObjective::Mine { asteroid_id } => asteroid_id.clone(),
+            other => panic!("expected Mine, got {other:?}"),
+        };
+
+        assert_ne!(id_a, id_b);
+        assert_eq!(id_a, asteroid_1);
+        assert_eq!(id_b, asteroid_2);
+    }
+
+    #[test]
+    fn assign_ship_with_cargo_skipped_no_iterator_consumption() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_a = make_ship_id("ship_a");
+        let ship_b = make_ship_id("ship_b");
+        add_idle_ship(&mut state, &mut ship_agents, ship_a.clone());
+        add_idle_ship(&mut state, &mut ship_agents, ship_b.clone());
+
+        let asteroid_1 = make_asteroid_id("asteroid_1");
+        add_mineable_asteroid(&mut state, asteroid_1.clone(), 0.8);
+
+        // Give ship_a cargo so deposit_priority fires → skipped
+        state
+            .ships
+            .get_mut(&ship_a)
+            .unwrap()
+            .inventory
+            .push(InventoryItem::Ore {
+                lot_id: LotId("lot_1".to_string()),
+                asteroid_id: make_asteroid_id("some_asteroid"),
+                kg: 50.0,
+                composition: {
+                    let mut composition = std::collections::HashMap::new();
+                    composition.insert("Fe".to_string(), 0.8_f32);
+                    composition
+                },
+            });
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(ship_agents[&ship_a].objective.is_none());
+        assert!(matches!(
+            ship_agents[&ship_b].objective,
+            Some(ShipObjective::Mine { ref asteroid_id }) if *asteroid_id == asteroid_1
+        ));
+    }
+
+    #[test]
+    fn assign_busy_ship_not_assigned() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+
+        state.ships.get_mut(&ship_id).unwrap().task = Some(TaskState {
+            kind: TaskKind::Mine {
+                asteroid: make_asteroid_id("asteroid_x"),
+                duration_ticks: 10,
+            },
+            started_tick: 0,
+            eta_tick: 10,
+        });
+
+        add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(ship_agents[&ship_id].objective.is_none());
+    }
+
+    #[test]
+    fn assign_deep_scan_when_tech_unlocked() {
+        let (mut state, mut content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+        state.scan_sites.clear();
+
+        let tech_id = TechId("tech_deep_scan".to_string());
+        content.autopilot.deep_scan_tech = "tech_deep_scan".to_string();
+        content.autopilot.deep_scan_targets = vec![sim_core::DeepScanTargetConfig {
+            tag: "IronRich".to_string(),
+            min_confidence: 0.5,
+        }];
+        state.research.unlocked.insert(tech_id);
+
+        let asteroid_id = make_asteroid_id("asteroid_scan");
+        state.asteroids.insert(
+            asteroid_id.clone(),
+            AsteroidState {
+                id: asteroid_id.clone(),
+                position: test_position(),
+                true_composition: std::collections::HashMap::new(),
+                anomaly_tags: vec![],
+                mass_kg: 500.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(sim_core::AnomalyTag("IronRich".to_string()), 0.9)],
+                    composition: None,
+                },
+            },
+        );
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(matches!(
+            ship_agents[&ship_id].objective,
+            Some(ShipObjective::DeepScan { ref asteroid_id }) if asteroid_id.0 == "asteroid_scan"
+        ));
+    }
+
+    #[test]
+    fn assign_deep_scan_skipped_without_tech() {
+        let (mut state, mut content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+        state.scan_sites.clear();
+
+        content.autopilot.deep_scan_tech = "tech_deep_scan".to_string();
+        content.autopilot.deep_scan_targets = vec![sim_core::DeepScanTargetConfig {
+            tag: "IronRich".to_string(),
+            min_confidence: 0.5,
+        }];
+
+        state.asteroids.insert(
+            make_asteroid_id("asteroid_scan"),
+            AsteroidState {
+                id: make_asteroid_id("asteroid_scan"),
+                position: test_position(),
+                true_composition: std::collections::HashMap::new(),
+                anomaly_tags: vec![],
+                mass_kg: 500.0,
+                knowledge: AsteroidKnowledge {
+                    tag_beliefs: vec![(sim_core::AnomalyTag("IronRich".to_string()), 0.9)],
+                    composition: None,
+                },
+            },
+        );
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(ship_agents[&ship_id].objective.is_none());
+    }
+
+    #[test]
+    fn assign_ship_not_at_station_skipped() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+
+        // Move ship to a different position than the station
+        let mut different_pos = test_position();
+        different_pos.radius_au_um = sim_core::RadiusAuMicro(999_999);
+        state.ships.get_mut(&ship_id).unwrap().position = different_pos;
+
+        add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        // Ship not co-located with station → no assignment
+        assert!(ship_agents[&ship_id].objective.is_none());
+    }
+
+    #[test]
+    fn assign_three_ships_waterfall_mine_then_survey() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_a = make_ship_id("ship_a");
+        let ship_b = make_ship_id("ship_b");
+        let ship_c = make_ship_id("ship_c");
+        add_idle_ship(&mut state, &mut ship_agents, ship_a.clone());
+        add_idle_ship(&mut state, &mut ship_agents, ship_b.clone());
+        add_idle_ship(&mut state, &mut ship_agents, ship_c.clone());
+
+        state.scan_sites.clear();
+        add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
+
+        let site_id = sim_core::SiteId("site_1".to_string());
+        state.scan_sites.push(sim_core::ScanSite {
+            id: site_id.clone(),
+            position: test_position(),
+            template_id: "template_default".to_string(),
+        });
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(matches!(
+            ship_agents[&ship_a].objective,
+            Some(ShipObjective::Mine { .. })
+        ));
+        assert!(matches!(
+            ship_agents[&ship_b].objective,
+            Some(ShipObjective::Survey { .. })
+        ));
+        // ship_c: all candidates consumed
+        assert!(ship_agents[&ship_c].objective.is_none());
+    }
+
+    #[test]
+    fn assign_existing_objective_not_overwritten() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+        add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
+
+        // Pre-set an objective
+        ship_agents.get_mut(&ship_id).unwrap().objective = Some(ShipObjective::DeepScan {
+            asteroid_id: make_asteroid_id("other"),
+        });
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(matches!(
+            ship_agents[&ship_id].objective,
+            Some(ShipObjective::DeepScan { .. })
+        ));
+    }
+
+    #[test]
+    fn assign_survey_when_no_mine_candidates() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+
+        state.scan_sites.clear();
+        state.scan_sites.push(sim_core::ScanSite {
+            id: sim_core::SiteId("site_1".to_string()),
+            position: test_position(),
+            template_id: "template_default".to_string(),
+        });
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(matches!(
+            ship_agents[&ship_id].objective,
+            Some(ShipObjective::Survey { ref site_id }) if site_id.0 == "site_1"
+        ));
+    }
+
+    #[test]
+    fn assign_no_candidates_no_objective() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+
+        state.scan_sites.clear();
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(ship_agents[&ship_id].objective.is_none());
     }
 }
