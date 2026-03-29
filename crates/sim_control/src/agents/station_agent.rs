@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use sim_core::{
-    compute_entity_absolute, inventory_volume_m3, is_crew_satisfied, trade, AsteroidId, Command,
-    CommandEnvelope, ComponentId, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
+    compute_entity_absolute, inventory_volume_m3, trade, AsteroidId, Command, CommandEnvelope,
+    ComponentId, GameContent, GameState, InputAmount, InputFilter, InventoryItem,
     ModuleBehaviorDef, ModuleKindState, PrincipalId, ResearchDomain, ShipId, SiteId, StationId,
     TechId, TradeItemSpec,
 };
