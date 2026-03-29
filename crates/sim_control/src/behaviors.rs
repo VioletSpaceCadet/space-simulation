@@ -341,6 +341,7 @@ pub(crate) fn build_export_candidates(
 // ---------------------------------------------------------------------------
 
 /// Installs, enables, and configures station modules.
+#[allow(dead_code)] // Removed in VIO-453
 pub(crate) struct StationModuleManager;
 
 impl AutopilotBehavior for StationModuleManager {
@@ -411,6 +412,7 @@ impl AutopilotBehavior for StationModuleManager {
 /// Auto-assigns unassigned labs to the highest-priority eligible tech.
 /// Caches eligible techs per domain; rebuilt only when the unlocked set changes.
 #[derive(Default)]
+#[allow(dead_code)] // Removed in VIO-453
 pub(crate) struct LabAssignment {
     /// domain → eligible tech IDs (prereqs met, not yet unlocked, needs this domain).
     cached_eligible: HashMap<ResearchDomain, Vec<TechId>>,
@@ -520,6 +522,7 @@ impl AutopilotBehavior for LabAssignment {
 }
 
 /// Imports thrusters when a shipyard is ready and conditions are met.
+#[allow(dead_code)] // Removed in VIO-453
 pub(crate) struct ThrusterImport;
 
 impl AutopilotBehavior for ThrusterImport {
@@ -645,6 +648,7 @@ impl AutopilotBehavior for ThrusterImport {
 }
 
 /// Jettisons all slag from stations whose storage usage exceeds the threshold.
+#[allow(dead_code)] // Removed in VIO-453
 pub(crate) struct SlagJettison;
 
 impl AutopilotBehavior for SlagJettison {
@@ -687,6 +691,7 @@ impl AutopilotBehavior for SlagJettison {
 }
 
 /// Exports surplus materials and components for revenue.
+#[allow(dead_code)] // Removed in VIO-453
 pub(crate) struct MaterialExport;
 
 impl AutopilotBehavior for MaterialExport {
@@ -743,6 +748,7 @@ impl AutopilotBehavior for MaterialExport {
 }
 
 /// Propellant pipeline management — toggles electrolysis based on LH2 levels.
+#[allow(dead_code)] // Removed in VIO-453
 pub(crate) struct PropellantPipeline;
 
 impl AutopilotBehavior for PropellantPipeline {
@@ -809,6 +815,7 @@ impl AutopilotBehavior for PropellantPipeline {
 }
 
 /// Fits idle ships at stations with modules according to hull fitting templates.
+#[allow(dead_code)] // Removed in VIO-453
 pub(crate) struct ShipFitting;
 
 impl AutopilotBehavior for ShipFitting {
@@ -1107,6 +1114,7 @@ impl AutopilotBehavior for ShipTaskScheduler {
 // Crew assignment — assign available crew to understaffed modules by priority
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)] // Removed in VIO-453
 struct CrewAssignment;
 
 impl AutopilotBehavior for CrewAssignment {
@@ -1210,6 +1218,7 @@ impl AutopilotBehavior for CrewAssignment {
 // Crew recruitment — import crew when demand exceeds supply
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)] // Removed in VIO-453 (VIO-442/VIO-454 may update first)
 struct CrewRecruitment;
 
 impl AutopilotBehavior for CrewRecruitment {
@@ -1323,6 +1332,7 @@ impl AutopilotBehavior for CrewRecruitment {
 }
 
 /// Creates the default behavior chain in the exact order required for determinism.
+#[allow(dead_code)] // Removed in VIO-453
 pub(crate) fn default_behaviors() -> Vec<Box<dyn AutopilotBehavior>> {
     vec![
         Box::new(StationModuleManager),
