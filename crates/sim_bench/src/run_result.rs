@@ -207,6 +207,7 @@ mod tests {
             max_module_wear: 0.6,
             repair_kits_remaining: 5,
             balance: 0.0,
+            crew_salary_per_hour: 0.0,
             thruster_count: 0,
             export_revenue_total: 0.0,
             export_count: 0,

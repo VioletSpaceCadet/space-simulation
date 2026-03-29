@@ -146,6 +146,7 @@ pub struct MetricsSnapshot {
 
     // Economy
     pub balance: f64,
+    pub crew_salary_per_hour: f64,
     pub thruster_count: u32,
     pub export_revenue_total: f64,
     pub export_count: u32,
@@ -252,6 +253,7 @@ impl MetricsSnapshot {
         use MetricValue::{F64, U32};
         vec![
             ("balance", F64(self.balance)),
+            ("crew_salary_per_hour", F64(self.crew_salary_per_hour)),
             ("thruster_count", U32(self.thruster_count)),
             ("export_revenue_total", F64(self.export_revenue_total)),
             ("export_count", U32(self.export_count)),
@@ -308,6 +310,7 @@ impl MetricsSnapshot {
             ("max_tech_evidence", F32),
             // Economy
             ("balance", F64),
+            ("crew_salary_per_hour", F64),
             ("thruster_count", U32),
             ("export_revenue_total", F64),
             ("export_count", U32),
@@ -470,6 +473,7 @@ struct MetricsAccumulator {
     max_wear: f32,
     total_repair_kits: u32,
     total_thruster_count: u32,
+    crew_salary_per_hour: f64,
 
     power_generated_kw: f32,
     power_consumed_kw: f32,
@@ -508,6 +512,13 @@ impl MetricsAccumulator {
     #[allow(clippy::cast_possible_truncation)]
     fn accumulate_station(&mut self, station: &crate::StationState, content: &GameContent) {
         self.inv.accumulate(&station.inventory);
+
+        // Crew salary
+        for (role, &count) in &station.crew {
+            if let Some(role_def) = content.crew_roles.get(role) {
+                self.crew_salary_per_hour += role_def.salary_per_hour * f64::from(count);
+            }
+        }
 
         let volume_used = inventory_volume_m3(&station.inventory, content);
         if station.cargo_capacity_m3 > 0.0 {
@@ -762,6 +773,7 @@ impl MetricsAccumulator {
             max_module_wear: self.max_wear,
             repair_kits_remaining: self.total_repair_kits,
             balance: state.balance,
+            crew_salary_per_hour: self.crew_salary_per_hour,
             thruster_count: self.total_thruster_count,
             export_revenue_total: state.export_revenue_total,
             export_count: state.export_count,

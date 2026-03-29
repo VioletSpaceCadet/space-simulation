@@ -408,6 +408,7 @@ mod tests {
             max_module_wear: 0.35,
             repair_kits_remaining: 8,
             balance: 1_000_000.0 + index as f64 * 1000.0,
+            crew_salary_per_hour: 100.0,
             thruster_count: 2,
             export_revenue_total: 50_000.0 + index as f64 * 500.0,
             export_count: 10 + index as u32,
