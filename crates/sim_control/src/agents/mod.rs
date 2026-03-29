@@ -5,8 +5,7 @@ use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};
 /// A decision-making agent that receives context and emits commands.
 ///
 /// Agents are scoped — they see relevant state but only act within their
-/// domain. The trait signature intentionally matches `AutopilotBehavior`
-/// to allow incremental migration.
+/// domain.
 pub(crate) trait Agent: Send {
     /// Human-readable name for logging/debugging.
     #[allow(dead_code)] // Used for logging in future tickets
