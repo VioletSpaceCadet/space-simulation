@@ -159,6 +159,20 @@ mod tests {
         state
     }
 
+    /// Test helper: runs StationAgent::manage_propellant() for the first station.
+    fn test_station_agent_propellant_commands(
+        state: &sim_core::GameState,
+        content: &sim_core::GameContent,
+        owner: &PrincipalId,
+        next_id: &mut u64,
+    ) -> Vec<CommandEnvelope> {
+        let station_id = state.stations.keys().next().unwrap().clone();
+        let mut agent = agents::station_agent::StationAgent::new(station_id);
+        let mut commands = Vec::new();
+        agent.manage_propellant(state, content, owner, next_id, &mut commands);
+        commands
+    }
+
     #[test]
     fn test_autopilot_assigns_mine_when_asteroid_known() {
         let content = autopilot_content();
@@ -1797,7 +1811,7 @@ mod tests {
         );
 
         let candidates =
-            crate::behaviors::test_collect_deep_scan_candidates(&state, &content, &test_position());
+            crate::behaviors::collect_deep_scan_candidates(&state, &content, &test_position());
         assert!(
             candidates.contains(&asteroid_id),
             "VolatileRich asteroids should be deep scan candidates"
@@ -1989,12 +2003,8 @@ mod tests {
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
 
-        let commands = crate::behaviors::test_propellant_pipeline_commands(
-            &state,
-            &content,
-            &owner,
-            &mut next_id,
-        );
+        let commands =
+            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
         assert!(
             commands.is_empty(),
             "should emit no commands when station has no electrolysis module"
@@ -2012,12 +2022,8 @@ mod tests {
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
-        let commands = crate::behaviors::test_propellant_pipeline_commands(
-            &state,
-            &content,
-            &owner,
-            &mut next_id,
-        );
+        let commands =
+            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
 
         let enables_electrolysis = commands.iter().any(|cmd| {
             matches!(
@@ -2055,12 +2061,8 @@ mod tests {
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
-        let commands = crate::behaviors::test_propellant_pipeline_commands(
-            &state,
-            &content,
-            &owner,
-            &mut next_id,
-        );
+        let commands =
+            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
 
         let disables = commands.iter().any(|cmd| {
             matches!(
@@ -2087,12 +2089,8 @@ mod tests {
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
-        let commands = crate::behaviors::test_propellant_pipeline_commands(
-            &state,
-            &content,
-            &owner,
-            &mut next_id,
-        );
+        let commands =
+            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
 
         assert!(
             commands.is_empty(),
@@ -2129,12 +2127,8 @@ mod tests {
 
         let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
         let mut next_id = 0u64;
-        let commands = crate::behaviors::test_propellant_pipeline_commands(
-            &state,
-            &content,
-            &owner,
-            &mut next_id,
-        );
+        let commands =
+            test_station_agent_propellant_commands(&state, &content, &owner, &mut next_id);
 
         assert!(
             commands.is_empty(),

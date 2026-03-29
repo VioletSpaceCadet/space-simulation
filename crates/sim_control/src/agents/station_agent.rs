@@ -17,12 +17,12 @@ use crate::objectives::ShipObjective;
 use super::ship_agent::ShipAgent;
 use super::Agent;
 
-/// Per-station agent that consolidates all station-level behaviors into
+/// Per-station agent that consolidates all station-level concerns into
 /// ordered sub-concern methods.
 ///
-/// Execution order within `generate()` matches the legacy `default_behaviors()`
-/// ordering (AD5 from plan). Each sub-concern is a method, not a separate trait
-/// object — keeps it simple and avoids dynamic dispatch overhead.
+/// Execution order: modules → labs → crew → economy (trade-gated) →
+/// slag → exports (trade-gated) → propellant → ship fitting.
+/// Each sub-concern is a method, not a separate trait object.
 ///
 /// Created per `StationState`; removed when the station is removed from state.
 pub(crate) struct StationAgent {
@@ -32,8 +32,8 @@ pub(crate) struct StationAgent {
 
 /// Per-station cache for lab assignment decisions.
 ///
-/// Mirrors the cache from `LabAssignment` behavior but is scoped to a single
-/// station (AD6 from plan). Rebuilt when the set of unlocked techs changes.
+/// Per-station cache for lab assignment. Maps research domains to eligible
+/// tech IDs. Rebuilt when the set of unlocked techs changes.
 #[derive(Default)]
 pub(crate) struct LabAssignmentCache {
     /// domain → eligible tech IDs (prereqs met, not yet unlocked, needs this domain).
@@ -53,7 +53,7 @@ impl StationAgent {
     }
 
     // --- Sub-concern methods ---
-    // Execution order matches default_behaviors() for determinism (AD5).
+    // Execution order matches fixed sub-concern ordering for determinism.
 
     /// 1. Install modules from inventory, re-enable disabled modules (except
     ///    propellant-role and max-wear), set processor thresholds.
@@ -512,7 +512,7 @@ impl StationAgent {
     }
 
     /// 8. Toggle propellant modules based on global LH2 levels (hysteresis).
-    fn manage_propellant(
+    pub(crate) fn manage_propellant(
         &mut self,
         state: &GameState,
         content: &GameContent,
