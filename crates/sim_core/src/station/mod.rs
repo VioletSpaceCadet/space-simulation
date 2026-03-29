@@ -160,13 +160,27 @@ fn update_module_efficiencies(
     state: &mut GameState,
     station_id: &StationId,
     content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
 ) {
     let Some(station) = state.stations.get_mut(station_id) else {
         return;
     };
+    let current_tick = state.meta.tick;
     for module in &mut station.modules {
         if let Some(def) = content.module_defs.get(&module.def_id) {
+            let old_efficiency = module.efficiency;
             module.efficiency = crate::compute_module_efficiency(module, def, &content.constants);
+            if (module.efficiency - old_efficiency).abs() > f32::EPSILON {
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::ModuleEfficiencyChanged {
+                        station_id: station_id.clone(),
+                        module_id: module.id.clone(),
+                        efficiency: module.efficiency,
+                    },
+                ));
+            }
         }
     }
 }
@@ -191,7 +205,7 @@ pub(crate) fn tick_stations(
             compute_power_budget(state, station_id, content, events)
         );
         // Compute combined efficiency after power budget sets power_stalled flags
-        update_module_efficiencies(state, station_id, content);
+        update_module_efficiencies(state, station_id, content, events);
         timed!(
             timings,
             processors,

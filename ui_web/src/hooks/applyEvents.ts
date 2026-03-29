@@ -832,12 +832,21 @@ function handleCrewUnassigned(state: SimState, event: EventPayload<'CrewUnassign
   });
 }
 
-function handleModuleUnderstaffed(state: SimState, event: EventPayload<'ModuleUnderstaffed'>): SimState {
-  return mapStationModule(state, event.station_id, event.module_id, (m) => ({ ...m, crew_satisfied: false }));
+// Crew satisfaction is now reflected via ModuleEfficiencyChanged events.
+// These events are kept for alert/notification purposes but don't mutate state.
+function handleModuleUnderstaffed(state: SimState): SimState {
+  return state;
 }
 
-function handleModuleFullyStaffed(state: SimState, event: EventPayload<'ModuleFullyStaffed'>): SimState {
-  return mapStationModule(state, event.station_id, event.module_id, (m) => ({ ...m, crew_satisfied: true }));
+function handleModuleFullyStaffed(state: SimState): SimState {
+  return state;
+}
+
+function handleModuleEfficiencyChanged(state: SimState, event: EventPayload<'ModuleEfficiencyChanged'>): SimState {
+  return mapStationModule(state, event.station_id, event.module_id, (m) => ({
+    ...m,
+    efficiency: event.efficiency,
+  }));
 }
 
 // No-op handler for informational events that don't mutate state
@@ -913,6 +922,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   MoltenTransferred: noOp,
   PipeFreeze: noOp,
   StationBankrupt: noOp,
+  ModuleEfficiencyChanged: handleModuleEfficiencyChanged,
 };
 
 export function applyEvents(

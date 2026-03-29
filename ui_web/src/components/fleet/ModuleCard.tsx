@@ -12,14 +12,20 @@ function wearColor(wear: number): string {
 
 const BADGE = 'text-[9px] px-1 rounded';
 
+function efficiencyColor(efficiency: number): string {
+  if (efficiency > 0.8) { return 'text-green-400'; }
+  if (efficiency > 0.5) { return 'text-yellow-400'; }
+  return 'text-red-400';
+}
+
 function StatusBadges({
   isStalled,
   thermal,
-  crewSatisfied,
+  efficiency,
 }: {
   isStalled: boolean
   thermal?: ThermalState
-  crewSatisfied?: boolean
+  efficiency?: number
 }) {
   return (
     <>
@@ -38,8 +44,10 @@ function StatusBadges({
       {thermal && thermal.overheat_zone === 'Damage' && (
         <span className={`${BADGE} text-red-300 bg-red-500/20 font-bold`}>DAMAGE</span>
       )}
-      {crewSatisfied === false && (
-        <span className={`${BADGE} text-orange-400 bg-orange-400/10`}>UNDERSTAFFED</span>
+      {efficiency !== undefined && efficiency < 1.0 && (
+        <span className={`${BADGE} ${efficiencyColor(efficiency)} bg-current/10`}>
+          {Math.round(efficiency * 100)}%
+        </span>
       )}
     </>
   );
@@ -82,7 +90,7 @@ export function ModuleCard({
         <StatusBadges
           isStalled={isStalled}
           thermal={m.thermal}
-          crewSatisfied={m.crew_satisfied}
+          efficiency={m.efficiency}
         />
       </div>
       <div className="flex items-center gap-2 mt-1 text-[10px]">
