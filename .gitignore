@@ -47,6 +47,10 @@ node_modules/
 mcp_advisor/dist/
 content/advisor_proposals/
 
+# Knowledge system (per-session, not shared)
+content/knowledge/journals/
+content/knowledge/playbook.md
+
 # Coverage reports
 lcov.info
 ui_web/coverage/
