@@ -53,7 +53,7 @@ samply record target/release/sim_cli run --ticks 10000 --seed 42   # CPU profile
 Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus `sim_world` (content loading + world gen) and `ui_web/` (React).
 
 - **sim_core** — Pure deterministic sim. No IO. Public API: `tick()`, `inventory_volume_m3()`, `mine_duration()`, `TickTimings`, `compute_step_stats()`, etc.
-- **sim_control** — `AutopilotController` (deposit→mine→deepscan→survey priority + station module auto-management).
+- **sim_control** — `AutopilotController` with hierarchical agents: `StationAgent` (per-station modules, labs, crew, trade, ship objectives) and `ShipAgent` (per-ship tactical execution: transit, mine, deposit, refuel).
 - **sim_world** — `load_content()` + `build_initial_state()`. Content from `content/*.json`.
 - **sim_bench** — Scenario runner. JSON overrides (constants + `module.*` dotted keys). Parallel seeds via rayon. Outputs Parquet + CSV metrics.
 - **scripts/analysis** — Python ML data pipeline (DuckDB + pyarrow). Feature extraction, outcome labeling, cross-seed analysis. Tooling: ruff (lint/format), mypy (types), pytest (tests).

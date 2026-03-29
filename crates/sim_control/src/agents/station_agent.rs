@@ -512,7 +512,7 @@ impl StationAgent {
     }
 
     /// 8. Toggle propellant modules based on global LH2 levels (hysteresis).
-    fn manage_propellant(
+    pub(crate) fn manage_propellant(
         &mut self,
         state: &GameState,
         content: &GameContent,
