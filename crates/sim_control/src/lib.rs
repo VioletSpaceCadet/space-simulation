@@ -80,7 +80,12 @@ impl CommandSource for AutopilotController {
         self.station_agents
             .retain(|id, _| state.stations.contains_key(id));
 
-        // 3. Station agents assign objectives to co-located idle ships (AD1)
+        // 3. Station agents assign objectives to co-located idle ships (AD1).
+        // Note: deduplication is per-station (each station has its own shared
+        // iterators). With multiple stations, two stations could theoretically
+        // assign the same asteroid. This is acceptable — the current game has
+        // one station, and multi-station deduplication belongs in the strategic
+        // layer (future work).
         for station_agent in self.station_agents.values() {
             station_agent.assign_ship_objectives(
                 &mut self.ship_agents,

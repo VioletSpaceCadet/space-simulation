@@ -1232,4 +1232,108 @@ mod tests {
         // Ship not co-located with station → no assignment
         assert!(ship_agents[&ship_id].objective.is_none());
     }
+
+    #[test]
+    fn assign_three_ships_waterfall_mine_then_survey() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_a = make_ship_id("ship_a");
+        let ship_b = make_ship_id("ship_b");
+        let ship_c = make_ship_id("ship_c");
+        add_idle_ship(&mut state, &mut ship_agents, ship_a.clone());
+        add_idle_ship(&mut state, &mut ship_agents, ship_b.clone());
+        add_idle_ship(&mut state, &mut ship_agents, ship_c.clone());
+
+        state.scan_sites.clear();
+        add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
+
+        let site_id = sim_core::SiteId("site_1".to_string());
+        state.scan_sites.push(sim_core::ScanSite {
+            id: site_id.clone(),
+            position: test_position(),
+            template_id: "template_default".to_string(),
+        });
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(matches!(
+            ship_agents[&ship_a].objective,
+            Some(ShipObjective::Mine { .. })
+        ));
+        assert!(matches!(
+            ship_agents[&ship_b].objective,
+            Some(ShipObjective::Survey { .. })
+        ));
+        // ship_c: all candidates consumed
+        assert!(ship_agents[&ship_c].objective.is_none());
+    }
+
+    #[test]
+    fn assign_existing_objective_not_overwritten() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+        add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
+
+        // Pre-set an objective
+        ship_agents.get_mut(&ship_id).unwrap().objective = Some(ShipObjective::DeepScan {
+            asteroid_id: make_asteroid_id("other"),
+        });
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(matches!(
+            ship_agents[&ship_id].objective,
+            Some(ShipObjective::DeepScan { .. })
+        ));
+    }
+
+    #[test]
+    fn assign_survey_when_no_mine_candidates() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+
+        state.scan_sites.clear();
+        state.scan_sites.push(sim_core::ScanSite {
+            id: sim_core::SiteId("site_1".to_string()),
+            position: test_position(),
+            template_id: "template_default".to_string(),
+        });
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(matches!(
+            ship_agents[&ship_id].objective,
+            Some(ShipObjective::Survey { ref site_id }) if site_id.0 == "site_1"
+        ));
+    }
+
+    #[test]
+    fn assign_no_candidates_no_objective() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let owner = test_owner();
+        let station_id = station_id_from_state(&state);
+
+        let ship_id = make_ship_id("ship_a");
+        add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
+
+        state.scan_sites.clear();
+
+        let agent = StationAgent::new(station_id);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+
+        assert!(ship_agents[&ship_id].objective.is_none());
+    }
 }
