@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use agents::ship_agent::ShipAgent;
 use agents::station_agent::StationAgent;
 use agents::Agent;
-use behaviors::{AutopilotBehavior, AUTOPILOT_OWNER};
+use behaviors::AUTOPILOT_OWNER;
 use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId, ShipId, StationId};
 
 pub trait CommandSource {
@@ -19,13 +19,14 @@ pub trait CommandSource {
     ) -> Vec<CommandEnvelope>;
 }
 
-/// Drives ships automatically via flat behaviors (station management, labs,
-/// crew, exports, etc.) plus hierarchical ship agents that convert objectives
-/// into tactical commands.
+/// Pure agent-based autopilot controller.
+///
+/// Station agents handle per-station decisions (modules, labs, crew, trade,
+/// ship objectives). Ship agents handle tactical execution (transit, mine,
+/// deposit, refuel).
 pub struct AutopilotController {
-    behaviors: Vec<Box<dyn AutopilotBehavior>>,
-    ship_agents: BTreeMap<ShipId, ShipAgent>,
     station_agents: BTreeMap<StationId, StationAgent>,
+    ship_agents: BTreeMap<ShipId, ShipAgent>,
     /// Cached owner ID — avoids per-tick String allocation.
     owner: PrincipalId,
 }
@@ -33,9 +34,8 @@ pub struct AutopilotController {
 impl AutopilotController {
     pub fn new() -> Self {
         Self {
-            behaviors: behaviors::default_behaviors(),
-            ship_agents: BTreeMap::new(),
             station_agents: BTreeMap::new(),
+            ship_agents: BTreeMap::new(),
             owner: PrincipalId(AUTOPILOT_OWNER.to_string()),
         }
     }
@@ -56,21 +56,7 @@ impl CommandSource for AutopilotController {
     ) -> Vec<CommandEnvelope> {
         let mut commands = Vec::new();
 
-        // 1. Run flat behaviors (station management, labs, crew, etc.)
-        for behavior in &mut self.behaviors {
-            commands.extend(behavior.generate(state, content, &self.owner, next_command_id));
-        }
-
-        // 2. Sync agent lifecycle — create for new entities, remove for deleted
-        for (ship_id, ship) in &state.ships {
-            if ship.owner == self.owner && !self.ship_agents.contains_key(ship_id) {
-                self.ship_agents
-                    .insert(ship_id.clone(), ShipAgent::new(ship_id.clone()));
-            }
-        }
-        self.ship_agents
-            .retain(|id, _| state.ships.contains_key(id));
-
+        // 1. Sync agent lifecycle — create for new entities, remove for deleted
         for station_id in state.stations.keys() {
             if !self.station_agents.contains_key(station_id) {
                 self.station_agents
@@ -80,12 +66,26 @@ impl CommandSource for AutopilotController {
         self.station_agents
             .retain(|id, _| state.stations.contains_key(id));
 
+        for (ship_id, ship) in &state.ships {
+            if ship.owner == self.owner && !self.ship_agents.contains_key(ship_id) {
+                self.ship_agents
+                    .insert(ship_id.clone(), ShipAgent::new(ship_id.clone()));
+            }
+        }
+        self.ship_agents
+            .retain(|id, _| state.ships.contains_key(id));
+
+        // 2. Station agents generate commands (modules, labs, crew, trade)
+        //    in BTreeMap order (deterministic by StationId)
+        for agent in self.station_agents.values_mut() {
+            commands.extend(agent.generate(state, content, &self.owner, next_command_id));
+        }
+
         // 3. Station agents assign objectives to co-located idle ships (AD1).
-        // Note: deduplication is per-station (each station has its own shared
+        // Deduplication is per-station (each station has its own shared
         // iterators). With multiple stations, two stations could theoretically
-        // assign the same asteroid. This is acceptable — the current game has
-        // one station, and multi-station deduplication belongs in the strategic
-        // layer (future work).
+        // assign the same asteroid. Acceptable for single-station game;
+        // multi-station deduplication belongs in the strategic layer.
         for station_agent in self.station_agents.values() {
             station_agent.assign_ship_objectives(
                 &mut self.ship_agents,
