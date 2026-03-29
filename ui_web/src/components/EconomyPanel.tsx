@@ -70,6 +70,13 @@ interface Props {
   events: SimEvent[]
 }
 
+const SALARY_RATES: Record<string, number> = {
+  operator: 25,
+  technician: 37.5,
+  scientist: 50,
+  pilot: 40,
+};
+
 export function EconomyPanel({ snapshot, events }: Props) {
   const [pricing, setPricing] = useState<PricingTable | null>(null);
   const [importCategory, setImportCategory] = useState<ItemCategory>('Material');
@@ -90,13 +97,6 @@ export function EconomyPanel({ snapshot, events }: Props) {
       .then((data: PricingTable) => setPricing(data))
       .catch((err: unknown) => console.error('Failed to fetch pricing:', err));
   }, []);
-
-  const SALARY_RATES: Record<string, number> = {
-    operator: 25,
-    technician: 37.5,
-    scientist: 50,
-    pilot: 40,
-  };
 
   const crewSalaryPerHour = useMemo(() => {
     if (!snapshot) { return 0; }
