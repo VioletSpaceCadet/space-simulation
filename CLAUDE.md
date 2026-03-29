@@ -140,6 +140,8 @@ Use the **sim-e2e-tester agent** (`.claude/agents/sim-e2e-tester`) for balance a
 
 Use the **fe-chrome-tester agent** (`.claude/agents/fe-chrome-tester`) for browser-based UI testing. Requires `--chrome` flag. Tests panel rendering, SSE streaming, speed controls, alerts, economy, and save system at `localhost:5173`.
 
+Use the **perf-reviewer agent** (`.claude/agents/perf-reviewer`) for CPU profiling and performance regression detection. Requires `--chrome` flag for flamegraph analysis. Runs samply profiles (500k+ ticks), reads sim_bench timing stats, browses Firefox Profiler Call Trees, and compares before/after results. Use after optimization PRs or when tick logic changes.
+
 **E2E tests** (`e2e/`) are intentionally minimal — they cover SSE streaming, pause/resume, speed controls, save, and spacebar toggle. Don't add complex E2E tests; they're fragile and better covered by vitest unit tests or the sim-e2e-tester agent with Chrome.
 
 ## Knowledge System

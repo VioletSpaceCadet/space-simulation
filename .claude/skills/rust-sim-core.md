@@ -1,7 +1,7 @@
 ---
 name: Rust Simulation Core
 triggers: [sim_core, tick, determinism, GameState, RNG, inventory, wear, research, asteroid, mining, sim_world, sim_control, autopilot, instrumentation, TickTimings, timed]
-agents: [sim-e2e-tester]
+agents: [sim-e2e-tester, perf-reviewer]
 ---
 
 ## When to Use
