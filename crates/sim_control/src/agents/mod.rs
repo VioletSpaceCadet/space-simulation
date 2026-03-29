@@ -1,5 +1,4 @@
 pub(crate) mod ship_agent;
-pub(crate) mod ship_assignment;
 pub(crate) mod station_agent;
 
 use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId};

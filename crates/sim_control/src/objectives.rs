@@ -1,6 +1,6 @@
 use sim_core::{AsteroidId, SiteId, StationId};
 
-/// Objective issued by a station agent (or assignment bridge) to a ship agent.
+/// Objective issued by a station agent to a ship agent.
 ///
 /// Ship agents receive an objective and autonomously handle the tactical
 /// details: transit, refueling, task execution, and deposit.
