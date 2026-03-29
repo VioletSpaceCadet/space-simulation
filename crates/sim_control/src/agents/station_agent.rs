@@ -217,6 +217,20 @@ impl StationAgent {
         let Some(station) = state.stations.get(&self.station_id) else {
             return;
         };
+
+        // Early exit: skip if no module needs crew assignment
+        let any_unsatisfied = station.modules.iter().any(|m| {
+            m.enabled
+                && !m.prev_crew_satisfied
+                && content
+                    .module_defs
+                    .get(&m.def_id)
+                    .is_some_and(|d| !d.crew_requirement.is_empty())
+        });
+        if !any_unsatisfied || station.crew.is_empty() {
+            return;
+        }
+
         let tick = state.meta.tick;
 
         let mut module_order: Vec<usize> = (0..station.modules.len()).collect();
@@ -231,22 +245,21 @@ impl StationAgent {
             station.crew.clone();
         for module in &station.modules {
             for (role, &count) in &module.assigned_crew {
-                let entry = available.entry(role.clone()).or_insert(0);
-                *entry = entry.saturating_sub(count);
+                if let Some(entry) = available.get_mut(role) {
+                    *entry = entry.saturating_sub(count);
+                }
             }
         }
 
         for &module_index in &module_order {
             let module = &station.modules[module_index];
-            if !module.enabled {
+            if !module.enabled || module.prev_crew_satisfied {
                 continue;
             }
             let Some(def) = content.module_defs.get(&module.def_id) else {
                 continue;
             };
-            if def.crew_requirement.is_empty()
-                || is_crew_satisfied(&module.assigned_crew, &def.crew_requirement)
-            {
+            if def.crew_requirement.is_empty() {
                 continue;
             }
             for (role, &needed) in &def.crew_requirement {
@@ -268,7 +281,9 @@ impl StationAgent {
                             count: can_assign,
                         },
                     ));
-                    *available.entry(role.clone()).or_insert(0) -= can_assign;
+                    if let Some(entry) = available.get_mut(role) {
+                        *entry -= can_assign;
+                    }
                 }
             }
         }
@@ -286,6 +301,20 @@ impl StationAgent {
         let Some(station) = state.stations.get(&self.station_id) else {
             return;
         };
+
+        // Early exit: skip if all modules are crew-satisfied
+        let any_unsatisfied = station.modules.iter().any(|m| {
+            m.enabled
+                && !m.prev_crew_satisfied
+                && content
+                    .module_defs
+                    .get(&m.def_id)
+                    .is_some_and(|d| !d.crew_requirement.is_empty())
+        });
+        if !any_unsatisfied {
+            return;
+        }
+
         let tick = state.meta.tick;
 
         let mut demand: std::collections::BTreeMap<sim_core::CrewRole, u32> =
