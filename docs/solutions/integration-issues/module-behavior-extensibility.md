@@ -56,6 +56,11 @@ The module system uses enum variants in both `ModuleBehaviorDef` (content defini
 18. Add module to `dev_base_state.json` if it should be available from game start
 19. Add test fixtures (`state_with_*()` helpers) for the new module type
 
+## Notes
+
+- Station tick dispatch uses `ModuleTypeIndex` (pre-computed per-type index vectors). New behavior types need an index field in `ModuleTypeIndex` and a corresponding `tick_*_modules()` function, called from `tick_station_modules()`.
+- `power_priority()` on `ModuleBehaviorDef` returns `None` for infrastructure modules (solar, battery, radiator) — these are never power-stalled.
+
 ## Prevention
 
 - Before starting a new module type, copy this checklist into your implementation plan.

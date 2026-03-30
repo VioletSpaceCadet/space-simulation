@@ -76,7 +76,7 @@ Use MCP tool: stop_simulation
 - **Need ~3000+ ticks for meaningful data.** At 1000 TPS, wait 3+ seconds. Trends need 50+ metric samples (captured every 60 ticks by default).
 - **Rates at 0.0 during early ticks are normal.** Ships transit for ~2880 ticks before first mining. Material production starts later.
 - **Only one daemon at a time.** `start_simulation` kills any previous daemon. Don't start a daemon manually and then use MCP — they'll conflict.
-- **Thermal metrics read 0 on feat/heat-h2h3 branch** unless the dev_base_state includes thermal modules AND smelter is running hot. The cold refinery path doesn't generate thermal data.
+- **Thermal metrics read 0 in early ticks** unless the smelter reaches operating temperature with ore available. The cold refinery path doesn't generate thermal data. See also: [balance-analysis-workflow](../logic-errors/balance-analysis-workflow.md).
 
 ### Practical workflow
 

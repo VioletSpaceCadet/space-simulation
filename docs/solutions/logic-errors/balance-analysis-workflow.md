@@ -81,3 +81,7 @@ Workflow: recall past knowledge → run sim → analyze metrics via MCP → prop
 - Before starting analysis, call `query_knowledge` to check if the issue has been observed before.
 - After completing analysis, call `save_run_journal` to persist findings for future sessions.
 - Consult `content/knowledge/playbook.md` for known strategy patterns and parameter relationships.
+
+## Related
+
+- [testing-tools-practical-guide](../integration-issues/testing-tools-practical-guide.md) — MCP tool setup, gotchas, and practical workflow for live balance testing via the daemon.
