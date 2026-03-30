@@ -7,6 +7,25 @@ use crate::objectives::ShipObjective;
 
 use super::Agent;
 
+/// Build a single-element command vec assigning a task to a ship.
+fn make_ship_task_cmd(
+    ship: &ShipState,
+    ship_id: &ShipId,
+    tick: u64,
+    next_id: &mut u64,
+    task_kind: TaskKind,
+) -> Vec<CommandEnvelope> {
+    vec![make_cmd(
+        &ship.owner,
+        tick,
+        next_id,
+        Command::AssignShipTask {
+            ship_id: ship_id.clone(),
+            task_kind,
+        },
+    )]
+}
+
 /// A ship-level agent that converts a `ShipObjective` into tactical commands.
 ///
 /// The ship agent handles the "how" of executing an objective: transit routing,
@@ -152,55 +171,29 @@ impl Agent for ShipAgent {
         // Opportunistic refuel takes precedence over everything
         if should_opportunistic_refuel(ship, state, content) {
             if let Some(task_kind) = crate::behaviors::try_refuel(ship, state, content) {
-                return vec![make_cmd(
-                    &ship.owner,
+                return make_ship_task_cmd(
+                    ship,
+                    &self.ship_id,
                     state.meta.tick,
                     next_id,
-                    Command::AssignShipTask {
-                        ship_id: self.ship_id.clone(),
-                        task_kind,
-                    },
-                )];
+                    task_kind,
+                );
             }
         }
 
         // Deposit priority: if ship has cargo, deposit first regardless of objective
-        if let Some(deposit_task) = deposit_priority(ship, state, content) {
-            return vec![make_cmd(
-                &ship.owner,
-                state.meta.tick,
-                next_id,
-                Command::AssignShipTask {
-                    ship_id: self.ship_id.clone(),
-                    task_kind: deposit_task,
-                },
-            )];
+        if let Some(task_kind) = deposit_priority(ship, state, content) {
+            return make_ship_task_cmd(ship, &self.ship_id, state.meta.tick, next_id, task_kind);
         }
 
         // Convert objective to task
         if let Some(task_kind) = self.objective_to_task(ship, state, content) {
-            return vec![make_cmd(
-                &ship.owner,
-                state.meta.tick,
-                next_id,
-                Command::AssignShipTask {
-                    ship_id: self.ship_id.clone(),
-                    task_kind,
-                },
-            )];
+            return make_ship_task_cmd(ship, &self.ship_id, state.meta.tick, next_id, task_kind);
         }
 
         // Fallback: try refueling when idle with nothing else to do
         if let Some(task_kind) = crate::behaviors::try_refuel(ship, state, content) {
-            return vec![make_cmd(
-                &ship.owner,
-                state.meta.tick,
-                next_id,
-                Command::AssignShipTask {
-                    ship_id: self.ship_id.clone(),
-                    task_kind,
-                },
-            )];
+            return make_ship_task_cmd(ship, &self.ship_id, state.meta.tick, next_id, task_kind);
         }
 
         Vec::new()

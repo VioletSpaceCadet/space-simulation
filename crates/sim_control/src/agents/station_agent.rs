@@ -17,6 +17,18 @@ use crate::objectives::ShipObjective;
 use super::ship_agent::ShipAgent;
 use super::Agent;
 
+/// Returns true if any enabled module has an unsatisfied crew requirement.
+fn has_unsatisfied_crew_need(station: &sim_core::StationState, content: &GameContent) -> bool {
+    station.modules.iter().any(|m| {
+        m.enabled
+            && !m.prev_crew_satisfied
+            && content
+                .module_defs
+                .get(&m.def_id)
+                .is_some_and(|d| !d.crew_requirement.is_empty())
+    })
+}
+
 /// Per-station agent that consolidates all station-level concerns into
 /// ordered sub-concern methods.
 ///
@@ -220,15 +232,7 @@ impl StationAgent {
         };
 
         // Early exit: skip if no module needs crew assignment
-        let any_unsatisfied = station.modules.iter().any(|m| {
-            m.enabled
-                && !m.prev_crew_satisfied
-                && content
-                    .module_defs
-                    .get(&m.def_id)
-                    .is_some_and(|d| !d.crew_requirement.is_empty())
-        });
-        if !any_unsatisfied || station.crew.is_empty() {
+        if !has_unsatisfied_crew_need(station, content) || station.crew.is_empty() {
             return;
         }
 
@@ -304,15 +308,7 @@ impl StationAgent {
         };
 
         // Early exit: skip if all modules are crew-satisfied
-        let any_unsatisfied = station.modules.iter().any(|m| {
-            m.enabled
-                && !m.prev_crew_satisfied
-                && content
-                    .module_defs
-                    .get(&m.def_id)
-                    .is_some_and(|d| !d.crew_requirement.is_empty())
-        });
-        if !any_unsatisfied {
+        if !has_unsatisfied_crew_need(station, content) {
             return;
         }
 
@@ -635,7 +631,7 @@ impl StationAgent {
         };
 
         let idle_ships = collect_idle_ships(state, owner);
-        let mut consumed: Vec<String> = Vec::new();
+        let mut consumed: HashMap<String, usize> = HashMap::new();
 
         for ship_id in &idle_ships {
             let Some(ship) = state.ships.get(ship_id) else {
@@ -668,14 +664,11 @@ impl StationAgent {
                         matches!(item, InventoryItem::Module { module_def_id, .. } if module_def_id == module_def_id_str)
                     })
                     .count();
-                let already_consumed = consumed
-                    .iter()
-                    .filter(|mid| *mid == module_def_id_str)
-                    .count();
+                let already_consumed = consumed.get(module_def_id_str).copied().unwrap_or(0);
                 let available = in_inventory > already_consumed;
 
                 if available {
-                    consumed.push(module_def_id_str.clone());
+                    *consumed.entry(module_def_id_str.clone()).or_insert(0) += 1;
                     commands.push(make_cmd(
                         owner,
                         state.meta.tick,
