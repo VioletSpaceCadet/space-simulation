@@ -37,4 +37,18 @@ cp "$RUN_DIR/summary.json" "$OUTPUT_DIR/summary.json" 2>/dev/null || true
 echo "  artifacts written to $OUTPUT_DIR/"
 echo "  run directory: $RUN_DIR"
 
+# Run dev_state_smoke scenario (5k ticks, validates progression gates)
+echo "  running dev_state_smoke scenario..."
+"$BENCH" run --scenario "$REPO_ROOT/scenarios/dev_state_smoke.json" --output-dir "$OUTPUT_DIR"
+
+DEV_RUN_DIR=$(find "$OUTPUT_DIR" -maxdepth 1 -type d -name 'dev_state_smoke_*' | sort | tail -1)
+
+if [ -z "$DEV_RUN_DIR" ] || [ ! -f "$DEV_RUN_DIR/batch_summary.json" ]; then
+  echo "ERROR: batch_summary.json not found in $OUTPUT_DIR/dev_state_smoke_*/"
+  exit 1
+fi
+
+# Validate progression gates
+python3 "$REPO_ROOT/scripts/validate_dev_state_smoke.py" "$DEV_RUN_DIR/batch_summary.json"
+
 echo "=== Bench Smoke passed ==="

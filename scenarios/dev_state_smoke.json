@@ -1,0 +1,8 @@
+{
+  "name": "dev_state_smoke",
+  "ticks": 5000,
+  "metrics_every": 100,
+  "seeds": [42, 7],
+  "state": "./content/dev_base_state.json",
+  "content_dir": "./content"
+}
