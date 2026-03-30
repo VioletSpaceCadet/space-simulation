@@ -64,11 +64,11 @@ fn module_id_index_after_install() {
 #[test]
 fn module_id_index_after_uninstall() {
     let mut content = base_content();
-    // Need a processor def so install works
+    // Need a module def so the id index can be built
     content.module_defs.insert(
-        "module_test_proc".to_string(),
-        ModuleDefBuilder::new("module_test_proc")
-            .name("Test Proc")
+        "module_test_storage".to_string(),
+        ModuleDefBuilder::new("module_test_storage")
+            .name("Test Storage")
             .mass(100.0)
             .volume(1.0)
             .power(1.0)
@@ -83,11 +83,11 @@ fn module_id_index_after_uninstall() {
     let station = state.stations.get_mut(&station_id).unwrap();
     station
         .modules
-        .push(test_module("module_test_proc", ModuleKindState::Storage));
+        .push(test_module("module_test_storage", ModuleKindState::Storage));
     station.modules.last_mut().unwrap().id = ModuleInstanceId("mod_first".to_string());
     station
         .modules
-        .push(test_module("module_test_proc", ModuleKindState::Storage));
+        .push(test_module("module_test_storage", ModuleKindState::Storage));
     station.modules.last_mut().unwrap().id = ModuleInstanceId("mod_second".to_string());
     station.rebuild_module_index(&content);
 
@@ -250,6 +250,8 @@ fn empty_station_indexes() {
     assert!(station.module_type_index.assemblers.is_empty());
     assert!(station.module_type_index.sensors.is_empty());
     assert!(station.module_type_index.maintenance.is_empty());
+    assert!(station.module_type_index.thermal.is_empty());
+    assert!(station.module_type_index.roles.is_empty());
     assert!(station.module_id_index.is_empty());
 
     // Lookup should return None
