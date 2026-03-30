@@ -99,7 +99,7 @@ pub(crate) fn try_refuel(
             content.constants.docking_range_au_um,
         ) && s.inventory.iter().any(|item| {
             matches!(item, InventoryItem::Material { element, kg, .. }
-                if element == "LH2" && *kg > content.constants.min_meaningful_kg)
+                if *element == content.autopilot.propellant_element && *kg > content.constants.min_meaningful_kg)
         })
     })?;
     Some(TaskKind::Refuel {
