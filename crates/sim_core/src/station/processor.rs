@@ -49,28 +49,22 @@ fn execute(
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) -> super::RunOutcome {
-    // Capacity pre-check
     let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
         return super::RunOutcome::Skipped { reset_timer: false };
     };
 
-    // Read processor state for threshold and selected recipe
-    let threshold_kg = {
-        let Some(station) = state.stations.get(&ctx.station_id) else {
-            return super::RunOutcome::Skipped { reset_timer: false };
-        };
-        match &station.modules[ctx.module_idx].kind_state {
-            ModuleKindState::Processor(ps) => ps.threshold_kg,
-            _ => return super::RunOutcome::Skipped { reset_timer: false },
+    let threshold_kg = state.stations.get(&ctx.station_id).and_then(|s| {
+        match &s.modules[ctx.module_idx].kind_state {
+            ModuleKindState::Processor(ps) => Some(ps.threshold_kg),
+            _ => None,
         }
-    };
-
-    let recipe = resolve_recipe(state, ctx, processor_def, content, events);
-    let Some(recipe) = recipe else {
+    });
+    let Some(threshold_kg) = threshold_kg else {
         return super::RunOutcome::Skipped { reset_timer: false };
     };
-
-    // Tech gate: if recipe requires a tech that isn't unlocked, skip
+    let Some(recipe) = resolve_recipe(state, ctx, processor_def, content, events) else {
+        return super::RunOutcome::Skipped { reset_timer: false };
+    };
     if let Some(outcome) = check_tech_gate(state, ctx, processor_def, recipe, events) {
         return outcome;
     }
@@ -90,37 +84,16 @@ fn execute(
     if total_input_kg < threshold_kg {
         return super::RunOutcome::Skipped { reset_timer: false };
     }
-
-    // Thermal gating: check if recipe requires a minimum temperature
-    let (thermal_eff, thermal_qual) = if let Some(ref thermal_req) = recipe.thermal_req {
-        let temp_mk = state
-            .stations
-            .get(&ctx.station_id)
-            .and_then(|s| s.modules[ctx.module_idx].thermal.as_ref())
-            .map_or(0, |t| t.temp_mk);
-
-        if temp_mk < thermal_req.min_temp_mk {
-            return super::RunOutcome::Stalled(super::StallReason::TooCold {
-                current_temp_mk: temp_mk,
-                required_temp_mk: thermal_req.min_temp_mk,
-            });
-        }
-
-        (
-            thermal::thermal_efficiency(temp_mk, thermal_req),
-            thermal::thermal_quality_factor(temp_mk, thermal_req),
-        )
-    } else {
-        (1.0, 1.0)
+    let thermal_result = check_thermal_gate(state, ctx, recipe);
+    let (thermal_eff, thermal_qual) = match thermal_result {
+        Ok(pair) => pair,
+        Err(outcome) => return outcome,
     };
-
-    let rate_kg = match recipe.inputs.first().map(|i| &i.amount) {
-        Some(InputAmount::Kg(kg)) => *kg,
-        _ => return super::RunOutcome::Skipped { reset_timer: false },
+    let Some(InputAmount::Kg(rate_kg)) = recipe.inputs.first().map(|i| &i.amount) else {
+        return super::RunOutcome::Skipped { reset_timer: false };
     };
-
+    let rate_kg = *rate_kg;
     let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
-
     // Warm the volume cache
     {
         let Some(station_mut) = state.stations.get_mut(&ctx.station_id) else {
@@ -129,8 +102,13 @@ fn execute(
         let _ = station_mut.used_volume_m3(content);
     }
 
-    let (peeked_kg, lots) =
-        peek_from_source(state, ctx, input_container_idx, rate_kg, &input_filter);
+    let (peeked_kg, lots) = peek_from_source(
+        state,
+        ctx,
+        input_container_idx,
+        rate_kg,
+        input_filter.as_ref(),
+    );
 
     if peeked_kg < content.constants.min_meaningful_kg {
         return super::RunOutcome::Skipped { reset_timer: false };
@@ -189,7 +167,7 @@ struct ProcessorRunCtx<'a> {
 // Port-based thermal routing helpers
 // ---------------------------------------------------------------------------
 
-/// Find a ThermalContainer connected to this module's Output port via a ThermalLink.
+/// Find a `ThermalContainer` connected to this module's Output port via a `ThermalLink`.
 /// Returns `(container_module_idx, capacity_kg)`.
 fn find_linked_output_container(
     station: &StationState,
@@ -223,7 +201,7 @@ fn find_linked_output_container(
     Some((to_idx, capacity_kg))
 }
 
-/// Find a ThermalContainer connected to this module's Input port via a ThermalLink.
+/// Find a `ThermalContainer` connected to this module's Input port via a `ThermalLink`.
 /// Returns the container's module index.
 fn find_linked_input_container(
     station: &StationState,
@@ -275,6 +253,7 @@ fn build_processor_modifiers(
     mods
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_processor_run(
     ctx: &super::ModuleTickContext,
     state: &mut GameState,
@@ -302,7 +281,7 @@ fn resolve_processor_run(
         input_container_idx,
         rate_kg,
         min_kg,
-        &input_filter,
+        input_filter.as_ref(),
     );
     if consumed_kg < min_kg {
         return;
@@ -386,13 +365,14 @@ fn resolve_processor_run(
 }
 
 /// Consume input from the correct source (linked container or station inventory).
+#[allow(clippy::type_complexity)]
 fn consume_from_source(
     state: &mut GameState,
     ctx: &super::ModuleTickContext,
     input_container_idx: Option<usize>,
     rate_kg: f32,
     min_kg: f32,
-    input_filter: &Option<crate::InputFilter>,
+    input_filter: Option<&crate::InputFilter>,
 ) -> (f32, Vec<(HashMap<String, f32>, f32)>) {
     let Some(station) = state.stations.get_mut(&ctx.station_id) else {
         return (0.0, vec![]);
@@ -406,17 +386,18 @@ fn consume_from_source(
         &mut station.inventory
     };
     consume_ore_fifo_with_lots(source, rate_kg, min_kg, |item| {
-        matches_input_filter(item, input_filter.as_ref())
+        matches_input_filter(item, input_filter)
     })
 }
 
 /// Peek input from the correct source (linked container or station inventory).
+#[allow(clippy::type_complexity)]
 fn peek_from_source(
     state: &GameState,
     ctx: &super::ModuleTickContext,
     input_container_idx: Option<usize>,
     rate_kg: f32,
-    input_filter: &Option<crate::InputFilter>,
+    input_filter: Option<&crate::InputFilter>,
 ) -> (f32, Vec<(HashMap<String, f32>, f32)>) {
     let Some(station) = state.stations.get(&ctx.station_id) else {
         return (0.0, vec![]);
@@ -430,7 +411,7 @@ fn peek_from_source(
         &station.inventory
     };
     peek_ore_fifo_with_lots(source, rate_kg, |item| {
-        matches_input_filter(item, input_filter.as_ref())
+        matches_input_filter(item, input_filter)
     })
 }
 
@@ -538,8 +519,8 @@ fn route_material_output(
 }
 
 /// Compute material output from a processor run.
-/// Routes to a linked ThermalContainer (with thermal props) if the processor has
-/// a `molten_out` port connected via a ThermalLink; otherwise falls back to
+/// Routes to a linked `ThermalContainer` (with thermal props) if the processor has
+/// a `molten_out` port connected via a `ThermalLink`; otherwise falls back to
 /// station inventory with `thermal: None`.
 /// Returns `(material_kg, material_quality)`.
 fn emit_material_output(
@@ -702,6 +683,33 @@ fn apply_recipe_heat(
                 .saturating_sub(delta_mk.unsigned_abs());
         }
     }
+}
+
+/// Check thermal gate: if recipe requires a minimum temperature, verify the module
+/// is hot enough. Returns `Ok((efficiency, quality))` or `Err(RunOutcome::Stalled)`.
+fn check_thermal_gate(
+    state: &GameState,
+    ctx: &super::ModuleTickContext,
+    recipe: &crate::RecipeDef,
+) -> Result<(f32, f32), super::RunOutcome> {
+    let Some(ref thermal_req) = recipe.thermal_req else {
+        return Ok((1.0, 1.0));
+    };
+    let temp_mk = state
+        .stations
+        .get(&ctx.station_id)
+        .and_then(|s| s.modules[ctx.module_idx].thermal.as_ref())
+        .map_or(0, |t| t.temp_mk);
+    if temp_mk < thermal_req.min_temp_mk {
+        return Err(super::RunOutcome::Stalled(super::StallReason::TooCold {
+            current_temp_mk: temp_mk,
+            required_temp_mk: thermal_req.min_temp_mk,
+        }));
+    }
+    Ok((
+        thermal::thermal_efficiency(temp_mk, thermal_req),
+        thermal::thermal_quality_factor(temp_mk, thermal_req),
+    ))
 }
 
 /// Check if the recipe requires a tech that isn't unlocked.
