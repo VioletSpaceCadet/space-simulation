@@ -45,7 +45,7 @@ fn processor_output_scales_with_crew_efficiency() {
         })
         .sum();
 
-    // Full efficiency: 1000 kg ore × 0.7 Fe fraction = 350 kg Fe
+    // Full efficiency: 500 kg ore (recipe input) × 0.7 Fe fraction = 350 kg Fe
     // Half crew efficiency: 350 × 0.5 = 175 kg Fe
     assert!(
         (fe_kg - 175.0).abs() < 1.0,
@@ -205,10 +205,60 @@ fn compound_efficiency_stacking() {
         })
         .sum();
 
-    // Full efficiency: 1000 kg ore × 0.7 Fe fraction = 350 kg Fe
+    // Full efficiency: 500 kg ore (recipe input) × 0.7 Fe fraction = 350 kg Fe
     // Compound: 350 × 0.5 (crew) × 0.75 (wear) = 131.25 kg Fe
     assert!(
         (fe_kg - 131.25).abs() < 1.0,
         "compound efficiency (crew=0.5 × wear=0.75) should produce ~131.25 kg Fe, got {fe_kg}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 5. Assembler produces nothing when efficiency < 0.5
+// ---------------------------------------------------------------------------
+
+#[test]
+fn assembler_zero_output_below_half_efficiency() {
+    // Assembler uses round(1.0 * efficiency). At efficiency < 0.5, round → 0.
+    // Wear = 0.85 → critical band → wear_factor = 0.5
+    // Add crew requirement: 2 operators, assign 0 → crew_factor = 0.0
+    // Combined: 0.0 * 0.5 = 0.0 → round(0) = 0 → no output
+    let mut content = assembler_content();
+    let assembler_def = content
+        .module_defs
+        .get_mut("module_basic_assembler")
+        .unwrap();
+    assembler_def
+        .crew_requirement
+        .insert(CrewRole("operator".to_string()), 2);
+
+    let mut state = state_with_assembler(&content);
+    let station_id = test_station_id();
+
+    // No crew assigned, crew_factor = 0.0
+    rebuild_indices(&mut state, &content);
+
+    let mut rng = make_rng();
+    for _ in 0..5 {
+        tick(&mut state, &[], &content, &mut rng, None);
+    }
+
+    let station = &state.stations[&station_id];
+    let repair_kit_count: u32 = station
+        .inventory
+        .iter()
+        .filter_map(|i| match i {
+            InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } if component_id.0 == "repair_kit" => Some(*count),
+            _ => None,
+        })
+        .sum();
+
+    assert_eq!(
+        repair_kit_count, 0,
+        "assembler with zero efficiency should produce no items"
     );
 }
