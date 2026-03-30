@@ -833,3 +833,263 @@ fn invariant_no_permanent_idle_dev_base_state() {
         "Research data pool should have entries after 5k ticks"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Manufacturing pipeline e2e (VIO-477)
+// ---------------------------------------------------------------------------
+
+/// End-to-end test: ore → smelter → crucible (as molten) → casting mold → cast_fe_part.
+/// Uses real content (load_content) with pre-heated modules to verify the full
+/// thermal manufacturing pipeline works after VIO-459 fix.
+#[test]
+fn manufacturing_pipeline_ore_to_cast_part() {
+    let content = sim_world::load_content("../../content").unwrap();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let station_id = StationId("station_mfg_test".to_string());
+
+    // Build a minimal station with smelter + crucible + casting mold
+    let mut state = GameState {
+        meta: MetaState {
+            tick: 0,
+            seed: 42,
+            schema_version: 1,
+            content_version: content.content_version.clone(),
+        },
+        scan_sites: vec![],
+        asteroids: std::collections::BTreeMap::new(),
+        ships: std::collections::BTreeMap::new(),
+        stations: [(
+            station_id.clone(),
+            StationState {
+                id: station_id.clone(),
+                position: Position {
+                    parent_body: BodyId("earth_orbit_zone".to_string()),
+                    radius_au_um: RadiusAuMicro(3000),
+                    angle_mdeg: AngleMilliDeg(0),
+                },
+                inventory: vec![
+                    // Ore for smelting
+                    InventoryItem::Ore {
+                        lot_id: LotId("lot_mfg_001".to_string()),
+                        asteroid_id: AsteroidId("ast_mfg_001".to_string()),
+                        kg: 5000.0,
+                        composition: HashMap::from([
+                            ("Fe".to_string(), 0.7),
+                            ("Si".to_string(), 0.3),
+                        ]),
+                    },
+                ],
+                cargo_capacity_m3: 10_000.0,
+                power_available_per_tick: 200.0,
+                modules: vec![
+                    // Smelter at operating temperature
+                    ModuleState {
+                        id: ModuleInstanceId("mod_smelter".to_string()),
+                        def_id: "module_basic_smelter".to_string(),
+                        enabled: true,
+                        kind_state: ModuleKindState::Processor(ProcessorState {
+                            threshold_kg: 100.0,
+                            ticks_since_last_run: 100,
+                            stalled: false,
+                            selected_recipe: None,
+                        }),
+                        wear: WearState::default(),
+                        thermal: Some(ThermalState {
+                            temp_mk: 2_100_000,
+                            thermal_group: Some("default".to_string()),
+                            ..Default::default()
+                        }),
+                        power_stalled: false,
+                        module_priority: 0,
+                        assigned_crew: std::collections::BTreeMap::from([(
+                            CrewRole("operator".to_string()),
+                            1,
+                        )]),
+                        efficiency: 1.0,
+                        prev_crew_satisfied: true,
+                    },
+                    // Crucible for molten storage
+                    ModuleState {
+                        id: ModuleInstanceId("mod_crucible".to_string()),
+                        def_id: "module_crucible".to_string(),
+                        enabled: true,
+                        kind_state: ModuleKindState::ThermalContainer(ThermalContainerState {
+                            held_items: vec![],
+                        }),
+                        wear: WearState::default(),
+                        thermal: Some(ThermalState {
+                            temp_mk: 2_100_000,
+                            thermal_group: Some("default".to_string()),
+                            ..Default::default()
+                        }),
+                        power_stalled: false,
+                        module_priority: 0,
+                        assigned_crew: Default::default(),
+                        efficiency: 1.0,
+                        prev_crew_satisfied: true,
+                    },
+                    // Casting mold at operating temperature
+                    ModuleState {
+                        id: ModuleInstanceId("mod_casting_mold".to_string()),
+                        def_id: "module_casting_mold".to_string(),
+                        enabled: true,
+                        kind_state: ModuleKindState::Processor(ProcessorState {
+                            threshold_kg: 0.0,
+                            ticks_since_last_run: 100,
+                            stalled: false,
+                            selected_recipe: None,
+                        }),
+                        wear: WearState::default(),
+                        thermal: Some(ThermalState {
+                            temp_mk: 2_100_000,
+                            thermal_group: Some("default".to_string()),
+                            ..Default::default()
+                        }),
+                        power_stalled: false,
+                        module_priority: 0,
+                        assigned_crew: std::collections::BTreeMap::from([(
+                            CrewRole("operator".to_string()),
+                            1,
+                        )]),
+                        efficiency: 1.0,
+                        prev_crew_satisfied: true,
+                    },
+                ],
+                crew: std::collections::BTreeMap::from([(CrewRole("operator".to_string()), 2)]),
+                leaders: Vec::new(),
+                thermal_links: vec![
+                    // Smelter → Crucible
+                    ThermalLink {
+                        from_module_id: ModuleInstanceId("mod_smelter".to_string()),
+                        from_port_id: "molten_out".to_string(),
+                        to_module_id: ModuleInstanceId("mod_crucible".to_string()),
+                        to_port_id: "molten_in".to_string(),
+                    },
+                    // Crucible → Casting Mold
+                    ThermalLink {
+                        from_module_id: ModuleInstanceId("mod_crucible".to_string()),
+                        from_port_id: "molten_out".to_string(),
+                        to_module_id: ModuleInstanceId("mod_casting_mold".to_string()),
+                        to_port_id: "molten_in".to_string(),
+                    },
+                ],
+                modifiers: Default::default(),
+                power: Default::default(),
+                cached_inventory_volume_m3: None,
+                module_type_index: Default::default(),
+                module_id_index: HashMap::new(),
+                power_budget_cache: Default::default(),
+            },
+        )]
+        .into_iter()
+        .collect(),
+        research: ResearchState {
+            unlocked: std::collections::HashSet::new(),
+            data_pool: sim_core::AHashMap::default(),
+            evidence: sim_core::AHashMap::default(),
+            action_counts: sim_core::AHashMap::default(),
+        },
+        balance: 1_000_000.0,
+        export_revenue_total: 0.0,
+        export_count: 0,
+        counters: Counters {
+            next_event_id: 0,
+            next_command_id: 0,
+            next_asteroid_id: 0,
+            next_lot_id: 0,
+            next_module_instance_id: 1,
+        },
+        modifiers: Default::default(),
+        events: Default::default(),
+        propellant_consumed_total: 0.0,
+        body_cache: sim_core::build_body_cache(&content.solar_system.bodies),
+    };
+    // Rebuild indices
+    for station in state.stations.values_mut() {
+        station.rebuild_module_index(&content);
+    }
+
+    // Run ticks — smelter should produce Fe and route to crucible
+    for _ in 0..10 {
+        tick(&mut state, &[], &content, &mut rng, None);
+    }
+
+    let station = &state.stations[&station_id];
+
+    // 1. Ore was consumed
+    let ore_kg: f32 = station
+        .inventory
+        .iter()
+        .filter_map(|i| match i {
+            InventoryItem::Ore { kg, .. } => Some(*kg),
+            _ => None,
+        })
+        .sum();
+    assert!(
+        ore_kg < 5000.0,
+        "smelter should have consumed some ore, remaining: {ore_kg}"
+    );
+
+    // 2. Fe reached crucible as molten
+    let crucible_idx = station
+        .module_index_by_id(&ModuleInstanceId("mod_crucible".to_string()))
+        .expect("crucible should exist");
+    let crucible_fe: f32 = match &station.modules[crucible_idx].kind_state {
+        ModuleKindState::ThermalContainer(c) => c
+            .held_items
+            .iter()
+            .filter_map(|i| match i {
+                InventoryItem::Material {
+                    element,
+                    kg,
+                    thermal,
+                    ..
+                } if element == "Fe" => {
+                    // Verify thermal state is present
+                    assert!(
+                        thermal.is_some(),
+                        "crucible Fe should have thermal properties"
+                    );
+                    if let Some(tp) = thermal {
+                        // Material arrives hot from smelter. Over 10 ticks the crucible
+                        // may cool below the melting point if there's no heat source,
+                        // so the phase may become Solid. The key assertion is that
+                        // thermal props exist (routed through the port system).
+                        assert!(tp.temp_mk > 0, "crucible Fe should have nonzero temp");
+                    }
+                    Some(*kg)
+                }
+                _ => None,
+            })
+            .sum(),
+        _ => panic!("expected ThermalContainer"),
+    };
+    assert!(
+        crucible_fe > 0.0,
+        "crucible should contain molten Fe from smelter, got {crucible_fe}"
+    );
+
+    // 3. Cast part may or may not be produced in 10 ticks (casting mold has an interval).
+    // Run more ticks to give casting mold time to consume from crucible.
+    for _ in 0..20 {
+        tick(&mut state, &[], &content, &mut rng, None);
+    }
+
+    let station = &state.stations[&station_id];
+    let cast_parts: u32 = station
+        .inventory
+        .iter()
+        .filter_map(|i| match i {
+            InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } if component_id.0 == "cast_fe_part" => Some(*count),
+            _ => None,
+        })
+        .sum();
+    assert!(
+        cast_parts > 0,
+        "casting mold should produce cast_fe_part from crucible Fe"
+    );
+}
