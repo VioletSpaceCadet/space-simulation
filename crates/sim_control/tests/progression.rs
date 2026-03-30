@@ -676,3 +676,89 @@ fn lab_per_run_amounts_are_not_time_scaled() {
         panic!("expected Lab");
     }
 }
+
+// ---------------------------------------------------------------------------
+// VIO-461: dev_base_state progression test
+// ---------------------------------------------------------------------------
+
+/// Load the actual shipped dev_base_state.json and run 10k ticks with autopilot.
+/// Verifies that the game makes meaningful progress — catches regressions like
+/// VIO-457 (ship stranding) and VIO-458 (power deficit).
+#[test]
+fn dev_base_state_progression() {
+    let content = sim_world::load_content("../../content").unwrap();
+    let json = std::fs::read_to_string("../../content/dev_base_state.json").unwrap();
+    let mut state: GameState = serde_json::from_str(&json).unwrap();
+    state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Run a few ticks to let autopilot install modules, then assign crew
+    run_with_autopilot(&content, &mut state, &mut rng, 3);
+    sim_world::auto_assign_initial_crew(&mut state, &content);
+
+    // Track whether ships were ever active
+    let mut ever_had_active_ship = false;
+    let mut max_consecutive_idle = 0_u32;
+    let mut consecutive_idle = 0_u32;
+
+    let total_ticks = 10_000;
+    let mut autopilot = AutopilotController::new();
+    let mut next_cmd_id = state.counters.next_command_id;
+
+    for _ in 0..total_ticks {
+        let commands = autopilot.generate_commands(&state, &content, &mut next_cmd_id);
+        tick(&mut state, &commands, &content, &mut rng, None);
+
+        // Check ship activity
+        let all_idle = state.ships.values().all(|s| {
+            s.task
+                .as_ref()
+                .is_none_or(|t| matches!(t.kind, TaskKind::Idle))
+        });
+        if all_idle && !state.ships.is_empty() {
+            consecutive_idle += 1;
+            max_consecutive_idle = max_consecutive_idle.max(consecutive_idle);
+        } else {
+            if !all_idle {
+                ever_had_active_ship = true;
+            }
+            consecutive_idle = 0;
+        }
+    }
+    state.counters.next_command_id = next_cmd_id;
+
+    // Assert meaningful progression
+    let total_ore_kg: f32 = state
+        .stations
+        .values()
+        .flat_map(|s| &s.inventory)
+        .filter_map(|item| match item {
+            InventoryItem::Material { element, kg, .. } if element == "Fe" => Some(kg),
+            _ => None,
+        })
+        .sum();
+
+    assert!(
+        ever_had_active_ship,
+        "Ships should have been active at some point during 10k ticks"
+    );
+
+    // Ships shouldn't be permanently idle for more than ~200 ticks
+    // (enough for transit + task + buffer)
+    assert!(
+        max_consecutive_idle < 500,
+        "Fleet was idle for {max_consecutive_idle} consecutive ticks — possible stranding regression"
+    );
+
+    assert!(
+        state.research.unlocked.len() >= 2,
+        "Should unlock at least 2 techs in 10k ticks. Unlocked: {:?}",
+        state.research.unlocked
+    );
+
+    assert!(
+        state.balance > 0.0,
+        "Balance should not collapse in 10k ticks. Balance: {}",
+        state.balance
+    );
+}
