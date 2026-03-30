@@ -120,19 +120,23 @@ fn execute(
     let output_volume =
         estimate_output_volume_m3(recipe, &avg_composition, peeked_kg, content) * thermal_eff;
 
-    let Some(station) = state.stations.get(&ctx.station_id) else {
-        return super::RunOutcome::Skipped { reset_timer: false };
-    };
-    let current_used = station
-        .cached_inventory_volume_m3
-        .unwrap_or_else(|| crate::inventory_volume_m3(&station.inventory, content));
-    let capacity = station.cargo_capacity_m3;
-    let shortfall = (current_used + output_volume) - capacity;
-
-    if shortfall > 0.0 {
-        return super::RunOutcome::Stalled(super::StallReason::VolumeCap {
-            shortfall_m3: shortfall,
-        });
+    // Skip station volume check when output routes to a linked thermal container
+    let has_output_container = state.stations.get(&ctx.station_id).is_some_and(|s| {
+        find_linked_output_container(s, content, &ctx.module_id, ctx.def).is_some()
+    });
+    if !has_output_container {
+        let Some(station) = state.stations.get(&ctx.station_id) else {
+            return super::RunOutcome::Skipped { reset_timer: false };
+        };
+        let current_used = station
+            .cached_inventory_volume_m3
+            .unwrap_or_else(|| crate::inventory_volume_m3(&station.inventory, content));
+        let shortfall = (current_used + output_volume) - station.cargo_capacity_m3;
+        if shortfall > 0.0 {
+            return super::RunOutcome::Stalled(super::StallReason::VolumeCap {
+                shortfall_m3: shortfall,
+            });
+        }
     }
 
     // Process the ore — pass the already-resolved recipe ID to avoid double resolution
@@ -175,17 +179,14 @@ fn find_linked_output_container(
     source_module_id: &crate::ModuleInstanceId,
     source_def: &crate::ModuleDef,
 ) -> Option<(usize, f32)> {
-    let has_molten_out = source_def
+    let port = source_def
         .ports
         .iter()
-        .any(|p| p.direction == PortDirection::Output && p.accepts == PortFilter::AnyMolten);
-    if !has_molten_out {
-        return None;
-    }
+        .find(|p| p.direction == PortDirection::Output && p.accepts == PortFilter::AnyMolten)?;
     let link = station
         .thermal_links
         .iter()
-        .find(|l| l.from_module_id == *source_module_id)?;
+        .find(|l| l.from_module_id == *source_module_id && l.from_port_id == port.id)?;
     let to_idx = station.module_index_by_id(&link.to_module_id)?;
     if !matches!(
         station.modules[to_idx].kind_state,
@@ -208,17 +209,14 @@ fn find_linked_input_container(
     dest_module_id: &crate::ModuleInstanceId,
     dest_def: &crate::ModuleDef,
 ) -> Option<usize> {
-    let has_molten_in = dest_def
+    let port = dest_def
         .ports
         .iter()
-        .any(|p| p.direction == PortDirection::Input && p.accepts == PortFilter::AnyMolten);
-    if !has_molten_in {
-        return None;
-    }
+        .find(|p| p.direction == PortDirection::Input && p.accepts == PortFilter::AnyMolten)?;
     let link = station
         .thermal_links
         .iter()
-        .find(|l| l.to_module_id == *dest_module_id)?;
+        .find(|l| l.to_module_id == *dest_module_id && l.to_port_id == port.id)?;
     let from_idx = station.module_index_by_id(&link.from_module_id)?;
     if !matches!(
         station.modules[from_idx].kind_state,
