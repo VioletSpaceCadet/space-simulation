@@ -8,8 +8,8 @@
 //! 5. Balance sanity checks — flag extreme outliers
 
 use sim_core::{
-    ComponentId, GameContent, InputFilter, ModuleBehaviorDef, OutputSpec, RecipeId, TechEffect,
-    TechId,
+    ComponentId, GameContent, GameState, InputFilter, InventoryItem, ModuleBehaviorDef, OutputSpec,
+    RecipeId, TechEffect, TechId,
 };
 use sim_world::load_content;
 use std::collections::HashSet;
@@ -1557,5 +1557,145 @@ fn recipe_graph_allows_diamond_shapes() {
             "diamond shape should NOT be flagged as cycle for recipe '{}'",
             recipe_id
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// dev_base_state coherence (VIO-478)
+// ---------------------------------------------------------------------------
+
+fn load_dev_base_state() -> GameState {
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+    let path = format!("{manifest}/../../content/dev_base_state.json");
+    let json = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
+    serde_json::from_str(&json).unwrap_or_else(|e| panic!("parse {path}: {e}"))
+}
+
+/// All module_def_ids referenced in inventory exist in content.
+#[test]
+fn dev_base_state_module_defs_exist() {
+    let content = load_test_content();
+    let state = load_dev_base_state();
+
+    for station in state.stations.values() {
+        for item in &station.inventory {
+            if let InventoryItem::Module { module_def_id, .. } = item {
+                assert!(
+                    content.module_defs.contains_key(module_def_id),
+                    "station '{}' references unknown module_def_id '{module_def_id}'",
+                    station.id.0
+                );
+            }
+        }
+    }
+}
+
+/// Power generation from inventory modules >= power consumption.
+#[test]
+fn dev_base_state_power_budget_positive() {
+    let content = load_test_content();
+    let state = load_dev_base_state();
+
+    for station in state.stations.values() {
+        let mut generation_kw = 0.0_f32;
+        let mut consumption_kw = 0.0_f32;
+
+        for item in &station.inventory {
+            if let InventoryItem::Module { module_def_id, .. } = item {
+                if let Some(def) = content.module_defs.get(module_def_id) {
+                    if let ModuleBehaviorDef::SolarArray(solar) = &def.behavior {
+                        generation_kw += solar.base_output_kw;
+                    }
+                    if def.power_consumption_per_run > 0.0 {
+                        consumption_kw += def.power_consumption_per_run;
+                    }
+                }
+            }
+        }
+
+        // Also count installed modules
+        for module in &station.modules {
+            if let Some(def) = content.module_defs.get(&module.def_id) {
+                if let ModuleBehaviorDef::SolarArray(solar) = &def.behavior {
+                    generation_kw += solar.base_output_kw;
+                }
+                if def.power_consumption_per_run > 0.0 {
+                    consumption_kw += def.power_consumption_per_run;
+                }
+            }
+        }
+
+        assert!(
+            generation_kw >= consumption_kw,
+            "station '{}' power deficit: {generation_kw}kW generation < {consumption_kw}kW consumption",
+            station.id.0
+        );
+    }
+}
+
+/// All crew roles in station crew rosters exist in crew_roles content.
+#[test]
+fn dev_base_state_crew_roles_exist() {
+    let content = load_test_content();
+    let state = load_dev_base_state();
+
+    for station in state.stations.values() {
+        for role in station.crew.keys() {
+            assert!(
+                content.crew_roles.contains_key(role),
+                "station '{}' has unknown crew role '{}'",
+                station.id.0,
+                role.0
+            );
+        }
+    }
+}
+
+/// Ships have valid hull_ids and their cargo capacity can hold at least one ore lot.
+#[test]
+fn dev_base_state_ships_valid() {
+    let content = load_test_content();
+    let state = load_dev_base_state();
+
+    for ship in state.ships.values() {
+        // Hull exists
+        assert!(
+            content.hulls.contains_key(&ship.hull_id),
+            "ship '{}' references unknown hull_id '{}'",
+            ship.id.0,
+            ship.hull_id
+        );
+
+        // Cargo capacity is meaningful
+        assert!(
+            ship.cargo_capacity_m3 > 0.0,
+            "ship '{}' has zero cargo capacity",
+            ship.id.0
+        );
+
+        // Propellant is filled
+        assert!(
+            ship.propellant_kg > 0.0,
+            "ship '{}' starts with no propellant",
+            ship.id.0
+        );
+    }
+}
+
+/// Ship fitted modules reference valid module_def_ids.
+#[test]
+fn dev_base_state_ship_modules_exist() {
+    let content = load_test_content();
+    let state = load_dev_base_state();
+
+    for ship in state.ships.values() {
+        for fitted in &ship.fitted_modules {
+            assert!(
+                content.module_defs.contains_key(&fitted.module_def_id.0),
+                "ship '{}' fitted module references unknown def '{}'",
+                ship.id.0,
+                fitted.module_def_id.0
+            );
+        }
     }
 }
