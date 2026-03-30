@@ -444,8 +444,10 @@ fn resolve_assembler_run(
                     QualityFormula::ElementFractionTimesMultiplier { .. } => 1.0,
                 };
 
+                // Use round() so assemblers degrade gracefully: efficiency >= 0.5
+                // still produces 1 item (VIO-460). floor() caused a cliff at < 1.0.
                 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-                let produced_count = (1.0_f32 * ctx.efficiency).floor() as u32;
+                let produced_count = (1.0_f32 * ctx.efficiency).round() as u32;
                 if produced_count == 0 {
                     continue;
                 }
@@ -1173,5 +1175,59 @@ mod assembler_component_tests {
             })
             .sum();
         assert_eq!(thruster_count, 4, "thrusters should be unchanged at 4");
+    }
+
+    #[test]
+    fn assembler_produces_at_degraded_wear() {
+        let content = assembler_content_with_component_input();
+        let mut state = assembler_state(&content);
+        let station_id = StationId("station_test".to_string());
+
+        // Set wear to degraded band (>= 0.5) → efficiency = 0.75
+        // With floor(), this produced 0 items (VIO-460). With round(), produces 1.
+        state.stations.get_mut(&station_id).unwrap().modules[0]
+            .wear
+            .wear = 0.6;
+
+        let mut rng = rand::rngs::mock::StepRng::new(42, 1);
+        crate::tick(&mut state, &[], &content, &mut rng, None);
+        crate::tick(&mut state, &[], &content, &mut rng, None);
+
+        let station = &state.stations[&station_id];
+        let has_output = station.inventory.iter().any(|item| {
+            matches!(item, InventoryItem::Component { component_id, .. }
+                if component_id.0 == "hull_plate")
+        });
+        assert!(
+            has_output,
+            "Assembler at degraded wear (0.75 efficiency) should still produce (VIO-460)"
+        );
+    }
+
+    #[test]
+    fn assembler_produces_at_critical_wear() {
+        let content = assembler_content_with_component_input();
+        let mut state = assembler_state(&content);
+        let station_id = StationId("station_test".to_string());
+
+        // Set wear to critical band (>= 0.8) → efficiency = 0.5
+        // round(0.5) = 1, so assembler still produces at critical wear.
+        state.stations.get_mut(&station_id).unwrap().modules[0]
+            .wear
+            .wear = 0.85;
+
+        let mut rng = rand::rngs::mock::StepRng::new(42, 1);
+        crate::tick(&mut state, &[], &content, &mut rng, None);
+        crate::tick(&mut state, &[], &content, &mut rng, None);
+
+        let station = &state.stations[&station_id];
+        let has_output = station.inventory.iter().any(|item| {
+            matches!(item, InventoryItem::Component { component_id, .. }
+                if component_id.0 == "hull_plate")
+        });
+        assert!(
+            has_output,
+            "Assembler at critical wear (0.5 efficiency) should still produce 1 item"
+        );
     }
 }
