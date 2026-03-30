@@ -237,6 +237,11 @@
         },
         {
           "kind": "Module",
+          "item_id": "module_item_0031",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
           "item_id": "module_item_0019",
           "module_def_id": "module_propulsion_lab"
         },
