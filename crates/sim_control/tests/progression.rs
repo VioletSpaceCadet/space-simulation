@@ -727,17 +727,6 @@ fn dev_base_state_progression() {
     }
     state.counters.next_command_id = next_cmd_id;
 
-    // Assert meaningful progression
-    let total_ore_kg: f32 = state
-        .stations
-        .values()
-        .flat_map(|s| &s.inventory)
-        .filter_map(|item| match item {
-            InventoryItem::Material { element, kg, .. } if element == "Fe" => Some(kg),
-            _ => None,
-        })
-        .sum();
-
     assert!(
         ever_had_active_ship,
         "Ships should have been active at some point during 10k ticks"
@@ -760,5 +749,87 @@ fn dev_base_state_progression() {
         state.balance > 0.0,
         "Balance should not collapse in 10k ticks. Balance: {}",
         state.balance
+    );
+}
+
+// ---------------------------------------------------------------------------
+// VIO-476: Invariant tests — "no permanent idle" and "research advances"
+// ---------------------------------------------------------------------------
+
+/// Run sim with autopilot for `ticks` ticks, asserting that ships never stay
+/// permanently idle. Returns the final state for further assertions.
+fn run_and_assert_no_permanent_idle(
+    content: &GameContent,
+    state: &mut GameState,
+    rng: &mut ChaCha8Rng,
+    ticks: u64,
+    max_idle_window: u32,
+) {
+    let mut autopilot = AutopilotController::new();
+    let mut next_cmd_id = state.counters.next_command_id;
+    let mut consecutive_idle = 0_u32;
+
+    for tick_num in 0..ticks {
+        let commands = autopilot.generate_commands(state, content, &mut next_cmd_id);
+        tick(state, &commands, content, rng, None);
+
+        let all_idle = state.ships.values().all(|s| {
+            s.task
+                .as_ref()
+                .is_none_or(|t| matches!(t.kind, TaskKind::Idle))
+        });
+        if all_idle && !state.ships.is_empty() {
+            consecutive_idle += 1;
+            assert!(
+                consecutive_idle < max_idle_window,
+                "Fleet permanently idle for {consecutive_idle} consecutive ticks at tick {tick_num}"
+            );
+        } else {
+            consecutive_idle = 0;
+        }
+    }
+    state.counters.next_command_id = next_cmd_id;
+}
+
+/// Invariant: ships never permanently idle when using dev_base_state
+/// during the early game phase (first 2000 ticks) where resources are fresh.
+/// build_initial_state has limited scan sites/asteroids so ships may legitimately
+/// idle once all are exhausted — the dev_base_state test below covers the full
+/// game state with proper scan site replenishment.
+#[test]
+fn invariant_no_permanent_idle_early_game() {
+    let content = production_like_content();
+    let mut state = production_like_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Let autopilot install modules, then assign crew
+    run_with_autopilot(&content, &mut state, &mut rng, 3);
+    sim_world::auto_assign_initial_crew(&mut state, &content);
+
+    // Test the first 2000 ticks (before resources can be fully depleted)
+    // 200 ticks max idle: enough for transit + task completion + reassignment
+    run_and_assert_no_permanent_idle(&content, &mut state, &mut rng, 2_000, 200);
+}
+
+/// Invariant: ships never permanently idle when using dev_base_state.json.
+#[test]
+fn invariant_no_permanent_idle_dev_base_state() {
+    let content = sim_world::load_content("../../content").unwrap();
+    let json = std::fs::read_to_string("../../content/dev_base_state.json").unwrap();
+    let mut state: GameState = serde_json::from_str(&json).unwrap();
+    state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Let autopilot install modules, then assign crew
+    run_with_autopilot(&content, &mut state, &mut rng, 3);
+    sim_world::auto_assign_initial_crew(&mut state, &content);
+
+    // 200 ticks max idle
+    run_and_assert_no_permanent_idle(&content, &mut state, &mut rng, 5_000, 200);
+
+    // Also assert research advances
+    assert!(
+        !state.research.data_pool.is_empty(),
+        "Research data pool should have entries after 5k ticks"
     );
 }
