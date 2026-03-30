@@ -31,6 +31,7 @@ mod crew;
 mod crucible;
 mod determinism_canary;
 mod manufacturing;
+mod module_index;
 mod replenish;
 mod thermal_link;
 mod trade;
