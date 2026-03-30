@@ -88,9 +88,8 @@ impl StationAgent {
         let has_power_gen = station.power.generated_kw > 0.0;
         let deficit_kw = station.power.deficit_kw;
         if has_power_gen && deficit_kw > 0.01 {
-            // Power deficit: disable lowest-priority consumers to shed load.
-            // Collect enabled modules with power consumption, sorted by stall priority desc
-            // (highest priority = shed first).
+            // Power deficit: disable least-critical consumers to shed load.
+            // Uses power_priority() — None = infrastructure (never shed), lower = shed first.
             let mut shedding_candidates: Vec<(usize, f32, u8)> = station
                 .modules
                 .iter()
@@ -100,15 +99,15 @@ impl StationAgent {
                         return None;
                     }
                     let def = content.module_defs.get(&module.def_id)?;
+                    let priority = def.power_priority()?; // None = infrastructure, skip
                     if def.power_consumption_per_run <= 0.0 {
-                        return None; // Skip power generators / zero-power modules
+                        return None;
                     }
-                    let priority = def.power_stall_priority.unwrap_or(0);
                     Some((index, def.power_consumption_per_run, priority))
                 })
                 .collect();
-            // Sort by priority desc (shed highest priority first), then by index for determinism
-            shedding_candidates.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.0.cmp(&b.0)));
+            // Sort ascending: lowest priority number = least critical = shed first
+            shedding_candidates.sort_by(|a, b| a.2.cmp(&b.2).then_with(|| a.0.cmp(&b.0)));
 
             let mut remaining_deficit = deficit_kw;
             for (index, power_kw, _) in &shedding_candidates {
@@ -1515,27 +1514,42 @@ mod tests {
         use sim_core::test_fixtures::ModuleDefBuilder;
 
         let mut content = base_content();
-        // Add two processor module defs with different stall priorities
+        // Two modules with different power priorities.
+        // Lower number = less critical = shed first (matching sim_core convention).
         content.module_defs.insert(
-            "module_low_priority".to_string(),
-            ModuleDefBuilder::new("module_low_priority")
-                .name("Low Priority")
+            "module_least_critical".to_string(),
+            ModuleDefBuilder::new("module_least_critical")
+                .name("Least Critical")
                 .mass(100.0)
                 .volume(1.0)
                 .power(20.0)
-                .power_stall_priority(5) // high = shed first
-                .behavior(sim_core::ModuleBehaviorDef::Storage { capacity_m3: 10.0 })
+                .power_stall_priority(0) // lowest = shed first
+                .behavior(sim_core::ModuleBehaviorDef::Assembler(
+                    sim_core::AssemblerDef {
+                        assembly_interval_minutes: 1,
+                        assembly_interval_ticks: 1,
+                        max_stock: HashMap::new(),
+                        recipes: vec![],
+                    },
+                ))
                 .build(),
         );
         content.module_defs.insert(
-            "module_high_priority".to_string(),
-            ModuleDefBuilder::new("module_high_priority")
-                .name("High Priority")
+            "module_most_critical".to_string(),
+            ModuleDefBuilder::new("module_most_critical")
+                .name("Most Critical")
                 .mass(100.0)
                 .volume(1.0)
                 .power(15.0)
-                .power_stall_priority(1) // low = shed last
-                .behavior(sim_core::ModuleBehaviorDef::Storage { capacity_m3: 10.0 })
+                .power_stall_priority(4) // highest = shed last
+                .behavior(sim_core::ModuleBehaviorDef::Assembler(
+                    sim_core::AssemblerDef {
+                        assembly_interval_minutes: 1,
+                        assembly_interval_ticks: 1,
+                        max_stock: HashMap::new(),
+                        recipes: vec![],
+                    },
+                ))
                 .build(),
         );
 
@@ -1546,10 +1560,16 @@ mod tests {
         // Install the two modules
         let station = state.stations.get_mut(&station_id).unwrap();
         station.modules.push(sim_core::ModuleState {
-            id: sim_core::ModuleInstanceId("mod_low".to_string()),
-            def_id: "module_low_priority".to_string(),
+            id: sim_core::ModuleInstanceId("mod_least_critical".to_string()),
+            def_id: "module_least_critical".to_string(),
             enabled: true,
-            kind_state: sim_core::ModuleKindState::Storage,
+            kind_state: sim_core::ModuleKindState::Assembler(sim_core::AssemblerState {
+                ticks_since_last_run: 0,
+                stalled: false,
+                capped: false,
+                cap_override: HashMap::new(),
+                selected_recipe: None,
+            }),
             wear: sim_core::WearState::default(),
             thermal: None,
             power_stalled: false,
@@ -1559,10 +1579,16 @@ mod tests {
             prev_crew_satisfied: true,
         });
         station.modules.push(sim_core::ModuleState {
-            id: sim_core::ModuleInstanceId("mod_high".to_string()),
-            def_id: "module_high_priority".to_string(),
+            id: sim_core::ModuleInstanceId("mod_most_critical".to_string()),
+            def_id: "module_most_critical".to_string(),
             enabled: true,
-            kind_state: sim_core::ModuleKindState::Storage,
+            kind_state: sim_core::ModuleKindState::Assembler(sim_core::AssemblerState {
+                ticks_since_last_run: 0,
+                stalled: false,
+                capped: false,
+                cap_override: HashMap::new(),
+                selected_recipe: None,
+            }),
             wear: sim_core::WearState::default(),
             thermal: None,
             power_stalled: false,
@@ -1587,7 +1613,7 @@ mod tests {
 
         agent.manage_modules(&state, &content, &owner, &mut next_id, &mut commands);
 
-        // Should disable the low-priority module (stall_priority=5, shed first)
+        // Should disable the least-critical module (stall_priority=0, shed first)
         // 20kW power consumption >= 20kW deficit, so only one module needs shedding
         let disable_cmds: Vec<_> = commands
             .iter()
@@ -1597,14 +1623,14 @@ mod tests {
             !disable_cmds.is_empty(),
             "should disable at least one module during deficit"
         );
-        // The low-priority module (stall_priority=5) should be disabled first
+        // The least-critical module (stall_priority=0) should be disabled first
         let first_disabled = match &disable_cmds[0].command {
             Command::SetModuleEnabled { module_id, .. } => module_id.0.clone(),
             _ => panic!("expected SetModuleEnabled"),
         };
         assert_eq!(
-            first_disabled, "mod_low",
-            "lowest-priority module should be shed first"
+            first_disabled, "mod_least_critical",
+            "least-critical module (lowest priority number) should be shed first"
         );
     }
 }
