@@ -125,6 +125,8 @@ fn replenish_test_content() -> GameContent {
             reference_mass_kg: 15_000.0,
             refuel_kg_per_minute: 16.67,
             autopilot_refuel_threshold_pct: 0.8,
+            autopilot_refuel_max_pct: 0.99,
+            autopilot_shipyard_component_count: 4,
             // Bottleneck detection
             bottleneck_storage_threshold_pct: 0.95,
             bottleneck_slag_ratio_threshold: 0.5,

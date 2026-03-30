@@ -425,20 +425,23 @@ impl StationAgent {
                     .and_then(|recipe_id| content.recipes.get(recipe_id)),
                 _ => None,
             })
-            .map_or(4u32, |recipe| {
-                recipe
-                    .inputs
-                    .iter()
-                    .find_map(|input| match (&input.filter, &input.amount) {
-                        (InputFilter::Component(cid), InputAmount::Count(n))
-                            if cid.0 == *import_component =>
-                        {
-                            Some(*n)
-                        }
-                        _ => None,
-                    })
-                    .unwrap_or(4)
-            });
+            .map_or(
+                content.constants.autopilot_shipyard_component_count,
+                |recipe| {
+                    recipe
+                        .inputs
+                        .iter()
+                        .find_map(|input| match (&input.filter, &input.amount) {
+                            (InputFilter::Component(cid), InputAmount::Count(n))
+                                if cid.0 == *import_component =>
+                            {
+                                Some(*n)
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or(content.constants.autopilot_shipyard_component_count)
+                },
+            );
 
         let has_shipyard = station
             .modules_with_role(shipyard_role)

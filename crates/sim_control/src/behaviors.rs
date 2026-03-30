@@ -86,8 +86,10 @@ pub(crate) fn try_refuel(
     if content.constants.fuel_cost_per_au <= 0.0 {
         return None;
     }
-    // Only refuel if below capacity
-    if ship.propellant_kg >= ship.propellant_capacity_kg * 0.99 {
+    // Only refuel if below max capacity threshold
+    if ship.propellant_kg
+        >= ship.propellant_capacity_kg * content.constants.autopilot_refuel_max_pct
+    {
         return None;
     }
     // Find co-located station with LH2

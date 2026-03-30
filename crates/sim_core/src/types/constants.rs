@@ -137,6 +137,12 @@ pub struct Constants {
     /// Propellant fraction below which autopilot opportunistically refuels when at a station.
     #[serde(default = "default_autopilot_refuel_threshold_pct")]
     pub autopilot_refuel_threshold_pct: f32,
+    /// Propellant fraction at or above which refueling is considered complete.
+    #[serde(default = "default_autopilot_refuel_max_pct")]
+    pub autopilot_refuel_max_pct: f32,
+    /// Default component import count for shipyard when no recipe match is found.
+    #[serde(default = "default_autopilot_shipyard_component_count")]
+    pub autopilot_shipyard_component_count: u32,
     // Bottleneck detection (used by daemon analytics)
     /// Station storage usage fraction above which bottleneck detection flags `StorageFull`.
     #[serde(default = "default_bottleneck_storage_threshold_pct")]
@@ -305,6 +311,12 @@ fn default_refuel_kg_per_minute() -> f32 {
 }
 fn default_autopilot_refuel_threshold_pct() -> f32 {
     0.8 // refuel when below 80% capacity
+}
+fn default_autopilot_refuel_max_pct() -> f32 {
+    0.99 // skip refuel when at 99%+ capacity
+}
+fn default_autopilot_shipyard_component_count() -> u32 {
+    4 // fallback import count for shipyard recipes
 }
 fn default_bottleneck_storage_threshold_pct() -> f32 {
     0.95
