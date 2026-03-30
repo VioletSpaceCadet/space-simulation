@@ -1,7 +1,8 @@
 use crate::{
     composition::{blend_slag_composition, merge_material_lot, weighted_composition},
     thermal, Event, EventEnvelope, GameContent, GameState, InputAmount, InventoryItem,
-    ModuleBehaviorDef, ModuleKindState, OutputSpec, QualityFormula, StationId, YieldFormula,
+    MaterialThermalProps, ModuleBehaviorDef, ModuleKindState, OutputSpec, Phase, PortDirection,
+    PortFilter, QualityFormula, StationId, StationState, YieldFormula,
 };
 use std::collections::HashMap;
 
@@ -75,8 +76,23 @@ fn execute(
     }
 
     let input_filter_for_threshold = recipe.inputs.first().map(|i| &i.filter);
+
+    // Check for linked input container (e.g., casting mold reading from crucible)
+    let input_container_idx = state
+        .stations
+        .get(&ctx.station_id)
+        .and_then(|s| find_linked_input_container(s, &ctx.module_id, ctx.def));
+
     let total_input_kg: f32 = state.stations.get(&ctx.station_id).map_or(0.0, |s| {
-        s.inventory
+        let source = if let Some(cidx) = input_container_idx {
+            match &s.modules[cidx].kind_state {
+                ModuleKindState::ThermalContainer(c) => &c.held_items,
+                _ => &s.inventory,
+            }
+        } else {
+            &s.inventory
+        };
+        source
             .iter()
             .filter(|item| matches_input_filter(item, input_filter_for_threshold))
             .map(InventoryItem::mass_kg)
@@ -128,7 +144,15 @@ fn execute(
     let Some(station) = state.stations.get(&ctx.station_id) else {
         return super::RunOutcome::Skipped { reset_timer: false };
     };
-    let (peeked_kg, lots) = peek_ore_fifo_with_lots(&station.inventory, rate_kg, |item| {
+    let peek_source = if let Some(cidx) = input_container_idx {
+        match &station.modules[cidx].kind_state {
+            ModuleKindState::ThermalContainer(c) => &c.held_items,
+            _ => &station.inventory,
+        }
+    } else {
+        &station.inventory
+    };
+    let (peeked_kg, lots) = peek_ore_fifo_with_lots(peek_source, rate_kg, |item| {
         matches_input_filter(item, input_filter.as_ref())
     });
 
@@ -164,6 +188,7 @@ fn execute(
         thermal_eff,
         thermal_qual,
         &recipe_id,
+        input_container_idx,
     );
 
     super::RunOutcome::Completed
@@ -172,10 +197,79 @@ fn execute(
 /// Shared context for processor output emission helpers.
 struct ProcessorRunCtx<'a> {
     station_id: &'a StationId,
+    module_id: &'a crate::ModuleInstanceId,
+    module_idx: usize,
+    module_def: &'a crate::ModuleDef,
     avg_composition: &'a HashMap<String, f32>,
     consumed_kg: f32,
     proc_mods: &'a crate::modifiers::ModifierSet,
     min_meaningful_kg: f32,
+}
+
+// ---------------------------------------------------------------------------
+// Port-based thermal routing helpers
+// ---------------------------------------------------------------------------
+
+/// Find a ThermalContainer connected to this module's Output port via a ThermalLink.
+/// Returns `(container_module_idx, capacity_kg)`.
+fn find_linked_output_container(
+    station: &StationState,
+    content: &GameContent,
+    source_module_id: &crate::ModuleInstanceId,
+    source_def: &crate::ModuleDef,
+) -> Option<(usize, f32)> {
+    let has_molten_out = source_def
+        .ports
+        .iter()
+        .any(|p| p.direction == PortDirection::Output && p.accepts == PortFilter::AnyMolten);
+    if !has_molten_out {
+        return None;
+    }
+    let link = station
+        .thermal_links
+        .iter()
+        .find(|l| l.from_module_id == *source_module_id)?;
+    let to_idx = station.module_index_by_id(&link.to_module_id)?;
+    if !matches!(
+        station.modules[to_idx].kind_state,
+        ModuleKindState::ThermalContainer(_)
+    ) {
+        return None;
+    }
+    let to_def = content.module_defs.get(&station.modules[to_idx].def_id)?;
+    let capacity_kg = match &to_def.behavior {
+        ModuleBehaviorDef::ThermalContainer(tc) => tc.capacity_kg,
+        _ => return None,
+    };
+    Some((to_idx, capacity_kg))
+}
+
+/// Find a ThermalContainer connected to this module's Input port via a ThermalLink.
+/// Returns the container's module index.
+fn find_linked_input_container(
+    station: &StationState,
+    dest_module_id: &crate::ModuleInstanceId,
+    dest_def: &crate::ModuleDef,
+) -> Option<usize> {
+    let has_molten_in = dest_def
+        .ports
+        .iter()
+        .any(|p| p.direction == PortDirection::Input && p.accepts == PortFilter::AnyMolten);
+    if !has_molten_in {
+        return None;
+    }
+    let link = station
+        .thermal_links
+        .iter()
+        .find(|l| l.to_module_id == *dest_module_id)?;
+    let from_idx = station.module_index_by_id(&link.from_module_id)?;
+    if !matches!(
+        station.modules[from_idx].kind_state,
+        ModuleKindState::ThermalContainer(_)
+    ) {
+        return None;
+    }
+    Some(from_idx)
 }
 
 fn build_processor_modifiers(
@@ -210,6 +304,7 @@ fn resolve_processor_run(
     thermal_efficiency: f32,
     thermal_quality: f32,
     recipe_id: &crate::RecipeId,
+    input_container_idx: Option<usize>,
 ) {
     let current_tick = state.meta.tick;
     let Some(recipe) = content.recipes.get(recipe_id) else {
@@ -226,7 +321,15 @@ fn resolve_processor_run(
         let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return;
         };
-        consume_ore_fifo_with_lots(&mut station.inventory, rate_kg, min_kg, |item| {
+        let source = if let Some(cidx) = input_container_idx {
+            match &mut station.modules[cidx].kind_state {
+                ModuleKindState::ThermalContainer(ref mut c) => &mut c.held_items,
+                _ => &mut station.inventory,
+            }
+        } else {
+            &mut station.inventory
+        };
+        consume_ore_fifo_with_lots(source, rate_kg, min_kg, |item| {
             matches_input_filter(item, input_filter.as_ref())
         })
     };
@@ -248,6 +351,9 @@ fn resolve_processor_run(
     let proc_mods = build_processor_modifiers(ctx.efficiency, thermal_efficiency, thermal_quality);
     let run_ctx = ProcessorRunCtx {
         station_id: &ctx.station_id,
+        module_id: &ctx.module_id,
+        module_idx: ctx.module_idx,
+        module_def: ctx.def,
         avg_composition: &avg_composition,
         consumed_kg,
         proc_mods: &proc_mods,
@@ -264,8 +370,14 @@ fn resolve_processor_run(
                 yield_formula,
                 quality_formula,
             } => {
-                (material_kg, material_quality) =
-                    emit_material_output(state, &run_ctx, element, yield_formula, quality_formula);
+                (material_kg, material_quality) = emit_material_output(
+                    state,
+                    &run_ctx,
+                    element,
+                    yield_formula,
+                    quality_formula,
+                    content,
+                );
             }
             OutputSpec::Slag { yield_formula } => {
                 slag_kg = emit_slag_output(
@@ -302,7 +414,10 @@ fn resolve_processor_run(
     apply_recipe_heat(state, ctx, content, recipe);
 }
 
-/// Compute material output from a processor run and merge into station inventory.
+/// Compute material output from a processor run.
+/// Routes to a linked ThermalContainer (with thermal props) if the processor has
+/// a `molten_out` port connected via a ThermalLink; otherwise falls back to
+/// station inventory with `thermal: None`.
 /// Returns `(material_kg, material_quality)`.
 fn emit_material_output(
     state: &mut GameState,
@@ -310,6 +425,7 @@ fn emit_material_output(
     element: &str,
     yield_formula: &YieldFormula,
     quality_formula: &QualityFormula,
+    content: &GameContent,
 ) -> (f32, f32) {
     let yield_frac = match yield_formula {
         YieldFormula::ElementFraction { element: el } => {
@@ -335,14 +451,79 @@ fn emit_material_output(
         &state.modifiers,
     );
     if material_kg > run.min_meaningful_kg {
-        if let Some(station) = state.stations.get_mut(run.station_id) {
-            merge_material_lot(
-                &mut station.inventory,
-                element.to_string(),
-                material_kg,
-                material_quality,
-                None,
-            );
+        // Check for linked thermal container via output port
+        let linked = state.stations.get(run.station_id).and_then(|station| {
+            find_linked_output_container(station, content, run.module_id, run.module_def)
+        });
+
+        if let Some((container_idx, capacity_kg)) = linked {
+            let station = state.stations.get(run.station_id).unwrap();
+            // Read processor temperature for thermal props
+            let module_temp = station.modules[run.module_idx]
+                .thermal
+                .as_ref()
+                .map_or(0, |t| t.temp_mk);
+            // Determine phase from element melting point
+            let phase = content
+                .elements
+                .iter()
+                .find(|e| e.id == element)
+                .and_then(|e| e.melting_point_mk)
+                .map_or(Phase::Solid, |mp| {
+                    if module_temp >= mp {
+                        Phase::Liquid
+                    } else {
+                        Phase::Solid
+                    }
+                });
+            // Check container capacity
+            let current_kg: f32 = match &station.modules[container_idx].kind_state {
+                ModuleKindState::ThermalContainer(c) => {
+                    c.held_items.iter().map(InventoryItem::mass_kg).sum()
+                }
+                _ => 0.0,
+            };
+
+            if current_kg + material_kg <= capacity_kg {
+                let thermal_props = MaterialThermalProps {
+                    temp_mk: module_temp,
+                    phase,
+                    latent_heat_buffer_j: 0,
+                };
+                let station = state.stations.get_mut(run.station_id).unwrap();
+                if let ModuleKindState::ThermalContainer(ref mut container) =
+                    station.modules[container_idx].kind_state
+                {
+                    merge_material_lot(
+                        &mut container.held_items,
+                        element.to_string(),
+                        material_kg,
+                        material_quality,
+                        Some(thermal_props),
+                    );
+                }
+            } else {
+                // Container full — fall back to cold station inventory
+                let station = state.stations.get_mut(run.station_id).unwrap();
+                merge_material_lot(
+                    &mut station.inventory,
+                    element.to_string(),
+                    material_kg,
+                    material_quality,
+                    None,
+                );
+            }
+        } else {
+            // No linked container — original behavior
+            if let Some(station) = state.stations.get_mut(run.station_id) {
+                merge_material_lot(
+                    &mut station.inventory,
+                    element.to_string(),
+                    material_kg,
+                    material_quality,
+                    None,
+                );
+            }
         }
     }
     (material_kg, material_quality)
