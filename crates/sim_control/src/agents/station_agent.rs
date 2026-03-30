@@ -103,6 +103,10 @@ impl StationAgent {
                     if def.power_consumption_per_run <= 0.0 {
                         return None;
                     }
+                    // Never shed propellant pipeline modules
+                    if content.module_has_role(&module.def_id, &content.autopilot.propellant_role) {
+                        return None;
+                    }
                     Some((index, def.power_consumption_per_run, priority))
                 })
                 .collect();
