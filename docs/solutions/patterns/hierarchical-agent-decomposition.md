@@ -76,6 +76,55 @@ The flat `ShipAssignmentBridge` ran once globally — its shared iterators ensur
 
 When refactoring removes code another branch modifies (VIO-442 modified `CrewRecruitment` while VIO-453 deleted it), create a follow-up ticket (VIO-454) immediately rather than trying to coordinate branches. The follow-up ports the change to the new location after the modifying branch lands.
 
+## Caching Strategy: LabAssignmentCache
+
+Per-entity agents can hold caches that persist across ticks. `LabAssignmentCache` avoids re-computing eligible techs every tick:
+
+- `initialized: bool` — first call rebuilds the cache
+- `last_unlocked_count: usize` — invalidates when a tech unlocks (count changes)
+- `cached_eligible: Vec<(TechId, f32)>` — sorted eligible techs with sufficiency scores
+
+**Invalidation rule**: compare `state.research.unlocked.len()` against `last_unlocked_count`. If changed, rebuild. This is O(1) to check and avoids the full O(techs × domains) sufficiency computation on 99% of ticks.
+
+## Performance: Early-Exit Optimization (VIO-456)
+
+The agent decomposition initially caused a ~15% tick throughput regression because `generate_commands()` ran all sub-concerns every tick, even when nothing changed. Fix: each sub-concern checks a cheap precondition before doing work.
+
+Examples of early exits in `StationAgent` sub-concerns:
+- `assign_crew()`: exits if `!has_unsatisfied_crew_need(station, content)`
+- `manage_labs()`: exits if cache is valid and no new techs unlocked
+- `import_components()`: exits if trade not yet unlocked
+
+These early exits restored throughput to pre-refactor levels while keeping the clean per-concern method structure.
+
+## Related Patterns
+
+### ModuleDefBuilder (VIO-436/437)
+
+Builder API for constructing `ModuleDef` in test fixtures. Avoids 20+ field struct literals:
+
+```rust
+ModuleDefBuilder::new("module_test")
+    .name("Test Module")
+    .power(10.0)
+    .wear(0.01)
+    .crew("operator", 2)
+    .behavior(ModuleBehaviorDef::Processor(...))
+    .build()
+```
+
+All fields have sensible defaults. Chain only the fields your test cares about.
+
+### ModuleTypeIndex (VIO-443/444)
+
+Pre-computed per-type module index vectors on `StationState`. Rebuilt on install/uninstall:
+
+- `processors: Vec<usize>`, `labs: Vec<usize>`, etc.
+- Each tick subsystem iterates only its matching indices
+- `module_id_index: HashMap<ModuleInstanceId, usize>` for O(1) lookup by ID
+
+**Invalidation**: `rebuild_module_index()` called from `handle_install_module()` and `handle_uninstall_module()` command handlers.
+
 ## Prevention
 
 - PR review checklist should include "scoping audit" for any per-entity agent work
