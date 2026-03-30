@@ -1,7 +1,8 @@
 use crate::{
     composition::{blend_slag_composition, merge_material_lot, weighted_composition},
     thermal, Event, EventEnvelope, GameContent, GameState, InputAmount, InventoryItem,
-    ModuleBehaviorDef, ModuleKindState, OutputSpec, QualityFormula, StationId, YieldFormula,
+    MaterialThermalProps, ModuleBehaviorDef, ModuleKindState, OutputSpec, Phase, PortDirection,
+    PortFilter, QualityFormula, StationId, StationState, YieldFormula,
 };
 use std::collections::HashMap;
 
@@ -48,75 +49,51 @@ fn execute(
     content: &GameContent,
     events: &mut Vec<EventEnvelope>,
 ) -> super::RunOutcome {
-    // Capacity pre-check
     let ModuleBehaviorDef::Processor(processor_def) = &ctx.def.behavior else {
         return super::RunOutcome::Skipped { reset_timer: false };
     };
 
-    // Read processor state for threshold and selected recipe
-    let threshold_kg = {
-        let Some(station) = state.stations.get(&ctx.station_id) else {
-            return super::RunOutcome::Skipped { reset_timer: false };
-        };
-        match &station.modules[ctx.module_idx].kind_state {
-            ModuleKindState::Processor(ps) => ps.threshold_kg,
-            _ => return super::RunOutcome::Skipped { reset_timer: false },
+    let threshold_kg = state.stations.get(&ctx.station_id).and_then(|s| {
+        match &s.modules[ctx.module_idx].kind_state {
+            ModuleKindState::Processor(ps) => Some(ps.threshold_kg),
+            _ => None,
         }
-    };
-
-    let recipe = resolve_recipe(state, ctx, processor_def, content, events);
-    let Some(recipe) = recipe else {
+    });
+    let Some(threshold_kg) = threshold_kg else {
         return super::RunOutcome::Skipped { reset_timer: false };
     };
-
-    // Tech gate: if recipe requires a tech that isn't unlocked, skip
+    let Some(recipe) = resolve_recipe(state, ctx, processor_def, content, events) else {
+        return super::RunOutcome::Skipped { reset_timer: false };
+    };
     if let Some(outcome) = check_tech_gate(state, ctx, processor_def, recipe, events) {
         return outcome;
     }
 
     let input_filter_for_threshold = recipe.inputs.first().map(|i| &i.filter);
-    let total_input_kg: f32 = state.stations.get(&ctx.station_id).map_or(0.0, |s| {
-        s.inventory
-            .iter()
-            .filter(|item| matches_input_filter(item, input_filter_for_threshold))
-            .map(InventoryItem::mass_kg)
-            .sum()
-    });
+    let input_container_idx = state
+        .stations
+        .get(&ctx.station_id)
+        .and_then(|s| find_linked_input_container(s, &ctx.module_id, ctx.def));
+    let total_input_kg: f32 = scan_input_kg(
+        state,
+        &ctx.station_id,
+        input_container_idx,
+        input_filter_for_threshold,
+    );
 
     if total_input_kg < threshold_kg {
         return super::RunOutcome::Skipped { reset_timer: false };
     }
-
-    // Thermal gating: check if recipe requires a minimum temperature
-    let (thermal_eff, thermal_qual) = if let Some(ref thermal_req) = recipe.thermal_req {
-        let temp_mk = state
-            .stations
-            .get(&ctx.station_id)
-            .and_then(|s| s.modules[ctx.module_idx].thermal.as_ref())
-            .map_or(0, |t| t.temp_mk);
-
-        if temp_mk < thermal_req.min_temp_mk {
-            return super::RunOutcome::Stalled(super::StallReason::TooCold {
-                current_temp_mk: temp_mk,
-                required_temp_mk: thermal_req.min_temp_mk,
-            });
-        }
-
-        (
-            thermal::thermal_efficiency(temp_mk, thermal_req),
-            thermal::thermal_quality_factor(temp_mk, thermal_req),
-        )
-    } else {
-        (1.0, 1.0)
+    let thermal_result = check_thermal_gate(state, ctx, recipe);
+    let (thermal_eff, thermal_qual) = match thermal_result {
+        Ok(pair) => pair,
+        Err(outcome) => return outcome,
     };
-
-    let rate_kg = match recipe.inputs.first().map(|i| &i.amount) {
-        Some(InputAmount::Kg(kg)) => *kg,
-        _ => return super::RunOutcome::Skipped { reset_timer: false },
+    let Some(InputAmount::Kg(rate_kg)) = recipe.inputs.first().map(|i| &i.amount) else {
+        return super::RunOutcome::Skipped { reset_timer: false };
     };
-
+    let rate_kg = *rate_kg;
     let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
-
     // Warm the volume cache
     {
         let Some(station_mut) = state.stations.get_mut(&ctx.station_id) else {
@@ -125,12 +102,13 @@ fn execute(
         let _ = station_mut.used_volume_m3(content);
     }
 
-    let Some(station) = state.stations.get(&ctx.station_id) else {
-        return super::RunOutcome::Skipped { reset_timer: false };
-    };
-    let (peeked_kg, lots) = peek_ore_fifo_with_lots(&station.inventory, rate_kg, |item| {
-        matches_input_filter(item, input_filter.as_ref())
-    });
+    let (peeked_kg, lots) = peek_from_source(
+        state,
+        ctx,
+        input_container_idx,
+        rate_kg,
+        input_filter.as_ref(),
+    );
 
     if peeked_kg < content.constants.min_meaningful_kg {
         return super::RunOutcome::Skipped { reset_timer: false };
@@ -142,16 +120,23 @@ fn execute(
     let output_volume =
         estimate_output_volume_m3(recipe, &avg_composition, peeked_kg, content) * thermal_eff;
 
-    let current_used = station
-        .cached_inventory_volume_m3
-        .unwrap_or_else(|| crate::inventory_volume_m3(&station.inventory, content));
-    let capacity = station.cargo_capacity_m3;
-    let shortfall = (current_used + output_volume) - capacity;
-
-    if shortfall > 0.0 {
-        return super::RunOutcome::Stalled(super::StallReason::VolumeCap {
-            shortfall_m3: shortfall,
-        });
+    // Skip station volume check when output routes to a linked thermal container
+    let has_output_container = state.stations.get(&ctx.station_id).is_some_and(|s| {
+        find_linked_output_container(s, content, &ctx.module_id, ctx.def).is_some()
+    });
+    if !has_output_container {
+        let Some(station) = state.stations.get(&ctx.station_id) else {
+            return super::RunOutcome::Skipped { reset_timer: false };
+        };
+        let current_used = station
+            .cached_inventory_volume_m3
+            .unwrap_or_else(|| crate::inventory_volume_m3(&station.inventory, content));
+        let shortfall = (current_used + output_volume) - station.cargo_capacity_m3;
+        if shortfall > 0.0 {
+            return super::RunOutcome::Stalled(super::StallReason::VolumeCap {
+                shortfall_m3: shortfall,
+            });
+        }
     }
 
     // Process the ore — pass the already-resolved recipe ID to avoid double resolution
@@ -164,6 +149,7 @@ fn execute(
         thermal_eff,
         thermal_qual,
         &recipe_id,
+        input_container_idx,
     );
 
     super::RunOutcome::Completed
@@ -172,10 +158,73 @@ fn execute(
 /// Shared context for processor output emission helpers.
 struct ProcessorRunCtx<'a> {
     station_id: &'a StationId,
+    module_id: &'a crate::ModuleInstanceId,
+    module_idx: usize,
+    module_def: &'a crate::ModuleDef,
     avg_composition: &'a HashMap<String, f32>,
     consumed_kg: f32,
     proc_mods: &'a crate::modifiers::ModifierSet,
     min_meaningful_kg: f32,
+}
+
+// ---------------------------------------------------------------------------
+// Port-based thermal routing helpers
+// ---------------------------------------------------------------------------
+
+/// Find a `ThermalContainer` connected to this module's Output port via a `ThermalLink`.
+/// Returns `(container_module_idx, capacity_kg)`.
+fn find_linked_output_container(
+    station: &StationState,
+    content: &GameContent,
+    source_module_id: &crate::ModuleInstanceId,
+    source_def: &crate::ModuleDef,
+) -> Option<(usize, f32)> {
+    let port = source_def
+        .ports
+        .iter()
+        .find(|p| p.direction == PortDirection::Output && p.accepts == PortFilter::AnyMolten)?;
+    let link = station
+        .thermal_links
+        .iter()
+        .find(|l| l.from_module_id == *source_module_id && l.from_port_id == port.id)?;
+    let to_idx = station.module_index_by_id(&link.to_module_id)?;
+    if !matches!(
+        station.modules[to_idx].kind_state,
+        ModuleKindState::ThermalContainer(_)
+    ) {
+        return None;
+    }
+    let to_def = content.module_defs.get(&station.modules[to_idx].def_id)?;
+    let capacity_kg = match &to_def.behavior {
+        ModuleBehaviorDef::ThermalContainer(tc) => tc.capacity_kg,
+        _ => return None,
+    };
+    Some((to_idx, capacity_kg))
+}
+
+/// Find a `ThermalContainer` connected to this module's Input port via a `ThermalLink`.
+/// Returns the container's module index.
+fn find_linked_input_container(
+    station: &StationState,
+    dest_module_id: &crate::ModuleInstanceId,
+    dest_def: &crate::ModuleDef,
+) -> Option<usize> {
+    let port = dest_def
+        .ports
+        .iter()
+        .find(|p| p.direction == PortDirection::Input && p.accepts == PortFilter::AnyMolten)?;
+    let link = station
+        .thermal_links
+        .iter()
+        .find(|l| l.to_module_id == *dest_module_id && l.to_port_id == port.id)?;
+    let from_idx = station.module_index_by_id(&link.from_module_id)?;
+    if !matches!(
+        station.modules[from_idx].kind_state,
+        ModuleKindState::ThermalContainer(_)
+    ) {
+        return None;
+    }
+    Some(from_idx)
 }
 
 fn build_processor_modifiers(
@@ -202,6 +251,7 @@ fn build_processor_modifiers(
     mods
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_processor_run(
     ctx: &super::ModuleTickContext,
     state: &mut GameState,
@@ -210,6 +260,7 @@ fn resolve_processor_run(
     thermal_efficiency: f32,
     thermal_quality: f32,
     recipe_id: &crate::RecipeId,
+    input_container_idx: Option<usize>,
 ) {
     let current_tick = state.meta.tick;
     let Some(recipe) = content.recipes.get(recipe_id) else {
@@ -222,14 +273,14 @@ fn resolve_processor_run(
     let input_filter = recipe.inputs.first().map(|i| &i.filter).cloned();
     let min_kg = content.constants.min_meaningful_kg;
 
-    let (consumed_kg, lots) = {
-        let Some(station) = state.stations.get_mut(&ctx.station_id) else {
-            return;
-        };
-        consume_ore_fifo_with_lots(&mut station.inventory, rate_kg, min_kg, |item| {
-            matches_input_filter(item, input_filter.as_ref())
-        })
-    };
+    let (consumed_kg, lots) = consume_from_source(
+        state,
+        ctx,
+        input_container_idx,
+        rate_kg,
+        min_kg,
+        input_filter.as_ref(),
+    );
     if consumed_kg < min_kg {
         return;
     }
@@ -248,6 +299,9 @@ fn resolve_processor_run(
     let proc_mods = build_processor_modifiers(ctx.efficiency, thermal_efficiency, thermal_quality);
     let run_ctx = ProcessorRunCtx {
         station_id: &ctx.station_id,
+        module_id: &ctx.module_id,
+        module_idx: ctx.module_idx,
+        module_def: ctx.def,
         avg_composition: &avg_composition,
         consumed_kg,
         proc_mods: &proc_mods,
@@ -264,8 +318,14 @@ fn resolve_processor_run(
                 yield_formula,
                 quality_formula,
             } => {
-                (material_kg, material_quality) =
-                    emit_material_output(state, &run_ctx, element, yield_formula, quality_formula);
+                (material_kg, material_quality) = emit_material_output(
+                    state,
+                    &run_ctx,
+                    element,
+                    yield_formula,
+                    quality_formula,
+                    content,
+                );
             }
             OutputSpec::Slag { yield_formula } => {
                 slag_kg = emit_slag_output(
@@ -302,7 +362,164 @@ fn resolve_processor_run(
     apply_recipe_heat(state, ctx, content, recipe);
 }
 
-/// Compute material output from a processor run and merge into station inventory.
+/// Consume input from the correct source (linked container or station inventory).
+#[allow(clippy::type_complexity)]
+fn consume_from_source(
+    state: &mut GameState,
+    ctx: &super::ModuleTickContext,
+    input_container_idx: Option<usize>,
+    rate_kg: f32,
+    min_kg: f32,
+    input_filter: Option<&crate::InputFilter>,
+) -> (f32, Vec<(HashMap<String, f32>, f32)>) {
+    let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+        return (0.0, vec![]);
+    };
+    let source = if let Some(cidx) = input_container_idx {
+        match &mut station.modules[cidx].kind_state {
+            ModuleKindState::ThermalContainer(ref mut c) => &mut c.held_items,
+            _ => &mut station.inventory,
+        }
+    } else {
+        &mut station.inventory
+    };
+    consume_ore_fifo_with_lots(source, rate_kg, min_kg, |item| {
+        matches_input_filter(item, input_filter)
+    })
+}
+
+/// Peek input from the correct source (linked container or station inventory).
+#[allow(clippy::type_complexity)]
+fn peek_from_source(
+    state: &GameState,
+    ctx: &super::ModuleTickContext,
+    input_container_idx: Option<usize>,
+    rate_kg: f32,
+    input_filter: Option<&crate::InputFilter>,
+) -> (f32, Vec<(HashMap<String, f32>, f32)>) {
+    let Some(station) = state.stations.get(&ctx.station_id) else {
+        return (0.0, vec![]);
+    };
+    let source = if let Some(cidx) = input_container_idx {
+        match &station.modules[cidx].kind_state {
+            ModuleKindState::ThermalContainer(c) => &c.held_items,
+            _ => &station.inventory,
+        }
+    } else {
+        &station.inventory
+    };
+    peek_ore_fifo_with_lots(source, rate_kg, |item| {
+        matches_input_filter(item, input_filter)
+    })
+}
+
+/// Scan available input material from the correct source (container or station inventory).
+fn scan_input_kg(
+    state: &GameState,
+    station_id: &StationId,
+    input_container_idx: Option<usize>,
+    input_filter: Option<&crate::InputFilter>,
+) -> f32 {
+    state.stations.get(station_id).map_or(0.0, |s| {
+        let source = if let Some(cidx) = input_container_idx {
+            match &s.modules[cidx].kind_state {
+                ModuleKindState::ThermalContainer(c) => &c.held_items,
+                _ => &s.inventory,
+            }
+        } else {
+            &s.inventory
+        };
+        source
+            .iter()
+            .filter(|item| matches_input_filter(item, input_filter))
+            .map(InventoryItem::mass_kg)
+            .sum()
+    })
+}
+
+/// Route material to a linked thermal container or fall back to station inventory.
+fn route_material_output(
+    state: &mut GameState,
+    run: &ProcessorRunCtx,
+    element: &str,
+    material_kg: f32,
+    material_quality: f32,
+    content: &GameContent,
+) {
+    let linked = state.stations.get(run.station_id).and_then(|station| {
+        find_linked_output_container(station, content, run.module_id, run.module_def)
+    });
+
+    if let Some((container_idx, capacity_kg)) = linked {
+        let Some(station) = state.stations.get(run.station_id) else {
+            return;
+        };
+        let module_temp = station.modules[run.module_idx]
+            .thermal
+            .as_ref()
+            .map_or(0, |t| t.temp_mk);
+        let phase = content
+            .elements
+            .iter()
+            .find(|e| e.id == element)
+            .and_then(|e| e.melting_point_mk)
+            .map_or(Phase::Solid, |mp| {
+                if module_temp >= mp {
+                    Phase::Liquid
+                } else {
+                    Phase::Solid
+                }
+            });
+        let current_kg: f32 = match &station.modules[container_idx].kind_state {
+            ModuleKindState::ThermalContainer(c) => {
+                c.held_items.iter().map(InventoryItem::mass_kg).sum()
+            }
+            _ => 0.0,
+        };
+
+        if current_kg + material_kg <= capacity_kg {
+            let thermal_props = MaterialThermalProps {
+                temp_mk: module_temp,
+                phase,
+                latent_heat_buffer_j: 0,
+            };
+            if let Some(station) = state.stations.get_mut(run.station_id) {
+                if let ModuleKindState::ThermalContainer(ref mut container) =
+                    station.modules[container_idx].kind_state
+                {
+                    merge_material_lot(
+                        &mut container.held_items,
+                        element.to_string(),
+                        material_kg,
+                        material_quality,
+                        Some(thermal_props),
+                    );
+                }
+            }
+        } else if let Some(station) = state.stations.get_mut(run.station_id) {
+            merge_material_lot(
+                &mut station.inventory,
+                element.to_string(),
+                material_kg,
+                material_quality,
+                None,
+            );
+        }
+    } else if let Some(station) = state.stations.get_mut(run.station_id) {
+        merge_material_lot(
+            &mut station.inventory,
+            element.to_string(),
+            material_kg,
+            material_quality,
+            None,
+        );
+    }
+}
+
+/// Compute material output from a processor run.
+/// Routes to a linked `ThermalContainer` (with thermal props) if the processor has
+/// a `molten_out` port connected via a `ThermalLink`; otherwise falls back to
+/// station inventory with `thermal: None`.
 /// Returns `(material_kg, material_quality)`.
 fn emit_material_output(
     state: &mut GameState,
@@ -310,6 +527,7 @@ fn emit_material_output(
     element: &str,
     yield_formula: &YieldFormula,
     quality_formula: &QualityFormula,
+    content: &GameContent,
 ) -> (f32, f32) {
     let yield_frac = match yield_formula {
         YieldFormula::ElementFraction { element: el } => {
@@ -335,15 +553,7 @@ fn emit_material_output(
         &state.modifiers,
     );
     if material_kg > run.min_meaningful_kg {
-        if let Some(station) = state.stations.get_mut(run.station_id) {
-            merge_material_lot(
-                &mut station.inventory,
-                element.to_string(),
-                material_kg,
-                material_quality,
-                None,
-            );
-        }
+        route_material_output(state, run, element, material_kg, material_quality, content);
     }
     (material_kg, material_quality)
 }
@@ -471,6 +681,33 @@ fn apply_recipe_heat(
                 .saturating_sub(delta_mk.unsigned_abs());
         }
     }
+}
+
+/// Check thermal gate: if recipe requires a minimum temperature, verify the module
+/// is hot enough. Returns `Ok((efficiency, quality))` or `Err(RunOutcome::Stalled)`.
+fn check_thermal_gate(
+    state: &GameState,
+    ctx: &super::ModuleTickContext,
+    recipe: &crate::RecipeDef,
+) -> Result<(f32, f32), super::RunOutcome> {
+    let Some(ref thermal_req) = recipe.thermal_req else {
+        return Ok((1.0, 1.0));
+    };
+    let temp_mk = state
+        .stations
+        .get(&ctx.station_id)
+        .and_then(|s| s.modules[ctx.module_idx].thermal.as_ref())
+        .map_or(0, |t| t.temp_mk);
+    if temp_mk < thermal_req.min_temp_mk {
+        return Err(super::RunOutcome::Stalled(super::StallReason::TooCold {
+            current_temp_mk: temp_mk,
+            required_temp_mk: thermal_req.min_temp_mk,
+        }));
+    }
+    Ok((
+        thermal::thermal_efficiency(temp_mk, thermal_req),
+        thermal::thermal_quality_factor(temp_mk, thermal_req),
+    ))
 }
 
 /// Check if the recipe requires a tech that isn't unlocked.

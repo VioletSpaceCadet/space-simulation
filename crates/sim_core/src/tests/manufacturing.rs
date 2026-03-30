@@ -405,3 +405,226 @@ fn determinism_fixture_based() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Thermal pipeline tests (VIO-459)
+// ---------------------------------------------------------------------------
+
+use crate::test_fixtures::{make_rng, rebuild_indices, test_station_id, thermal_content};
+
+/// Build content with smelter (with molten_out port) and crucible (with molten_in port).
+fn pipeline_content() -> GameContent {
+    let mut content = thermal_content();
+    // Add molten_out port to smelter
+    let smelter_def = content.module_defs.get_mut("module_basic_smelter").unwrap();
+    smelter_def.ports = vec![ModulePort {
+        id: "molten_out".to_string(),
+        direction: PortDirection::Output,
+        accepts: PortFilter::AnyMolten,
+    }];
+    // Add crucible
+    content.module_defs.insert(
+        "module_test_crucible".to_string(),
+        ModuleDefBuilder::new("module_test_crucible")
+            .name("Test Crucible")
+            .mass(2000.0)
+            .volume(5.0)
+            .behavior(ModuleBehaviorDef::ThermalContainer(ThermalContainerDef {
+                capacity_kg: 1000.0,
+            }))
+            .thermal(ThermalDef {
+                heat_capacity_j_per_k: 80_000.0,
+                passive_cooling_coefficient: 0.5,
+                max_temp_mk: 3_000_000,
+                operating_min_mk: None,
+                operating_max_mk: None,
+                thermal_group: Some("default".to_string()),
+                idle_heat_generation_w: None,
+            })
+            .ports(vec![
+                ModulePort {
+                    id: "molten_in".to_string(),
+                    direction: PortDirection::Input,
+                    accepts: PortFilter::AnyMolten,
+                },
+                ModulePort {
+                    id: "molten_out".to_string(),
+                    direction: PortDirection::Output,
+                    accepts: PortFilter::AnyMolten,
+                },
+            ])
+            .build(),
+    );
+    content
+}
+
+/// Set up a station with smelter at operating temp + crucible + thermal link.
+fn state_with_smelter_and_crucible(content: &GameContent) -> GameState {
+    let mut state = crate::test_fixtures::state_with_smelter_at_temp(content, 1_900_000);
+    let station_id = test_station_id();
+    let station = state.stations.get_mut(&station_id).unwrap();
+
+    // Add crucible module
+    station.modules.push(ModuleState {
+        id: ModuleInstanceId("mod_crucible_001".to_string()),
+        def_id: "module_test_crucible".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::ThermalContainer(ThermalContainerState { held_items: vec![] }),
+        wear: WearState::default(),
+        thermal: Some(ThermalState {
+            temp_mk: 1_900_000,
+            thermal_group: Some("default".to_string()),
+            ..Default::default()
+        }),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
+    });
+
+    // Create thermal link: smelter.molten_out → crucible.molten_in
+    station.thermal_links.push(ThermalLink {
+        from_module_id: ModuleInstanceId("mod_smelter_001".to_string()),
+        from_port_id: "molten_out".to_string(),
+        to_module_id: ModuleInstanceId("mod_crucible_001".to_string()),
+        to_port_id: "molten_in".to_string(),
+    });
+
+    rebuild_indices(&mut state, content);
+    state
+}
+
+#[test]
+fn smelter_outputs_to_linked_crucible() {
+    let content = pipeline_content();
+    let mut state = state_with_smelter_and_crucible(&content);
+    let station_id = test_station_id();
+    let mut rng = make_rng();
+
+    // Tick once — smelter should run (at temp, ore available, interval elapsed)
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    let station = &state.stations[&station_id];
+
+    // Fe should NOT be in station inventory
+    let station_fe: f32 = station
+        .inventory
+        .iter()
+        .filter_map(|i| match i {
+            InventoryItem::Material { element, kg, .. } if element == "Fe" => Some(*kg),
+            _ => None,
+        })
+        .sum();
+    assert!(
+        station_fe < 1.0,
+        "Fe should not be in station inventory when linked to crucible, got {station_fe}"
+    );
+
+    // Fe should be in crucible held_items as liquid
+    let crucible_idx = station
+        .module_index_by_id(&ModuleInstanceId("mod_crucible_001".to_string()))
+        .unwrap();
+    let held_items = match &station.modules[crucible_idx].kind_state {
+        ModuleKindState::ThermalContainer(c) => &c.held_items,
+        _ => panic!("expected ThermalContainer"),
+    };
+    let crucible_fe: f32 = held_items
+        .iter()
+        .filter_map(|i| match i {
+            InventoryItem::Material { element, kg, .. } if element == "Fe" => Some(*kg),
+            _ => None,
+        })
+        .sum();
+    assert!(
+        crucible_fe > 100.0,
+        "crucible should contain smelted Fe, got {crucible_fe}"
+    );
+
+    // Check it's liquid
+    let fe_item = held_items
+        .iter()
+        .find(|i| matches!(i, InventoryItem::Material { element, .. } if element == "Fe"))
+        .unwrap();
+    if let InventoryItem::Material { thermal, .. } = fe_item {
+        let thermal = thermal
+            .as_ref()
+            .expect("crucible Fe should have thermal props");
+        assert_eq!(
+            thermal.phase,
+            Phase::Liquid,
+            "Fe should be liquid in crucible"
+        );
+    }
+}
+
+#[test]
+fn smelter_without_link_falls_back_to_inventory() {
+    let content = pipeline_content();
+    // Use smelter at temp but NO crucible, NO thermal link
+    let mut state = crate::test_fixtures::state_with_smelter_at_temp(&content, 1_900_000);
+    rebuild_indices(&mut state, &content);
+    let station_id = test_station_id();
+    let mut rng = make_rng();
+
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    let station = &state.stations[&station_id];
+    let station_fe: f32 = station
+        .inventory
+        .iter()
+        .filter_map(|i| match i {
+            InventoryItem::Material { element, kg, .. } if element == "Fe" => Some(*kg),
+            _ => None,
+        })
+        .sum();
+    assert!(
+        station_fe > 100.0,
+        "Fe should be in station inventory when no link, got {station_fe}"
+    );
+}
+
+#[test]
+fn smelter_output_to_full_crucible_falls_back() {
+    let content = pipeline_content();
+    let mut state = state_with_smelter_and_crucible(&content);
+    let station_id = test_station_id();
+
+    // Fill crucible near capacity (1000 kg cap)
+    let crucible_idx = state.stations[&station_id]
+        .module_index_by_id(&ModuleInstanceId("mod_crucible_001".to_string()))
+        .unwrap();
+    if let ModuleKindState::ThermalContainer(ref mut c) =
+        state.stations.get_mut(&station_id).unwrap().modules[crucible_idx].kind_state
+    {
+        c.held_items.push(InventoryItem::Material {
+            element: "Fe".to_string(),
+            kg: 990.0,
+            quality: 0.5,
+            thermal: Some(MaterialThermalProps {
+                temp_mk: 1_900_000,
+                phase: Phase::Liquid,
+                latent_heat_buffer_j: 0,
+            }),
+        });
+    }
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    // Smelter output (~350 kg) exceeds remaining capacity (~10 kg),
+    // so it falls back to station inventory
+    let station = &state.stations[&station_id];
+    let station_fe: f32 = station
+        .inventory
+        .iter()
+        .filter_map(|i| match i {
+            InventoryItem::Material { element, kg, .. } if element == "Fe" => Some(*kg),
+            _ => None,
+        })
+        .sum();
+    assert!(
+        station_fe > 100.0,
+        "Fe should fall back to station inventory when crucible full, got {station_fe}"
+    );
+}
