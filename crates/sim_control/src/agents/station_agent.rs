@@ -83,12 +83,39 @@ impl StationAgent {
             }
         }
 
-        for module in &station.modules {
-            // Re-enable disabled modules, but not max-wear or propellant-role
-            if !module.enabled
-                && module.wear.wear < 1.0
-                && !content.module_has_role(&module.def_id, &content.autopilot.propellant_role)
-            {
+        // Power-aware module management: shed load during deficit, re-enable during surplus.
+        // Only apply when the station has power generation infrastructure (solar/battery).
+        let has_power_gen = station.power.generated_kw > 0.0;
+        let deficit_kw = station.power.deficit_kw;
+        if has_power_gen && deficit_kw > 0.01 {
+            // Power deficit: disable lowest-priority consumers to shed load.
+            // Collect enabled modules with power consumption, sorted by stall priority desc
+            // (highest priority = shed first).
+            let mut shedding_candidates: Vec<(usize, f32, u8)> = station
+                .modules
+                .iter()
+                .enumerate()
+                .filter_map(|(index, module)| {
+                    if !module.enabled {
+                        return None;
+                    }
+                    let def = content.module_defs.get(&module.def_id)?;
+                    if def.power_consumption_per_run <= 0.0 {
+                        return None; // Skip power generators / zero-power modules
+                    }
+                    let priority = def.power_stall_priority.unwrap_or(0);
+                    Some((index, def.power_consumption_per_run, priority))
+                })
+                .collect();
+            // Sort by priority desc (shed highest priority first), then by index for determinism
+            shedding_candidates.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.0.cmp(&b.0)));
+
+            let mut remaining_deficit = deficit_kw;
+            for (index, power_kw, _) in &shedding_candidates {
+                if remaining_deficit <= 0.0 {
+                    break;
+                }
+                let module = &station.modules[*index];
                 commands.push(make_cmd(
                     owner,
                     state.meta.tick,
@@ -96,11 +123,42 @@ impl StationAgent {
                     Command::SetModuleEnabled {
                         station_id: self.station_id.clone(),
                         module_id: module.id.clone(),
-                        enabled: true,
+                        enabled: false,
                     },
                 ));
+                remaining_deficit -= power_kw;
             }
+        } else {
+            // No deficit (or no power infrastructure): re-enable disabled modules.
+            // When power infra exists, respect headroom; otherwise re-enable all.
+            let mut available_headroom = station.power.generated_kw - station.power.consumed_kw;
+            for module in &station.modules {
+                if !module.enabled
+                    && module.wear.wear < 1.0
+                    && !content.module_has_role(&module.def_id, &content.autopilot.propellant_role)
+                {
+                    let power_cost = content
+                        .module_defs
+                        .get(&module.def_id)
+                        .map_or(0.0, |d| d.power_consumption_per_run);
+                    if !has_power_gen || power_cost <= available_headroom || power_cost <= 0.0 {
+                        commands.push(make_cmd(
+                            owner,
+                            state.meta.tick,
+                            next_id,
+                            Command::SetModuleEnabled {
+                                station_id: self.station_id.clone(),
+                                module_id: module.id.clone(),
+                                enabled: true,
+                            },
+                        ));
+                        available_headroom -= power_cost;
+                    }
+                }
+            }
+        }
 
+        for module in &station.modules {
             if let ModuleKindState::Processor(processor_state) = &module.kind_state {
                 if processor_state.threshold_kg == 0.0 {
                     commands.push(make_cmd(
@@ -1450,5 +1508,103 @@ mod tests {
         agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
 
         assert!(ship_agents[&ship_id].objective.is_none());
+    }
+
+    #[test]
+    fn manage_modules_sheds_load_during_power_deficit() {
+        use sim_core::test_fixtures::ModuleDefBuilder;
+
+        let mut content = base_content();
+        // Add two processor module defs with different stall priorities
+        content.module_defs.insert(
+            "module_low_priority".to_string(),
+            ModuleDefBuilder::new("module_low_priority")
+                .name("Low Priority")
+                .mass(100.0)
+                .volume(1.0)
+                .power(20.0)
+                .power_stall_priority(5) // high = shed first
+                .behavior(sim_core::ModuleBehaviorDef::Storage { capacity_m3: 10.0 })
+                .build(),
+        );
+        content.module_defs.insert(
+            "module_high_priority".to_string(),
+            ModuleDefBuilder::new("module_high_priority")
+                .name("High Priority")
+                .mass(100.0)
+                .volume(1.0)
+                .power(15.0)
+                .power_stall_priority(1) // low = shed last
+                .behavior(sim_core::ModuleBehaviorDef::Storage { capacity_m3: 10.0 })
+                .build(),
+        );
+
+        let mut state = base_state(&content);
+        let owner = PrincipalId("principal_autopilot".to_string());
+        let station_id = state.stations.keys().next().unwrap().clone();
+
+        // Install the two modules
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("mod_low".to_string()),
+            def_id: "module_low_priority".to_string(),
+            enabled: true,
+            kind_state: sim_core::ModuleKindState::Storage,
+            wear: sim_core::WearState::default(),
+            thermal: None,
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
+        });
+        station.modules.push(sim_core::ModuleState {
+            id: sim_core::ModuleInstanceId("mod_high".to_string()),
+            def_id: "module_high_priority".to_string(),
+            enabled: true,
+            kind_state: sim_core::ModuleKindState::Storage,
+            wear: sim_core::WearState::default(),
+            thermal: None,
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
+        });
+
+        // Set power state with deficit: 30kW gen, 50kW consumed = 20kW deficit
+        station.power = sim_core::PowerState {
+            generated_kw: 30.0,
+            consumed_kw: 50.0,
+            deficit_kw: 20.0,
+            ..Default::default()
+        };
+        station.rebuild_module_index(&content);
+
+        let mut agent = StationAgent::new(station_id);
+        let mut next_id = 0u64;
+        let mut commands = Vec::new();
+
+        agent.manage_modules(&state, &content, &owner, &mut next_id, &mut commands);
+
+        // Should disable the low-priority module (stall_priority=5, shed first)
+        // 20kW power consumption >= 20kW deficit, so only one module needs shedding
+        let disable_cmds: Vec<_> = commands
+            .iter()
+            .filter(|c| matches!(&c.command, Command::SetModuleEnabled { enabled: false, .. }))
+            .collect();
+        assert!(
+            !disable_cmds.is_empty(),
+            "should disable at least one module during deficit"
+        );
+        // The low-priority module (stall_priority=5) should be disabled first
+        let first_disabled = match &disable_cmds[0].command {
+            Command::SetModuleEnabled { module_id, .. } => module_id.0.clone(),
+            _ => panic!("expected SetModuleEnabled"),
+        };
+        assert_eq!(
+            first_disabled, "mod_low",
+            "lowest-priority module should be shed first"
+        );
     }
 }
