@@ -81,7 +81,7 @@ impl CommandSource for AutopilotController {
             commands.extend(agent.generate(state, content, &self.owner, next_command_id));
         }
 
-        // 3. Station agents assign objectives to co-located idle ships (AD1).
+        // 3. Station agents assign objectives to idle ships (AD1).
         // Deduplication is per-station (each station has its own shared
         // iterators). With multiple stations, two stations could theoretically
         // assign the same asteroid. Acceptable for single-station game;

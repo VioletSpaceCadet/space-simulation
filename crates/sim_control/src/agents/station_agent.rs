@@ -692,10 +692,10 @@ impl StationAgent {
         }
     }
 
-    /// Assign objectives to idle ship agents at this station.
+    /// Assign objectives to idle ship agents owned by this station's owner.
     ///
-    /// Absorbs the `ShipAssignmentBridge` logic (VIO-451). Scoped to ships
-    /// co-located with this station. Uses shared-iterator deduplication (AD1)
+    /// Ships can be at any position — the ship agent will generate Transit
+    /// tasks to reach assigned targets. Uses shared-iterator deduplication (AD1)
     /// so no two ships target the same asteroid or scan site.
     ///
     /// Called separately from `generate()` because it mutates ship agents,
@@ -711,27 +711,21 @@ impl StationAgent {
             return;
         };
 
-        // Collect idle ships at this station's position with no current objective.
+        // Collect idle ships owned by this station's owner with no current objective.
+        // Ships can be at any position — the ship agent will generate Transit
+        // tasks to reach assigned targets (fixes VIO-457: ships stranded after
+        // completing tasks at remote locations).
         let idle_ships = collect_idle_ships(state, owner);
         let assignable: Vec<ShipId> = idle_ships
             .into_iter()
-            .filter(|id| {
-                ship_agents.get(id).is_some_and(|a| a.objective.is_none())
-                    && state
-                        .ships
-                        .get(id)
-                        .is_some_and(|s| s.position == station.position)
-            })
+            .filter(|id| ship_agents.get(id).is_some_and(|a| a.objective.is_none()))
             .collect();
 
         if assignable.is_empty() {
             return;
         }
 
-        let Some(first_ship) = state.ships.get(&assignable[0]) else {
-            return;
-        };
-        let reference_pos = &first_ship.position;
+        let reference_pos = &station.position;
 
         let deep_scan_unlocked = state
             .research
@@ -1331,7 +1325,7 @@ mod tests {
     }
 
     #[test]
-    fn assign_ship_not_at_station_skipped() {
+    fn assign_ship_not_at_station_still_assigned() {
         let (mut state, content, mut ship_agents) = assignment_setup();
         let owner = test_owner();
         let station_id = station_id_from_state(&state);
@@ -1339,7 +1333,8 @@ mod tests {
         let ship_id = make_ship_id("ship_a");
         add_idle_ship(&mut state, &mut ship_agents, ship_id.clone());
 
-        // Move ship to a different position than the station
+        // Move ship to a different position than the station (simulates
+        // completing a task at a remote location — VIO-457 regression test)
         let mut different_pos = test_position();
         different_pos.radius_au_um = sim_core::RadiusAuMicro(999_999);
         state.ships.get_mut(&ship_id).unwrap().position = different_pos;
@@ -1349,8 +1344,8 @@ mod tests {
         let agent = StationAgent::new(station_id);
         agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
 
-        // Ship not co-located with station → no assignment
-        assert!(ship_agents[&ship_id].objective.is_none());
+        // Ship at remote position still gets assigned (ship agent handles transit)
+        assert!(ship_agents[&ship_id].objective.is_some());
     }
 
     #[test]
