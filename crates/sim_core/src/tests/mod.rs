@@ -30,6 +30,7 @@ mod wear;
 mod crew;
 mod crucible;
 mod determinism_canary;
+mod efficiency;
 mod manufacturing;
 mod replenish;
 mod salary;
