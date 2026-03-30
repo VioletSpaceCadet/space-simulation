@@ -185,6 +185,9 @@ fn update_module_efficiencies(
     }
 }
 
+// timings is only used inside timed!() macro which is cfg-gated behind
+// debug_assertions or the instrumentation feature.
+#[allow(unused_mut, unused_variables)]
 pub(crate) fn tick_stations(
     state: &mut GameState,
     content: &GameContent,
