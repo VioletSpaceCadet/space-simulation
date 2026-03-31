@@ -149,7 +149,7 @@ fn execute_tick(
 
         if score.threshold != guard.last_threshold {
             let previous_threshold = guard.last_threshold.clone();
-            guard.last_threshold = score.threshold.clone();
+            guard.last_threshold.clone_from(&score.threshold);
             events.push(sim_core::EventEnvelope {
                 id: sim_core::EventId(guard.next_command_id),
                 tick: guard.game_state.meta.tick,
