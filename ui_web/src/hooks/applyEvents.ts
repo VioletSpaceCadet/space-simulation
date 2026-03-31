@@ -923,6 +923,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   PipeFreeze: noOp,
   StationBankrupt: noOp,
   ModuleEfficiencyChanged: handleModuleEfficiencyChanged,
+  ScoreThresholdCrossed: noOp,
 };
 
 export function applyEvents(

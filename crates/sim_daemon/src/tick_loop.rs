@@ -141,6 +141,30 @@ fn execute_tick(
         }
     }
 
+    // Score computation at its own interval
+    let score_interval = guard.content.scoring.computation_interval_ticks;
+    if score_interval > 0 && guard.game_state.meta.tick.is_multiple_of(score_interval) {
+        let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
+        let score = sim_core::compute_run_score(&snapshot, &guard.game_state, &guard.content);
+
+        if score.threshold != guard.last_threshold {
+            let previous_threshold = guard.last_threshold.clone();
+            guard.last_threshold = score.threshold.clone();
+            events.push(sim_core::EventEnvelope {
+                id: sim_core::EventId(guard.next_command_id),
+                tick: guard.game_state.meta.tick,
+                event: sim_core::Event::ScoreThresholdCrossed {
+                    previous_threshold,
+                    new_threshold: score.threshold.clone(),
+                    composite_score: score.composite,
+                },
+            });
+            guard.next_command_id += 1;
+        }
+
+        guard.push_score(score);
+    }
+
     let done = max_ticks.is_some_and(|max| guard.game_state.meta.tick >= max);
     (events, done)
 }
@@ -174,6 +198,8 @@ mod tests {
             metrics_writer: None,
             alert_engine: None,
             timings_history: VecDeque::new(),
+            score_history: VecDeque::new(),
+            last_threshold: String::new(),
         }));
         let command_queue = Arc::new(Mutex::new(Vec::new()));
         let paused = Arc::new(AtomicBool::new(false));

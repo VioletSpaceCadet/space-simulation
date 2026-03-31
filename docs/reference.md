@@ -171,6 +171,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 - `GET /api/v1/pricing` — returns the `PricingTable` as JSON
 - `GET /api/v1/content` — returns tech definitions, lab rates (points/hr), data pool net rates (per kind/hr), `minutes_per_tick`, and recipe catalog (`Record<RecipeId, RecipeDef>`)
 - `GET /api/v1/perf` — per-step tick timing stats (mean/p50/p95/max µs) from rolling buffer of last 1,000 ticks. Requires `instrumentation` feature or debug build.
+- `GET /api/v1/score` — returns the latest `RunScore` JSON (composite, threshold, per-dimension breakdown). Returns 204 if no score computed yet. Score updates every `computation_interval_ticks` (default 24).
 
 **Future direction (not yet built):**
 - Ore keyed by composition hash instead of asteroid ID — compatible ores blend naturally.

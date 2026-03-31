@@ -446,6 +446,12 @@ export const eventSchemas = {
     module_id: z.string(),
     efficiency: z.number(),
   }),
+
+  ScoreThresholdCrossed: z.object({
+    previous_threshold: z.string(),
+    new_threshold: z.string(),
+    composite_score: z.number(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;
