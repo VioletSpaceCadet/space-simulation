@@ -397,11 +397,11 @@ def test_scoring_dimensions_basic() -> None:
     # Seed 0 final tick is 200
     assert rows[0][0] == 0
     assert rows[0][1] == 200
-    assert abs(rows[0][2] - 500.0) < 1e-6  # composite
+    assert abs(float(rows[0][2]) - 500.0) < 1e-6  # composite
     assert rows[0][9] == "Enterprise"  # threshold
     # Seed 1 final tick is 200
     assert rows[1][0] == 1
-    assert abs(rows[1][2] - 300.0) < 1e-6
+    assert abs(float(rows[1][2]) - 300.0) < 1e-6
 
 
 def test_scoring_dimensions_single_tick() -> None:
@@ -417,7 +417,7 @@ def test_scoring_dimensions_single_tick() -> None:
     result = scoring_dimensions(rel)
     rows = result.fetchall()
     assert len(rows) == 1
-    assert abs(rows[0][2] - 123.4) < 1e-6
+    assert abs(float(rows[0][2]) - 123.4) < 1e-6
 
 
 # --- score_trajectory ---
@@ -476,9 +476,9 @@ def test_score_distribution_stats() -> None:
     assert len(rows) == 7  # composite + 6 dimensions
     # Find composite row
     composite_row = next(r for r in rows if r[0] == "composite")
-    assert abs(composite_row[1] - 500.0) < 1e-6  # mean of 400 and 600
-    assert composite_row[3] == 400.0  # min
-    assert composite_row[4] == 600.0  # max
+    assert abs(float(composite_row[1]) - 500.0) < 1e-6  # mean of 400 and 600
+    assert float(composite_row[3]) == 400.0  # min
+    assert float(composite_row[4]) == 600.0  # max
 
 
 def test_score_distribution_single_seed() -> None:
@@ -494,4 +494,4 @@ def test_score_distribution_single_seed() -> None:
     result = score_distribution(rel)
     rows = result.fetchall()
     for row in rows:
-        assert abs(row[2]) < 1e-6, f"stddev for {row[0]} should be 0, got {row[2]}"
+        assert abs(float(row[2])) < 1e-6, f"stddev for {row[0]} should be 0, got {row[2]}"
