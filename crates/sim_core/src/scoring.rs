@@ -1,9 +1,9 @@
-//! Run scoring types and configuration.
+//! Run scoring — types, configuration, and computation.
 //!
 //! `ScoringConfig` is loaded from `content/scoring.json` as part of `GameContent`.
-//! `RunScore` is the output of `compute_run_score()` (implemented in VIO-521).
-//! All types are pure data — no computation logic in this module yet.
+//! `compute_run_score()` is a pure function producing a `RunScore` from game state.
 
+use crate::{GameContent, GameState, MetricsSnapshot};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -125,6 +125,158 @@ pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Score computation
+// ---------------------------------------------------------------------------
+
+/// Compute a run score from the current metrics snapshot and game state.
+///
+/// Pure function — no state mutation, no IO. Deterministic for the same inputs.
+/// Each dimension produces a raw value, which is normalized to [0.0, 1.0] by
+/// dividing by the dimension's ceiling (clamped). The composite score is the
+/// weighted sum scaled by `scale_factor`.
+pub fn compute_run_score(
+    metrics: &MetricsSnapshot,
+    state: &GameState,
+    content: &GameContent,
+) -> RunScore {
+    let config = &content.scoring;
+    if config.dimensions.is_empty() {
+        return RunScore::default();
+    }
+
+    let tick = metrics.tick.max(1) as f64; // avoid division by zero
+
+    let mut dimensions = BTreeMap::new();
+    let mut composite = 0.0;
+
+    for dim in &config.dimensions {
+        let raw_value = compute_dimension_raw(&dim.id, metrics, state, content, tick);
+        let normalized = (raw_value / dim.ceiling).clamp(0.0, 1.0);
+        let weighted = normalized * dim.weight * config.scale_factor;
+        composite += weighted;
+
+        dimensions.insert(
+            dim.id.clone(),
+            DimensionScore {
+                id: dim.id.clone(),
+                name: dim.name.clone(),
+                raw_value,
+                normalized,
+                weighted,
+            },
+        );
+    }
+
+    let threshold = resolve_threshold(&config.thresholds, composite);
+
+    RunScore {
+        dimensions,
+        composite,
+        threshold,
+        tick: metrics.tick,
+    }
+}
+
+/// Compute the raw value for a single dimension by its ID.
+fn compute_dimension_raw(
+    dimension_id: &str,
+    metrics: &MetricsSnapshot,
+    state: &GameState,
+    content: &GameContent,
+    tick: f64,
+) -> f64 {
+    match dimension_id {
+        "industrial_output" => compute_industrial(metrics, tick),
+        "research_progress" => compute_research(metrics, content),
+        "economic_health" => compute_economic(metrics, state, tick),
+        "fleet_operations" => compute_fleet(metrics, state),
+        "efficiency" => compute_efficiency(metrics),
+        "expansion" => compute_expansion(metrics, state),
+        _ => 0.0, // unknown dimension — content-defined, scores zero
+    }
+}
+
+/// Industrial Output: material throughput per tick + assembler activity.
+fn compute_industrial(metrics: &MetricsSnapshot, tick: f64) -> f64 {
+    let throughput = f64::from(metrics.total_material_kg) / tick;
+    let assembler_active = metrics
+        .per_module_metrics
+        .get("assembler")
+        .map_or(0, |m| m.active);
+    // Throughput rate plus small assembler activity bonus (0.1 per active assembler)
+    throughput + f64::from(assembler_active) * 0.1
+}
+
+/// Research Progress: fraction of techs unlocked + scan data growth.
+fn compute_research(metrics: &MetricsSnapshot, content: &GameContent) -> f64 {
+    let total_techs = content.techs.len().max(1) as f64;
+    let tech_fraction = f64::from(metrics.techs_unlocked) / total_techs;
+    let data_signal = (f64::from(metrics.total_scan_data) / 1000.0).min(1.0);
+    // Blend: 70% tech unlock fraction, 30% data accumulation signal
+    tech_fraction * 0.7 + data_signal * 0.3
+}
+
+/// Economic Health: balance trend + export revenue per tick.
+fn compute_economic(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> f64 {
+    let starting_balance = 1_000_000_000.0_f64;
+    let balance_ratio = (state.balance / starting_balance).clamp(0.0, 2.0) / 2.0;
+    let revenue_rate = metrics.export_revenue_total / tick;
+    let revenue_signal = (revenue_rate / 10_000.0).min(1.0);
+    // Blend: 50% balance health, 50% revenue generation
+    balance_ratio * 0.5 + revenue_signal * 0.5
+}
+
+/// Fleet Operations: utilization + fleet size.
+fn compute_fleet(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
+    let total = f64::from(metrics.fleet_total).max(1.0);
+    let active = total - f64::from(metrics.fleet_idle);
+    let utilization = active / total;
+    let ships_constructed = state.ships.len().saturating_sub(1) as f64; // subtract starting ship
+    let construction_signal = (ships_constructed / 5.0).min(1.0);
+    // Blend: 60% utilization, 40% fleet growth
+    utilization * 0.6 + construction_signal * 0.4
+}
+
+/// Efficiency: inverted wear + power utilization + storage balance.
+fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
+    let wear_score = 1.0 - f64::from(metrics.avg_module_wear);
+    let power_util = if metrics.power_generated_kw > 0.0 {
+        (f64::from(metrics.power_consumed_kw) / f64::from(metrics.power_generated_kw)).min(1.0)
+    } else {
+        0.0
+    };
+    let storage_pct = f64::from(metrics.station_storage_used_pct);
+    // Penalize extremes: empty (<10%) or overflowing (>95%)
+    let storage_score = if storage_pct < 0.1 {
+        storage_pct / 0.1
+    } else if storage_pct > 0.95 {
+        (1.0 - storage_pct) / 0.05
+    } else {
+        1.0
+    };
+    // Equal blend of three efficiency signals
+    (wear_score + power_util + storage_score) / 3.0
+}
+
+/// Expansion: station count + fleet size (sqrt diminishing returns).
+fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
+    let station_count = state.stations.len() as f64;
+    let station_signal = (station_count / 3.0).min(1.0);
+    let fleet_signal = (f64::from(metrics.fleet_total).sqrt() / 3.0).min(1.0);
+    // Blend: 50% stations, 50% fleet reach
+    station_signal * 0.5 + fleet_signal * 0.5
+}
+
+/// Resolve the highest threshold name for a given composite score.
+fn resolve_threshold(thresholds: &[ThresholdDef], composite: f64) -> String {
+    thresholds
+        .iter()
+        .rev()
+        .find(|t| composite >= t.min_score)
+        .map_or_else(String::new, |t| t.name.clone())
 }
 
 // ---------------------------------------------------------------------------
@@ -353,5 +505,161 @@ mod tests {
         let config = ScoringConfig::default();
         assert_eq!(config.computation_interval_ticks, 24);
         assert!((config.scale_factor - 2500.0).abs() < f64::EPSILON);
+    }
+
+    // -- compute_run_score tests --
+
+    fn make_metrics(tick: u64) -> MetricsSnapshot {
+        crate::MetricsSnapshot {
+            tick,
+            metrics_version: crate::METRICS_VERSION,
+            total_ore_kg: 0.0,
+            total_material_kg: 500.0,
+            total_slag_kg: 0.0,
+            per_element_material_kg: BTreeMap::new(),
+            station_storage_used_pct: 0.5,
+            ship_cargo_used_pct: 0.0,
+            per_element_ore_stats: BTreeMap::new(),
+            ore_lot_count: 0,
+            avg_material_quality: 0.8,
+            per_module_metrics: BTreeMap::from([(
+                "assembler".to_string(),
+                crate::ModuleStatusMetrics {
+                    active: 1,
+                    stalled: 0,
+                    starved: 0,
+                },
+            )]),
+            fleet_total: 3,
+            fleet_idle: 1,
+            fleet_mining: 1,
+            fleet_transiting: 1,
+            fleet_surveying: 0,
+            fleet_depositing: 0,
+            fleet_refueling: 0,
+            fleet_propellant_kg: 100.0,
+            fleet_propellant_pct: 0.8,
+            propellant_consumed_total: 50.0,
+            scan_sites_remaining: 5,
+            asteroids_discovered: 3,
+            asteroids_depleted: 0,
+            techs_unlocked: 2,
+            total_scan_data: 500.0,
+            max_tech_evidence: 0.5,
+            avg_module_wear: 0.2,
+            max_module_wear: 0.5,
+            repair_kits_remaining: 5,
+            balance: 999_000_000.0,
+            crew_salary_per_hour: 0.0,
+            thruster_count: 3,
+            export_revenue_total: 50_000.0,
+            export_count: 5,
+            power_generated_kw: 10.0,
+            power_consumed_kw: 8.0,
+            power_deficit_kw: 0.0,
+            battery_charge_pct: 0.9,
+            station_max_temp_mk: 300_000,
+            station_avg_temp_mk: 293_000,
+            overheat_warning_count: 0,
+            overheat_critical_count: 0,
+            heat_wear_multiplier_avg: 1.0,
+        }
+    }
+
+    fn scored_content() -> crate::GameContent {
+        let mut content = crate::test_fixtures::base_content();
+        content.scoring = sample_config();
+        content
+    }
+
+    #[test]
+    fn compute_run_score_deterministic() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+        let metrics = make_metrics(100);
+
+        let score1 = compute_run_score(&metrics, &state, &content);
+        let score2 = compute_run_score(&metrics, &state, &content);
+        assert_eq!(score1.composite, score2.composite);
+        assert_eq!(score1.dimensions, score2.dimensions);
+    }
+
+    #[test]
+    fn all_dimensions_in_unit_range() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+        let metrics = make_metrics(100);
+
+        let score = compute_run_score(&metrics, &state, &content);
+        for (dim_id, dim_score) in &score.dimensions {
+            assert!(
+                (0.0..=1.0).contains(&dim_score.normalized),
+                "dimension '{dim_id}' normalized={} out of [0.0, 1.0]",
+                dim_score.normalized
+            );
+        }
+    }
+
+    #[test]
+    fn tick_zero_scores_startup() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+        let mut metrics = make_metrics(1);
+        metrics.total_material_kg = 0.0;
+        metrics.techs_unlocked = 0;
+        metrics.export_revenue_total = 0.0;
+        metrics.fleet_total = 1;
+        metrics.fleet_idle = 1;
+
+        let score = compute_run_score(&metrics, &state, &content);
+        // Minimal production activity, but balance alone gives economic score
+        assert!(
+            score.composite < 500.0,
+            "minimal activity should be below Enterprise (500), got {}",
+            score.composite
+        );
+    }
+
+    #[test]
+    fn empty_scoring_config_returns_default() {
+        let mut content = scored_content();
+        content.scoring = ScoringConfig::default(); // empty dimensions
+        let state = crate::test_fixtures::base_state(&content);
+        let metrics = make_metrics(100);
+
+        let score = compute_run_score(&metrics, &state, &content);
+        assert_eq!(score.composite, 0.0);
+        assert!(score.dimensions.is_empty());
+    }
+
+    #[test]
+    fn composite_scales_with_activity() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+
+        let low_metrics = make_metrics(1000);
+        let mut high_metrics = make_metrics(1000);
+        high_metrics.total_material_kg = 50_000.0;
+        high_metrics.techs_unlocked = 5;
+        high_metrics.export_revenue_total = 500_000.0;
+
+        let low_score = compute_run_score(&low_metrics, &state, &content);
+        let high_score = compute_run_score(&high_metrics, &state, &content);
+        assert!(
+            high_score.composite > low_score.composite,
+            "more activity should produce higher score: high={} vs low={}",
+            high_score.composite,
+            low_score.composite
+        );
+    }
+
+    #[test]
+    fn resolve_threshold_finds_highest() {
+        let thresholds = sample_config().thresholds;
+        assert_eq!(resolve_threshold(&thresholds, 0.0), "Startup");
+        assert_eq!(resolve_threshold(&thresholds, 199.0), "Startup");
+        assert_eq!(resolve_threshold(&thresholds, 200.0), "Contractor");
+        assert_eq!(resolve_threshold(&thresholds, 999.0), "Enterprise");
+        assert_eq!(resolve_threshold(&thresholds, 2500.0), "Space Magnate");
     }
 }

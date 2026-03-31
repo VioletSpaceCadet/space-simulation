@@ -6,11 +6,14 @@ pub fn apply_overrides(
     content: &mut GameContent,
     overrides: &HashMap<String, serde_json::Value>,
 ) -> Result<()> {
-    // Split overrides into constant and module groups.
+    // Split overrides into constant, module, and autopilot groups.
     let mut constant_overrides = Vec::new();
+    let mut autopilot_overrides = Vec::new();
     for (key, value) in overrides {
         if let Some(rest) = key.strip_prefix("module.") {
             apply_module_override(&mut content.module_defs, rest, key, value)?;
+        } else if let Some(rest) = key.strip_prefix("autopilot.") {
+            autopilot_overrides.push((rest, value));
         } else {
             constant_overrides.push((key.as_str(), value));
         }
@@ -18,6 +21,9 @@ pub fn apply_overrides(
     // Apply constant overrides in a single serialize→patch→deserialize pass.
     if !constant_overrides.is_empty() {
         apply_constant_overrides(&mut content.constants, &constant_overrides)?;
+    }
+    if !autopilot_overrides.is_empty() {
+        apply_autopilot_overrides(&mut content.autopilot, &autopilot_overrides)?;
     }
     Ok(())
 }
@@ -179,6 +185,37 @@ fn apply_constant_overrides(
 
     *constants = serde_json::from_value(serde_json::Value::Object(map))
         .context("failed to deserialize Constants after applying overrides")?;
+    Ok(())
+}
+
+/// Apply overrides to `AutopilotConfig` using the same serialize→patch→deserialize
+/// pattern as constant overrides. Keys are bare field names (without the `autopilot.` prefix).
+fn apply_autopilot_overrides(
+    autopilot: &mut sim_core::AutopilotConfig,
+    overrides: &[(&str, &serde_json::Value)],
+) -> Result<()> {
+    let serde_json::Value::Object(mut map) =
+        serde_json::to_value(&*autopilot).context("failed to serialize AutopilotConfig")?
+    else {
+        unreachable!("AutopilotConfig serializes to JSON object")
+    };
+
+    for &(key, value) in overrides {
+        if !map.contains_key(key) {
+            bail!(
+                "unknown autopilot override key 'autopilot.{key}'. \
+                 Valid keys: {}",
+                map.keys()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+        map.insert(key.to_string(), value.clone());
+    }
+
+    *autopilot = serde_json::from_value(serde_json::Value::Object(map))
+        .context("failed to deserialize AutopilotConfig after applying overrides")?;
     Ok(())
 }
 
@@ -595,5 +632,40 @@ mod tests {
                 assert_eq!(proc_def.processing_interval_minutes, 90);
             }
         }
+    }
+
+    #[test]
+    fn test_autopilot_overrides() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let original_pct = content.autopilot.slag_jettison_pct;
+        let overrides = HashMap::from([(
+            "autopilot.slag_jettison_pct".to_string(),
+            serde_json::json!(0.9),
+        )]);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert!(
+            (content.autopilot.slag_jettison_pct - 0.9).abs() < f32::EPSILON,
+            "autopilot.slag_jettison_pct should be overridden to 0.9"
+        );
+        assert!(
+            (original_pct - 0.75).abs() < f32::EPSILON,
+            "original value should have been 0.75"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_override_unknown_key_errors() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let overrides = HashMap::from([(
+            "autopilot.nonexistent_field".to_string(),
+            serde_json::json!(42),
+        )]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("unknown autopilot override key"),
+            "error should mention unknown key: {err}"
+        );
     }
 }
