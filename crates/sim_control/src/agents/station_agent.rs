@@ -900,9 +900,9 @@ fn default_concerns() -> Vec<Box<dyn StationConcern>> {
 
 /// Iterator state for ship objective candidate lists.
 struct ObjectiveCandidates<'a> {
-    next_mine: &'a std::slice::Iter<'a, AsteroidId>,
-    next_site: &'a std::slice::Iter<'a, SiteId>,
-    next_deep_scan: &'a std::slice::Iter<'a, AsteroidId>,
+    mine: &'a std::slice::Iter<'a, AsteroidId>,
+    site: &'a std::slice::Iter<'a, SiteId>,
+    deep_scan: &'a std::slice::Iter<'a, AsteroidId>,
 }
 
 /// Log a ship objective assignment decision.
@@ -925,19 +925,19 @@ fn log_objective_decision(
     // The _ arm reports deep_scan alternatives (only other scored type).
     let alts: Vec<String> = match priority {
         "Mine" => candidates
-            .next_mine
+            .mine
             .clone()
             .take(3)
             .map(|id| id.0.clone())
             .collect(),
         "Survey" => candidates
-            .next_site
+            .site
             .clone()
             .take(3)
             .map(|id| id.0.clone())
             .collect(),
         _ => candidates
-            .next_deep_scan
+            .deep_scan
             .clone()
             .take(3)
             .map(|id| id.0.clone())
@@ -958,9 +958,9 @@ fn log_objective_decision(
         alt_3_score: 0.0,
         context_json: format!(
             "{{\"mine_remaining\":{},\"survey_remaining\":{},\"deep_scan_remaining\":{}}}",
-            candidates.next_mine.clone().count(),
-            candidates.next_site.clone().count(),
-            candidates.next_deep_scan.clone().count(),
+            candidates.mine.clone().count(),
+            candidates.site.clone().count(),
+            candidates.deep_scan.clone().count(),
         ),
     });
 }
@@ -1079,9 +1079,9 @@ impl StationAgent {
                 if let Some(obj) = objective {
                     if let Some(ref mut log) = decisions {
                         let cands = ObjectiveCandidates {
-                            next_mine: &next_mine,
-                            next_site: &next_site,
-                            next_deep_scan: &next_deep_scan,
+                            mine: &next_mine,
+                            site: &next_site,
+                            deep_scan: &next_deep_scan,
                         };
                         log_objective_decision(
                             log,
