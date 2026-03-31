@@ -1,0 +1,49 @@
+{
+  "dimensions": [
+    {
+      "id": "industrial_output",
+      "name": "Industrial Output",
+      "weight": 0.25,
+      "ceiling": 1000.0
+    },
+    {
+      "id": "research_progress",
+      "name": "Research Progress",
+      "weight": 0.20,
+      "ceiling": 1.0
+    },
+    {
+      "id": "economic_health",
+      "name": "Economic Health",
+      "weight": 0.20,
+      "ceiling": 1.0
+    },
+    {
+      "id": "fleet_operations",
+      "name": "Fleet Operations",
+      "weight": 0.15,
+      "ceiling": 1.0
+    },
+    {
+      "id": "efficiency",
+      "name": "Efficiency",
+      "weight": 0.10,
+      "ceiling": 1.0
+    },
+    {
+      "id": "expansion",
+      "name": "Expansion",
+      "weight": 0.10,
+      "ceiling": 1.0
+    }
+  ],
+  "thresholds": [
+    { "name": "Startup", "min_score": 0.0 },
+    { "name": "Contractor", "min_score": 200.0 },
+    { "name": "Enterprise", "min_score": 500.0 },
+    { "name": "Industrial Giant", "min_score": 1000.0 },
+    { "name": "Space Magnate", "min_score": 2000.0 }
+  ],
+  "computation_interval_ticks": 24,
+  "scale_factor": 2500.0
+}

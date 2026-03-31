@@ -47,6 +47,7 @@ pub fn validate_content(content: &GameContent) {
     validate_hull_defs(content);
     validate_autopilot(content, &element_ids);
     validate_crew_roles(content);
+    validate_scoring(content);
 }
 
 fn validate_constants(content: &GameContent) {
@@ -479,6 +480,17 @@ fn validate_crew_roles(content: &GameContent) {
     }
 }
 
+fn validate_scoring(content: &GameContent) {
+    // Skip validation for test fixtures that use ScoringConfig::default() (empty dimensions).
+    // Real content from scoring.json will have dimensions populated.
+    if content.scoring.dimensions.is_empty() && content.scoring.thresholds.is_empty() {
+        return;
+    }
+    if let Err(err) = sim_core::validate_scoring_config(&content.scoring) {
+        panic!("invalid scoring config: {err}");
+    }
+}
+
 pub fn validate_state(state: &GameState, content: &GameContent) {
     let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
     for station in state.stations.values() {
@@ -633,6 +645,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let initial_station: sim_core::InitialStationDef =
         load_optional_json(dir, "initial_station.json")?;
     let autopilot: sim_core::AutopilotConfig = load_optional_json(dir, "autopilot.json")?;
+    let scoring: sim_core::ScoringConfig = load_optional_json(dir, "scoring.json")?;
     let crew_roles = load_crew_roles(dir)?;
     let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
@@ -667,6 +680,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         initial_station,
         autopilot,
         crew_roles,
+        scoring,
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -1851,6 +1865,47 @@ mod tests {
                 module_def_id: sim_core::ModuleDefId("mod_valid".to_string()),
             }],
         );
+        validate_content(&content);
+    }
+
+    #[test]
+    fn scoring_config_loads_from_content() {
+        let content = load_content("../../content").expect("load_content failed");
+        assert_eq!(content.scoring.dimensions.len(), 6);
+        assert_eq!(content.scoring.thresholds.len(), 5);
+        assert_eq!(content.scoring.computation_interval_ticks, 24);
+        assert!(
+            sim_core::validate_scoring_config(&content.scoring).is_ok(),
+            "scoring config should be valid"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid scoring config")]
+    fn scoring_config_bad_weights_panics() {
+        let mut content = minimal_content();
+        content.scoring = sim_core::ScoringConfig {
+            dimensions: vec![
+                sim_core::DimensionDef {
+                    id: "a".into(),
+                    name: "A".into(),
+                    weight: 0.6,
+                    ceiling: 1.0,
+                },
+                sim_core::DimensionDef {
+                    id: "b".into(),
+                    name: "B".into(),
+                    weight: 0.6, // sums to 1.2
+                    ceiling: 1.0,
+                },
+            ],
+            thresholds: vec![sim_core::ThresholdDef {
+                name: "Start".into(),
+                min_score: 0.0,
+            }],
+            computation_interval_ticks: 24,
+            scale_factor: 2500.0,
+        };
         validate_content(&content);
     }
 }

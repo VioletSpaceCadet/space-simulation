@@ -230,6 +230,9 @@ pub struct GameContent {
     /// Crew role definitions loaded from `content/crew_roles.json`.
     #[serde(default)]
     pub crew_roles: BTreeMap<CrewRole, CrewRoleDef>,
+    /// Scoring configuration loaded from `content/scoring.json`.
+    #[serde(default)]
+    pub scoring: crate::scoring::ScoringConfig,
     /// Pre-computed element id -> density (kg/m3) lookup. Populated by `init_caches()`.
     #[serde(skip)]
     pub density_map: AHashMap<String, f32>,

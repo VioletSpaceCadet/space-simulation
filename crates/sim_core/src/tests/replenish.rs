@@ -139,6 +139,7 @@ fn replenish_test_content() -> GameContent {
         initial_station: crate::InitialStationDef::default(),
         autopilot: crate::AutopilotConfig::default(),
         crew_roles: std::collections::BTreeMap::new(),
+        scoring: Default::default(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
