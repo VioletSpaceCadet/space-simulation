@@ -29,17 +29,40 @@ fn has_unsatisfied_crew_need(station: &sim_core::StationState, content: &GameCon
     })
 }
 
-/// Per-station agent that consolidates all station-level concerns into
-/// ordered sub-concern methods.
+/// Context passed to each station concern on every tick.
+pub(crate) struct StationContext<'a> {
+    pub station_id: &'a StationId,
+    pub state: &'a GameState,
+    pub content: &'a GameContent,
+    pub owner: &'a PrincipalId,
+    pub next_id: &'a mut u64,
+    pub trade_unlocked: bool,
+}
+
+/// A composable station-level concern that generates commands.
 ///
-/// Execution order: modules → labs → crew → economy (trade-gated) →
-/// slag → exports (trade-gated) → propellant → ship fitting.
-/// Each sub-concern is a method, not a separate trait object.
+/// Each concern is a separate struct. `StationAgent` holds a `Vec` of
+/// concerns and runs them in order. Adding a new concern means creating
+/// a new struct and adding it to `default_concerns()` — no changes to
+/// `StationAgent` itself.
+pub(crate) trait StationConcern: Send {
+    /// Human-readable concern name for decision logging (VIO-468).
+    #[allow(dead_code)]
+    fn name(&self) -> &'static str;
+    fn should_run(&self, ctx: &StationContext) -> bool;
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope>;
+}
+
+/// Per-station agent that composes ordered concerns.
+///
+/// Execution order is determined by `default_concerns()`:
+/// modules → labs → crew → recruit → import → slag → exports →
+/// propellant → ship fitting.
 ///
 /// Created per `StationState`; removed when the station is removed from state.
 pub(crate) struct StationAgent {
     pub(crate) station_id: StationId,
-    pub(crate) lab_cache: LabAssignmentCache,
+    concerns: Vec<Box<dyn StationConcern>>,
 }
 
 /// Per-station cache for lab assignment decisions.
@@ -56,192 +79,210 @@ pub(crate) struct LabAssignmentCache {
     pub(crate) initialized: bool,
 }
 
-impl StationAgent {
-    pub(crate) fn new(station_id: StationId) -> Self {
-        Self {
-            station_id,
-            lab_cache: LabAssignmentCache::default(),
+// --- Concern structs ---
+
+/// 1. Install modules from inventory, re-enable disabled modules (except
+///    propellant-role and max-wear), set processor thresholds.
+pub(crate) struct ModuleManagement;
+
+/// Shed load during power deficit or re-enable modules during surplus.
+fn manage_power(
+    station: &sim_core::StationState,
+    ctx: &mut StationContext,
+    commands: &mut Vec<CommandEnvelope>,
+) {
+    let has_power_gen = station.power.generated_kw > 0.0;
+    let deficit_kw = station.power.deficit_kw;
+    if has_power_gen && deficit_kw > 0.01 {
+        // Power deficit: disable least-critical consumers to shed load.
+        // Uses power_priority() — None = infrastructure (never shed), lower = shed first.
+        let mut shedding_candidates: Vec<(usize, f32, u8)> = station
+            .modules
+            .iter()
+            .enumerate()
+            .filter_map(|(index, module)| {
+                if !module.enabled {
+                    return None;
+                }
+                let def = ctx.content.module_defs.get(&module.def_id)?;
+                let priority = def.power_priority()?; // None = infrastructure, skip
+                if def.power_consumption_per_run <= 0.0 {
+                    return None;
+                }
+                // Never shed propellant pipeline modules
+                if ctx
+                    .content
+                    .module_has_role(&module.def_id, &ctx.content.autopilot.propellant_role)
+                {
+                    return None;
+                }
+                Some((index, def.power_consumption_per_run, priority))
+            })
+            .collect();
+        // Sort ascending: lowest priority number = least critical = shed first
+        shedding_candidates.sort_by(|a, b| a.2.cmp(&b.2).then_with(|| a.0.cmp(&b.0)));
+
+        let mut remaining_deficit = deficit_kw;
+        for (index, power_kw, _) in &shedding_candidates {
+            if remaining_deficit <= 0.0 {
+                break;
+            }
+            let module = &station.modules[*index];
+            commands.push(make_cmd(
+                ctx.owner,
+                ctx.state.meta.tick,
+                ctx.next_id,
+                Command::SetModuleEnabled {
+                    station_id: ctx.station_id.clone(),
+                    module_id: module.id.clone(),
+                    enabled: false,
+                },
+            ));
+            remaining_deficit -= power_kw;
+        }
+    } else {
+        // No deficit (or no power infrastructure): re-enable disabled modules.
+        // When power infra exists, respect headroom; otherwise re-enable all.
+        let mut available_headroom = station.power.generated_kw - station.power.consumed_kw;
+        for module in &station.modules {
+            if !module.enabled
+                && module.wear.wear < 1.0
+                && !ctx
+                    .content
+                    .module_has_role(&module.def_id, &ctx.content.autopilot.propellant_role)
+            {
+                let power_cost = ctx
+                    .content
+                    .module_defs
+                    .get(&module.def_id)
+                    .map_or(0.0, |d| d.power_consumption_per_run);
+                if !has_power_gen || power_cost <= available_headroom || power_cost <= 0.0 {
+                    commands.push(make_cmd(
+                        ctx.owner,
+                        ctx.state.meta.tick,
+                        ctx.next_id,
+                        Command::SetModuleEnabled {
+                            station_id: ctx.station_id.clone(),
+                            module_id: module.id.clone(),
+                            enabled: true,
+                        },
+                    ));
+                    available_headroom -= power_cost;
+                }
+            }
         }
     }
+}
 
-    // --- Sub-concern methods ---
-    // Execution order matches fixed sub-concern ordering for determinism.
-
-    /// 1. Install modules from inventory, re-enable disabled modules (except
-    ///    propellant-role and max-wear), set processor thresholds.
-    fn manage_modules(
-        &mut self,
-        state: &GameState,
-        content: &GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-        commands: &mut Vec<CommandEnvelope>,
-    ) {
-        let Some(station) = state.stations.get(&self.station_id) else {
-            return;
+impl StationConcern for ModuleManagement {
+    fn name(&self) -> &'static str {
+        "module_management"
+    }
+    fn should_run(&self, _ctx: &StationContext) -> bool {
+        true
+    }
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
+        let Some(station) = ctx.state.stations.get(ctx.station_id) else {
+            return Vec::new();
         };
+
+        let mut commands = Vec::new();
 
         for item in &station.inventory {
             if let InventoryItem::Module { item_id, .. } = item {
                 commands.push(make_cmd(
-                    owner,
-                    state.meta.tick,
-                    next_id,
+                    ctx.owner,
+                    ctx.state.meta.tick,
+                    ctx.next_id,
                     Command::InstallModule {
-                        station_id: self.station_id.clone(),
+                        station_id: ctx.station_id.clone(),
                         module_item_id: item_id.clone(),
                     },
                 ));
             }
         }
 
-        // Power-aware module management: shed load during deficit, re-enable during surplus.
-        // Only apply when the station has power generation infrastructure (solar/battery).
-        let has_power_gen = station.power.generated_kw > 0.0;
-        let deficit_kw = station.power.deficit_kw;
-        if has_power_gen && deficit_kw > 0.01 {
-            // Power deficit: disable least-critical consumers to shed load.
-            // Uses power_priority() — None = infrastructure (never shed), lower = shed first.
-            let mut shedding_candidates: Vec<(usize, f32, u8)> = station
-                .modules
-                .iter()
-                .enumerate()
-                .filter_map(|(index, module)| {
-                    if !module.enabled {
-                        return None;
-                    }
-                    let def = content.module_defs.get(&module.def_id)?;
-                    let priority = def.power_priority()?; // None = infrastructure, skip
-                    if def.power_consumption_per_run <= 0.0 {
-                        return None;
-                    }
-                    // Never shed propellant pipeline modules
-                    if content.module_has_role(&module.def_id, &content.autopilot.propellant_role) {
-                        return None;
-                    }
-                    Some((index, def.power_consumption_per_run, priority))
-                })
-                .collect();
-            // Sort ascending: lowest priority number = least critical = shed first
-            shedding_candidates.sort_by(|a, b| a.2.cmp(&b.2).then_with(|| a.0.cmp(&b.0)));
-
-            let mut remaining_deficit = deficit_kw;
-            for (index, power_kw, _) in &shedding_candidates {
-                if remaining_deficit <= 0.0 {
-                    break;
-                }
-                let module = &station.modules[*index];
-                commands.push(make_cmd(
-                    owner,
-                    state.meta.tick,
-                    next_id,
-                    Command::SetModuleEnabled {
-                        station_id: self.station_id.clone(),
-                        module_id: module.id.clone(),
-                        enabled: false,
-                    },
-                ));
-                remaining_deficit -= power_kw;
-            }
-        } else {
-            // No deficit (or no power infrastructure): re-enable disabled modules.
-            // When power infra exists, respect headroom; otherwise re-enable all.
-            let mut available_headroom = station.power.generated_kw - station.power.consumed_kw;
-            for module in &station.modules {
-                if !module.enabled
-                    && module.wear.wear < 1.0
-                    && !content.module_has_role(&module.def_id, &content.autopilot.propellant_role)
-                {
-                    let power_cost = content
-                        .module_defs
-                        .get(&module.def_id)
-                        .map_or(0.0, |d| d.power_consumption_per_run);
-                    if !has_power_gen || power_cost <= available_headroom || power_cost <= 0.0 {
-                        commands.push(make_cmd(
-                            owner,
-                            state.meta.tick,
-                            next_id,
-                            Command::SetModuleEnabled {
-                                station_id: self.station_id.clone(),
-                                module_id: module.id.clone(),
-                                enabled: true,
-                            },
-                        ));
-                        available_headroom -= power_cost;
-                    }
-                }
-            }
-        }
+        manage_power(station, ctx, &mut commands);
 
         for module in &station.modules {
             if let ModuleKindState::Processor(processor_state) = &module.kind_state {
                 if processor_state.threshold_kg == 0.0 {
                     commands.push(make_cmd(
-                        owner,
-                        state.meta.tick,
-                        next_id,
+                        ctx.owner,
+                        ctx.state.meta.tick,
+                        ctx.next_id,
                         Command::SetModuleThreshold {
-                            station_id: self.station_id.clone(),
+                            station_id: ctx.station_id.clone(),
                             module_id: module.id.clone(),
-                            threshold_kg: content.constants.autopilot_refinery_threshold_kg,
+                            threshold_kg: ctx.content.constants.autopilot_refinery_threshold_kg,
                         },
                     ));
                 }
             }
         }
-    }
 
-    /// 2. Assign unassigned labs to the highest-priority eligible tech.
-    fn assign_labs(
-        &mut self,
-        state: &GameState,
-        content: &GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-        commands: &mut Vec<CommandEnvelope>,
-    ) {
+        commands
+    }
+}
+
+/// 2. Assign unassigned labs to the highest-priority eligible tech.
+#[derive(Default)]
+pub(crate) struct LabAssignment {
+    cache: LabAssignmentCache,
+}
+
+impl StationConcern for LabAssignment {
+    fn name(&self) -> &'static str {
+        "lab_assignment"
+    }
+    fn should_run(&self, _ctx: &StationContext) -> bool {
+        true
+    }
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
         // Rebuild eligible tech cache when unlocked set changes.
-        let unlocked_count = state.research.unlocked.len();
-        if !self.lab_cache.initialized || unlocked_count != self.lab_cache.last_unlocked_count {
-            self.lab_cache.cached_eligible.clear();
-            for tech in &content.techs {
-                if state.research.unlocked.contains(&tech.id) {
+        let unlocked_count = ctx.state.research.unlocked.len();
+        if !self.cache.initialized || unlocked_count != self.cache.last_unlocked_count {
+            self.cache.cached_eligible.clear();
+            for tech in &ctx.content.techs {
+                if ctx.state.research.unlocked.contains(&tech.id) {
                     continue;
                 }
                 if !tech
                     .prereqs
                     .iter()
-                    .all(|p| state.research.unlocked.contains(p))
+                    .all(|p| ctx.state.research.unlocked.contains(p))
                 {
                     continue;
                 }
                 for domain in tech.domain_requirements.keys() {
-                    self.lab_cache
+                    self.cache
                         .cached_eligible
                         .entry(domain.clone())
                         .or_default()
                         .push(tech.id.clone());
                 }
             }
-            self.lab_cache.last_unlocked_count = unlocked_count;
-            self.lab_cache.initialized = true;
+            self.cache.last_unlocked_count = unlocked_count;
+            self.cache.initialized = true;
         }
 
-        let Some(station) = state.stations.get(&self.station_id) else {
-            return;
+        let Some(station) = ctx.state.stations.get(ctx.station_id) else {
+            return Vec::new();
         };
+
+        let mut commands = Vec::new();
 
         for module in &station.modules {
             let ModuleKindState::Lab(lab_state) = &module.kind_state else {
                 continue;
             };
             if let Some(ref tech_id) = lab_state.assigned_tech {
-                if !state.research.unlocked.contains(tech_id) {
+                if !ctx.state.research.unlocked.contains(tech_id) {
                     continue;
                 }
             }
 
-            let Some(def) = content.module_defs.get(&module.def_id) else {
+            let Some(def) = ctx.content.module_defs.get(&module.def_id) else {
                 continue;
             };
             let ModuleBehaviorDef::Lab(lab_def) = &def.behavior else {
@@ -249,16 +290,17 @@ impl StationAgent {
             };
 
             let eligible = self
-                .lab_cache
+                .cache
                 .cached_eligible
                 .get(&lab_def.domain)
                 .map_or(&[][..], |v| v.as_slice());
             let mut candidates: Vec<(TechId, f32)> = eligible
                 .iter()
-                .filter(|tid| !state.research.unlocked.contains(tid))
+                .filter(|tid| !ctx.state.research.unlocked.contains(tid))
                 .filter_map(|tid| {
-                    let tech = content.techs.iter().find(|t| t.id == *tid)?;
-                    let sufficiency = compute_sufficiency(tech, state.research.evidence.get(tid));
+                    let tech = ctx.content.techs.iter().find(|t| t.id == *tid)?;
+                    let sufficiency =
+                        compute_sufficiency(tech, ctx.state.research.evidence.get(tid));
                     Some((tid.clone(), sufficiency))
                 })
                 .collect();
@@ -266,38 +308,43 @@ impl StationAgent {
 
             if let Some((tech_id, _)) = candidates.first() {
                 commands.push(make_cmd(
-                    owner,
-                    state.meta.tick,
-                    next_id,
+                    ctx.owner,
+                    ctx.state.meta.tick,
+                    ctx.next_id,
                     Command::AssignLabTech {
-                        station_id: self.station_id.clone(),
+                        station_id: ctx.station_id.clone(),
                         module_id: module.id.clone(),
                         tech_id: Some(tech_id.clone()),
                     },
                 ));
             }
         }
-    }
 
-    /// 3. Assign available crew to understaffed modules by priority.
-    fn assign_crew(
-        &mut self,
-        state: &GameState,
-        content: &GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-        commands: &mut Vec<CommandEnvelope>,
-    ) {
-        let Some(station) = state.stations.get(&self.station_id) else {
-            return;
+        commands
+    }
+}
+
+/// 3. Assign available crew to understaffed modules by priority.
+struct CrewAssignment;
+
+impl StationConcern for CrewAssignment {
+    fn name(&self) -> &'static str {
+        "crew_assignment"
+    }
+    fn should_run(&self, _ctx: &StationContext) -> bool {
+        true
+    }
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
+        let Some(station) = ctx.state.stations.get(ctx.station_id) else {
+            return Vec::new();
         };
 
-        // Early exit: skip if no module needs crew assignment
-        if !has_unsatisfied_crew_need(station, content) || station.crew.is_empty() {
-            return;
+        if !has_unsatisfied_crew_need(station, ctx.content) || station.crew.is_empty() {
+            return Vec::new();
         }
 
-        let tick = state.meta.tick;
+        let tick = ctx.state.meta.tick;
+        let mut commands = Vec::new();
 
         let mut module_order: Vec<usize> = (0..station.modules.len()).collect();
         module_order.sort_by(|&a, &b| {
@@ -322,7 +369,7 @@ impl StationAgent {
             if !module.enabled || module.prev_crew_satisfied {
                 continue;
             }
-            let Some(def) = content.module_defs.get(&module.def_id) else {
+            let Some(def) = ctx.content.module_defs.get(&module.def_id) else {
                 continue;
             };
             if def.crew_requirement.is_empty() {
@@ -337,11 +384,11 @@ impl StationAgent {
                 let can_assign = available.get(role).copied().unwrap_or(0).min(gap);
                 if can_assign > 0 {
                     commands.push(make_cmd(
-                        owner,
+                        ctx.owner,
                         tick,
-                        next_id,
+                        ctx.next_id,
                         Command::AssignCrew {
-                            station_id: self.station_id.clone(),
+                            station_id: ctx.station_id.clone(),
                             module_id: module.id.clone(),
                             role: role.clone(),
                             count: can_assign,
@@ -353,27 +400,32 @@ impl StationAgent {
                 }
             }
         }
-    }
 
-    /// 4. Recruit crew when demand exceeds supply.
-    fn recruit_crew(
-        &mut self,
-        state: &GameState,
-        content: &GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-        commands: &mut Vec<CommandEnvelope>,
-    ) {
-        let Some(station) = state.stations.get(&self.station_id) else {
-            return;
+        commands
+    }
+}
+
+/// 4. Recruit crew when demand exceeds supply.
+struct CrewRecruitment;
+
+impl StationConcern for CrewRecruitment {
+    fn name(&self) -> &'static str {
+        "crew_recruitment"
+    }
+    fn should_run(&self, ctx: &StationContext) -> bool {
+        ctx.trade_unlocked
+    }
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
+        let Some(station) = ctx.state.stations.get(ctx.station_id) else {
+            return Vec::new();
         };
 
-        // Early exit: skip if all modules are crew-satisfied
-        if !has_unsatisfied_crew_need(station, content) {
-            return;
+        if !has_unsatisfied_crew_need(station, ctx.content) {
+            return Vec::new();
         }
 
-        let tick = state.meta.tick;
+        let tick = ctx.state.meta.tick;
+        let mut commands = Vec::new();
 
         let mut demand: std::collections::BTreeMap<sim_core::CrewRole, u32> =
             std::collections::BTreeMap::new();
@@ -381,7 +433,7 @@ impl StationAgent {
             if !module.enabled {
                 continue;
             }
-            let Some(def) = content.module_defs.get(&module.def_id) else {
+            let Some(def) = ctx.content.module_defs.get(&module.def_id) else {
                 continue;
             };
             for (role, &count) in &def.crew_requirement {
@@ -399,75 +451,83 @@ impl StationAgent {
                 role: role.clone(),
                 count: shortfall,
             };
-            let Some(cost) = trade::compute_import_cost(&item_spec, &content.pricing, content)
+            let Some(cost) =
+                trade::compute_import_cost(&item_spec, &ctx.content.pricing, ctx.content)
             else {
                 continue;
             };
-            let budget_cap = state.balance * content.constants.autopilot_budget_cap_fraction;
+            let budget_cap =
+                ctx.state.balance * ctx.content.constants.autopilot_budget_cap_fraction;
             if cost > budget_cap {
                 continue;
             }
             // Salary projection: skip if hiring would cause bankruptcy within 30 days
-            let hours_per_tick = f64::from(content.constants.minutes_per_tick) / 60.0;
-            let projection_ticks = content.constants.game_minutes_to_ticks(30 * 24 * 60);
-            let current_salary_per_tick: f64 = state
+            let hours_per_tick = f64::from(ctx.content.constants.minutes_per_tick) / 60.0;
+            let projection_ticks = ctx.content.constants.game_minutes_to_ticks(30 * 24 * 60);
+            let current_salary_per_tick: f64 = ctx
+                .state
                 .stations
                 .values()
                 .flat_map(|s| s.crew.iter())
                 .map(|(r, &c)| {
-                    content
+                    ctx.content
                         .crew_roles
                         .get(r)
                         .map_or(0.0, |d| d.salary_per_hour * f64::from(c) * hours_per_tick)
                 })
                 .sum();
-            let new_hire_salary_per_tick = content.crew_roles.get(role).map_or(0.0, |d| {
+            let new_hire_salary_per_tick = ctx.content.crew_roles.get(role).map_or(0.0, |d| {
                 d.salary_per_hour * f64::from(shortfall) * hours_per_tick
             });
-            let projected = state.balance
+            let projected = ctx.state.balance
                 - cost
                 - (current_salary_per_tick + new_hire_salary_per_tick) * projection_ticks as f64;
             if projected < 0.0 {
                 continue;
             }
             commands.push(make_cmd(
-                owner,
+                ctx.owner,
                 tick,
-                next_id,
+                ctx.next_id,
                 Command::Import {
-                    station_id: self.station_id.clone(),
+                    station_id: ctx.station_id.clone(),
                     item_spec,
                 },
             ));
         }
-    }
 
-    /// 5. Import thruster components for shipyard.
-    fn import_components(
-        &mut self,
-        state: &GameState,
-        content: &GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-        commands: &mut Vec<CommandEnvelope>,
-    ) {
-        let Some(station) = state.stations.get(&self.station_id) else {
-            return;
+        commands
+    }
+}
+
+/// 5. Import thruster components for shipyard.
+struct ComponentImport;
+
+impl StationConcern for ComponentImport {
+    fn name(&self) -> &'static str {
+        "component_import"
+    }
+    fn should_run(&self, ctx: &StationContext) -> bool {
+        ctx.trade_unlocked
+    }
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
+        let Some(station) = ctx.state.stations.get(ctx.station_id) else {
+            return Vec::new();
         };
 
-        let tech_unlocked = state
-            .research
-            .unlocked
-            .contains(&TechId(content.autopilot.ship_construction_tech.clone()));
+        let tech_unlocked = ctx.state.research.unlocked.contains(&TechId(
+            ctx.content.autopilot.ship_construction_tech.clone(),
+        ));
         if !tech_unlocked {
-            return;
+            return Vec::new();
         }
 
-        let shipyard_role = &content.autopilot.shipyard_role;
-        let import_component = &content.autopilot.shipyard_import_component;
+        let shipyard_role = &ctx.content.autopilot.shipyard_role;
+        let import_component = &ctx.content.autopilot.shipyard_import_component;
 
         // Find the shipyard recipe's component requirement
-        let mut shipyard_defs: Vec<_> = content
+        let mut shipyard_defs: Vec<_> = ctx
+            .content
             .module_defs
             .values()
             .filter(|def| def.roles.iter().any(|r| r == shipyard_role))
@@ -479,11 +539,11 @@ impl StationAgent {
                 ModuleBehaviorDef::Assembler(assembler_def) => assembler_def
                     .recipes
                     .first()
-                    .and_then(|recipe_id| content.recipes.get(recipe_id)),
+                    .and_then(|recipe_id| ctx.content.recipes.get(recipe_id)),
                 _ => None,
             })
             .map_or(
-                content.constants.autopilot_shipyard_component_count,
+                ctx.content.constants.autopilot_shipyard_component_count,
                 |recipe| {
                     recipe
                         .inputs
@@ -496,7 +556,7 @@ impl StationAgent {
                             }
                             _ => None,
                         })
-                        .unwrap_or(content.constants.autopilot_shipyard_component_count)
+                        .unwrap_or(ctx.content.constants.autopilot_shipyard_component_count)
                 },
             );
 
@@ -505,7 +565,7 @@ impl StationAgent {
             .iter()
             .any(|&idx| station.modules[idx].enabled);
         if !has_shipyard {
-            return;
+            return Vec::new();
         }
 
         let component_count: u32 = station
@@ -521,7 +581,7 @@ impl StationAgent {
             })
             .sum();
         if component_count >= required_components {
-            return;
+            return Vec::new();
         }
 
         let needed = required_components - component_count;
@@ -530,42 +590,46 @@ impl StationAgent {
             count: needed,
         };
 
-        let Some(cost) = trade::compute_import_cost(&item_spec, &content.pricing, content) else {
-            return;
+        let Some(cost) = trade::compute_import_cost(&item_spec, &ctx.content.pricing, ctx.content)
+        else {
+            return Vec::new();
         };
-        if cost > state.balance * content.constants.autopilot_budget_cap_fraction {
-            return;
+        if cost > ctx.state.balance * ctx.content.constants.autopilot_budget_cap_fraction {
+            return Vec::new();
         }
 
-        commands.push(make_cmd(
-            owner,
-            state.meta.tick,
-            next_id,
+        vec![make_cmd(
+            ctx.owner,
+            ctx.state.meta.tick,
+            ctx.next_id,
             Command::Import {
-                station_id: self.station_id.clone(),
+                station_id: ctx.station_id.clone(),
                 item_spec,
             },
-        ));
+        )]
     }
+}
 
-    /// 6. Jettison slag when storage usage exceeds threshold.
-    fn jettison_slag(
-        &mut self,
-        state: &GameState,
-        content: &GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-        commands: &mut Vec<CommandEnvelope>,
-    ) {
-        let Some(station) = state.stations.get(&self.station_id) else {
-            return;
+/// 6. Jettison slag when storage usage exceeds threshold.
+struct SlagJettison;
+
+impl StationConcern for SlagJettison {
+    fn name(&self) -> &'static str {
+        "slag_jettison"
+    }
+    fn should_run(&self, _ctx: &StationContext) -> bool {
+        true
+    }
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
+        let Some(station) = ctx.state.stations.get(ctx.station_id) else {
+            return Vec::new();
         };
 
-        let threshold = content.constants.autopilot_slag_jettison_pct;
+        let threshold = ctx.content.constants.autopilot_slag_jettison_pct;
         if station.cargo_capacity_m3 <= 0.0 {
-            return;
+            return Vec::new();
         }
-        let used_m3 = inventory_volume_m3(&station.inventory, content);
+        let used_m3 = inventory_volume_m3(&station.inventory, ctx.content);
         let used_pct = used_m3 / station.cargo_capacity_m3;
 
         if used_pct >= threshold
@@ -574,36 +638,42 @@ impl StationAgent {
                 .iter()
                 .any(|i| matches!(i, InventoryItem::Slag { .. }))
         {
-            commands.push(make_cmd(
-                owner,
-                state.meta.tick,
-                next_id,
+            vec![make_cmd(
+                ctx.owner,
+                ctx.state.meta.tick,
+                ctx.next_id,
                 Command::JettisonSlag {
-                    station_id: self.station_id.clone(),
+                    station_id: ctx.station_id.clone(),
                 },
-            ));
+            )]
+        } else {
+            Vec::new()
         }
     }
+}
 
-    /// 7. Export surplus materials for revenue.
-    fn export_materials(
-        &mut self,
-        state: &GameState,
-        content: &GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-        commands: &mut Vec<CommandEnvelope>,
-    ) {
-        let Some(station) = state.stations.get(&self.station_id) else {
-            return;
+/// 7. Export surplus materials for revenue.
+struct MaterialExport;
+
+impl StationConcern for MaterialExport {
+    fn name(&self) -> &'static str {
+        "material_export"
+    }
+    fn should_run(&self, ctx: &StationContext) -> bool {
+        ctx.trade_unlocked
+    }
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
+        let Some(station) = ctx.state.stations.get(ctx.station_id) else {
+            return Vec::new();
         };
 
-        let batch_size_kg = content.constants.autopilot_export_batch_size_kg;
-        let min_revenue = content.constants.autopilot_export_min_revenue;
+        let batch_size_kg = ctx.content.constants.autopilot_export_batch_size_kg;
+        let min_revenue = ctx.content.constants.autopilot_export_min_revenue;
+        let mut commands = Vec::new();
 
-        let candidates = build_export_candidates(station, &content.autopilot, batch_size_kg);
+        let candidates = build_export_candidates(station, &ctx.content.autopilot, batch_size_kg);
         for candidate in candidates {
-            if trade::compute_export_revenue(&candidate, &content.pricing, content)
+            if trade::compute_export_revenue(&candidate, &ctx.content.pricing, ctx.content)
                 .is_none_or(|rev| rev < min_revenue)
             {
                 continue;
@@ -612,50 +682,57 @@ impl StationAgent {
                 continue;
             }
             commands.push(make_cmd(
-                owner,
-                state.meta.tick,
-                next_id,
+                ctx.owner,
+                ctx.state.meta.tick,
+                ctx.next_id,
                 Command::Export {
-                    station_id: self.station_id.clone(),
+                    station_id: ctx.station_id.clone(),
                     item_spec: candidate,
                 },
             ));
         }
-    }
 
-    /// 8. Toggle propellant modules based on global LH2 levels (hysteresis).
-    pub(crate) fn manage_propellant(
-        &mut self,
-        state: &GameState,
-        content: &GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-        commands: &mut Vec<CommandEnvelope>,
-    ) {
-        let Some(station) = state.stations.get(&self.station_id) else {
-            return;
+        commands
+    }
+}
+
+/// 8. Toggle propellant modules based on global LH2 levels (hysteresis).
+pub(crate) struct PropellantManagement;
+
+impl StationConcern for PropellantManagement {
+    fn name(&self) -> &'static str {
+        "propellant_management"
+    }
+    fn should_run(&self, _ctx: &StationContext) -> bool {
+        true
+    }
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
+        let Some(station) = ctx.state.stations.get(ctx.station_id) else {
+            return Vec::new();
         };
 
-        let propellant_role = &content.autopilot.propellant_role;
-        let support_role = &content.autopilot.propellant_support_role;
+        let propellant_role = &ctx.content.autopilot.propellant_role;
+        let support_role = &ctx.content.autopilot.propellant_support_role;
 
         if !station.has_role(propellant_role) {
-            return;
+            return Vec::new();
         }
 
-        let propellant_kg = total_element_inventory(state, &content.autopilot.propellant_element);
-        let threshold = content.constants.autopilot_lh2_threshold_kg;
+        let propellant_kg =
+            total_element_inventory(ctx.state, &ctx.content.autopilot.propellant_element);
+        let threshold = ctx.content.constants.autopilot_lh2_threshold_kg;
+        let mut commands = Vec::new();
 
-        if propellant_kg > threshold * content.constants.autopilot_lh2_abundant_multiplier {
+        if propellant_kg > threshold * ctx.content.constants.autopilot_lh2_abundant_multiplier {
             for &module_idx in station.modules_with_role(propellant_role) {
                 let module = &station.modules[module_idx];
                 if module.enabled && module.wear.wear < 1.0 {
                     commands.push(make_cmd(
-                        owner,
-                        state.meta.tick,
-                        next_id,
+                        ctx.owner,
+                        ctx.state.meta.tick,
+                        ctx.next_id,
                         Command::SetModuleEnabled {
-                            station_id: self.station_id.clone(),
+                            station_id: ctx.station_id.clone(),
                             module_id: module.id.clone(),
                             enabled: false,
                         },
@@ -667,11 +744,11 @@ impl StationAgent {
                 let module = &station.modules[module_idx];
                 if !module.enabled && module.wear.wear < 1.0 {
                     commands.push(make_cmd(
-                        owner,
-                        state.meta.tick,
-                        next_id,
+                        ctx.owner,
+                        ctx.state.meta.tick,
+                        ctx.next_id,
                         Command::SetModuleEnabled {
-                            station_id: self.station_id.clone(),
+                            station_id: ctx.station_id.clone(),
                             module_id: module.id.clone(),
                             enabled: true,
                         },
@@ -679,26 +756,32 @@ impl StationAgent {
                 }
             }
         }
-    }
 
-    /// 9. Fit idle ships at this station with available modules.
-    fn fit_ships(
-        &mut self,
-        state: &GameState,
-        content: &GameContent,
-        owner: &PrincipalId,
-        next_id: &mut u64,
-        commands: &mut Vec<CommandEnvelope>,
-    ) {
-        let Some(station) = state.stations.get(&self.station_id) else {
-            return;
+        commands
+    }
+}
+
+/// 9. Fit idle ships at this station with available modules.
+struct ShipFitting;
+
+impl StationConcern for ShipFitting {
+    fn name(&self) -> &'static str {
+        "ship_fitting"
+    }
+    fn should_run(&self, _ctx: &StationContext) -> bool {
+        true
+    }
+    fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
+        let Some(station) = ctx.state.stations.get(ctx.station_id) else {
+            return Vec::new();
         };
 
-        let idle_ships = collect_idle_ships(state, owner);
+        let idle_ships = collect_idle_ships(ctx.state, ctx.owner);
         let mut consumed: HashMap<String, usize> = HashMap::new();
+        let mut commands = Vec::new();
 
         for ship_id in &idle_ships {
-            let Some(ship) = state.ships.get(ship_id) else {
+            let Some(ship) = ctx.state.ships.get(ship_id) else {
                 continue;
             };
 
@@ -707,7 +790,7 @@ impl StationAgent {
                 continue;
             }
 
-            let Some(template) = content.fitting_templates.get(&ship.hull_id) else {
+            let Some(template) = ctx.content.fitting_templates.get(&ship.hull_id) else {
                 continue;
             };
 
@@ -734,19 +817,68 @@ impl StationAgent {
                 if available {
                     *consumed.entry(module_def_id_str.clone()).or_insert(0) += 1;
                     commands.push(make_cmd(
-                        owner,
-                        state.meta.tick,
-                        next_id,
+                        ctx.owner,
+                        ctx.state.meta.tick,
+                        ctx.next_id,
                         Command::FitShipModule {
                             ship_id: ship_id.clone(),
                             slot_index: entry.slot_index,
                             module_def_id: entry.module_def_id.clone(),
-                            station_id: self.station_id.clone(),
+                            station_id: ctx.station_id.clone(),
                         },
                     ));
                 }
             }
         }
+
+        commands
+    }
+}
+
+/// Default concern set for a station agent, in execution order.
+fn default_concerns() -> Vec<Box<dyn StationConcern>> {
+    vec![
+        Box::new(ModuleManagement),
+        Box::new(LabAssignment::default()),
+        Box::new(CrewAssignment),
+        Box::new(CrewRecruitment),
+        Box::new(ComponentImport),
+        Box::new(SlagJettison),
+        Box::new(MaterialExport),
+        Box::new(PropellantManagement),
+        Box::new(ShipFitting),
+    ]
+}
+
+impl StationAgent {
+    pub(crate) fn new(station_id: StationId) -> Self {
+        Self {
+            station_id,
+            concerns: default_concerns(),
+        }
+    }
+
+    /// Run the propellant concern in isolation (used by lib.rs tests).
+    #[cfg(test)]
+    pub(crate) fn manage_propellant(
+        &mut self,
+        state: &GameState,
+        content: &GameContent,
+        owner: &PrincipalId,
+        next_id: &mut u64,
+        commands: &mut Vec<CommandEnvelope>,
+    ) {
+        let trade_unlocked = state.meta.tick >= sim_core::trade_unlock_tick(&content.constants);
+        let mut ctx = StationContext {
+            station_id: &self.station_id,
+            state,
+            content,
+            owner,
+            next_id,
+            trade_unlocked,
+        };
+        let mut concern = PropellantManagement;
+        commands.extend(concern.generate(&mut ctx));
     }
 
     /// Assign objectives to idle ship agents owned by this station's owner.
@@ -854,30 +986,24 @@ impl Agent for StationAgent {
             return Vec::new();
         }
 
-        let mut commands = Vec::new();
         let trade_unlocked = state.meta.tick >= sim_core::trade_unlock_tick(&content.constants);
+        let mut commands = Vec::new();
 
-        // Sub-concerns in order matching default_behaviors() (AD5)
-        self.manage_modules(state, content, owner, next_id, &mut commands);
-        self.assign_labs(state, content, owner, next_id, &mut commands);
-        self.assign_crew(state, content, owner, next_id, &mut commands);
-
-        // Economy methods gated by trade unlock
-        if trade_unlocked {
-            self.recruit_crew(state, content, owner, next_id, &mut commands);
-            self.import_components(state, content, owner, next_id, &mut commands);
+        // Build context; disjoint field borrows allow &self.station_id + &mut self.concerns.
+        let station_id = &self.station_id;
+        for concern in &mut self.concerns {
+            let mut ctx = StationContext {
+                station_id,
+                state,
+                content,
+                owner,
+                next_id,
+                trade_unlocked,
+            };
+            if concern.should_run(&ctx) {
+                commands.extend(concern.generate(&mut ctx));
+            }
         }
-
-        self.jettison_slag(state, content, owner, next_id, &mut commands);
-
-        if trade_unlocked {
-            self.export_materials(state, content, owner, next_id, &mut commands);
-        }
-
-        self.manage_propellant(state, content, owner, next_id, &mut commands);
-        self.fit_ships(state, content, owner, next_id, &mut commands);
-        // Ship assignment is called separately via assign_ship_objectives()
-        // because it mutates ship agents, not the command buffer.
 
         commands
     }
@@ -939,12 +1065,26 @@ mod tests {
     use sim_core::test_fixtures::{base_content, base_state};
 
     #[test]
-    fn new_agent_has_empty_lab_cache() {
+    fn new_agent_has_default_concerns() {
         let agent = StationAgent::new(StationId("test_station".to_string()));
         assert_eq!(agent.station_id, StationId("test_station".to_string()));
-        assert!(!agent.lab_cache.initialized);
-        assert_eq!(agent.lab_cache.last_unlocked_count, 0);
-        assert!(agent.lab_cache.cached_eligible.is_empty());
+        assert_eq!(agent.concerns.len(), 9);
+        // Verify concern ordering matches expected sequence
+        let names: Vec<&str> = agent.concerns.iter().map(|c| c.name()).collect();
+        assert_eq!(
+            names,
+            vec![
+                "module_management",
+                "lab_assignment",
+                "crew_assignment",
+                "crew_recruitment",
+                "component_import",
+                "slag_jettison",
+                "material_export",
+                "propellant_management",
+                "ship_fitting",
+            ]
+        );
     }
 
     #[test]
@@ -991,11 +1131,18 @@ mod tests {
                 module_def_id: "mod_def_test".to_string(),
             });
 
-        let mut agent = StationAgent::new(station_id.clone());
+        let mut concern = ModuleManagement;
         let mut next_id = 1;
-        let mut commands = Vec::new();
+        let mut ctx = StationContext {
+            station_id: &station_id,
+            state: &state,
+            content: &content,
+            owner: &owner,
+            next_id: &mut next_id,
+            trade_unlocked: false,
+        };
 
-        agent.manage_modules(&state, &content, &owner, &mut next_id, &mut commands);
+        let commands = concern.generate(&mut ctx);
 
         assert_eq!(commands.len(), 1);
         assert!(matches!(
@@ -1024,11 +1171,18 @@ mod tests {
         });
         station.cached_inventory_volume_m3 = None;
 
-        let mut agent = StationAgent::new(station_id.clone());
+        let mut concern = SlagJettison;
         let mut next_id = 1;
-        let mut commands = Vec::new();
+        let mut ctx = StationContext {
+            station_id: &station_id,
+            state: &state,
+            content: &content,
+            owner: &owner,
+            next_id: &mut next_id,
+            trade_unlocked: false,
+        };
 
-        agent.jettison_slag(&state, &content, &owner, &mut next_id, &mut commands);
+        let commands = concern.generate(&mut ctx);
 
         assert_eq!(commands.len(), 1);
         assert!(matches!(
@@ -1092,11 +1246,18 @@ mod tests {
         });
         station.rebuild_module_index(&content);
 
-        let mut agent = StationAgent::new(station_id);
+        let mut concern = CrewRecruitment;
         let mut next_id = 1;
-        let mut commands = Vec::new();
+        let mut ctx = StationContext {
+            station_id: &station_id,
+            state: &state,
+            content: &content,
+            owner: &owner,
+            next_id: &mut next_id,
+            trade_unlocked: true,
+        };
 
-        agent.recruit_crew(&state, &content, &owner, &mut next_id, &mut commands);
+        let commands = concern.generate(&mut ctx);
 
         // Should produce NO import command because salary projection shows bankruptcy
         assert!(
@@ -1607,11 +1768,18 @@ mod tests {
         };
         station.rebuild_module_index(&content);
 
-        let mut agent = StationAgent::new(station_id);
+        let mut concern = ModuleManagement;
         let mut next_id = 0u64;
-        let mut commands = Vec::new();
+        let mut ctx = StationContext {
+            station_id: &station_id,
+            state: &state,
+            content: &content,
+            owner: &owner,
+            next_id: &mut next_id,
+            trade_unlocked: false,
+        };
 
-        agent.manage_modules(&state, &content, &owner, &mut next_id, &mut commands);
+        let commands = concern.generate(&mut ctx);
 
         // Should disable the least-critical module (stall_priority=0, shed first)
         // 20kW power consumption >= 20kW deficit, so only one module needs shedding
