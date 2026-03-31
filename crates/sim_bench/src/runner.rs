@@ -45,38 +45,8 @@ pub fn run_seed(
     autopilot.enable_decision_logging();
     let mut next_command_id = 0u64;
 
-    std::fs::create_dir_all(seed_dir)
-        .with_context(|| format!("creating seed directory: {}", seed_dir.display()))?;
-    let mut decisions_writer =
-        csv::Writer::from_path(seed_dir.join("decisions.csv")).context("creating decisions CSV")?;
-
-    // Write run_info.json
-    sim_world::write_run_info(
-        seed_dir,
-        &format!("seed_{seed}"),
-        seed,
-        &content.content_version,
-        metrics_every,
-        serde_json::json!({
-            "runner": "sim_bench",
-            "ticks": ticks,
-        }),
-    )?;
-
-    let element_ids = sim_core::content_element_ids(content);
-    let behavior_types = sim_core::content_behavior_types(content);
-    let mut metrics_writer = sim_core::MetricsFileWriter::new(
-        seed_dir.to_path_buf(),
-        element_ids.clone(),
-        behavior_types.clone(),
-    )
-    .with_context(|| format!("opening metrics CSV in {}", seed_dir.display()))?;
-    let mut parquet_writer = ParquetMetricsWriter::new(
-        &seed_dir.join("metrics.parquet"),
-        element_ids,
-        behavior_types,
-    )
-    .with_context(|| format!("opening metrics Parquet in {}", seed_dir.display()))?;
+    let (mut metrics_writer, mut parquet_writer, mut decisions_writer) =
+        create_seed_writers(seed_dir, seed, ticks, content, metrics_every)?;
 
     #[allow(clippy::cast_possible_truncation)]
     let mut all_timings: Vec<TickTimings> = Vec::with_capacity(ticks as usize);
@@ -108,10 +78,10 @@ pub fn run_seed(
     if state.meta.tick % metrics_every != 0 {
         metrics_writer
             .write_row(&final_snapshot)
-            .context("writing final CSV metrics row")?;
+            .context("final CSV row")?;
         parquet_writer
             .write_row(&final_snapshot, &final_score)
-            .context("writing final Parquet metrics row")?;
+            .context("final Parquet row")?;
     }
     metrics_writer.flush().context("flushing CSV")?;
     parquet_writer.finish().context("finishing Parquet")?;
@@ -148,6 +118,47 @@ pub fn run_seed(
         wall_time_ms,
         run_id,
     })
+}
+
+/// Create the CSV, Parquet, and decision writers for a seed run.
+fn create_seed_writers(
+    seed_dir: &Path,
+    seed: u64,
+    ticks: u64,
+    content: &GameContent,
+    metrics_every: u64,
+) -> Result<(
+    sim_core::MetricsFileWriter,
+    ParquetMetricsWriter,
+    csv::Writer<std::fs::File>,
+)> {
+    std::fs::create_dir_all(seed_dir)
+        .with_context(|| format!("creating seed directory: {}", seed_dir.display()))?;
+    let decisions_writer =
+        csv::Writer::from_path(seed_dir.join("decisions.csv")).context("creating decisions CSV")?;
+    sim_world::write_run_info(
+        seed_dir,
+        &format!("seed_{seed}"),
+        seed,
+        &content.content_version,
+        metrics_every,
+        serde_json::json!({"runner": "sim_bench", "ticks": ticks}),
+    )?;
+    let element_ids = sim_core::content_element_ids(content);
+    let behavior_types = sim_core::content_behavior_types(content);
+    let metrics_writer = sim_core::MetricsFileWriter::new(
+        seed_dir.to_path_buf(),
+        element_ids.clone(),
+        behavior_types.clone(),
+    )
+    .with_context(|| format!("opening metrics CSV in {}", seed_dir.display()))?;
+    let parquet_writer = ParquetMetricsWriter::new(
+        &seed_dir.join("metrics.parquet"),
+        element_ids,
+        behavior_types,
+    )
+    .with_context(|| format!("opening metrics Parquet in {}", seed_dir.display()))?;
+    Ok((metrics_writer, parquet_writer, decisions_writer))
 }
 
 #[allow(clippy::too_many_arguments)]
