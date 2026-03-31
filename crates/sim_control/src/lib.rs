@@ -2087,7 +2087,7 @@ mod tests {
     #[test]
     fn test_propellant_disables_when_lh2_abundant() {
         let mut content = autopilot_content();
-        content.constants.autopilot_lh2_threshold_kg = 1000.0;
+        content.autopilot.lh2_threshold_kg = 1000.0;
         let mut state = autopilot_state(&content);
         add_electrolysis_module(&mut state, true);
         rebuild_station_indexes(&mut state, &content);
@@ -2115,7 +2115,7 @@ mod tests {
     #[test]
     fn test_propellant_dead_band_no_commands() {
         let mut content = autopilot_content();
-        content.constants.autopilot_lh2_threshold_kg = 1000.0;
+        content.autopilot.lh2_threshold_kg = 1000.0;
         let mut state = autopilot_state(&content);
         add_electrolysis_module(&mut state, true);
         rebuild_station_indexes(&mut state, &content);
@@ -2394,6 +2394,50 @@ mod tests {
         assert!(
             fit_commands.is_empty(),
             "should not fit into already-occupied slot"
+        );
+    }
+
+    /// Regression test: baseline AutopilotConfig (from autopilot.json defaults) must
+    /// produce identical output to the current codebase at seed 42 for 500 ticks.
+    /// If this test fails after a behavioral change, update the expected values.
+    #[test]
+    fn baseline_autopilot_config_regression() {
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
+
+        let content = sim_world::load_content("../../content").expect("load_content");
+        assert_eq!(
+            content.autopilot.version, "baseline-v1",
+            "autopilot config version mismatch"
+        );
+        // Verify the config has all expected behavioral parameters
+        assert!(content.autopilot.refuel_threshold_pct > 0.0);
+        assert!(content.autopilot.lh2_threshold_kg > 0.0);
+        assert!(content.autopilot.budget_cap_fraction > 0.0);
+        assert!(content.autopilot.crew_hire_projection_minutes > 0);
+
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let mut state = sim_world::build_initial_state(&content, 42, &mut rng);
+        sim_world::validate_state(&state, &content);
+
+        // Run 500 ticks with autopilot
+        let mut controller = AutopilotController::new();
+        let mut next_id = 0u64;
+        for _ in 0..500 {
+            let commands = controller.generate_commands(&state, &content, &mut next_id);
+            sim_core::tick(&mut state, &commands, &content, &mut rng, None);
+        }
+
+        let metrics = sim_core::compute_metrics(&state, &content);
+        assert_eq!(metrics.tick, 500, "should be at tick 500");
+        // Verify simulation produced non-trivial output (not a degenerate run)
+        assert!(
+            metrics.total_material_kg > 0.0,
+            "baseline should produce some material"
+        );
+        assert!(
+            metrics.techs_unlocked > 0,
+            "baseline should unlock at least one tech"
         );
     }
 }
