@@ -151,6 +151,7 @@ impl Agent for ShipAgent {
         content: &GameContent,
         _owner: &PrincipalId,
         next_id: &mut u64,
+        _decisions: Option<&mut Vec<super::DecisionRecord>>,
     ) -> Vec<CommandEnvelope> {
         let Some(ship) = state.ships.get(&self.ship_id) else {
             return Vec::new();
@@ -276,7 +277,7 @@ mod tests {
         let mut agent = ShipAgent::new(test_ship_id());
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
     }
 
@@ -288,7 +289,7 @@ mod tests {
         agent.objective = Some(ShipObjective::Idle);
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
     }
 
@@ -305,7 +306,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert_eq!(commands.len(), 1);
         match &commands[0].command {
             Command::AssignShipTask { ship_id, task_kind } => {
@@ -331,7 +332,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert_eq!(commands.len(), 1);
         match &commands[0].command {
             Command::AssignShipTask { task_kind, .. } => {
@@ -360,7 +361,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert_eq!(commands.len(), 1);
         match &commands[0].command {
             Command::AssignShipTask { task_kind, .. } => {
@@ -382,7 +383,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert_eq!(commands.len(), 1);
         match &commands[0].command {
             Command::AssignShipTask { task_kind, .. } => {
@@ -407,7 +408,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
         assert!(agent.objective.is_none()); // Objective was cleared
     }
@@ -425,7 +426,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
         assert!(agent.objective.is_none());
     }
@@ -442,7 +443,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
         assert!(agent.objective.is_none());
     }
@@ -459,7 +460,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
         assert!(agent.objective.is_none());
     }
@@ -477,7 +478,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
         assert!(agent.objective.is_none());
     }
@@ -512,7 +513,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert_eq!(commands.len(), 1);
         // Should be a Deposit task, not Mine
         match &commands[0].command {
@@ -548,7 +549,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
     }
 
@@ -563,7 +564,7 @@ mod tests {
         });
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
     }
 }

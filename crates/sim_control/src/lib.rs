@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use agents::ship_agent::ShipAgent;
 use agents::station_agent::StationAgent;
 use agents::Agent;
+pub use agents::DecisionRecord;
 use behaviors::AUTOPILOT_OWNER;
 use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId, ShipId, StationId};
 
@@ -29,6 +30,9 @@ pub struct AutopilotController {
     ship_agents: BTreeMap<ShipId, ShipAgent>,
     /// Cached owner ID — avoids per-tick String allocation.
     owner: PrincipalId,
+    /// When `Some`, agents log structured decision records for diagnostics.
+    /// Enable via `enable_decision_logging()`, consume via `take_decisions()`.
+    decision_log: Option<Vec<DecisionRecord>>,
 }
 
 impl AutopilotController {
@@ -37,7 +41,20 @@ impl AutopilotController {
             station_agents: BTreeMap::new(),
             ship_agents: BTreeMap::new(),
             owner: PrincipalId(AUTOPILOT_OWNER.to_string()),
+            decision_log: None,
         }
+    }
+
+    /// Enable structured decision logging. Zero overhead when not called.
+    pub fn enable_decision_logging(&mut self) {
+        self.decision_log = Some(Vec::new());
+    }
+
+    /// Drain and return all accumulated decision records since last call.
+    pub fn take_decisions(&mut self) -> Vec<DecisionRecord> {
+        self.decision_log
+            .as_mut()
+            .map_or_else(Vec::new, std::mem::take)
     }
 }
 
@@ -56,29 +73,39 @@ impl CommandSource for AutopilotController {
     ) -> Vec<CommandEnvelope> {
         let mut commands = Vec::new();
 
+        // Destructure for disjoint field borrows (decision_log + station_agents + ship_agents).
+        let Self {
+            station_agents,
+            ship_agents,
+            owner,
+            decision_log,
+        } = self;
+
         // 1. Sync agent lifecycle — create for new entities, remove for deleted
         for station_id in state.stations.keys() {
-            if !self.station_agents.contains_key(station_id) {
-                self.station_agents
-                    .insert(station_id.clone(), StationAgent::new(station_id.clone()));
+            if !station_agents.contains_key(station_id) {
+                station_agents.insert(station_id.clone(), StationAgent::new(station_id.clone()));
             }
         }
-        self.station_agents
-            .retain(|id, _| state.stations.contains_key(id));
+        station_agents.retain(|id, _| state.stations.contains_key(id));
 
         for (ship_id, ship) in &state.ships {
-            if ship.owner == self.owner && !self.ship_agents.contains_key(ship_id) {
-                self.ship_agents
-                    .insert(ship_id.clone(), ShipAgent::new(ship_id.clone()));
+            if ship.owner == *owner && !ship_agents.contains_key(ship_id) {
+                ship_agents.insert(ship_id.clone(), ShipAgent::new(ship_id.clone()));
             }
         }
-        self.ship_agents
-            .retain(|id, _| state.ships.contains_key(id));
+        ship_agents.retain(|id, _| state.ships.contains_key(id));
 
         // 2. Station agents generate commands (modules, labs, crew, trade)
         //    in BTreeMap order (deterministic by StationId)
-        for agent in self.station_agents.values_mut() {
-            commands.extend(agent.generate(state, content, &self.owner, next_command_id));
+        for agent in station_agents.values_mut() {
+            commands.extend(agent.generate(
+                state,
+                content,
+                owner,
+                next_command_id,
+                decision_log.as_mut(),
+            ));
         }
 
         // 3. Station agents assign objectives to idle ships (AD1).
@@ -86,18 +113,25 @@ impl CommandSource for AutopilotController {
         // iterators). With multiple stations, two stations could theoretically
         // assign the same asteroid. Acceptable for single-station game;
         // multi-station deduplication belongs in the strategic layer.
-        for station_agent in self.station_agents.values() {
+        for station_agent in station_agents.values() {
             station_agent.assign_ship_objectives(
-                &mut self.ship_agents,
+                ship_agents,
                 state,
                 content,
-                &self.owner,
+                owner,
+                decision_log.as_mut(),
             );
         }
 
         // 4. Ship agents run in BTreeMap order (deterministic by ShipId, AD2)
-        for agent in self.ship_agents.values_mut() {
-            commands.extend(agent.generate(state, content, &self.owner, next_command_id));
+        for agent in ship_agents.values_mut() {
+            commands.extend(agent.generate(
+                state,
+                content,
+                owner,
+                next_command_id,
+                decision_log.as_mut(),
+            ));
         }
 
         commands

@@ -29,6 +29,8 @@ fn has_unsatisfied_crew_need(station: &sim_core::StationState, content: &GameCon
     })
 }
 
+use super::DecisionRecord;
+
 /// Context passed to each station concern on every tick.
 pub(crate) struct StationContext<'a> {
     pub station_id: &'a StationId,
@@ -37,6 +39,7 @@ pub(crate) struct StationContext<'a> {
     pub owner: &'a PrincipalId,
     pub next_id: &'a mut u64,
     pub trade_unlocked: bool,
+    pub decisions: Option<&'a mut Vec<DecisionRecord>>,
 }
 
 /// A composable station-level concern that generates commands.
@@ -306,7 +309,7 @@ impl StationConcern for LabAssignment {
                 .collect();
             candidates.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0 .0.cmp(&b.0 .0)));
 
-            if let Some((tech_id, _)) = candidates.first() {
+            if let Some((tech_id, score)) = candidates.first() {
                 commands.push(make_cmd(
                     ctx.owner,
                     ctx.state.meta.tick,
@@ -317,6 +320,32 @@ impl StationConcern for LabAssignment {
                         tech_id: Some(tech_id.clone()),
                     },
                 ));
+                if let Some(ref mut log) = ctx.decisions {
+                    log.push(DecisionRecord {
+                        tick: ctx.state.meta.tick,
+                        agent: format!("station:{}", ctx.station_id.0),
+                        concern: "lab_assignment".to_string(),
+                        decision_type: "pick_tech".to_string(),
+                        chosen_id: tech_id.0.clone(),
+                        chosen_score: f64::from(*score),
+                        alt_1_id: candidates
+                            .get(1)
+                            .map_or_else(String::new, |(t, _)| t.0.clone()),
+                        alt_1_score: candidates.get(1).map_or(0.0, |(_, s)| f64::from(*s)),
+                        alt_2_id: candidates
+                            .get(2)
+                            .map_or_else(String::new, |(t, _)| t.0.clone()),
+                        alt_2_score: candidates.get(2).map_or(0.0, |(_, s)| f64::from(*s)),
+                        alt_3_id: candidates
+                            .get(3)
+                            .map_or_else(String::new, |(t, _)| t.0.clone()),
+                        alt_3_score: candidates.get(3).map_or(0.0, |(_, s)| f64::from(*s)),
+                        context_json: format!(
+                            "{{\"domain\":\"{:?}\",\"module\":\"{}\"}}",
+                            lab_def.domain, module.id.0,
+                        ),
+                    });
+                }
             }
         }
 
@@ -484,6 +513,25 @@ impl StationConcern for CrewRecruitment {
                 - (current_salary_per_tick + new_hire_salary_per_tick) * projection_ticks as f64;
             if projected < 0.0 {
                 continue;
+            }
+            if let Some(ref mut log) = ctx.decisions {
+                log.push(DecisionRecord {
+                    tick,
+                    agent: format!("station:{}", ctx.station_id.0),
+                    concern: "crew_recruitment".to_string(),
+                    decision_type: "recruit".to_string(),
+                    chosen_id: role.0.clone(),
+                    chosen_score: f64::from(shortfall),
+                    alt_1_id: String::new(),
+                    alt_1_score: 0.0,
+                    alt_2_id: String::new(),
+                    alt_2_score: 0.0,
+                    alt_3_id: String::new(),
+                    alt_3_score: 0.0,
+                    context_json: format!(
+                        "{{\"cost\":{cost},\"budget_cap\":{budget_cap},\"projected_balance\":{projected}}}",
+                    ),
+                });
             }
             commands.push(make_cmd(
                 ctx.owner,
@@ -850,6 +898,73 @@ fn default_concerns() -> Vec<Box<dyn StationConcern>> {
     ]
 }
 
+/// Iterator state for ship objective candidate lists.
+struct ObjectiveCandidates<'a> {
+    mine: &'a std::slice::Iter<'a, AsteroidId>,
+    site: &'a std::slice::Iter<'a, SiteId>,
+    deep_scan: &'a std::slice::Iter<'a, AsteroidId>,
+}
+
+/// Log a ship objective assignment decision.
+fn log_objective_decision(
+    log: &mut Vec<DecisionRecord>,
+    tick: u64,
+    station_id: &StationId,
+    obj: &ShipObjective,
+    priority: &str,
+    candidates: &ObjectiveCandidates,
+) {
+    let (chosen_id, decision_type) = match obj {
+        ShipObjective::Mine { asteroid_id } => (asteroid_id.0.clone(), "assign_mine"),
+        ShipObjective::Survey { site_id } => (site_id.0.clone(), "assign_survey"),
+        ShipObjective::DeepScan { asteroid_id } => (asteroid_id.0.clone(), "assign_deep_scan"),
+        ShipObjective::Deposit { station_id } => (station_id.0.clone(), "assign_deposit"),
+        ShipObjective::Idle => (String::new(), "idle"),
+    };
+    // Peek at remaining alternatives from the matching iterator.
+    // The _ arm reports deep_scan alternatives (only other scored type).
+    let alts: Vec<String> = match priority {
+        "Mine" => candidates
+            .mine
+            .clone()
+            .take(3)
+            .map(|id| id.0.clone())
+            .collect(),
+        "Survey" => candidates
+            .site
+            .clone()
+            .take(3)
+            .map(|id| id.0.clone())
+            .collect(),
+        _ => candidates
+            .deep_scan
+            .clone()
+            .take(3)
+            .map(|id| id.0.clone())
+            .collect(),
+    };
+    log.push(DecisionRecord {
+        tick,
+        agent: format!("station:{}", station_id.0),
+        concern: "ship_objectives".to_string(),
+        decision_type: decision_type.to_string(),
+        chosen_id,
+        chosen_score: 0.0,
+        alt_1_id: alts.first().cloned().unwrap_or_default(),
+        alt_1_score: 0.0,
+        alt_2_id: alts.get(1).cloned().unwrap_or_default(),
+        alt_2_score: 0.0,
+        alt_3_id: alts.get(2).cloned().unwrap_or_default(),
+        alt_3_score: 0.0,
+        context_json: format!(
+            "{{\"mine_remaining\":{},\"survey_remaining\":{},\"deep_scan_remaining\":{}}}",
+            candidates.mine.clone().count(),
+            candidates.site.clone().count(),
+            candidates.deep_scan.clone().count(),
+        ),
+    });
+}
+
 impl StationAgent {
     pub(crate) fn new(station_id: StationId) -> Self {
         Self {
@@ -876,6 +991,7 @@ impl StationAgent {
             owner,
             next_id,
             trade_unlocked,
+            decisions: None,
         };
         let mut concern = PropellantManagement;
         commands.extend(concern.generate(&mut ctx));
@@ -895,6 +1011,7 @@ impl StationAgent {
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
+        mut decisions: Option<&mut Vec<DecisionRecord>>,
     ) {
         let Some(station) = state.stations.get(&self.station_id) else {
             return;
@@ -960,6 +1077,21 @@ impl StationAgent {
                     _ => None,
                 };
                 if let Some(obj) = objective {
+                    if let Some(ref mut log) = decisions {
+                        let cands = ObjectiveCandidates {
+                            mine: &next_mine,
+                            site: &next_site,
+                            deep_scan: &next_deep_scan,
+                        };
+                        log_objective_decision(
+                            log,
+                            state.meta.tick,
+                            &self.station_id,
+                            &obj,
+                            priority,
+                            &cands,
+                        );
+                    }
                     if let Some(agent) = ship_agents.get_mut(&ship_id) {
                         agent.objective = Some(obj);
                     }
@@ -981,6 +1113,7 @@ impl Agent for StationAgent {
         content: &GameContent,
         owner: &PrincipalId,
         next_id: &mut u64,
+        mut decisions: Option<&mut Vec<DecisionRecord>>,
     ) -> Vec<CommandEnvelope> {
         if !state.stations.contains_key(&self.station_id) {
             return Vec::new();
@@ -999,6 +1132,8 @@ impl Agent for StationAgent {
                 owner,
                 next_id,
                 trade_unlocked,
+                #[allow(clippy::option_as_ref_deref)] // Need &mut Vec, not &mut [T]
+                decisions: decisions.as_mut().map(|v| &mut **v),
             };
             if concern.should_run(&ctx) {
                 commands.extend(concern.generate(&mut ctx));
@@ -1096,7 +1231,7 @@ mod tests {
         let mut agent = StationAgent::new(station_id);
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         // base_state has no modules in inventory, no disabled modules, no labs, etc.
         assert!(commands.is_empty());
     }
@@ -1109,7 +1244,7 @@ mod tests {
         let mut agent = StationAgent::new(StationId("nonexistent".to_string()));
         let mut next_id = 1;
 
-        let commands = agent.generate(&state, &content, &owner, &mut next_id);
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
     }
 
@@ -1140,6 +1275,7 @@ mod tests {
             owner: &owner,
             next_id: &mut next_id,
             trade_unlocked: false,
+            decisions: None,
         };
 
         let commands = concern.generate(&mut ctx);
@@ -1180,6 +1316,7 @@ mod tests {
             owner: &owner,
             next_id: &mut next_id,
             trade_unlocked: false,
+            decisions: None,
         };
 
         let commands = concern.generate(&mut ctx);
@@ -1255,6 +1392,7 @@ mod tests {
             owner: &owner,
             next_id: &mut next_id,
             trade_unlocked: true,
+            decisions: None,
         };
 
         let commands = concern.generate(&mut ctx);
@@ -1348,7 +1486,7 @@ mod tests {
         let station_id = station_id_from_state(&state);
         let agent = StationAgent::new(station_id);
 
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         assert!(ship_agents.is_empty());
     }
@@ -1370,7 +1508,7 @@ mod tests {
         add_mineable_asteroid(&mut state, asteroid_2.clone(), 0.5);
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         let obj_a = ship_agents[&ship_a]
             .objective
@@ -1427,7 +1565,7 @@ mod tests {
             });
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         assert!(ship_agents[&ship_a].objective.is_none());
         assert!(matches!(
@@ -1457,7 +1595,7 @@ mod tests {
         add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         assert!(ship_agents[&ship_id].objective.is_none());
     }
@@ -1497,7 +1635,7 @@ mod tests {
         );
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         assert!(matches!(
             ship_agents[&ship_id].objective,
@@ -1537,7 +1675,7 @@ mod tests {
         );
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         assert!(ship_agents[&ship_id].objective.is_none());
     }
@@ -1560,7 +1698,7 @@ mod tests {
         add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         // Ship at remote position still gets assigned (ship agent handles transit)
         assert!(ship_agents[&ship_id].objective.is_some());
@@ -1590,7 +1728,7 @@ mod tests {
         });
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         assert!(matches!(
             ship_agents[&ship_a].objective,
@@ -1620,7 +1758,7 @@ mod tests {
         });
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         assert!(matches!(
             ship_agents[&ship_id].objective,
@@ -1645,7 +1783,7 @@ mod tests {
         });
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         assert!(matches!(
             ship_agents[&ship_id].objective,
@@ -1665,7 +1803,7 @@ mod tests {
         state.scan_sites.clear();
 
         let agent = StationAgent::new(station_id);
-        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner);
+        agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
 
         assert!(ship_agents[&ship_id].objective.is_none());
     }
@@ -1777,6 +1915,7 @@ mod tests {
             owner: &owner,
             next_id: &mut next_id,
             trade_unlocked: false,
+            decisions: None,
         };
 
         let commands = concern.generate(&mut ctx);
@@ -1800,5 +1939,44 @@ mod tests {
             first_disabled, "mod_least_critical",
             "least-critical module (lowest priority number) should be shed first"
         );
+    }
+
+    #[test]
+    fn decision_logging_disabled_produces_no_records() {
+        let content = base_content();
+        let state = base_state(&content);
+        let owner = PrincipalId("principal_autopilot".to_string());
+        let station_id = state.stations.keys().next().unwrap().clone();
+        let mut agent = StationAgent::new(station_id);
+        let mut next_id = 1;
+
+        // No decisions parameter (None) — should still produce commands without logging
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
+        assert!(commands.is_empty()); // base_state has nothing to do
+    }
+
+    #[test]
+    fn decision_logging_captures_ship_objective() {
+        let (mut state, content, mut ship_agents) = assignment_setup();
+        let station_id = station_id_from_state(&state);
+        let agent = StationAgent::new(station_id);
+
+        add_idle_ship(&mut state, &mut ship_agents, make_ship_id("ship_1"));
+        add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 1.0);
+
+        let mut decisions = Vec::new();
+        let owner = test_owner();
+        agent.assign_ship_objectives(
+            &mut ship_agents,
+            &state,
+            &content,
+            &owner,
+            Some(&mut decisions),
+        );
+
+        assert_eq!(decisions.len(), 1);
+        assert_eq!(decisions[0].concern, "ship_objectives");
+        assert_eq!(decisions[0].decision_type, "assign_mine");
+        assert_eq!(decisions[0].chosen_id, "asteroid_1");
     }
 }
