@@ -187,8 +187,10 @@ def research_stall_tick(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation
     )
 
 
-def final_score(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
-    """Compute composite economy score at the final tick per seed.
+def legacy_final_score(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
+    """Compute legacy composite economy score at the final tick per seed.
+
+    Deprecated: use scoring_dimensions() for the official 6-dimension system.
 
     Score is a weighted sum of normalized components:
     - balance (30%): log-scale relative to initial $1B
@@ -225,6 +227,118 @@ def final_score(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
             ) AS score,
             tick AS final_tick
         FROM final_rows
+        """,
+    )
+
+
+# Backward-compatible alias
+final_score = legacy_final_score
+
+
+def scoring_dimensions(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
+    """Extract 6-dimension scoring breakdown at the final tick per seed.
+
+    Reads pre-computed score columns from sim_bench Parquet output:
+    score_composite, score_industrial, score_research, score_economic,
+    score_fleet, score_efficiency, score_expansion, score_threshold.
+
+    Returns:
+        Relation with columns: seed, final_tick, score_composite,
+        score_industrial, score_research, score_economic, score_fleet,
+        score_efficiency, score_expansion, score_threshold.
+    """
+    return rel.query(
+        "metrics",
+        """
+        WITH final_ticks AS (
+            SELECT seed, MAX(tick) AS max_tick
+            FROM metrics
+            GROUP BY seed
+        )
+        SELECT m.seed,
+            m.tick AS final_tick,
+            m.score_composite,
+            m.score_industrial,
+            m.score_research,
+            m.score_economic,
+            m.score_fleet,
+            m.score_efficiency,
+            m.score_expansion,
+            m.score_threshold
+        FROM metrics m
+        JOIN final_ticks f ON m.seed = f.seed AND m.tick = f.max_tick
+        ORDER BY m.seed
+        """,
+    )
+
+
+def score_trajectory(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
+    """Extract score at each metrics interval for trajectory analysis.
+
+    Returns:
+        Relation with columns: seed, tick, score_composite, score_threshold.
+        One row per (seed, tick) where a score was computed.
+    """
+    return rel.query(
+        "metrics",
+        """
+        SELECT seed, tick, score_composite, score_threshold
+        FROM metrics
+        WHERE score_composite IS NOT NULL
+        ORDER BY seed, tick
+        """,
+    )
+
+
+def score_distribution(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
+    """Compute cross-seed score statistics at the final tick.
+
+    Returns:
+        Relation with columns: dimension, mean, stddev, min_val, max_val, cv.
+        Sorted by CV descending (high-variance dimensions first).
+    """
+    return rel.query(
+        "metrics",
+        """
+        WITH final_ticks AS (
+            SELECT seed, MAX(tick) AS max_tick
+            FROM metrics
+            GROUP BY seed
+        ),
+        final_scores AS (
+            SELECT m.score_composite, m.score_industrial, m.score_research,
+                m.score_economic, m.score_fleet, m.score_efficiency,
+                m.score_expansion
+            FROM metrics m
+            JOIN final_ticks f ON m.seed = f.seed AND m.tick = f.max_tick
+        ),
+        unpivoted AS (
+            SELECT 'composite' AS dimension, score_composite AS value FROM final_scores
+            UNION ALL
+            SELECT 'industrial', score_industrial FROM final_scores
+            UNION ALL
+            SELECT 'research', score_research FROM final_scores
+            UNION ALL
+            SELECT 'economic', score_economic FROM final_scores
+            UNION ALL
+            SELECT 'fleet', score_fleet FROM final_scores
+            UNION ALL
+            SELECT 'efficiency', score_efficiency FROM final_scores
+            UNION ALL
+            SELECT 'expansion', score_expansion FROM final_scores
+        )
+        SELECT dimension,
+            AVG(value) AS mean,
+            COALESCE(STDDEV_SAMP(value), 0.0) AS stddev,
+            MIN(value) AS min_val,
+            MAX(value) AS max_val,
+            CASE WHEN AVG(value) != 0
+                THEN COALESCE(STDDEV_SAMP(value), 0.0) / ABS(AVG(value))
+                ELSE 0.0
+            END AS cv
+        FROM unpivoted
+        GROUP BY dimension
+        ORDER BY cv DESC
         """,
     )
 
