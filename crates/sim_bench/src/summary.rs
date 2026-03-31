@@ -357,4 +357,60 @@ mod tests {
         assert!((fleet_total["min"].as_f64().unwrap() - 4.0).abs() < 1e-5);
         assert!((fleet_total["max"].as_f64().unwrap() - 6.0).abs() < 1e-5);
     }
+
+    #[test]
+    fn test_summary_includes_score_stats() {
+        let s1 = make_snapshot(100, 0.5, 2, 0, 0, 3, 0.2, 5);
+        let s2 = make_snapshot(100, 0.7, 2, 0, 0, 5, 0.4, 3);
+        let snapshots: Vec<(u64, &MetricsSnapshot)> = vec![(1, &s1), (2, &s2)];
+
+        let score1 = RunScore {
+            composite: 300.0,
+            threshold: "Contractor".into(),
+            tick: 100,
+            dimensions: std::collections::BTreeMap::from([(
+                "industrial_output".into(),
+                sim_core::DimensionScore {
+                    id: "industrial_output".into(),
+                    name: "Industrial Output".into(),
+                    raw_value: 5.0,
+                    normalized: 0.5,
+                    weighted: 312.5,
+                },
+            )]),
+        };
+        let score2 = RunScore {
+            composite: 500.0,
+            threshold: "Enterprise".into(),
+            tick: 100,
+            dimensions: std::collections::BTreeMap::from([(
+                "industrial_output".into(),
+                sim_core::DimensionScore {
+                    id: "industrial_output".into(),
+                    name: "Industrial Output".into(),
+                    raw_value: 8.0,
+                    normalized: 0.8,
+                    weighted: 500.0,
+                },
+            )]),
+        };
+        let scores: Vec<&RunScore> = vec![&score1, &score2];
+
+        let stats = compute_summary(&snapshots, &scores);
+        let composite = stats
+            .metrics
+            .iter()
+            .find(|m| m.name == "score_composite")
+            .expect("should have score_composite");
+        assert!((composite.mean - 400.0).abs() < 1e-6);
+        assert!((composite.min - 300.0).abs() < 1e-6);
+        assert!((composite.max - 500.0).abs() < 1e-6);
+
+        let industrial = stats
+            .metrics
+            .iter()
+            .find(|m| m.name == "score_industrial_output")
+            .expect("should have score_industrial_output");
+        assert!((industrial.mean - 0.65).abs() < 1e-6);
+    }
 }

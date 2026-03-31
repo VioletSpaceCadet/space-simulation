@@ -83,7 +83,7 @@ struct RowBuffer {
     module_active_cols: Vec<UInt32Builder>,
     module_stalled_cols: Vec<UInt32Builder>,
     module_starved_cols: Vec<UInt32Builder>,
-    // Score columns (7 f64 dimensions + 1 f64 composite + 1 string threshold)
+    // Score columns (1 f64 composite + 6 f64 dimensions + 1 string threshold)
     score_composite: Float64Builder,
     score_industrial: Float64Builder,
     score_research: Float64Builder,
