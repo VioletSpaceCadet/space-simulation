@@ -268,6 +268,8 @@ mod tests {
             events_path: None,
             error_message: None,
             timing_stats: None,
+            score_composite: None,
+            score_threshold: None,
         };
 
         let json = serde_json::to_string_pretty(&result).unwrap();
@@ -308,6 +310,8 @@ mod tests {
             events_path: None,
             error_message: None,
             timing_stats: None,
+            score_composite: None,
+            score_threshold: None,
         };
 
         result.write_atomic(&path).unwrap();
