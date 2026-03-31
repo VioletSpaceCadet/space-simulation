@@ -124,45 +124,50 @@ fn execute_tick(
     guard.push_timings(timings);
 
     let metrics_every = guard.metrics_every;
-    if metrics_every > 0 && guard.game_state.meta.tick.is_multiple_of(metrics_every) {
-        let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
-        guard.push_metrics(snapshot);
-
-        let SimState {
-            ref metrics_history,
-            ref mut alert_engine,
-            ref mut game_state,
-            ..
-        } = *guard;
-        if let Some(engine) = alert_engine.as_mut() {
-            let tick = game_state.meta.tick;
-            let alert_events = engine.evaluate(metrics_history, tick, &mut game_state.counters);
-            events.extend(alert_events);
-        }
-    }
-
-    // Score computation at its own interval
     let score_interval = guard.content.scoring.computation_interval_ticks;
-    if score_interval > 0 && guard.game_state.meta.tick.is_multiple_of(score_interval) {
-        let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
-        let score = sim_core::compute_run_score(&snapshot, &guard.game_state, &guard.content);
+    let tick = guard.game_state.meta.tick;
+    let needs_metrics = metrics_every > 0 && tick.is_multiple_of(metrics_every);
+    let needs_score = score_interval > 0 && tick.is_multiple_of(score_interval);
 
-        if score.threshold != guard.last_threshold {
-            let previous_threshold = guard.last_threshold.clone();
-            guard.last_threshold.clone_from(&score.threshold);
-            events.push(sim_core::EventEnvelope {
-                id: sim_core::EventId(guard.next_command_id),
-                tick: guard.game_state.meta.tick,
-                event: sim_core::Event::ScoreThresholdCrossed {
-                    previous_threshold,
-                    new_threshold: score.threshold.clone(),
-                    composite_score: score.composite,
-                },
-            });
-            guard.next_command_id += 1;
+    if needs_metrics || needs_score {
+        let snapshot = sim_core::compute_metrics(&guard.game_state, &guard.content);
+
+        if needs_metrics {
+            guard.push_metrics(snapshot.clone());
+
+            let SimState {
+                ref metrics_history,
+                ref mut alert_engine,
+                ref mut game_state,
+                ..
+            } = *guard;
+            if let Some(engine) = alert_engine.as_mut() {
+                let alert_events = engine.evaluate(metrics_history, tick, &mut game_state.counters);
+                events.extend(alert_events);
+            }
         }
 
-        guard.push_score(score);
+        if needs_score {
+            let score = sim_core::compute_run_score(&snapshot, &guard.game_state, &guard.content);
+
+            if score.threshold != guard.last_threshold {
+                let previous_threshold = guard.last_threshold.clone();
+                guard.last_threshold.clone_from(&score.threshold);
+                let event_id = guard.game_state.counters.next_event_id;
+                guard.game_state.counters.next_event_id += 1;
+                events.push(sim_core::EventEnvelope {
+                    id: sim_core::EventId(event_id),
+                    tick,
+                    event: sim_core::Event::ScoreThresholdCrossed {
+                        previous_threshold,
+                        new_threshold: score.threshold.clone(),
+                        composite_score: score.composite,
+                    },
+                });
+            }
+
+            guard.push_score(score);
+        }
     }
 
     let done = max_ticks.is_some_and(|max| guard.game_state.meta.tick >= max);

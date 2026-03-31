@@ -684,6 +684,23 @@ mod tests {
     }
 
     #[test]
+    fn score_trend_declining_when_decreasing() {
+        let mut score_history = VecDeque::new();
+        for tick in 0..50u64 {
+            score_history.push_back(RunScore {
+                composite: (50 - tick) as f64 * 10.0,
+                threshold: "Startup".to_string(),
+                tick,
+                dimensions: std::collections::BTreeMap::new(),
+            });
+        }
+        assert_eq!(
+            compute_score_trend(&score_history),
+            TrendDirection::Declining
+        );
+    }
+
+    #[test]
     fn score_trend_stable_with_single_entry() {
         let mut score_history = VecDeque::new();
         score_history.push_back(RunScore {
