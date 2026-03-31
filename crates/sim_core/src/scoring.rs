@@ -38,7 +38,7 @@ pub struct ThresholdDef {
 pub struct ScoringConfig {
     /// The 6 scoring dimensions with weights and normalization ceilings.
     pub dimensions: Vec<DimensionDef>,
-    /// Named score thresholds, ordered ascending by min_score.
+    /// Named score thresholds, ordered ascending by `min_score`.
     pub thresholds: Vec<ThresholdDef>,
     /// How often to recompute the score (in ticks). Default: 24.
     #[serde(default = "default_computation_interval")]
@@ -121,7 +121,7 @@ pub struct DimensionScore {
     pub raw_value: f64,
     /// Normalized score in [0.0, 1.0].
     pub normalized: f64,
-    /// Weighted contribution to composite (normalized * weight * scale_factor).
+    /// Weighted contribution to composite (normalized * weight * `scale_factor`).
     pub weighted: f64,
 }
 
