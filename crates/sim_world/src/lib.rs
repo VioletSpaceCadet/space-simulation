@@ -481,12 +481,13 @@ fn validate_crew_roles(content: &GameContent) {
 }
 
 fn validate_scoring(content: &GameContent) {
-    // Only validate if scoring config is non-empty (file may be missing for
-    // test fixtures that don't ship scoring.json).
-    if !content.scoring.dimensions.is_empty() {
-        if let Err(err) = sim_core::validate_scoring_config(&content.scoring) {
-            panic!("invalid scoring config: {err}");
-        }
+    // Skip validation for test fixtures that use ScoringConfig::default() (empty dimensions).
+    // Real content from scoring.json will have dimensions populated.
+    if content.scoring.dimensions.is_empty() && content.scoring.thresholds.is_empty() {
+        return;
+    }
+    if let Err(err) = sim_core::validate_scoring_config(&content.scoring) {
+        panic!("invalid scoring config: {err}");
     }
 }
 

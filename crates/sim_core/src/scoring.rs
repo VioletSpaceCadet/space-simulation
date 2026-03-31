@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 // ---------------------------------------------------------------------------
 
 /// A single scoring dimension definition.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DimensionDef {
     /// Unique identifier (e.g., `"industrial_output"`).
     pub id: String,
@@ -25,7 +25,7 @@ pub struct DimensionDef {
 }
 
 /// A named score threshold (e.g., "Enterprise" at 500 points).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThresholdDef {
     /// Display name.
     pub name: String,
@@ -34,7 +34,7 @@ pub struct ThresholdDef {
 }
 
 /// Scoring configuration loaded from `content/scoring.json`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoringConfig {
     /// The 6 scoring dimensions with weights and normalization ceilings.
     pub dimensions: Vec<DimensionDef>,
@@ -73,20 +73,34 @@ pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
         return Err("scoring config must have at least one dimension".into());
     }
 
-    let weight_sum: f64 = config.dimensions.iter().map(|d| d.weight).sum();
-    if (weight_sum - 1.0).abs() > 1e-6 {
-        return Err(format!(
-            "dimension weights must sum to 1.0, got {weight_sum:.6}"
-        ));
+    // Check for duplicate dimension IDs
+    let mut seen_ids = std::collections::HashSet::new();
+    for dim in &config.dimensions {
+        if !seen_ids.insert(&dim.id) {
+            return Err(format!("duplicate dimension id: '{}'", dim.id));
+        }
     }
 
     for dim in &config.dimensions {
+        if dim.weight <= 0.0 {
+            return Err(format!(
+                "dimension '{}' has non-positive weight {}",
+                dim.id, dim.weight
+            ));
+        }
         if dim.ceiling <= 0.0 {
             return Err(format!(
                 "dimension '{}' has non-positive ceiling {}",
                 dim.id, dim.ceiling
             ));
         }
+    }
+
+    let weight_sum: f64 = config.dimensions.iter().map(|d| d.weight).sum();
+    if (weight_sum - 1.0).abs() > 1e-6 {
+        return Err(format!(
+            "dimension weights must sum to 1.0, got {weight_sum:.6}"
+        ));
     }
 
     // Thresholds must be ascending by min_score
@@ -103,6 +117,13 @@ pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
         return Err("computation_interval_ticks must be > 0".into());
     }
 
+    if config.scale_factor <= 0.0 {
+        return Err(format!(
+            "scale_factor must be positive, got {}",
+            config.scale_factor
+        ));
+    }
+
     Ok(())
 }
 
@@ -111,7 +132,7 @@ pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 /// Score for a single dimension.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DimensionScore {
     /// Dimension id (matches `DimensionDef::id`).
     pub id: String,
@@ -126,7 +147,7 @@ pub struct DimensionScore {
 }
 
 /// Complete run score computed by `compute_run_score()`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RunScore {
     /// Per-dimension breakdown, keyed by dimension id.
     pub dimensions: BTreeMap<String, DimensionScore>,
@@ -144,7 +165,7 @@ impl Default for RunScore {
         Self {
             dimensions: BTreeMap::new(),
             composite: 0.0,
-            threshold: "Startup".to_string(),
+            threshold: String::new(),
             tick: 0,
         }
     }
@@ -265,6 +286,32 @@ mod tests {
         config.computation_interval_ticks = 0;
         let err = validate_scoring_config(&config).unwrap_err();
         assert!(err.contains("computation_interval_ticks"), "{err}");
+    }
+
+    #[test]
+    fn duplicate_dimension_ids_rejected() {
+        let mut config = sample_config();
+        config.dimensions[1].id = "industrial_output".into(); // duplicate
+        config.dimensions[1].weight = config.dimensions[0].weight; // fix weights
+        let err = validate_scoring_config(&config).unwrap_err();
+        assert!(err.contains("duplicate dimension id"), "{err}");
+    }
+
+    #[test]
+    fn negative_weight_rejected() {
+        let mut config = sample_config();
+        config.dimensions[0].weight = -0.25;
+        config.dimensions[1].weight = 0.70; // sums to 1.0 but negative weight
+        let err = validate_scoring_config(&config).unwrap_err();
+        assert!(err.contains("non-positive weight"), "{err}");
+    }
+
+    #[test]
+    fn non_positive_scale_factor_rejected() {
+        let mut config = sample_config();
+        config.scale_factor = 0.0;
+        let err = validate_scoring_config(&config).unwrap_err();
+        assert!(err.contains("scale_factor"), "{err}");
     }
 
     #[test]
