@@ -5,12 +5,14 @@
 //! columns are appended after all fixed scalar columns.
 
 use anyhow::{Context, Result};
-use arrow::array::{Float32Builder, Float64Builder, RecordBatch, UInt32Builder, UInt64Builder};
+use arrow::array::{
+    Float32Builder, Float64Builder, RecordBatch, StringBuilder, UInt32Builder, UInt64Builder,
+};
 use arrow::datatypes::{DataType, Field, Schema};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
-use sim_core::{MetricType, MetricValue, MetricsSnapshot};
+use sim_core::{MetricType, MetricValue, MetricsSnapshot, RunScore};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -81,6 +83,15 @@ struct RowBuffer {
     module_active_cols: Vec<UInt32Builder>,
     module_stalled_cols: Vec<UInt32Builder>,
     module_starved_cols: Vec<UInt32Builder>,
+    // Score columns (7 f64 dimensions + 1 f64 composite + 1 string threshold)
+    score_composite: Float64Builder,
+    score_industrial: Float64Builder,
+    score_research: Float64Builder,
+    score_economic: Float64Builder,
+    score_fleet: Float64Builder,
+    score_efficiency: Float64Builder,
+    score_expansion: Float64Builder,
+    score_threshold: StringBuilder,
     row_count: usize,
 }
 
@@ -120,6 +131,14 @@ impl RowBuffer {
             module_active_cols,
             module_stalled_cols,
             module_starved_cols,
+            score_composite: Float64Builder::new(),
+            score_industrial: Float64Builder::new(),
+            score_research: Float64Builder::new(),
+            score_economic: Float64Builder::new(),
+            score_fleet: Float64Builder::new(),
+            score_efficiency: Float64Builder::new(),
+            score_expansion: Float64Builder::new(),
+            score_threshold: StringBuilder::new(),
             row_count: 0,
         }
     }
@@ -157,11 +176,13 @@ impl ParquetMetricsWriter {
         })
     }
 
-    /// Append a metrics snapshot. Flushes to disk when the batch buffer is full.
-    pub fn write_row(&mut self, snapshot: &MetricsSnapshot) -> Result<()> {
+    /// Append a metrics snapshot with its corresponding score.
+    /// Flushes to disk when the batch buffer is full.
+    pub fn write_row(&mut self, snapshot: &MetricsSnapshot, score: &RunScore) -> Result<()> {
         append_to_buffer(
             &mut self.buffer,
             snapshot,
+            score,
             &self.element_ids,
             &self.behavior_types,
         );
@@ -247,13 +268,24 @@ pub(crate) fn build_schema(element_ids: &[String], behavior_types: &[String]) ->
         fields.push(Field::new(format!("{bt}_starved"), DataType::UInt32, false));
     }
 
+    // Score columns
+    fields.push(Field::new("score_composite", DataType::Float64, false));
+    fields.push(Field::new("score_industrial", DataType::Float64, false));
+    fields.push(Field::new("score_research", DataType::Float64, false));
+    fields.push(Field::new("score_economic", DataType::Float64, false));
+    fields.push(Field::new("score_fleet", DataType::Float64, false));
+    fields.push(Field::new("score_efficiency", DataType::Float64, false));
+    fields.push(Field::new("score_expansion", DataType::Float64, false));
+    fields.push(Field::new("score_threshold", DataType::Utf8, false));
+
     Schema::new(fields)
 }
 
-/// Append a single snapshot's values to the row buffer.
+/// Append a single snapshot's values and score to the row buffer.
 fn append_to_buffer(
     buf: &mut RowBuffer,
     snap: &MetricsSnapshot,
+    score: &RunScore,
     element_ids: &[String],
     behavior_types: &[String],
 ) {
@@ -287,6 +319,17 @@ fn append_to_buffer(
         buf.module_stalled_cols[index].append_value(metrics.map_or(0, |m| m.stalled));
         buf.module_starved_cols[index].append_value(metrics.map_or(0, |m| m.starved));
     }
+
+    // Score columns
+    let dim = |id: &str| -> f64 { score.dimensions.get(id).map_or(0.0, |d| d.normalized) };
+    buf.score_composite.append_value(score.composite);
+    buf.score_industrial.append_value(dim("industrial_output"));
+    buf.score_research.append_value(dim("research_progress"));
+    buf.score_economic.append_value(dim("economic_health"));
+    buf.score_fleet.append_value(dim("fleet_operations"));
+    buf.score_efficiency.append_value(dim("efficiency"));
+    buf.score_expansion.append_value(dim("expansion"));
+    buf.score_threshold.append_value(&score.threshold);
 }
 
 /// Build a `RecordBatch` from the accumulated buffer, consuming builder state.
@@ -319,6 +362,16 @@ fn build_record_batch(
         columns.push(Arc::new(buf.module_stalled_cols[index].finish()));
         columns.push(Arc::new(buf.module_starved_cols[index].finish()));
     }
+
+    // Score columns
+    columns.push(Arc::new(buf.score_composite.finish()));
+    columns.push(Arc::new(buf.score_industrial.finish()));
+    columns.push(Arc::new(buf.score_research.finish()));
+    columns.push(Arc::new(buf.score_economic.finish()));
+    columns.push(Arc::new(buf.score_fleet.finish()));
+    columns.push(Arc::new(buf.score_efficiency.finish()));
+    columns.push(Arc::new(buf.score_expansion.finish()));
+    columns.push(Arc::new(buf.score_threshold.finish()));
 
     RecordBatch::try_new(Arc::clone(schema), columns).context("building record batch")
 }
@@ -438,8 +491,9 @@ mod tests {
         )
         .unwrap();
         let snapshots: Vec<MetricsSnapshot> = (0..100).map(make_snapshot).collect();
+        let default_score = RunScore::default();
         for snap in &snapshots {
-            writer.write_row(snap).unwrap();
+            writer.write_row(snap, &default_score).unwrap();
         }
         writer.finish().unwrap();
 
@@ -532,7 +586,9 @@ mod tests {
 
         let bt = vec!["processor".to_string(), "assembler".to_string()];
         let mut writer = ParquetMetricsWriter::new(&path, element_ids, bt).unwrap();
-        writer.write_row(&make_snapshot(0)).unwrap();
+        writer
+            .write_row(&make_snapshot(0), &RunScore::default())
+            .unwrap();
         writer.finish().unwrap();
 
         // Read file metadata

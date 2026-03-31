@@ -13,6 +13,7 @@ use uuid::Uuid;
 pub struct SeedResult {
     pub seed: u64,
     pub final_snapshot: MetricsSnapshot,
+    pub final_score: sim_core::RunScore,
     #[allow(dead_code)]
     pub wall_time_ms: u64,
     pub run_id: String,
@@ -93,19 +94,23 @@ pub fn run_seed(
 
         if state.meta.tick % metrics_every == 0 {
             let snapshot = sim_core::compute_metrics(&state, content);
+            let score = sim_core::compute_run_score(&snapshot, &state, content);
+            parquet_writer
+                .write_row(&snapshot, &score)
+                .context("Parquet row")?;
             metrics_writer.write_row(&snapshot).context("CSV row")?;
-            parquet_writer.write_row(&snapshot).context("Parquet row")?;
         }
     }
 
     // Always capture final snapshot
     let final_snapshot = sim_core::compute_metrics(&state, content);
+    let final_score = sim_core::compute_run_score(&final_snapshot, &state, content);
     if state.meta.tick % metrics_every != 0 {
         metrics_writer
             .write_row(&final_snapshot)
             .context("writing final CSV metrics row")?;
         parquet_writer
-            .write_row(&final_snapshot)
+            .write_row(&final_snapshot, &final_score)
             .context("writing final Parquet metrics row")?;
     }
     metrics_writer.flush().context("flushing CSV")?;
@@ -132,12 +137,14 @@ pub fn run_seed(
         wall_time_ms,
         sim_ticks_per_second,
         &final_snapshot,
+        &final_score,
         &timing_stats,
     )?;
 
     Ok(SeedResult {
         seed,
         final_snapshot,
+        final_score,
         wall_time_ms,
         run_id,
     })
@@ -154,6 +161,7 @@ fn write_run_result(
     wall_time_ms: u64,
     sim_ticks_per_second: f64,
     final_snapshot: &MetricsSnapshot,
+    final_score: &sim_core::RunScore,
     timing_stats: &run_result::TimingStats,
 ) -> Result<()> {
     let (collapse_occurred, collapse_reason) = run_result::detect_collapse(final_snapshot);
@@ -188,6 +196,8 @@ fn write_run_result(
         events_path: None,
         error_message: None,
         timing_stats: Some(timing_stats.clone()),
+        score_composite: Some(final_score.composite),
+        score_threshold: Some(final_score.threshold.clone()),
     };
 
     result
