@@ -206,7 +206,7 @@ fn compute_industrial(metrics: &MetricsSnapshot, tick: f64) -> f64 {
         .per_module_metrics
         .get("assembler")
         .map_or(0, |m| m.active);
-    // Blend: 80% throughput, 20% assembler signal (0 or 1 normalized)
+    // Throughput rate plus small assembler activity bonus (0.1 per active assembler)
     throughput + f64::from(assembler_active) * 0.1
 }
 
@@ -261,7 +261,7 @@ fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
     (wear_score + power_util + storage_score) / 3.0
 }
 
-/// Expansion: station count + zone activity + fleet size (sqrt diminishing returns).
+/// Expansion: station count + fleet size (sqrt diminishing returns).
 fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     let station_count = state.stations.len() as f64;
     let station_signal = (station_count / 3.0).min(1.0);
@@ -613,9 +613,13 @@ mod tests {
 
         let score = compute_run_score(&metrics, &state, &content);
         // With minimal activity, should be in Startup range (< 200)
+        assert_eq!(
+            score.threshold, "Startup",
+            "minimal activity should be Startup"
+        );
         assert!(
-            score.composite < 500.0,
-            "tick-0 state should be low, got {}",
+            score.composite < 200.0,
+            "tick-0 state should be in Startup range (< 200), got {}",
             score.composite
         );
     }

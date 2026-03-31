@@ -633,4 +633,39 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_autopilot_overrides() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let original_pct = content.autopilot.slag_jettison_pct;
+        let overrides = HashMap::from([(
+            "autopilot.slag_jettison_pct".to_string(),
+            serde_json::json!(0.9),
+        )]);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert!(
+            (content.autopilot.slag_jettison_pct - 0.9).abs() < f32::EPSILON,
+            "autopilot.slag_jettison_pct should be overridden to 0.9"
+        );
+        assert!(
+            (original_pct - 0.75).abs() < f32::EPSILON,
+            "original value should have been 0.75"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_override_unknown_key_errors() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let overrides = HashMap::from([(
+            "autopilot.nonexistent_field".to_string(),
+            serde_json::json!(42),
+        )]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("unknown autopilot override key"),
+            "error should mention unknown key: {err}"
+        );
+    }
 }
