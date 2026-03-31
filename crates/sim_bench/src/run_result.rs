@@ -32,6 +32,12 @@ pub struct RunResult {
     pub error_message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timing_stats: Option<TimingStats>,
+    /// Final composite score at end of run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score_composite: Option<f64>,
+    /// Score threshold name at end of run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score_threshold: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -262,6 +268,8 @@ mod tests {
             events_path: None,
             error_message: None,
             timing_stats: None,
+            score_composite: None,
+            score_threshold: None,
         };
 
         let json = serde_json::to_string_pretty(&result).unwrap();
@@ -302,6 +310,8 @@ mod tests {
             events_path: None,
             error_message: None,
             timing_stats: None,
+            score_composite: None,
+            score_threshold: None,
         };
 
         result.write_atomic(&path).unwrap();

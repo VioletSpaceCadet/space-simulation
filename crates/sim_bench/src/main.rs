@@ -124,8 +124,10 @@ fn run(scenario_path: &str, output_dir: &str) -> Result<()> {
         .iter()
         .map(|r| (r.seed, &r.final_snapshot))
         .collect();
+    let score_refs: Vec<&sim_core::RunScore> =
+        seed_results.iter().map(|r| &r.final_score).collect();
 
-    let stats = summary::compute_summary(&snapshot_refs);
+    let stats = summary::compute_summary(&snapshot_refs, &score_refs);
     summary::print_summary(&scenario.name, scenario.ticks, &stats);
 
     // Write summary.json (legacy format, backward compat)

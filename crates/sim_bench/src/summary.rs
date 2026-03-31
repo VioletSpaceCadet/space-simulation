@@ -1,5 +1,5 @@
 use serde::Serialize;
-use sim_core::MetricsSnapshot;
+use sim_core::{MetricsSnapshot, RunScore};
 
 #[derive(Debug, Serialize)]
 pub struct SummaryStats {
@@ -17,7 +17,10 @@ pub struct MetricSummary {
     pub stddev: f64,
 }
 
-pub fn compute_summary(snapshots: &[(u64, &MetricsSnapshot)]) -> SummaryStats {
+pub fn compute_summary(
+    snapshots: &[(u64, &MetricsSnapshot)],
+    scores: &[&RunScore],
+) -> SummaryStats {
     let seed_count = snapshots.len();
 
     // A seed is "collapsed" if processor starved > 0 AND fleet_idle == fleet_total
@@ -88,6 +91,27 @@ pub fn compute_summary(snapshots: &[(u64, &MetricsSnapshot)]) -> SummaryStats {
             .map(|(_, s)| s.get_field_f64(field_name).unwrap_or(0.0))
             .collect();
         metrics.push(compute_metric_summary(field_name, &values));
+    }
+
+    // Score stats
+    if !scores.is_empty() {
+        let composites: Vec<f64> = scores.iter().map(|s| s.composite).collect();
+        metrics.push(compute_metric_summary("score_composite", &composites));
+
+        for dim_id in [
+            "industrial_output",
+            "research_progress",
+            "economic_health",
+            "fleet_operations",
+            "efficiency",
+            "expansion",
+        ] {
+            let values: Vec<f64> = scores
+                .iter()
+                .map(|s| s.dimensions.get(dim_id).map_or(0.0, |d| d.normalized))
+                .collect();
+            metrics.push(compute_metric_summary(&format!("score_{dim_id}"), &values));
+        }
     }
 
     SummaryStats {
@@ -255,7 +279,7 @@ mod tests {
         let s1 = make_snapshot(100, 0.5, 2, 0, 0, 3, 0.2, 5);
         let s2 = make_snapshot(100, 0.7, 2, 0, 0, 5, 0.4, 3);
         let snapshots: Vec<(u64, &MetricsSnapshot)> = vec![(1, &s1), (2, &s2)];
-        let stats = compute_summary(&snapshots);
+        let stats = compute_summary(&snapshots, &[]);
 
         assert_eq!(stats.seed_count, 2);
         assert_eq!(stats.collapsed_count, 0);
@@ -273,7 +297,7 @@ mod tests {
         let collapsed = make_snapshot(100, 0.5, 2, 2, 1, 3, 0.2, 5);
         let healthy = make_snapshot(100, 0.5, 2, 0, 0, 3, 0.2, 5);
         let snapshots: Vec<(u64, &MetricsSnapshot)> = vec![(1, &collapsed), (2, &healthy)];
-        let stats = compute_summary(&snapshots);
+        let stats = compute_summary(&snapshots, &[]);
 
         assert_eq!(stats.collapsed_count, 1);
     }
@@ -283,7 +307,7 @@ mod tests {
         let s1 = make_snapshot(100, 0.5, 2, 1, 0, 3, 0.2, 5);
         let s2 = make_snapshot(100, 0.5, 2, 1, 0, 3, 0.2, 5);
         let snapshots: Vec<(u64, &MetricsSnapshot)> = vec![(1, &s1), (2, &s2)];
-        let stats = compute_summary(&snapshots);
+        let stats = compute_summary(&snapshots, &[]);
 
         for metric in &stats.metrics {
             assert!(
@@ -332,5 +356,61 @@ mod tests {
         assert!((fleet_total["mean"].as_f64().unwrap() - 5.0).abs() < 1e-5);
         assert!((fleet_total["min"].as_f64().unwrap() - 4.0).abs() < 1e-5);
         assert!((fleet_total["max"].as_f64().unwrap() - 6.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_summary_includes_score_stats() {
+        let s1 = make_snapshot(100, 0.5, 2, 0, 0, 3, 0.2, 5);
+        let s2 = make_snapshot(100, 0.7, 2, 0, 0, 5, 0.4, 3);
+        let snapshots: Vec<(u64, &MetricsSnapshot)> = vec![(1, &s1), (2, &s2)];
+
+        let score1 = RunScore {
+            composite: 300.0,
+            threshold: "Contractor".into(),
+            tick: 100,
+            dimensions: std::collections::BTreeMap::from([(
+                "industrial_output".into(),
+                sim_core::DimensionScore {
+                    id: "industrial_output".into(),
+                    name: "Industrial Output".into(),
+                    raw_value: 5.0,
+                    normalized: 0.5,
+                    weighted: 312.5,
+                },
+            )]),
+        };
+        let score2 = RunScore {
+            composite: 500.0,
+            threshold: "Enterprise".into(),
+            tick: 100,
+            dimensions: std::collections::BTreeMap::from([(
+                "industrial_output".into(),
+                sim_core::DimensionScore {
+                    id: "industrial_output".into(),
+                    name: "Industrial Output".into(),
+                    raw_value: 8.0,
+                    normalized: 0.8,
+                    weighted: 500.0,
+                },
+            )]),
+        };
+        let scores: Vec<&RunScore> = vec![&score1, &score2];
+
+        let stats = compute_summary(&snapshots, &scores);
+        let composite = stats
+            .metrics
+            .iter()
+            .find(|m| m.name == "score_composite")
+            .expect("should have score_composite");
+        assert!((composite.mean - 400.0).abs() < 1e-6);
+        assert!((composite.min - 300.0).abs() < 1e-6);
+        assert!((composite.max - 500.0).abs() < 1e-6);
+
+        let industrial = stats
+            .metrics
+            .iter()
+            .find(|m| m.name == "score_industrial_output")
+            .expect("should have score_industrial_output");
+        assert!((industrial.mean - 0.65).abs() < 1e-6);
     }
 }
