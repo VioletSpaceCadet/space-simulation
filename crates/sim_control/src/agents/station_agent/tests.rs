@@ -107,7 +107,7 @@ fn manage_modules_installs_from_inventory() {
 #[test]
 fn jettison_slag_fires_above_threshold() {
     let mut content = base_content();
-    content.constants.autopilot_slag_jettison_pct = 0.5;
+    content.autopilot.slag_jettison_pct = 0.5;
     let mut state = base_state(&content);
     let owner = PrincipalId("principal_autopilot".to_string());
     let station_id = state.stations.keys().next().unwrap().clone();

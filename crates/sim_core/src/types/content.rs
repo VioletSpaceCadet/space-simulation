@@ -59,10 +59,16 @@ pub enum AlertRuleType {
 // ---------------------------------------------------------------------------
 
 /// Content-driven autopilot configuration loaded from `content/autopilot.json`.
-/// Maps semantic roles to content IDs so behaviors don't hardcode strings.
+/// Maps semantic roles to content IDs and behavioral parameters for the
+/// autopilot controller. All behavioral params have defaults matching the
+/// baseline autopilot behavior.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AutopilotConfig {
+    /// Config version identifier for tracking and comparison.
+    pub version: String,
+
+    // -- Content ID mappings --
     /// Module role for propellant generation (excluded from auto-re-enable, toggled by pipeline).
     pub propellant_role: String,
     /// Module role for propellant support (enabled when propellant is low — superset of propellant).
@@ -90,11 +96,40 @@ pub struct AutopilotConfig {
     /// Ship task scheduling priority order. Tasks are attempted in this order per idle ship.
     /// Valid entries: `"Deposit"`, `"Mine"`, `"DeepScan"`, `"Survey"`.
     pub task_priority: Vec<String>,
+
+    // -- Behavioral parameters (extracted from hardcoded values) --
+    /// Propellant fraction below which ships opportunistically refuel at a station.
+    pub refuel_threshold_pct: f32,
+    /// Propellant fraction at or above which refueling is considered complete.
+    pub refuel_max_pct: f32,
+    /// H2O inventory (kg) below which autopilot prioritizes volatile-rich mining.
+    pub volatile_threshold_kg: f32,
+    /// LH2 inventory threshold (kg) for propellant pipeline management.
+    pub lh2_threshold_kg: f32,
+    /// Multiplier on `lh2_threshold_kg` — disable electrolysis when LH2 exceeds this.
+    pub lh2_abundant_multiplier: f32,
+    /// Cargo capacity fraction at which slag is jettisoned.
+    pub slag_jettison_pct: f32,
+    /// Default refinery processing threshold (kg) for newly installed processor modules.
+    pub refinery_threshold_kg: f32,
+    /// Max kg per material export command per tick.
+    pub export_batch_size_kg: f32,
+    /// Minimum revenue threshold — skip exports below this amount.
+    pub export_min_revenue: f64,
+    /// Default component import count for shipyard recipes.
+    pub shipyard_component_count: u32,
+    /// Max fraction of balance the autopilot will spend on a single import.
+    pub budget_cap_fraction: f64,
+    /// Power deficit (kW) below which module shedding is not triggered.
+    pub power_deficit_threshold_kw: f32,
+    /// Forward-looking salary projection window (game-minutes) for crew hiring decisions.
+    pub crew_hire_projection_minutes: u64,
 }
 
 impl Default for AutopilotConfig {
     fn default() -> Self {
         Self {
+            version: "baseline-v1".to_string(),
             propellant_role: "propellant".to_string(),
             propellant_support_role: "propellant_support".to_string(),
             shipyard_role: "shipyard".to_string(),
@@ -135,6 +170,19 @@ impl Default for AutopilotConfig {
                 "DeepScan".to_string(),
                 "Survey".to_string(),
             ],
+            refuel_threshold_pct: 0.8,
+            refuel_max_pct: 0.99,
+            volatile_threshold_kg: 500.0,
+            lh2_threshold_kg: 5000.0,
+            lh2_abundant_multiplier: 2.0,
+            slag_jettison_pct: 0.8,
+            refinery_threshold_kg: 500.0,
+            export_batch_size_kg: 500.0,
+            export_min_revenue: 1_000.0,
+            shipyard_component_count: 4,
+            budget_cap_fraction: 0.05,
+            power_deficit_threshold_kw: 0.01,
+            crew_hire_projection_minutes: 30 * 24 * 60, // 30 days
         }
     }
 }

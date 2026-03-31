@@ -118,10 +118,10 @@ pub(in crate::agents) fn collect_mine_candidates(
     let primary_element = &content.autopilot.primary_mining_element;
     let needs_volatiles = station_has_module_with_role(state, support_role)
         && (total_element_inventory(state, volatile_element)
-            < content.constants.autopilot_volatile_threshold_kg
+            < content.autopilot.volatile_threshold_kg
             || (has_propellant_module
                 && total_element_inventory(state, propellant_element)
-                    < content.constants.autopilot_lh2_threshold_kg));
+                    < content.autopilot.lh2_threshold_kg));
 
     let sort_element = if needs_volatiles {
         volatile_element

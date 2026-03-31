@@ -56,14 +56,16 @@ impl StationConcern for CrewRecruitment {
             else {
                 continue;
             };
-            let budget_cap =
-                ctx.state.balance * ctx.content.constants.autopilot_budget_cap_fraction;
+            let budget_cap = ctx.state.balance * ctx.content.autopilot.budget_cap_fraction;
             if cost > budget_cap {
                 continue;
             }
-            // Salary projection: skip if hiring would cause bankruptcy within 30 days
+            // Salary projection: skip if hiring would cause bankruptcy within projection window
             let hours_per_tick = f64::from(ctx.content.constants.minutes_per_tick) / 60.0;
-            let projection_ticks = ctx.content.constants.game_minutes_to_ticks(30 * 24 * 60);
+            let projection_ticks = ctx
+                .content
+                .constants
+                .game_minutes_to_ticks(ctx.content.autopilot.crew_hire_projection_minutes);
             let current_salary_per_tick: f64 = ctx
                 .state
                 .stations
