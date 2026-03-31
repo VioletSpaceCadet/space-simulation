@@ -243,6 +243,15 @@ mod tests {
         assert!(seed_dir.join("metrics_000.csv").exists());
         assert!(seed_dir.join("metrics.parquet").exists());
         assert!(seed_dir.join("run_result.json").exists());
+        assert!(seed_dir.join("decisions.csv").exists());
+        // Verify decisions.csv has content (header + at least one data row)
+        let decisions_content = std::fs::read_to_string(seed_dir.join("decisions.csv")).unwrap();
+        let decision_lines: Vec<&str> = decisions_content.lines().collect();
+        assert!(
+            decision_lines.len() >= 2,
+            "decisions.csv should have header + data: got {} lines",
+            decision_lines.len()
+        );
 
         // Verify run_result.json content
         let content_str = std::fs::read_to_string(seed_dir.join("run_result.json")).unwrap();

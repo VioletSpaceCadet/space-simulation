@@ -898,17 +898,21 @@ fn default_concerns() -> Vec<Box<dyn StationConcern>> {
     ]
 }
 
+/// Iterator state for ship objective candidate lists.
+struct ObjectiveCandidates<'a> {
+    next_mine: &'a std::slice::Iter<'a, AsteroidId>,
+    next_site: &'a std::slice::Iter<'a, SiteId>,
+    next_deep_scan: &'a std::slice::Iter<'a, AsteroidId>,
+}
+
 /// Log a ship objective assignment decision.
-#[allow(clippy::too_many_arguments)]
 fn log_objective_decision(
     log: &mut Vec<DecisionRecord>,
     tick: u64,
     station_id: &StationId,
     obj: &ShipObjective,
     priority: &str,
-    next_mine: &std::slice::Iter<'_, AsteroidId>,
-    next_site: &std::slice::Iter<'_, SiteId>,
-    next_deep_scan: &std::slice::Iter<'_, AsteroidId>,
+    candidates: &ObjectiveCandidates,
 ) {
     let (chosen_id, decision_type) = match obj {
         ShipObjective::Mine { asteroid_id } => (asteroid_id.0.clone(), "assign_mine"),
@@ -917,10 +921,23 @@ fn log_objective_decision(
         ShipObjective::Deposit { station_id } => (station_id.0.clone(), "assign_deposit"),
         ShipObjective::Idle => (String::new(), "idle"),
     };
+    // Peek at remaining alternatives from the matching iterator.
+    // The _ arm reports deep_scan alternatives (only other scored type).
     let alts: Vec<String> = match priority {
-        "Mine" => next_mine.clone().take(3).map(|id| id.0.clone()).collect(),
-        "Survey" => next_site.clone().take(3).map(|id| id.0.clone()).collect(),
-        _ => next_deep_scan
+        "Mine" => candidates
+            .next_mine
+            .clone()
+            .take(3)
+            .map(|id| id.0.clone())
+            .collect(),
+        "Survey" => candidates
+            .next_site
+            .clone()
+            .take(3)
+            .map(|id| id.0.clone())
+            .collect(),
+        _ => candidates
+            .next_deep_scan
             .clone()
             .take(3)
             .map(|id| id.0.clone())
@@ -941,9 +958,9 @@ fn log_objective_decision(
         alt_3_score: 0.0,
         context_json: format!(
             "{{\"mine_remaining\":{},\"survey_remaining\":{},\"deep_scan_remaining\":{}}}",
-            next_mine.clone().count(),
-            next_site.clone().count(),
-            next_deep_scan.clone().count(),
+            candidates.next_mine.clone().count(),
+            candidates.next_site.clone().count(),
+            candidates.next_deep_scan.clone().count(),
         ),
     });
 }
@@ -1059,21 +1076,24 @@ impl StationAgent {
                     }),
                     _ => None,
                 };
-                if let Some(ref obj) = objective {
-                    if let Some(agent) = ship_agents.get_mut(&ship_id) {
-                        agent.objective = Some(obj.clone());
-                    }
+                if let Some(obj) = objective {
                     if let Some(ref mut log) = decisions {
+                        let cands = ObjectiveCandidates {
+                            next_mine: &next_mine,
+                            next_site: &next_site,
+                            next_deep_scan: &next_deep_scan,
+                        };
                         log_objective_decision(
                             log,
                             state.meta.tick,
                             &self.station_id,
-                            obj,
+                            &obj,
                             priority,
-                            &next_mine,
-                            &next_site,
-                            &next_deep_scan,
+                            &cands,
                         );
+                    }
+                    if let Some(agent) = ship_agents.get_mut(&ship_id) {
+                        agent.objective = Some(obj);
                     }
                     break;
                 }
