@@ -92,6 +92,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 | `module_defs.json` | Modules include: `module_basic_iron_refinery` (Processor, 60-tick interval, wear_per_run=0.01), `module_maintenance_bay` (Maintenance, 30-tick interval, reduces 0.2 wear, costs 1 RepairKit), `module_basic_assembler` (Assembler, 360-tick interval, wear_per_run=0.008, 200kg Fe → 1 RepairKit, max_stock: repair_kit=50), `module_basic_smelter` (Processor with ThermalDef, thermal recipe requirements), `module_basic_radiator` (Radiator, cooling_capacity_w shared across thermal group) |
 | `component_defs.json` | 1 component: `repair_kit` (50kg, 0.1 m³) |
 | `pricing.json` | Import/export pricing: surcharges per kg, per-item base prices, importable/exportable flags |
+| `scoring.json` | Run scoring config: 6 dimensions (id, name, weight, ceiling), 5 named thresholds (Startup→Space Magnate), computation_interval_ticks (default 24), scale_factor (default 2500). See Scoring section below. |
 | `dev_base_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
 
 ## Inventory & Refinery Design
@@ -302,3 +303,32 @@ runs/<name>_<timestamp>/
 - **Benchmark Runner (done):** `sim_bench` crate — JSON scenario files, constant overrides, parallel seed execution (rayon), per-seed CSV metrics, cross-seed summary statistics, collapse detection.
 - **Economy & Trade (done):** Balance system ($1B start), import/export commands, pricing table from pricing.json, shipyard assembler (OutputSpec::Ship), thruster import autopilot, Economy UI panel, daemon command queue + pricing endpoint.
 - **Heat System MVP (done):** Thermal state on modules (milli-Kelvin), smelter (processor with thermal requirements), radiator (shared cooling per thermal group), overheat escalation (Warning 2x wear, Critical 4x wear + auto-disable), thermal metrics, thermal alerts, UI temperature readouts and badges.
+
+## Scoring
+
+**Run scoring** evaluates simulation performance across 6 weighted dimensions, producing a composite score and named threshold.
+
+**Content schema** (`content/scoring.json`):
+- `dimensions[]` — Array of `DimensionDef`: `id` (string), `name` (string), `weight` (f64, all must sum to 1.0), `ceiling` (f64, normalization ceiling)
+- `thresholds[]` — Array of `ThresholdDef`: `name` (string), `min_score` (f64, ascending order)
+- `computation_interval_ticks` — How often score is recomputed (default: 24)
+- `scale_factor` — Multiplier on weighted sum to produce composite (default: 2500.0)
+
+**Dimensions** (6):
+
+| Dimension | Weight | Inputs |
+|---|---|---|
+| Industrial Output | 25% | total_material_kg/tick, assembler active count |
+| Research Progress | 20% | techs_unlocked/total, total_scan_data growth |
+| Economic Health | 20% | balance trend, export_revenue_total growth |
+| Fleet Operations | 15% | fleet utilization, ships constructed |
+| Efficiency | 10% | inverted avg_module_wear, power util, storage util |
+| Expansion | 10% | station count, zone activity, fleet size |
+
+**Named thresholds:** Startup (0) → Contractor (200) → Enterprise (500) → Industrial Giant (1000) → Space Magnate (2000+)
+
+**Types** (`sim_core::scoring`):
+- `ScoringConfig` — content-loaded config (dimensions, thresholds, interval, scale_factor)
+- `RunScore` — output: per-dimension `BTreeMap<String, DimensionScore>`, composite (f64), threshold (String), tick (u64)
+- `DimensionScore` — per-dimension: id, name, raw_value, normalized [0.0–1.0], weighted contribution
+- `validate_scoring_config()` — validates weights sum, ascending thresholds, positive ceilings
