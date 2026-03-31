@@ -8,7 +8,11 @@ from scripts.analysis.labels import (
     bottleneck_timeline,
     collapse_detection,
     final_score,
+    legacy_final_score,
     research_stall_tick,
+    score_distribution,
+    score_trajectory,
+    scoring_dimensions,
     storage_saturation_tick,
 )
 
@@ -361,3 +365,169 @@ def test_bottleneck_priority_order() -> None:
     result = bottleneck_timeline(rel)
     rows = result.fetchall()
     assert rows[0][3] == "StorageFull"
+
+
+# --- legacy_final_score alias ---
+
+
+def test_final_score_alias() -> None:
+    """final_score and legacy_final_score are the same function."""
+    assert final_score is legacy_final_score
+
+
+# --- scoring_dimensions ---
+
+
+def test_scoring_dimensions_basic() -> None:
+    """Extract scoring dimensions from final tick per seed."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 100, 250.0, 0.5, 0.3, 0.4, 0.6, 0.7, 0.2, 'Contractor'),
+            (0, 200, 500.0, 0.8, 0.6, 0.7, 0.9, 0.8, 0.5, 'Enterprise'),
+            (1, 100, 100.0, 0.2, 0.1, 0.3, 0.4, 0.5, 0.1, 'Startup'),
+            (1, 200, 300.0, 0.6, 0.4, 0.5, 0.7, 0.6, 0.3, 'Contractor')
+        ) AS t(seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold)
+    """)
+    result = scoring_dimensions(rel)
+    rows = result.order("seed").fetchall()
+    assert len(rows) == 2
+    # Seed 0 final tick is 200
+    assert rows[0][0] == 0
+    assert rows[0][1] == 200
+    assert abs(float(rows[0][2]) - 500.0) < 1e-6  # composite
+    assert rows[0][9] == "Enterprise"  # threshold
+    # Seed 1 final tick is 200
+    assert rows[1][0] == 1
+    assert abs(float(rows[1][2]) - 300.0) < 1e-6
+
+
+def test_scoring_dimensions_single_tick() -> None:
+    """Works with a single tick per seed."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 50, 123.4, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 'Startup')
+        ) AS t(seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold)
+    """)
+    result = scoring_dimensions(rel)
+    rows = result.fetchall()
+    assert len(rows) == 1
+    assert abs(float(rows[0][2]) - 123.4) < 1e-6
+
+
+# --- score_trajectory ---
+
+
+def test_score_trajectory_returns_all_ticks() -> None:
+    """Trajectory includes all ticks with score data."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 24,  100.0, 'Startup'),
+            (0, 48,  200.0, 'Startup'),
+            (0, 72,  350.0, 'Contractor'),
+            (1, 24,   50.0, 'Startup'),
+            (1, 48,  150.0, 'Startup')
+        ) AS t(seed, tick, score_composite, score_threshold)
+    """)
+    result = score_trajectory(rel)
+    rows = result.order("seed, tick").fetchall()
+    assert len(rows) == 5
+    assert rows[0] == (0, 24, 100.0, "Startup")
+    assert rows[2] == (0, 72, 350.0, "Contractor")
+
+
+def test_score_trajectory_filters_nulls() -> None:
+    """Rows with NULL score_composite are excluded."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 24,  100.0, 'Startup'),
+            (0, 48,  NULL,  NULL),
+            (0, 72,  300.0, 'Contractor')
+        ) AS t(seed, tick, score_composite, score_threshold)
+    """)
+    result = score_trajectory(rel)
+    rows = result.fetchall()
+    assert len(rows) == 2
+
+
+# --- score_distribution ---
+
+
+def test_score_distribution_stats() -> None:
+    """Distribution computes per-dimension aggregate stats."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 200, 400.0, 0.6, 0.5, 0.4, 0.8, 0.7, 0.3, 'Contractor'),
+            (1, 200, 600.0, 0.8, 0.7, 0.6, 0.9, 0.8, 0.5, 'Enterprise')
+        ) AS t(seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold)
+    """)
+    result = score_distribution(rel)
+    rows = result.order("dimension").fetchall()
+    assert len(rows) == 7  # composite + 6 dimensions
+    # Find composite row
+    composite_row = next(r for r in rows if r[0] == "composite")
+    assert abs(float(composite_row[1]) - 500.0) < 1e-6  # mean of 400 and 600
+    assert float(composite_row[3]) == 400.0  # min
+    assert float(composite_row[4]) == 600.0  # max
+
+
+def test_score_distribution_single_seed() -> None:
+    """With single seed, stddev is 0."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 100, 250.0, 0.5, 0.3, 0.4, 0.6, 0.7, 0.2, 'Contractor')
+        ) AS t(seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold)
+    """)
+    result = score_distribution(rel)
+    rows = result.fetchall()
+    for row in rows:
+        assert abs(float(row[2])) < 1e-6, f"stddev for {row[0]} should be 0, got {row[2]}"
+
+
+def test_score_distribution_zero_values() -> None:
+    """CV is 0 when all values are zero (exercises the ELSE 0.0 branch)."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 100, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'Startup'),
+            (1, 100, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'Startup')
+        ) AS t(seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold)
+    """)
+    result = score_distribution(rel)
+    rows = result.fetchall()
+    for row in rows:
+        assert float(row[5]) == 0.0, f"CV for {row[0]} should be 0, got {row[5]}"
+
+
+def test_scoring_dimensions_empty_input() -> None:
+    """Empty input returns empty result."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold
+        FROM (VALUES
+            (0, 100, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'Startup')
+        ) AS t(seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold)
+        WHERE 1 = 0
+    """)
+    result = scoring_dimensions(rel)
+    rows = result.fetchall()
+    assert len(rows) == 0
