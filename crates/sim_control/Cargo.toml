@@ -9,6 +9,7 @@ workspace = true
 
 [dependencies]
 sim_core = { path = "../sim_core" }
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 sim_core = { path = "../sim_core", features = ["test-support"] }

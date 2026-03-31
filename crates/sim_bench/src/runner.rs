@@ -41,10 +41,13 @@ pub fn run_seed(
         sim_world::build_initial_state(content, seed, &mut rng)
     };
     let mut autopilot = AutopilotController::new();
+    autopilot.enable_decision_logging();
     let mut next_command_id = 0u64;
 
     std::fs::create_dir_all(seed_dir)
         .with_context(|| format!("creating seed directory: {}", seed_dir.display()))?;
+    let mut decisions_writer =
+        csv::Writer::from_path(seed_dir.join("decisions.csv")).context("creating decisions CSV")?;
 
     // Write run_info.json
     sim_world::write_run_info(
@@ -79,18 +82,19 @@ pub fn run_seed(
 
     for _ in 0..ticks {
         let commands = autopilot.generate_commands(&state, content, &mut next_command_id);
+        for record in autopilot.take_decisions() {
+            decisions_writer
+                .serialize(&record)
+                .context("writing decision")?;
+        }
         let mut timings = TickTimings::default();
         sim_core::tick(&mut state, &commands, content, &mut rng, Some(&mut timings));
         all_timings.push(timings);
 
         if state.meta.tick % metrics_every == 0 {
             let snapshot = sim_core::compute_metrics(&state, content);
-            metrics_writer
-                .write_row(&snapshot)
-                .context("writing CSV metrics row")?;
-            parquet_writer
-                .write_row(&snapshot)
-                .context("writing Parquet metrics row")?;
+            metrics_writer.write_row(&snapshot).context("CSV row")?;
+            parquet_writer.write_row(&snapshot).context("Parquet row")?;
         }
     }
 
@@ -104,8 +108,9 @@ pub fn run_seed(
             .write_row(&final_snapshot)
             .context("writing final Parquet metrics row")?;
     }
-    metrics_writer.flush().context("flushing CSV metrics")?;
-    parquet_writer.finish().context("finishing Parquet file")?;
+    metrics_writer.flush().context("flushing CSV")?;
+    parquet_writer.finish().context("finishing Parquet")?;
+    decisions_writer.flush().context("flushing decisions")?;
 
     #[allow(clippy::cast_possible_truncation)]
     let wall_time_ms = start.elapsed().as_millis() as u64;
