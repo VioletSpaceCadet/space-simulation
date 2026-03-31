@@ -91,7 +91,8 @@ pub use types::{Command, CommandEnvelope, Event, EventEnvelope};
 pub use types::{InventoryItem, PricingEntry, PricingTable, TradeItemSpec};
 // -- types: constants & functions --
 pub use scoring::{
-    validate_scoring_config, DimensionDef, DimensionScore, RunScore, ScoringConfig, ThresholdDef,
+    compute_run_score, validate_scoring_config, DimensionDef, DimensionScore, RunScore,
+    ScoringConfig, ThresholdDef,
 };
 pub use types::{boiloff_rate_per_tick, derive_module_tick_values, Constants};
 pub use wear::wear_efficiency;
