@@ -495,3 +495,39 @@ def test_score_distribution_single_seed() -> None:
     rows = result.fetchall()
     for row in rows:
         assert abs(float(row[2])) < 1e-6, f"stddev for {row[0]} should be 0, got {row[2]}"
+
+
+def test_score_distribution_zero_values() -> None:
+    """CV is 0 when all values are zero (exercises the ELSE 0.0 branch)."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT * FROM (VALUES
+            (0, 100, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'Startup'),
+            (1, 100, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'Startup')
+        ) AS t(seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold)
+    """)
+    result = score_distribution(rel)
+    rows = result.fetchall()
+    for row in rows:
+        assert float(row[5]) == 0.0, f"CV for {row[0]} should be 0, got {row[5]}"
+
+
+def test_scoring_dimensions_empty_input() -> None:
+    """Empty input returns empty result."""
+    conn = duckdb.connect(":memory:")
+    rel = conn.sql("""
+        SELECT seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold
+        FROM (VALUES
+            (0, 100, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'Startup')
+        ) AS t(seed, tick, score_composite, score_industrial, score_research,
+               score_economic, score_fleet, score_efficiency, score_expansion,
+               score_threshold)
+        WHERE 1 = 0
+    """)
+    result = scoring_dimensions(rel)
+    rows = result.fetchall()
+    assert len(rows) == 0

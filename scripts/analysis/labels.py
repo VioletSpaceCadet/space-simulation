@@ -236,11 +236,10 @@ final_score = legacy_final_score
 
 
 def scoring_dimensions(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
-    """Extract 6-dimension scoring breakdown at the final tick per seed.
+    """Extract scoring breakdown (composite + 6 dimensions + threshold) per seed.
 
-    Reads pre-computed score columns from sim_bench Parquet output:
-    score_composite, score_industrial, score_research, score_economic,
-    score_fleet, score_efficiency, score_expansion, score_threshold.
+    Reads pre-computed score columns from sim_bench Parquet output at the
+    final tick for each seed.
 
     Returns:
         Relation with columns: seed, final_tick, score_composite,
@@ -292,6 +291,9 @@ def score_trajectory(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
 
 def score_distribution(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
     """Compute cross-seed score statistics at the final tick.
+
+    Covers composite + 6 numeric dimensions (score_threshold is categorical
+    and intentionally excluded).
 
     Returns:
         Relation with columns: dimension, mean, stddev, min_val, max_val, cv.
