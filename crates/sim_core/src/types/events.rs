@@ -360,4 +360,10 @@ pub enum Event {
         module_id: ModuleInstanceId,
         efficiency: f32,
     },
+    /// Emitted when the composite score crosses a named threshold boundary.
+    ScoreThresholdCrossed {
+        previous_threshold: String,
+        new_threshold: String,
+        composite_score: f64,
+    },
 }

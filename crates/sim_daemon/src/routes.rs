@@ -54,6 +54,7 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> anyhow::Resu
         .route("/api/v1/spatial-config", get(spatial_config_handler))
         .route("/api/v1/content", get(content_handler))
         .route("/api/v1/perf", get(perf_handler))
+        .route("/api/v1/score", get(score_handler))
         .route("/api/v1/speed", post(speed_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -206,6 +207,7 @@ async fn advisor_digest_handler(
         alert_details,
         &sim.timings_history,
         &sim.content.constants,
+        &sim.score_history,
     )
     .unwrap();
     drop(sim);
@@ -254,6 +256,34 @@ async fn perf_handler(State(app_state): State<AppState>) -> Json<serde_json::Val
         "sample_count": sample_count,
         "steps": steps,
     }))
+}
+
+async fn score_handler(
+    State(app_state): State<AppState>,
+) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
+    let sim = app_state.sim.lock();
+    match sim.score_history.back() {
+        Some(score) => match serde_json::to_string(score) {
+            Ok(json) => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "application/json")],
+                json,
+            ),
+            Err(err) => {
+                tracing::error!("score serialization failed: {err}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    [(header::CONTENT_TYPE, "application/json")],
+                    r#"{"error":"serialization failed"}"#.to_string(),
+                )
+            }
+        },
+        None => (
+            StatusCode::NO_CONTENT,
+            [(header::CONTENT_TYPE, "application/json")],
+            String::new(),
+        ),
+    }
 }
 
 pub async fn pause_handler(State(app_state): State<AppState>) -> Json<serde_json::Value> {
@@ -515,6 +545,8 @@ mod tests {
             metrics_writer: None,
             alert_engine: None,
             timings_history: VecDeque::new(),
+            score_history: VecDeque::new(),
+            last_threshold: String::new(),
         }));
         AppState {
             sim,

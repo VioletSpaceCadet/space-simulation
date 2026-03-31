@@ -1,6 +1,6 @@
 use crate::alerts::AlertDetail;
 use serde::Serialize;
-use sim_core::MetricsSnapshot;
+use sim_core::{MetricsSnapshot, RunScore};
 use std::collections::VecDeque;
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,10 @@ pub struct AdvisorDigest {
     pub alerts: Vec<AlertDetail>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub perf: Option<PerfSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score: Option<RunScore>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score_trend: Option<TrendDirection>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -253,6 +257,7 @@ pub fn compute_digest(
     alerts: Vec<AlertDetail>,
     timings: &VecDeque<sim_core::TickTimings>,
     constants: &sim_core::Constants,
+    score_history: &VecDeque<RunScore>,
 ) -> Option<AdvisorDigest> {
     let latest = history.back()?;
 
@@ -260,6 +265,13 @@ pub fn compute_digest(
         None
     } else {
         Some(compute_perf_summary(timings))
+    };
+
+    let (score, score_trend) = if let Some(latest_score) = score_history.back() {
+        let trend = compute_score_trend(score_history);
+        (Some(latest_score.clone()), Some(trend))
+    } else {
+        (None, None)
     };
 
     Some(AdvisorDigest {
@@ -270,7 +282,33 @@ pub fn compute_digest(
         bottleneck: detect_bottleneck(history, constants),
         alerts,
         perf,
+        score,
+        score_trend,
     })
+}
+
+fn compute_score_trend(score_history: &VecDeque<RunScore>) -> TrendDirection {
+    let short_avg = score_window_average(score_history, SHORT_WINDOW);
+    let long_avg = score_window_average(score_history, LONG_WINDOW);
+
+    if long_avg == 0.0 && short_avg == 0.0 {
+        TrendDirection::Stable
+    } else if short_avg > long_avg * 1.05 {
+        TrendDirection::Improving
+    } else if short_avg < long_avg * 0.95 {
+        TrendDirection::Declining
+    } else {
+        TrendDirection::Stable
+    }
+}
+
+fn score_window_average(history: &VecDeque<RunScore>, window: usize) -> f64 {
+    let count = history.len().min(window);
+    if count == 0 {
+        return 0.0;
+    }
+    let sum: f64 = history.iter().rev().take(count).map(|s| s.composite).sum();
+    sum / count as f64
 }
 
 fn compute_perf_summary(timings: &VecDeque<sim_core::TickTimings>) -> PerfSummary {
@@ -355,7 +393,14 @@ mod tests {
     #[test]
     fn empty_history_returns_none() {
         let history = VecDeque::new();
-        assert!(compute_digest(&history, vec![], &VecDeque::new(), &test_constants()).is_none());
+        assert!(compute_digest(
+            &history,
+            vec![],
+            &VecDeque::new(),
+            &test_constants(),
+            &VecDeque::new()
+        )
+        .is_none());
     }
 
     #[test]
@@ -363,7 +408,14 @@ mod tests {
         let mut history = VecDeque::new();
         history.push_back(empty_snapshot(1));
 
-        let digest = compute_digest(&history, vec![], &VecDeque::new(), &test_constants()).unwrap();
+        let digest = compute_digest(
+            &history,
+            vec![],
+            &VecDeque::new(),
+            &test_constants(),
+            &VecDeque::new(),
+        )
+        .unwrap();
         for trend in &digest.trends {
             assert_eq!(
                 trend.direction,
@@ -612,5 +664,94 @@ mod tests {
         history.push_back(snap);
 
         assert_eq!(detect_bottleneck(&history, &constants), Bottleneck::Healthy);
+    }
+
+    #[test]
+    fn score_trend_improving_when_increasing() {
+        let mut score_history = VecDeque::new();
+        for tick in 0..50u64 {
+            score_history.push_back(RunScore {
+                composite: tick as f64 * 10.0,
+                threshold: "Startup".to_string(),
+                tick,
+                dimensions: std::collections::BTreeMap::new(),
+            });
+        }
+        assert_eq!(
+            compute_score_trend(&score_history),
+            TrendDirection::Improving
+        );
+    }
+
+    #[test]
+    fn score_trend_declining_when_decreasing() {
+        let mut score_history = VecDeque::new();
+        for tick in 0..50u64 {
+            score_history.push_back(RunScore {
+                composite: (50 - tick) as f64 * 10.0,
+                threshold: "Startup".to_string(),
+                tick,
+                dimensions: std::collections::BTreeMap::new(),
+            });
+        }
+        assert_eq!(
+            compute_score_trend(&score_history),
+            TrendDirection::Declining
+        );
+    }
+
+    #[test]
+    fn score_trend_stable_with_single_entry() {
+        let mut score_history = VecDeque::new();
+        score_history.push_back(RunScore {
+            composite: 100.0,
+            threshold: "Startup".to_string(),
+            tick: 1,
+            dimensions: std::collections::BTreeMap::new(),
+        });
+        assert_eq!(compute_score_trend(&score_history), TrendDirection::Stable);
+    }
+
+    #[test]
+    fn digest_includes_score_when_present() {
+        let mut history = VecDeque::new();
+        history.push_back(empty_snapshot(1));
+
+        let mut score_history = VecDeque::new();
+        score_history.push_back(RunScore {
+            composite: 250.0,
+            threshold: "Contractor".to_string(),
+            tick: 1,
+            dimensions: std::collections::BTreeMap::new(),
+        });
+
+        let digest = compute_digest(
+            &history,
+            vec![],
+            &VecDeque::new(),
+            &test_constants(),
+            &score_history,
+        )
+        .unwrap();
+        assert!(digest.score.is_some());
+        assert!((digest.score.unwrap().composite - 250.0).abs() < 1e-6);
+        assert_eq!(digest.score_trend.unwrap(), TrendDirection::Stable);
+    }
+
+    #[test]
+    fn digest_omits_score_when_empty() {
+        let mut history = VecDeque::new();
+        history.push_back(empty_snapshot(1));
+
+        let digest = compute_digest(
+            &history,
+            vec![],
+            &VecDeque::new(),
+            &test_constants(),
+            &VecDeque::new(),
+        )
+        .unwrap();
+        assert!(digest.score.is_none());
+        assert!(digest.score_trend.is_none());
     }
 }

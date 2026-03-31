@@ -125,6 +125,8 @@ async fn main() -> Result<()> {
                     metrics_writer: setup.metrics_writer,
                     alert_engine,
                     timings_history: VecDeque::new(),
+                    score_history: VecDeque::new(),
+                    last_threshold: String::new(),
                 })),
                 command_queue: Arc::new(Mutex::new(Vec::new())),
                 event_tx: event_tx.clone(),
@@ -190,6 +192,8 @@ mod tests {
                 metrics_writer: None,
                 alert_engine: None,
                 timings_history: VecDeque::new(),
+                score_history: VecDeque::new(),
+                last_threshold: String::new(),
             })),
             command_queue: Arc::new(Mutex::new(Vec::new())),
             event_tx,
@@ -791,6 +795,8 @@ mod tests {
             metrics_writer: None,
             alert_engine: None,
             timings_history: VecDeque::new(),
+            score_history: VecDeque::new(),
+            last_threshold: String::new(),
         };
 
         let total_pushes = MAX_METRICS_HISTORY + 10;
@@ -906,6 +912,79 @@ mod tests {
         assert!(steps[0]["p50_us"].is_f64());
         assert!(steps[0]["p95_us"].is_f64());
         assert!(steps[0]["max_us"].is_f64());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_score_returns_204_with_no_history() -> Result<(), Box<dyn std::error::Error>> {
+        let app = make_router(make_test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/score")
+                    .body(Body::empty())?,
+            )
+            .await?;
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_score_returns_200_with_data() -> Result<(), Box<dyn std::error::Error>> {
+        let state = make_test_state();
+        {
+            let mut sim = state.sim.lock();
+            let snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
+            let score = sim_core::compute_run_score(&snapshot, &sim.game_state, &sim.content);
+            sim.push_score(score);
+        }
+        let app = make_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/score")
+                    .body(Body::empty())?,
+            )
+            .await?;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+        assert!(json.get("composite").is_some(), "should contain composite");
+        assert!(json.get("threshold").is_some(), "should contain threshold");
+        assert!(
+            json.get("dimensions").is_some(),
+            "should contain dimensions"
+        );
+        assert!(json.get("tick").is_some(), "should contain tick");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_advisor_digest_includes_score() -> Result<(), Box<dyn std::error::Error>> {
+        let state = make_test_state();
+        {
+            let mut sim = state.sim.lock();
+            let snapshot = sim_core::compute_metrics(&sim.game_state, &sim.content);
+            let score = sim_core::compute_run_score(&snapshot, &sim.game_state, &sim.content);
+            sim.push_metrics(snapshot);
+            sim.push_score(score);
+        }
+        let app = make_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/advisor/digest")
+                    .body(Body::empty())?,
+            )
+            .await?;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await?.to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body)?;
+        assert!(json.get("score").is_some(), "digest should contain score");
+        assert!(
+            json.get("score_trend").is_some(),
+            "digest should contain score_trend"
+        );
         Ok(())
     }
 }

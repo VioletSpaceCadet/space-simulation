@@ -3,7 +3,7 @@ use rand_chacha::ChaCha8Rng;
 use sim_control::AutopilotController;
 use sim_core::{
     CommandEnvelope, EventEnvelope, GameContent, GameState, MetricsFileWriter, MetricsSnapshot,
-    TickTimings,
+    RunScore, TickTimings,
 };
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -17,6 +17,9 @@ pub(crate) const MAX_METRICS_HISTORY: usize = 10_000;
 /// Maximum number of tick timings kept in the rolling buffer.
 pub(crate) const MAX_TIMINGS_HISTORY: usize = 1_000;
 
+/// Maximum number of score snapshots kept in the rolling buffer.
+pub(crate) const MAX_SCORE_HISTORY: usize = 10_000;
+
 pub struct SimState {
     pub game_state: GameState,
     pub content: GameContent,
@@ -28,6 +31,8 @@ pub struct SimState {
     pub metrics_writer: Option<MetricsFileWriter>,
     pub alert_engine: Option<crate::alerts::AlertEngine>,
     pub timings_history: VecDeque<TickTimings>,
+    pub score_history: VecDeque<RunScore>,
+    pub last_threshold: String,
 }
 
 impl SimState {
@@ -48,6 +53,13 @@ impl SimState {
             self.timings_history.pop_front();
         }
         self.timings_history.push_back(timings);
+    }
+
+    pub fn push_score(&mut self, score: RunScore) {
+        if self.score_history.len() >= MAX_SCORE_HISTORY {
+            self.score_history.pop_front();
+        }
+        self.score_history.push_back(score);
     }
 }
 
