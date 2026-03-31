@@ -14,9 +14,9 @@ use std::collections::BTreeMap;
 /// A single scoring dimension definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DimensionDef {
-    /// Unique identifier (e.g., "industrial_output").
+    /// Unique identifier (e.g., `"industrial_output"`).
     pub id: String,
-    /// Display name (e.g., "Industrial Output").
+    /// Display name.
     pub name: String,
     /// Weight in composite score (all weights must sum to 1.0).
     pub weight: f64,
@@ -27,7 +27,7 @@ pub struct DimensionDef {
 /// A named score threshold (e.g., "Enterprise" at 500 points).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThresholdDef {
-    /// Display name (e.g., "Enterprise").
+    /// Display name.
     pub name: String,
     /// Minimum composite score to enter this threshold.
     pub min_score: f64,
@@ -132,7 +132,7 @@ pub struct RunScore {
     pub dimensions: BTreeMap<String, DimensionScore>,
     /// Composite score (sum of all weighted contributions).
     pub composite: f64,
-    /// Named threshold (e.g., "Enterprise"). The highest threshold whose
+    /// Named threshold. The highest threshold whose
     /// `min_score` is <= `composite`.
     pub threshold: String,
     /// The tick at which this score was computed.
