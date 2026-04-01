@@ -5,6 +5,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
+mod compare;
 mod overrides;
 mod parquet_writer;
 mod run_result;
@@ -29,6 +30,21 @@ enum Commands {
         /// Path to the scenario JSON file.
         #[arg(long)]
         scenario: String,
+        /// Output directory (default: runs/).
+        #[arg(long, default_value = "runs")]
+        output_dir: String,
+    },
+    /// Compare two autopilot config files using the same seeds.
+    Compare {
+        /// Path to the scenario JSON file (defines seeds, ticks, content).
+        #[arg(long)]
+        scenario: String,
+        /// Path to the first autopilot config JSON file (baseline).
+        #[arg(long)]
+        config_a: String,
+        /// Path to the second autopilot config JSON file (variant).
+        #[arg(long)]
+        config_b: String,
         /// Output directory (default: runs/).
         #[arg(long, default_value = "runs")]
         output_dir: String,
@@ -186,6 +202,12 @@ fn main() -> Result<()> {
             scenario,
             output_dir,
         } => run(&scenario, &output_dir)?,
+        Commands::Compare {
+            scenario,
+            config_a,
+            config_b,
+            output_dir,
+        } => compare::run_compare(&scenario, &config_a, &config_b, &output_dir)?,
     }
     Ok(())
 }
