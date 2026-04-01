@@ -23,7 +23,7 @@ def test_generate_variants_single_param() -> None:
 def test_generate_variants_cartesian_product() -> None:
     """Multiple parameters produce cartesian product."""
     baseline = {"version": "v1", "a": 1, "b": "x"}
-    grid = {"a": [1, 2], "b": ["x", "y"]}
+    grid: dict[str, list[Any]] = {"a": [1, 2], "b": ["x", "y"]}
     variants = generate_variants(baseline, grid)
     assert len(variants) == 4  # 2 x 2
     overrides = [v[1] for v in variants]
