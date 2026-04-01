@@ -92,7 +92,8 @@ def run_comparison(
         return None
 
     with open(report_files[0]) as f:
-        return json.load(f)
+        report: dict[str, Any] = json.load(f)
+        return report
 
 
 def rank_variants(

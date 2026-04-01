@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from scripts.analysis.optimize_config import generate_variants, rank_variants
 
 # --- generate_variants ---
@@ -47,7 +49,7 @@ def test_generate_variants_preserves_baseline() -> None:
 def test_generate_variants_empty_grid() -> None:
     """Empty grid produces single variant (baseline unchanged)."""
     baseline = {"version": "v1", "a": 1}
-    grid: dict[str, list[object]] = {}
+    grid: dict[str, list[Any]] = {}
     variants = generate_variants(baseline, grid)
     assert len(variants) == 1
     assert variants[0][0] == baseline
