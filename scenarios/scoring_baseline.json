@@ -1,0 +1,8 @@
+{
+  "name": "scoring_baseline",
+  "ticks": 5000,
+  "metrics_every": 100,
+  "seeds": {"range": [1, 10]},
+  "state": "./content/dev_base_state.json",
+  "content_dir": "./content"
+}

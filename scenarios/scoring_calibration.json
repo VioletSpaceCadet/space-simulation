@@ -1,0 +1,8 @@
+{
+  "name": "scoring_calibration",
+  "ticks": 2000,
+  "metrics_every": 100,
+  "seeds": {"range": [1, 20]},
+  "state": "./content/dev_base_state.json",
+  "content_dir": "./content"
+}

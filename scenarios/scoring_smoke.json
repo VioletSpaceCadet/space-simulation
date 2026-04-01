@@ -1,0 +1,8 @@
+{
+  "name": "scoring_smoke",
+  "ticks": 500,
+  "metrics_every": 50,
+  "seeds": [1, 2, 3, 4, 5],
+  "state": "./content/dev_base_state.json",
+  "content_dir": "./content"
+}
