@@ -57,12 +57,12 @@ echo "  running scoring_smoke scenario..."
 
 SCORE_RUN_DIR=$(find "$OUTPUT_DIR" -maxdepth 1 -type d -name 'scoring_smoke_*' | sort | tail -1)
 
-if [ -z "$SCORE_RUN_DIR" ] || [ ! -f "$SCORE_RUN_DIR/batch_summary.json" ]; then
-  echo "ERROR: batch_summary.json not found in $OUTPUT_DIR/scoring_smoke_*/"
+if [ -z "$SCORE_RUN_DIR" ] || [ ! -f "$SCORE_RUN_DIR/summary.json" ]; then
+  echo "ERROR: summary.json not found in $OUTPUT_DIR/scoring_smoke_*/"
   exit 1
 fi
 
-python3 "$REPO_ROOT/scripts/validate_scoring_smoke.py" "$SCORE_RUN_DIR/batch_summary.json"
+python3 "$REPO_ROOT/scripts/validate_scoring_smoke.py" "$SCORE_RUN_DIR/summary.json"
 
 # Data gap detection (warning only — does not block CI)
 echo "  running data gap analysis..."
