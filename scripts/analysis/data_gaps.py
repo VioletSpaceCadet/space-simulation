@@ -212,23 +212,29 @@ def build_gap_report(
         dimensions.append(entry)
 
         if all_zero:
-            gaps.append({
-                "dimension": name,
-                "issue": "all_zero",
-                "detail": f"{name} is zero across all {seed_count} seeds",
-            })
+            gaps.append(
+                {
+                    "dimension": name,
+                    "issue": "all_zero",
+                    "detail": f"{name} is zero across all {seed_count} seeds",
+                }
+            )
         if zero_variance and not all_zero:
-            gaps.append({
-                "dimension": name,
-                "issue": "zero_variance",
-                "detail": f"{name} has no variance across {seed_count} seeds (mean={mean:.4f})",
-            })
+            gaps.append(
+                {
+                    "dimension": name,
+                    "issue": "zero_variance",
+                    "detail": f"{name} has no variance across {seed_count} seeds (mean={mean:.4f})",
+                }
+            )
         if static and not all_zero:
-            gaps.append({
-                "dimension": name,
-                "issue": "temporal_static",
-                "detail": f"{name} shows no change over time (max_delta={max_abs_delta:.6f})",
-            })
+            gaps.append(
+                {
+                    "dimension": name,
+                    "issue": "temporal_static",
+                    "detail": f"{name} shows no change over time (max_delta={max_abs_delta:.6f})",
+                }
+            )
 
     summary_lines = [f"Gap analysis: {len(dimensions)} dimensions, {len(gaps)} gaps found"]
     for gap in gaps:
