@@ -17,17 +17,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import duckdb
 
-# Score dimension columns in sim_bench Parquet output.
-SCORE_DIMENSIONS = [
-    "score_composite",
-    "score_industrial",
-    "score_research",
-    "score_economic",
-    "score_fleet",
-    "score_efficiency",
-    "score_expansion",
-]
-
 
 def dimension_stats(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
     """Compute per-dimension statistics at the final tick across all seeds.
@@ -73,7 +62,9 @@ def dimension_stats(rel: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
             MAX(value) AS max_val,
             COUNT(*) AS seed_count,
             MAX(ABS(value)) = 0 AS all_zero,
-            COALESCE(STDDEV_SAMP(value), 0.0) < 1e-10 AS zero_variance
+            CASE WHEN COUNT(*) < 2 THEN false
+                 ELSE COALESCE(STDDEV_SAMP(value), 0.0) < 1e-10
+            END AS zero_variance
         FROM unpivoted
         GROUP BY dimension
         ORDER BY dimension

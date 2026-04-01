@@ -82,6 +82,21 @@ def test_dimension_stats_zero_variance() -> None:
     assert not bool(fleet[6])  # not all_zero
 
 
+def test_dimension_stats_single_seed_not_zero_variance() -> None:
+    """Single seed should not be flagged as zero_variance (trivially true)."""
+    conn = duckdb.connect(":memory:")
+    rel = _make_score_relation(
+        conn,
+        [
+            (0, 100, 400.0, 0.6, 0.5, 0.4, 0.8, 0.7, 0.3),
+        ],
+    )
+    result = dimension_stats(rel)
+    rows = result.fetchall()
+    for row in rows:
+        assert not bool(row[7]), f"{row[0]} should not be zero_variance with 1 seed"
+
+
 # --- temporal_change ---
 
 
