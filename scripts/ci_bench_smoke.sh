@@ -51,4 +51,12 @@ fi
 # Validate progression gates
 python3 "$REPO_ROOT/scripts/validate_dev_state_smoke.py" "$DEV_RUN_DIR/batch_summary.json"
 
+# Data gap detection (warning only — does not block CI)
+echo "  running data gap analysis..."
+if python3 -m scripts.analysis.data_gaps "$RUN_DIR" --json "$OUTPUT_DIR/gap_report.json" 2>/dev/null; then
+  echo "  gap report written to $OUTPUT_DIR/gap_report.json"
+else
+  echo "  WARNING: data gap analysis failed (non-blocking)"
+fi
+
 echo "=== Bench Smoke passed ==="
