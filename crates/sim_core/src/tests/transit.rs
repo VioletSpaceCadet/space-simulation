@@ -117,6 +117,7 @@ fn transit_moves_ship_and_starts_next_task() {
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
         propellant_consumed_total: 0.0,
+        progression: Default::default(),
         body_cache: AHashMap::default(),
     };
 
@@ -314,6 +315,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
         propellant_consumed_total: 0.0,
+        progression: Default::default(),
         body_cache: AHashMap::default(),
     };
 

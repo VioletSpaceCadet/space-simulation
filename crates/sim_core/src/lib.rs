@@ -86,7 +86,10 @@ pub use types::{
     ThermalContainerDef, YieldFormula,
 };
 // -- types: progression --
-pub use types::{GamePhase, MilestoneCondition, MilestoneDef, MilestoneReward, TradeTier};
+pub use types::{
+    GamePhase, GrantRecord, MilestoneCondition, MilestoneDef, MilestoneReward, ProgressionState,
+    TradeTier,
+};
 // -- types: commands & events --
 pub use types::{Command, CommandEnvelope, Event, EventEnvelope};
 // -- types: inventory & trade --

@@ -1,4 +1,6 @@
-//! Progression system types: milestones, phases, trade tiers, grants.
+//! Progression system types: milestones, phases, trade tiers, grants, progression state.
+
+use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
@@ -99,4 +101,48 @@ pub struct MilestoneReward {
     /// Module def IDs to make available.
     #[serde(default)]
     pub unlock_module_ids: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Progression state (runtime)
+// ---------------------------------------------------------------------------
+
+/// Runtime progression state stored in `GameState`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ProgressionState {
+    /// IDs of completed milestones.
+    #[serde(default)]
+    pub completed_milestones: BTreeSet<String>,
+    /// Current game phase (descriptive label derived from milestones).
+    #[serde(default)]
+    pub phase: GamePhase,
+    /// Record of all grants received.
+    #[serde(default)]
+    pub grant_history: Vec<GrantRecord>,
+    /// Cumulative reputation score.
+    #[serde(default)]
+    pub reputation: f64,
+    /// Current trade capability tier.
+    #[serde(default)]
+    pub trade_tier: TradeTier,
+}
+
+impl ProgressionState {
+    /// Check if a specific milestone has been completed.
+    pub fn is_milestone_completed(&self, milestone_id: &str) -> bool {
+        self.completed_milestones.contains(milestone_id)
+    }
+
+    /// Check if the current trade tier is at least the given tier.
+    pub fn trade_tier_unlocked(&self, required: TradeTier) -> bool {
+        self.trade_tier >= required
+    }
+}
+
+/// Record of a grant payment received from a milestone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrantRecord {
+    pub milestone_id: String,
+    pub amount: f64,
+    pub tick: u64,
 }

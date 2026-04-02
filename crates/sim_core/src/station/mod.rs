@@ -1107,6 +1107,7 @@ mod framework_tests {
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
             propellant_consumed_total: 0.0,
+            progression: Default::default(),
             body_cache: AHashMap::default(),
         }
     }
