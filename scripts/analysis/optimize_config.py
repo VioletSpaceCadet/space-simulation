@@ -63,22 +63,27 @@ def run_comparison(
     variant_path = variant_dir / "config.json"
     variant_path.write_text(json.dumps(variant_config, indent=2))
 
-    result = subprocess.run(
-        [
-            sim_bench_path,
-            "compare",
-            "--scenario",
-            scenario_path,
-            "--config-a",
-            baseline_path,
-            "--config-b",
-            str(variant_path),
-            "--output-dir",
-            str(variant_dir),
-        ],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            [
+                sim_bench_path,
+                "compare",
+                "--scenario",
+                scenario_path,
+                "--config-a",
+                baseline_path,
+                "--config-b",
+                str(variant_path),
+                "--output-dir",
+                str(variant_dir),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"  TIMEOUT: {variant_label}", file=sys.stderr)
+        return None
 
     if result.returncode != 0:
         print(f"  FAILED: {variant_label}", file=sys.stderr)
