@@ -281,6 +281,9 @@ pub struct GameContent {
     /// Scoring configuration loaded from `content/scoring.json`.
     #[serde(default)]
     pub scoring: crate::scoring::ScoringConfig,
+    /// Milestone definitions loaded from `content/milestones.json`.
+    #[serde(default)]
+    pub milestones: Vec<super::progression::MilestoneDef>,
     /// Pre-computed element id -> density (kg/m3) lookup. Populated by `init_caches()`.
     #[serde(skip)]
     pub density_map: AHashMap<String, f32>,

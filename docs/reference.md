@@ -93,6 +93,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 | `component_defs.json` | 1 component: `repair_kit` (50kg, 0.1 m³) |
 | `pricing.json` | Import/export pricing: surcharges per kg, per-item base prices, importable/exportable flags |
 | `scoring.json` | Run scoring config: 6 dimensions (id, name, weight, ceiling), 5 named thresholds (Startup→Space Magnate), computation_interval_ticks (default 24), scale_factor (default 2500). See Scoring section below. |
+| `milestones.json` | Progression milestones: 8 milestones with conditions, rewards (grants, trade tier, zones), phase advancement. See Milestones section below. |
 | `dev_advanced_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
 
 ## Inventory & Refinery Design
@@ -333,3 +334,30 @@ runs/<name>_<timestamp>/
 - `RunScore` — output: per-dimension `BTreeMap<String, DimensionScore>`, composite (f64), threshold (String), tick (u64)
 - `DimensionScore` — per-dimension: id, name, raw_value, normalized [0.0–1.0], weighted contribution
 - `validate_scoring_config()` — validates weights sum, ascending thresholds, positive ceilings
+
+## Milestones
+
+**Milestone system** provides progression through content-driven conditions and rewards. Milestones are evaluated after research advancement (tick step 4.5, planned in VIO-533).
+
+**Content schema** (`content/milestones.json`):
+- `id` (string) — unique identifier
+- `name` (string) — display name
+- `description` (string) — flavor text
+- `conditions[]` — all must be met. Tagged union with `type` field:
+  - `metric_above` — `{field, threshold}`: `MetricsSnapshot.get_field_f64(field) >= threshold`
+  - `counter_above` — `{counter, threshold}`: game state counter >= threshold (e.g., `asteroids_discovered`, `techs_unlocked`, `assembler_runs`, `ships_built`)
+  - `milestone_completed` — `{milestone_id}`: prerequisite milestone must be done
+- `rewards` — applied on completion:
+  - `grant_amount` (f64) — money added to balance
+  - `reputation` (f64) — reputation points
+  - `unlock_trade_tier` (optional TradeTier) — upgrades trade access (None < BasicImport < Export < Full)
+  - `unlock_zone_ids` (string[]) — zones to open for scan site replenishment
+  - `unlock_module_ids` (string[]) — module defs to make available
+- `phase_advance` (optional GamePhase) — advance to this phase (Startup, Orbital, Industrial, Expansion, DeepSpace)
+
+**Types** (`sim_core::progression`):
+- `MilestoneDef` — content-loaded milestone definition
+- `MilestoneCondition` — tagged enum: MetricAbove, CounterAbove, MilestoneCompleted
+- `MilestoneReward` — grants, trade tier, zones, modules
+- `GamePhase` — Startup, Orbital, Industrial, Expansion, DeepSpace (not material `Phase`)
+- `TradeTier` — None, BasicImport, Export, Full (ordered)

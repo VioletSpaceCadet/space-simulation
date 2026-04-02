@@ -85,6 +85,8 @@ pub use types::{
     RadiatorDef, RecipeDef, RecipeInput, RecipeThermalReq, SensorArrayDef, SolarArrayDef,
     ThermalContainerDef, YieldFormula,
 };
+// -- types: progression --
+pub use types::{GamePhase, MilestoneCondition, MilestoneDef, MilestoneReward, TradeTier};
 // -- types: commands & events --
 pub use types::{Command, CommandEnvelope, Event, EventEnvelope};
 // -- types: inventory & trade --
