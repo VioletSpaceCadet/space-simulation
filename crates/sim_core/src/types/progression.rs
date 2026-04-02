@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 
 /// Descriptive game phase derived from milestone completion.
 /// Named `GamePhase` to avoid conflict with `Phase` (material phase: Solid/Liquid).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub enum GamePhase {
     #[default]
     Startup,
@@ -35,7 +37,7 @@ impl std::fmt::Display for GamePhase {
 // ---------------------------------------------------------------------------
 
 /// Trade capability tier, unlocked by milestone rewards.
-/// Ordered: None < BasicImport < Export < Full.
+/// Ordered: `None` < `BasicImport` < `Export` < `Full`.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
@@ -68,7 +70,7 @@ pub struct MilestoneDef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum MilestoneCondition {
-    /// A MetricsSnapshot field must be >= threshold.
+    /// A `MetricsSnapshot` field must be >= threshold.
     #[serde(rename = "metric_above")]
     MetricAbove { field: String, threshold: f64 },
     /// A game state counter must be >= threshold.

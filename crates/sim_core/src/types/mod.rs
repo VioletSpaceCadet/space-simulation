@@ -9,7 +9,7 @@ mod constants;
 mod content;
 mod events;
 mod inventory;
-pub mod progression;
+mod progression;
 mod state;
 
 pub use commands::*;

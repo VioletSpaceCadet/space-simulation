@@ -48,6 +48,7 @@ pub fn validate_content(content: &GameContent) {
     validate_autopilot(content, &element_ids);
     validate_crew_roles(content);
     validate_scoring(content);
+    validate_milestones(&content.milestones);
 }
 
 fn validate_constants(content: &GameContent) {
@@ -671,7 +672,6 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let autopilot: sim_core::AutopilotConfig = load_optional_json(dir, "autopilot.json")?;
     let scoring: sim_core::ScoringConfig = load_optional_json(dir, "scoring.json")?;
     let milestones: Vec<sim_core::MilestoneDef> = load_optional_json(dir, "milestones.json")?;
-    validate_milestones(&milestones);
     let crew_roles = load_crew_roles(dir)?;
     let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
