@@ -10,7 +10,7 @@ origin: docs/plans/2026-03-28-003-feat-game-progression-system-plan.md
 
 ## Overview
 
-The mechanical infrastructure for progression — a milestone/grant economy, achievement-gated trade, phase tracking, and critically, the split of `dev_base_state.json` into a proper progression starting state and an advanced development sandbox. This transforms the simulation from "start with everything, watch it run" into "earn every capability through industrial milestones."
+The mechanical infrastructure for progression — a milestone/grant economy, achievement-gated trade, phase tracking, and critically, the split of `dev_advanced_state.json` into a proper progression starting state and an advanced development sandbox. This transforms the simulation from "start with everything, watch it run" into "earn every capability through industrial milestones."
 
 **What changes for the player (autopilot):**
 - Starts with $50-100M instead of $1B
@@ -29,7 +29,7 @@ The mechanical infrastructure for progression — a milestone/grant economy, ach
 
 ## Problem Statement
 
-The simulation currently has no progression. The starting state (`dev_base_state.json`) provides:
+The simulation currently has no progression. The starting state (`dev_advanced_state.json`) provides:
 
 | Resource | Current Value | Problem |
 |---|---|---|
@@ -172,7 +172,7 @@ sim_world/src/lib.rs (EXTEND)
   ├── load milestones.json into GameContent
   └── build_initial_state() unchanged (used by scenarios without --state)
 
-content/dev_advanced_state.json (RENAMED from dev_base_state.json)
+content/dev_advanced_state.json (RENAMED from dev_advanced_state.json)
 content/progression_start.json (NEW)
 ```
 
@@ -218,16 +218,16 @@ let trade_unlocked = state.progression.trade_tier_unlocked(TradeTier::Basic);
 
 ## Implementation Tickets
 
-### Ticket 1: dev_base_state → dev_advanced_state rename
+### Ticket 1: dev_advanced_state → dev_advanced_state rename
 
-**What:** Rename `content/dev_base_state.json` to `content/dev_advanced_state.json`. Update ALL references across the codebase.
+**What:** Rename `content/dev_advanced_state.json` to `content/dev_advanced_state.json`. Update ALL references across the codebase.
 
 **Details:**
 - Rename the file
-- Update all scenario JSON files that reference `"state": "./content/dev_base_state.json"`
+- Update all scenario JSON files that reference `"state": "./content/dev_advanced_state.json"`
 - Update all Rust test code that references the path
 - Update CLI default state path (if hardcoded)
-- Update all docs that reference dev_base_state
+- Update all docs that reference dev_advanced_state
 - Git mv for clean history
 
 **Files to update (from research — 53 references found):**
@@ -239,9 +239,9 @@ let trade_unlocked = state.progression.trade_tier_unlocked(TradeTier::Basic);
 - `docs/plans/*.md`, `docs/reference.md`, `CLAUDE.md`
 
 **Acceptance criteria:**
-- [ ] `content/dev_base_state.json` no longer exists
+- [ ] `content/dev_advanced_state.json` no longer exists
 - [ ] `content/dev_advanced_state.json` has identical content
-- [ ] Zero references to "dev_base_state" in codebase (`grep -r "dev_base_state"` returns empty)
+- [ ] Zero references to "dev_advanced_state" in codebase (`grep -r "dev_advanced_state"` returns empty)
 - [ ] All tests pass (`cargo test`)
 - [ ] All scenarios still runnable
 - [ ] CI passes
@@ -575,7 +575,7 @@ let trade_unlocked = state.progression.trade_tier_unlocked(TradeTier::Basic);
 ## Dependency Graph
 
 ```
-Ticket 1: dev_base_state rename ─────────────────────────────────────┐
+Ticket 1: dev_advanced_state rename ─────────────────────────────────────┐
                                                                       │
 Ticket 2: Milestone schema + types ──────────────────────────────┐   │
                                                                   │   │
@@ -742,7 +742,7 @@ Ticket 3: ProgressionState + phase ───────────────
 
 ### Internal References
 
-- `content/dev_base_state.json` (→ `dev_advanced_state.json`) — current starting state (21 modules, $1B, 21 crew)
+- `content/dev_advanced_state.json` (→ `dev_advanced_state.json`) — current starting state (21 modules, $1B, 21 crew)
 - `crates/sim_core/src/engine.rs:9` — `trade_unlock_tick()` function (to be replaced)
 - `crates/sim_core/src/commands.rs:347,436` — import/export trade gating (to be updated)
 - `crates/sim_control/src/agents/station_agent.rs:969,1102` — StationContext.trade_unlocked (to be updated)

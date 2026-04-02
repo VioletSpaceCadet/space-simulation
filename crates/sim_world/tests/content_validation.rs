@@ -1561,21 +1561,21 @@ fn recipe_graph_allows_diamond_shapes() {
 }
 
 // ---------------------------------------------------------------------------
-// dev_base_state coherence (VIO-478)
+// dev_advanced_state coherence (VIO-478)
 // ---------------------------------------------------------------------------
 
-fn load_dev_base_state() -> GameState {
+fn load_dev_advanced_state() -> GameState {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
-    let path = format!("{manifest}/../../content/dev_base_state.json");
+    let path = format!("{manifest}/../../content/dev_advanced_state.json");
     let json = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
     serde_json::from_str(&json).unwrap_or_else(|e| panic!("parse {path}: {e}"))
 }
 
 /// All module_def_ids referenced in inventory exist in content.
 #[test]
-fn dev_base_state_module_defs_exist() {
+fn dev_advanced_state_module_defs_exist() {
     let content = load_test_content();
-    let state = load_dev_base_state();
+    let state = load_dev_advanced_state();
 
     for station in state.stations.values() {
         for item in &station.inventory {
@@ -1592,9 +1592,9 @@ fn dev_base_state_module_defs_exist() {
 
 /// Power generation from inventory modules >= power consumption.
 #[test]
-fn dev_base_state_power_budget_positive() {
+fn dev_advanced_state_power_budget_positive() {
     let content = load_test_content();
-    let state = load_dev_base_state();
+    let state = load_dev_advanced_state();
 
     for station in state.stations.values() {
         let mut generation_kw = 0.0_f32;
@@ -1635,9 +1635,9 @@ fn dev_base_state_power_budget_positive() {
 
 /// All crew roles in station crew rosters exist in crew_roles content.
 #[test]
-fn dev_base_state_crew_roles_exist() {
+fn dev_advanced_state_crew_roles_exist() {
     let content = load_test_content();
-    let state = load_dev_base_state();
+    let state = load_dev_advanced_state();
 
     for station in state.stations.values() {
         for role in station.crew.keys() {
@@ -1653,9 +1653,9 @@ fn dev_base_state_crew_roles_exist() {
 
 /// Ships have valid hull_ids and their cargo capacity can hold at least one ore lot.
 #[test]
-fn dev_base_state_ships_valid() {
+fn dev_advanced_state_ships_valid() {
     let content = load_test_content();
-    let state = load_dev_base_state();
+    let state = load_dev_advanced_state();
 
     for ship in state.ships.values() {
         // Hull exists
@@ -1684,9 +1684,9 @@ fn dev_base_state_ships_valid() {
 
 /// Ship fitted modules reference valid module_def_ids.
 #[test]
-fn dev_base_state_ship_modules_exist() {
+fn dev_advanced_state_ship_modules_exist() {
     let content = load_test_content();
-    let state = load_dev_base_state();
+    let state = load_dev_advanced_state();
 
     for ship in state.ships.values() {
         for fitted in &ship.fitted_modules {

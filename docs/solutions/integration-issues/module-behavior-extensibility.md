@@ -53,7 +53,7 @@ The module system uses enum variants in both `ModuleBehaviorDef` (content defini
 17. Run `./scripts/ci_event_sync.sh` to verify any new events are handled
 
 ### Content
-18. Add module to `dev_base_state.json` if it should be available from game start
+18. Add module to `dev_advanced_state.json` if it should be available from game start
 19. Add test fixtures (`state_with_*()` helpers) for the new module type
 
 ## Notes

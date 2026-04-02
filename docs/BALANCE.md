@@ -2,7 +2,7 @@
 
 > Last updated: 2026-02-24 (post VIO-5 through VIO-9).
 > Baseline and balance_v1_tuned scenarios, 5 seeds each, 20,160 ticks (2 weeks sim-time).
-> Using `dev_base_state.json` with full starting loadout (refinery, assembler, maintenance bay, 2 labs, 500 kg Fe, 10 repair kits).
+> Using `dev_advanced_state.json` with full starting loadout (refinery, assembler, maintenance bay, 2 labs, 500 kg Fe, 10 repair kits).
 
 ## 1. Current State: Gameplay Loop Works
 
@@ -185,7 +185,7 @@ compressed time scales, visible progress within a play session.
 
 | Issue | Summary |
 |---|---|
-| VIO-5 | Labs added to dev_base_state.json |
+| VIO-5 | Labs added to dev_advanced_state.json |
 | VIO-6 | State file support in sim_bench |
 | VIO-7 | build_initial_state() parity |
 | VIO-8 | Module-level overrides |

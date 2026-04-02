@@ -128,13 +128,13 @@ mod tests {
             "name": "with_state",
             "ticks": 500,
             "seeds": [1, 2],
-            "state": "./content/dev_base_state.json"
+            "state": "./content/dev_advanced_state.json"
         }"#,
         );
         let scenario = load_scenario(file.path()).unwrap();
         assert_eq!(
             scenario.state.as_deref(),
-            Some("./content/dev_base_state.json")
+            Some("./content/dev_advanced_state.json")
         );
     }
 

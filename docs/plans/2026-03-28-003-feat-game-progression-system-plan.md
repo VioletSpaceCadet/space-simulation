@@ -27,7 +27,7 @@ The simulation currently has no progression. Analysis of the current state revea
 | Trade gated by time (1 year), not achievement | Waiting is the "strategy" |
 | Autopilot handles everything | No strategic decisions to make |
 
-The `dev_base_state.json` is a development convenience, not a game. A player watching this simulation sees an autopilot efficiently running a pre-built industrial complex. There is no arc of: struggle → discovery → capability → mastery.
+The `dev_advanced_state.json` is a development convenience, not a game. A player watching this simulation sees an autopilot efficiently running a pre-built industrial complex. There is no arc of: struggle → discovery → capability → mastery.
 
 ## The Progression Arc
 
@@ -161,13 +161,13 @@ Inspired by proven patterns across Factorio (production-as-gate), Stellaris (par
 
 ### Project 1: Starting State Rework & Progression Engine
 
-**What it delivers:** The mechanical infrastructure for progression — a milestone/grant economy, achievement-gated trade, and critically, the split of dev_base_state into a proper progression starting state and an advanced development state.
+**What it delivers:** The mechanical infrastructure for progression — a milestone/grant economy, achievement-gated trade, and critically, the split of dev_advanced_state into a proper progression starting state and an advanced development state.
 
 **Why it follows scoring:** With scoring in place, we can immediately measure whether the new starting state + progression mechanics produce better, more interesting runs than the current "start with everything" approach.
 
 **Scope (~12-15 tickets):**
 
-- **dev_base_state → dev_advanced_state rename** — the current `content/dev_base_state.json` (fully equipped station, all modules, $1B) becomes `content/dev_advanced_state.json`. This is the "late-game development sandbox" for testing systems in isolation. All existing references updated (sim_cli, sim_daemon defaults, sim_bench scenarios, tests). No functionality changes — just naming clarity.
+- **dev_advanced_state → dev_advanced_state rename** — the current `content/dev_advanced_state.json` (fully equipped station, all modules, $1B) becomes `content/dev_advanced_state.json`. This is the "late-game development sandbox" for testing systems in isolation. All existing references updated (sim_cli, sim_daemon defaults, sim_bench scenarios, tests). No functionality changes — just naming clarity.
 - **New progression starting state** — `content/progression_start.json` with reduced starting conditions. A small orbital station with limited modules (basic refinery, basic assembler, basic solar array, sensor array, 1 lab, maintenance bay), 1 ship, modest starting balance ($50-100M), limited starting inventory (500 kg Fe, 10 repair kits, some H2O), scan sites only in near-homeworld zone. Enough to bootstrap the first mining → refining → manufacturing loop, but not enough to coast.
 - **ProgressionState** in `GameState` — current phase, completed milestones, grant history, reputation score. Evaluated every tick (after research, before events). Content-driven milestone definitions in `content/milestones.json`.
 - **Milestone system** — conditions checked against game state metrics (ore processed > X, techs unlocked > Y, ships built > Z, balance > $W). Uses the existing event system pattern: content-defined conditions, composable reward effects. Milestone reached → emit `Event::MilestoneReached`, apply rewards (grant money, unlock modules, open zones).
@@ -184,7 +184,7 @@ Inspired by proven patterns across Factorio (production-as-gate), Stellaris (par
 | Grant amounts | ~$10M for first milestone, scaling to ~$100M for mid-game milestones | KSP career mode calibration: grants should fund the next 2-3 steps, not the next 20. |
 | Reputation system | Simple numeric score incremented by milestone completion | Over-engineering risk: reputation is a single number that gates contract tier availability. Not a faction system. YAGNI. |
 | Starting balance | $50-100M (tuned via scoring comparison with dev_advanced_state) | Enough for ~500 ticks of basic operations (crew salary, module imports, some Fe imports) but not enough to buy everything. The scoring system (Project 0) lets us compare score trajectories between starting states. |
-| dev_base_state rename | `dev_base_state.json` → `dev_advanced_state.json`, all references updated | Clear naming: "advanced" = fully equipped dev sandbox. "progression" = the real starting experience. No functionality change, just naming clarity. |
+| dev_advanced_state rename | `dev_advanced_state.json` → `dev_advanced_state.json`, all references updated | Clear naming: "advanced" = fully equipped dev sandbox. "progression" = the real starting experience. No functionality change, just naming clarity. |
 
 **Dependencies:** Project 0 (scoring — needed to measure whether the new starting state produces better/more interesting runs).
 
@@ -502,7 +502,7 @@ Two starting states, clearly named:
 
 | File | Purpose | When to use |
 |---|---|---|
-| `content/dev_advanced_state.json` | Fully equipped station, all modules, $1B balance. **Renamed from dev_base_state.json** in Project 1. | Development, debugging, testing individual systems in isolation |
+| `content/dev_advanced_state.json` | Fully equipped station, all modules, $1B balance. **Renamed from dev_advanced_state.json** in Project 1. | Development, debugging, testing individual systems in isolation |
 | `content/progression_start.json` | Minimal station, limited modules, $50-100M balance. **New in Project 1.** | Progression gameplay, sim_bench scoring scenarios, AI evaluation |
 
 - `sim_cli` default: `--state progression_start.json` (progression is the real game)

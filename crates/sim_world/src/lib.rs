@@ -1648,15 +1648,15 @@ mod tests {
         assert!(setup.run_dir.is_none());
     }
 
-    /// Verify build_initial_state() produces the same module set as dev_base_state.json.
+    /// Verify build_initial_state() produces the same module set as dev_advanced_state.json.
     /// Prevents drift between the two initial state sources.
     #[test]
-    fn build_initial_state_matches_dev_base_state_modules() {
+    fn build_initial_state_matches_dev_advanced_state_modules() {
         let content = load_content("../../content").unwrap();
         let mut rng = rand::rngs::mock::StepRng::new(42, 1);
         let built = build_initial_state(&content, 42, &mut rng);
 
-        let json = std::fs::read_to_string("../../content/dev_base_state.json").unwrap();
+        let json = std::fs::read_to_string("../../content/dev_advanced_state.json").unwrap();
         let loaded: GameState = serde_json::from_str(&json).unwrap();
 
         let station_id = StationId("station_earth_orbit".to_string());
@@ -1686,7 +1686,7 @@ mod tests {
 
         assert_eq!(
             built_modules, loaded_modules,
-            "build_initial_state() modules differ from dev_base_state.json.\n\
+            "build_initial_state() modules differ from dev_advanced_state.json.\n\
              Built: {built_modules:?}\n\
              Loaded: {loaded_modules:?}"
         );

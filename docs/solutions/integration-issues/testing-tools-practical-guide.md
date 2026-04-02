@@ -133,7 +133,7 @@ Override constants or module parameters without editing content files:
   "name": "test_fast_refinery",
   "ticks": 720,
   "seeds": [1, 2, 3],
-  "state": "./content/dev_base_state.json",
+  "state": "./content/dev_advanced_state.json",
   "overrides": {
     "mining_rate_kg_per_minute": 30.0,
     "module.basic_iron_refinery.processing_interval_minutes": 45,

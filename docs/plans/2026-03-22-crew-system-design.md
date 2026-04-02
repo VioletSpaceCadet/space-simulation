@@ -279,7 +279,7 @@ Phase 1 trade-offs are intentionally varied (quality vs speed). Note for future:
 
 **New tech:** `tech_automation_basic` — gates automated module variants.
 
-**Updated: `content/dev_base_state.json`** — starting crew roster: 10 operators, 4 technicians, 2 scientists, 2 pilots. Slight operator surplus so the player experiences the system working before hitting the constraint.
+**Updated: `content/dev_advanced_state.json`** — starting crew roster: 10 operators, 4 technicians, 2 scientists, 2 pilots. Slight operator surplus so the player experiences the system working before hitting the constraint.
 
 **Updated: `content/pricing.json`** — crew role pricing (importable: true, exportable: false).
 
@@ -320,7 +320,7 @@ Phase 1 trade-offs are intentionally varied (quality vs speed). Note for future:
 2. **CR-02: Crew state + staffing logic** — StationState.crew/leaders, ModuleState.assigned_crew/crew_satisfied, ShipState.crew/leaders, AssignCrew/UnassignCrew commands + validation, crew satisfaction check in tick loop, transition events, Export rejection for Crew, crew_satisfied initialization on load
 3. **CR-03: Crew recruitment via trade** — TradeItemSpec::Crew variant, Import handling for crew, pricing.json crew entries
 4. **CR-04: Autopilot crew behaviors** — CrewAssignmentBehavior (priority-based, rebalancing guard, oscillation prevention), CrewRecruitmentBehavior (import by impact not gap count)
-5. **CR-05: Crew content** — Crew requirements on all module defs, 2 automated module variants with trade-off modifiers, tech_automation_basic, dev_base_state.json crew roster (10 op, 4 tech, 2 sci, 2 pilot)
+5. **CR-05: Crew content** — Crew requirements on all module defs, 2 automated module variants with trade-off modifiers, tech_automation_basic, dev_advanced_state.json crew roster (10 op, 4 tech, 2 sci, 2 pilot)
 6. **CR-06: SSE + frontend data layer** — Zod schemas for crew events, applyEvents handlers, types.ts crew fields, ModuleCard UNDERSTAFFED badge, StationDetail crew roster, ci_event_sync.sh
 7. **CR-07: Testing + determinism validation** — Unit tests, rebalancing oscillation test, automated-vs-crewed benchmark, integration test, determinism regression, sim_bench crew_system.json scenario
 

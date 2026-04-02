@@ -191,7 +191,7 @@ content/autopilot_baseline.json (NEW)
 - [ ] Unit test: tick-0 state (minimal activity) scores in Startup range
 - [ ] Unit test: advanced state (full activity) scores in Enterprise+ range
 - [ ] Unit test: per-tick normalization makes 1000-tick and 5000-tick runs comparable
-- [ ] Integration test with `load_content("../../content")` real content values — non-trivial score on dev_base_state after 500 ticks
+- [ ] Integration test with `load_content("../../content")` real content values — non-trivial score on dev_advanced_state after 500 ticks
 - [ ] No state mutation — function takes immutable references only
 
 **Dependencies:** Ticket 1
@@ -318,7 +318,7 @@ content/autopilot_baseline.json (NEW)
 - [ ] At least 10 behavioral parameters extracted (beyond current autopilot.json content ID mappings)
 - [ ] Config file versioned (`"version": "baseline-v1"`)
 - [ ] Unit test: default config matches hardcoded behavior across 1000 ticks
-- [ ] Integration test: dev_base_state + baseline config + seed 42 produces identical MetricsSnapshot at tick 500 vs current code
+- [ ] Integration test: dev_advanced_state + baseline config + seed 42 produces identical MetricsSnapshot at tick 500 vs current code
 
 **Dependencies:** None (parallel with tickets 1-6)
 **Estimated size:** Large (requires auditing all concerns)
@@ -416,7 +416,7 @@ content/autopilot_baseline.json (NEW)
 **What:** sim_bench scenarios specifically designed to validate scoring produces meaningful, non-degenerate distributions. These serve as regression tests for the scoring system itself.
 
 **Details:**
-- `scenarios/scoring_calibration.json` — runs dev_base_state for 2000 ticks across 20 seeds. Validates: composite score reaches Enterprise tier, all 6 dimensions have non-zero values, cross-seed stddev < 20% of mean (not too random).
+- `scenarios/scoring_calibration.json` — runs dev_advanced_state for 2000 ticks across 20 seeds. Validates: composite score reaches Enterprise tier, all 6 dimensions have non-zero values, cross-seed stddev < 20% of mean (not too random).
 - `scenarios/scoring_baseline.json` — establishes the canonical baseline score distribution. Run with baseline AutopilotConfig. Results saved as reference for future comparison.
 - `scenarios/scoring_dimensions.json` — tests that disabling specific systems (e.g., no mining, no research) produces expected dimension drops. Uses constant overrides to create controlled conditions.
 - Update `ci_bench_smoke.sh` to include a quick scoring validation (5 seeds, 500 ticks, check non-degenerate)

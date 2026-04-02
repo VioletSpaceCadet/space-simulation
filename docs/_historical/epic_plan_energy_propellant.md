@@ -63,9 +63,9 @@
 - **Bench:** None
 - **FE:** None
 
-#### E1-08: Add battery and solar array to dev_base_state.json
+#### E1-08: Add battery and solar array to dev_advanced_state.json
 - **Crates:** sim_world, content
-- **Changes:** Add `module_basic_solar_array` (x2) and `module_basic_battery` to station inventory in `dev_base_state.json`. Update `build_initial_state()` to match. Set `station_power_available_per_tick` to 0 (power now computed from solar arrays, not constant).
+- **Changes:** Add `module_basic_solar_array` (x2) and `module_basic_battery` to station inventory in `dev_advanced_state.json`. Update `build_initial_state()` to match. Set `station_power_available_per_tick` to 0 (power now computed from solar arrays, not constant).
 - **Schema:** None
 - **Bench:** Baseline scenario will now show power metrics
 - **FE:** None
@@ -158,9 +158,9 @@
 - **Bench:** None
 - **FE:** None
 
-#### E2-08: Update dev_base_state.json with expanded solar system
+#### E2-08: Update dev_advanced_state.json with expanded solar system
 - **Crates:** sim_world, content
-- **Changes:** Update `dev_base_state.json` scan sites to use new nodes. Distribute sites across nodes based on `scan_site_weight`. Update `build_initial_state()` to match.
+- **Changes:** Update `dev_advanced_state.json` scan sites to use new nodes. Distribute sites across nodes based on `scan_site_weight`. Update `build_initial_state()` to match.
 - **Schema:** None
 - **Bench:** Rerun baselines
 - **FE:** None
@@ -232,7 +232,7 @@
 - **Bench:** New CSV columns
 - **FE:** None
 
-#### E3-07: Add electrolysis and heating modules to dev_base_state.json
+#### E3-07: Add electrolysis and heating modules to dev_advanced_state.json
 - **Crates:** sim_world, content
 - **Changes:** Add heating unit and electrolysis unit to station inventory. Update `build_initial_state()`.
 - **Schema:** None
@@ -320,9 +320,9 @@
 - **Bench:** None
 - **FE:** None
 
-#### E4-07: Update dev_base_state.json with ship propellant
+#### E4-07: Update dev_advanced_state.json with ship propellant
 - **Crates:** sim_world, content
-- **Changes:** Add propellant fields to ship state in dev_base_state.json. Starting propellant: 50,000 kg (full tank). Update `build_initial_state()`.
+- **Changes:** Add propellant fields to ship state in dev_advanced_state.json. Starting propellant: 50,000 kg (full tank). Update `build_initial_state()`.
 - **Schema:** None
 - **Bench:** Rerun baselines
 - **FE:** None

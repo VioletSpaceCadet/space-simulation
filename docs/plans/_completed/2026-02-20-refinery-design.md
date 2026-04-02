@@ -4,7 +4,7 @@
 
 **Goal:** Add a refinery system — rich inventory, station modules, and a basic iron refinery that processes raw ore into Fe material (with quality) and blended slag.
 
-**Architecture:** Stations and ships replace the flat `HashMap<ElementId, f32>` cargo with a `Vec<InventoryItem>` enum that carries per-item metadata (composition, quality). Station modules are physical inventory items that the autopilot auto-installs; the refinery runs on a tick interval when enabled and above a threshold. A `dev_base_state.json` provides a hand-crafted starting world, establishing the save/load foundation.
+**Architecture:** Stations and ships replace the flat `HashMap<ElementId, f32>` cargo with a `Vec<InventoryItem>` enum that carries per-item metadata (composition, quality). Station modules are physical inventory items that the autopilot auto-installs; the refinery runs on a tick interval when enabled and above a threshold. A `dev_advanced_state.json` provides a hand-crafted starting world, establishing the save/load foundation.
 
 **Tech Stack:** Rust (sim_core, sim_control, sim_cli), TypeScript/React (ui_web), serde_json for save/load.
 
@@ -270,7 +270,7 @@ for each newly installed module (from ModuleInstalled events this tick):
 
 ---
 
-## 5. Save/Load Foundation (`dev_base_state.json`)
+## 5. Save/Load Foundation (`dev_advanced_state.json`)
 
 `sim_cli` accepts mutually exclusive startup modes:
 
@@ -282,7 +282,7 @@ sim run --state <path>         # load GameState from JSON file
 
 `GameState` is already `Serialize + Deserialize`, so loading is `serde_json::from_reader`. Saving is a future follow-up.
 
-`content/dev_base_state.json` is a hand-crafted tick-0 `GameState` with:
+`content/dev_advanced_state.json` is a hand-crafted tick-0 `GameState` with:
 - One ship at `node_earth_orbit`, empty inventory
 - One station at `node_earth_orbit`, inventory containing one `Module { module_basic_iron_refinery }`
 - Scan sites spread across the solar system (same as procedural gen would produce)

@@ -99,7 +99,7 @@ content/
   pricing.json         # Import/export prices per item
   crew_roles.json      # Crew role definitions and recruitment costs
   constants.json       # Simulation constants (tick rate, capacities, thresholds)
-  dev_base_state.json  # Default starting state for development
+  dev_advanced_state.json  # Default starting state for development
 ```
 
 Adding a new module type, recipe, or tech = adding a JSON entry, not a Rust enum variant.

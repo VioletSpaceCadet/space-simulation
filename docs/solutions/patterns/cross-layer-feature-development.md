@@ -45,7 +45,7 @@ Add consequences that cross system boundaries:
 
 ### Phase 5: Content & Balance
 - Module definitions in `module_defs.json`
-- Starting state updates in `dev_base_state.json` and `build_initial_state()`
+- Starting state updates in `dev_advanced_state.json` and `build_initial_state()`
 - sim_bench scenarios to validate balance at 30-day and 90-day horizons
 
 ## Supporting Learnings
