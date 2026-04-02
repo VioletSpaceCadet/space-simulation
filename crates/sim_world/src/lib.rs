@@ -556,6 +556,30 @@ fn load_fitting_templates(
     }
 }
 
+/// Validate milestone definitions: unique IDs, valid chained references.
+fn validate_milestones(milestones: &[sim_core::MilestoneDef]) {
+    let mut seen_ids = std::collections::HashSet::new();
+    for m in milestones {
+        assert!(
+            seen_ids.insert(m.id.as_str()),
+            "duplicate milestone id '{}'",
+            m.id
+        );
+    }
+    // Validate chained milestone references point to existing IDs.
+    for m in milestones {
+        for cond in &m.conditions {
+            if let sim_core::MilestoneCondition::MilestoneCompleted { milestone_id } = cond {
+                assert!(
+                    seen_ids.contains(milestone_id.as_str()),
+                    "milestone '{}' references unknown prerequisite milestone '{milestone_id}'",
+                    m.id
+                );
+            }
+        }
+    }
+}
+
 /// Load an optional JSON file, returning `T::default()` if the file is missing.
 fn load_optional_json<T: serde::de::DeserializeOwned + Default>(
     dir: &Path,
@@ -646,6 +670,8 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         load_optional_json(dir, "initial_station.json")?;
     let autopilot: sim_core::AutopilotConfig = load_optional_json(dir, "autopilot.json")?;
     let scoring: sim_core::ScoringConfig = load_optional_json(dir, "scoring.json")?;
+    let milestones: Vec<sim_core::MilestoneDef> = load_optional_json(dir, "milestones.json")?;
+    validate_milestones(&milestones);
     let crew_roles = load_crew_roles(dir)?;
     let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
         &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
@@ -681,6 +707,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         autopilot,
         crew_roles,
         scoring,
+        milestones,
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -1907,5 +1934,158 @@ mod tests {
             scale_factor: 2500.0,
         };
         validate_content(&content);
+    }
+
+    #[test]
+    fn milestones_load_from_content() {
+        let content = load_content("../../content").unwrap();
+        assert!(
+            content.milestones.len() >= 8,
+            "expected at least 8 milestones, got {}",
+            content.milestones.len()
+        );
+        let first = &content.milestones[0];
+        assert_eq!(first.id, "first_survey");
+        assert!(!first.conditions.is_empty());
+    }
+
+    #[test]
+    fn milestones_serde_round_trip() {
+        let milestone = sim_core::MilestoneDef {
+            id: "test_milestone".to_string(),
+            name: "Test".to_string(),
+            description: "A test milestone".to_string(),
+            conditions: vec![
+                sim_core::MilestoneCondition::MetricAbove {
+                    field: "total_ore_kg".to_string(),
+                    threshold: 100.0,
+                },
+                sim_core::MilestoneCondition::CounterAbove {
+                    counter: "asteroids_discovered".to_string(),
+                    threshold: 1.0,
+                },
+                sim_core::MilestoneCondition::MilestoneCompleted {
+                    milestone_id: "test_milestone".to_string(),
+                },
+            ],
+            rewards: sim_core::MilestoneReward {
+                grant_amount: 5_000_000.0,
+                reputation: 10.0,
+                unlock_trade_tier: Some(sim_core::TradeTier::BasicImport),
+                unlock_zone_ids: vec!["inner_belt".to_string()],
+                unlock_module_ids: vec![],
+            },
+            phase_advance: Some(sim_core::GamePhase::Orbital),
+        };
+        let json = serde_json::to_string(&milestone).unwrap();
+        let roundtripped: sim_core::MilestoneDef = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtripped.id, "test_milestone");
+        assert_eq!(roundtripped.conditions.len(), 3);
+        assert_eq!(
+            roundtripped.phase_advance,
+            Some(sim_core::GamePhase::Orbital)
+        );
+    }
+
+    #[test]
+    fn validate_milestones_accepts_valid() {
+        let milestones = vec![
+            sim_core::MilestoneDef {
+                id: "m1".to_string(),
+                name: "M1".to_string(),
+                description: String::new(),
+                conditions: vec![],
+                rewards: sim_core::MilestoneReward {
+                    grant_amount: 0.0,
+                    reputation: 0.0,
+                    unlock_trade_tier: None,
+                    unlock_zone_ids: vec![],
+                    unlock_module_ids: vec![],
+                },
+                phase_advance: None,
+            },
+            sim_core::MilestoneDef {
+                id: "m2".to_string(),
+                name: "M2".to_string(),
+                description: String::new(),
+                conditions: vec![sim_core::MilestoneCondition::MilestoneCompleted {
+                    milestone_id: "m1".to_string(),
+                }],
+                rewards: sim_core::MilestoneReward {
+                    grant_amount: 0.0,
+                    reputation: 0.0,
+                    unlock_trade_tier: None,
+                    unlock_zone_ids: vec![],
+                    unlock_module_ids: vec![],
+                },
+                phase_advance: None,
+            },
+        ];
+        validate_milestones(&milestones); // should not panic
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate milestone id")]
+    fn validate_milestones_rejects_duplicate_ids() {
+        let milestones = vec![
+            sim_core::MilestoneDef {
+                id: "dup".to_string(),
+                name: "D1".to_string(),
+                description: String::new(),
+                conditions: vec![],
+                rewards: sim_core::MilestoneReward {
+                    grant_amount: 0.0,
+                    reputation: 0.0,
+                    unlock_trade_tier: None,
+                    unlock_zone_ids: vec![],
+                    unlock_module_ids: vec![],
+                },
+                phase_advance: None,
+            },
+            sim_core::MilestoneDef {
+                id: "dup".to_string(),
+                name: "D2".to_string(),
+                description: String::new(),
+                conditions: vec![],
+                rewards: sim_core::MilestoneReward {
+                    grant_amount: 0.0,
+                    reputation: 0.0,
+                    unlock_trade_tier: None,
+                    unlock_zone_ids: vec![],
+                    unlock_module_ids: vec![],
+                },
+                phase_advance: None,
+            },
+        ];
+        validate_milestones(&milestones);
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown prerequisite milestone")]
+    fn validate_milestones_rejects_unknown_prereq() {
+        let milestones = vec![sim_core::MilestoneDef {
+            id: "m1".to_string(),
+            name: "M1".to_string(),
+            description: String::new(),
+            conditions: vec![sim_core::MilestoneCondition::MilestoneCompleted {
+                milestone_id: "nonexistent".to_string(),
+            }],
+            rewards: sim_core::MilestoneReward {
+                grant_amount: 0.0,
+                reputation: 0.0,
+                unlock_trade_tier: None,
+                unlock_zone_ids: vec![],
+                unlock_module_ids: vec![],
+            },
+            phase_advance: None,
+        }];
+        validate_milestones(&milestones);
+    }
+
+    #[test]
+    fn trade_tier_ordering() {
+        assert!(sim_core::TradeTier::None < sim_core::TradeTier::BasicImport);
+        assert!(sim_core::TradeTier::BasicImport < sim_core::TradeTier::Export);
+        assert!(sim_core::TradeTier::Export < sim_core::TradeTier::Full);
     }
 }

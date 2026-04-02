@@ -1,0 +1,107 @@
+[
+  {
+    "id": "first_survey",
+    "name": "First Survey",
+    "description": "Discover your first asteroid through sensor surveys.",
+    "conditions": [
+      { "type": "counter_above", "counter": "asteroids_discovered", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 5000000,
+      "reputation": 10
+    }
+  },
+  {
+    "id": "first_ore",
+    "name": "First Ore",
+    "description": "Mine and deliver at least 100 kg of ore to the station.",
+    "conditions": [
+      { "type": "metric_above", "field": "total_ore_kg", "threshold": 100 }
+    ],
+    "rewards": {
+      "grant_amount": 10000000,
+      "reputation": 15
+    }
+  },
+  {
+    "id": "first_material",
+    "name": "First Material",
+    "description": "Refine at least 50 kg of raw material from ore.",
+    "conditions": [
+      { "type": "metric_above", "field": "total_material_kg", "threshold": 50 }
+    ],
+    "rewards": {
+      "grant_amount": 15000000,
+      "reputation": 20,
+      "unlock_trade_tier": "BasicImport"
+    },
+    "phase_advance": "Orbital"
+  },
+  {
+    "id": "first_component",
+    "name": "First Component",
+    "description": "Manufacture your first component using the assembler.",
+    "conditions": [
+      { "type": "counter_above", "counter": "assembler_runs", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 20000000,
+      "reputation": 20
+    }
+  },
+  {
+    "id": "first_tech",
+    "name": "First Tech",
+    "description": "Unlock your first technology through research.",
+    "conditions": [
+      { "type": "counter_above", "counter": "techs_unlocked", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 25000000,
+      "reputation": 25
+    }
+  },
+  {
+    "id": "first_export",
+    "name": "First Export",
+    "description": "Complete your first export transaction.",
+    "conditions": [
+      { "type": "milestone_completed", "milestone_id": "first_material" },
+      { "type": "metric_above", "field": "export_count", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 30000000,
+      "reputation": 30,
+      "unlock_trade_tier": "Export"
+    }
+  },
+  {
+    "id": "fleet_expansion",
+    "name": "Fleet Expansion",
+    "description": "Build a second ship to expand your fleet operations.",
+    "conditions": [
+      { "type": "counter_above", "counter": "ships_built", "threshold": 2 }
+    ],
+    "rewards": {
+      "grant_amount": 50000000,
+      "reputation": 40
+    },
+    "phase_advance": "Industrial"
+  },
+  {
+    "id": "self_sustaining",
+    "name": "Self-Sustaining Economy",
+    "description": "Achieve export revenue exceeding grant dependence. Your operation is now self-sustaining.",
+    "conditions": [
+      { "type": "milestone_completed", "milestone_id": "first_export" },
+      { "type": "metric_above", "field": "export_revenue_total", "threshold": 200000000 }
+    ],
+    "rewards": {
+      "grant_amount": 100000000,
+      "reputation": 50,
+      "unlock_trade_tier": "Full",
+      "unlock_zone_ids": ["inner_belt", "outer_belt"]
+    },
+    "phase_advance": "Expansion"
+  }
+]

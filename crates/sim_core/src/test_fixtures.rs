@@ -405,6 +405,7 @@ pub fn base_content() -> GameContent {
         autopilot: AutopilotConfig::default(),
         crew_roles: BTreeMap::new(),
         scoring: Default::default(),
+        milestones: Vec::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -654,6 +655,7 @@ pub fn minimal_content() -> GameContent {
         },
         crew_roles: BTreeMap::new(),
         scoring: Default::default(),
+        milestones: Vec::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();

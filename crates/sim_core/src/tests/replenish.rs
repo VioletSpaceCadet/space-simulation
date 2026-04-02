@@ -140,6 +140,7 @@ fn replenish_test_content() -> GameContent {
         autopilot: crate::AutopilotConfig::default(),
         crew_roles: std::collections::BTreeMap::new(),
         scoring: Default::default(),
+        milestones: Vec::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
