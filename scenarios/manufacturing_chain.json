@@ -3,5 +3,5 @@
   "ticks": 3000,
   "metrics_every": 60,
   "seeds": [1, 2, 3],
-  "state": "./content/dev_base_state.json"
+  "state": "./content/dev_advanced_state.json"
 }

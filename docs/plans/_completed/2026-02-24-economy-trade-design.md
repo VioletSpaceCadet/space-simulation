@@ -214,7 +214,7 @@ Draggable panel alongside existing panels:
 | `content/component_defs.json` | Add `thruster` |
 | `content/module_defs.json` | Add `module_shipyard` + `module_engineering_lab` |
 | `content/techs.json` | Add `tech_ship_construction` |
-| `content/dev_base_state.json` | Add engineering lab + shipyard to starting inventory |
+| `content/dev_advanced_state.json` | Add engineering lab + shipyard to starting inventory |
 
 ## Crate Changes
 

@@ -21,7 +21,7 @@ fn test_station_id() -> StationId {
 fn thermal_30d_scenario_completes_no_collapse() {
     let content = sim_world::load_content(&content_dir()).unwrap();
     let state_path = format!(
-        "{}/../../content/dev_base_state.json",
+        "{}/../../content/dev_advanced_state.json",
         std::env::var("CARGO_MANIFEST_DIR").unwrap()
     );
     let state_json = std::fs::read_to_string(&state_path).unwrap();
@@ -92,7 +92,7 @@ fn thermal_stress_90d_completes_with_degraded_cooling() {
         }
     }
 
-    let state_path = format!("{content_dir}/dev_base_state.json");
+    let state_path = format!("{content_dir}/dev_advanced_state.json");
     let state_json = std::fs::read_to_string(&state_path).unwrap();
     let mut state: sim_core::GameState = serde_json::from_str(&state_json).unwrap();
     state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);

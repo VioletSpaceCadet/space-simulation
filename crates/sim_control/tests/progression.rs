@@ -678,16 +678,16 @@ fn lab_per_run_amounts_are_not_time_scaled() {
 }
 
 // ---------------------------------------------------------------------------
-// VIO-461: dev_base_state progression test
+// VIO-461: dev_advanced_state progression test
 // ---------------------------------------------------------------------------
 
-/// Load the actual shipped dev_base_state.json and run 10k ticks with autopilot.
+/// Load the actual shipped dev_advanced_state.json and run 10k ticks with autopilot.
 /// Verifies that the game makes meaningful progress — catches regressions like
 /// VIO-457 (ship stranding) and VIO-458 (power deficit).
 #[test]
-fn dev_base_state_progression() {
+fn dev_advanced_state_progression() {
     let content = sim_world::load_content("../../content").unwrap();
-    let json = std::fs::read_to_string("../../content/dev_base_state.json").unwrap();
+    let json = std::fs::read_to_string("../../content/dev_advanced_state.json").unwrap();
     let mut state: GameState = serde_json::from_str(&json).unwrap();
     state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
     let mut rng = ChaCha8Rng::seed_from_u64(42);
@@ -791,10 +791,10 @@ fn run_and_assert_no_permanent_idle(
     state.counters.next_command_id = next_cmd_id;
 }
 
-/// Invariant: ships never permanently idle when using dev_base_state
+/// Invariant: ships never permanently idle when using dev_advanced_state
 /// during the early game phase (first 2000 ticks) where resources are fresh.
 /// build_initial_state has limited scan sites/asteroids so ships may legitimately
-/// idle once all are exhausted — the dev_base_state test below covers the full
+/// idle once all are exhausted — the dev_advanced_state test below covers the full
 /// game state with proper scan site replenishment.
 #[test]
 fn invariant_no_permanent_idle_early_game() {
@@ -811,11 +811,11 @@ fn invariant_no_permanent_idle_early_game() {
     run_and_assert_no_permanent_idle(&content, &mut state, &mut rng, 2_000, 200);
 }
 
-/// Invariant: ships never permanently idle when using dev_base_state.json.
+/// Invariant: ships never permanently idle when using dev_advanced_state.json.
 #[test]
-fn invariant_no_permanent_idle_dev_base_state() {
+fn invariant_no_permanent_idle_dev_advanced_state() {
     let content = sim_world::load_content("../../content").unwrap();
-    let json = std::fs::read_to_string("../../content/dev_base_state.json").unwrap();
+    let json = std::fs::read_to_string("../../content/dev_advanced_state.json").unwrap();
     let mut state: GameState = serde_json::from_str(&json).unwrap();
     state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
     let mut rng = ChaCha8Rng::seed_from_u64(42);

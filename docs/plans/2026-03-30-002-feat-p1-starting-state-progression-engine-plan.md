@@ -29,7 +29,7 @@ The mechanical infrastructure for progression — a milestone/grant economy, ach
 
 ## Problem Statement
 
-The simulation currently has no progression. The starting state (`dev_base_state.json`) provides:
+The simulation currently has no progression. The starting state (formerly `dev_base_state.json`, now `dev_advanced_state.json`) provides:
 
 | Resource | Current Value | Problem |
 |---|---|---|

@@ -163,10 +163,10 @@ Use sparingly. CI will still catch issues.
 
 ## Content & Starting State
 
-- `content/dev_base_state.json` — canonical starting state for gameplay testing (refinery, assembler, maintenance bay, 2 labs, 500 kg Fe, 10 repair kits, 50 m³ ship cargo, 2,000 m³ station cargo)
+- `content/dev_advanced_state.json` — canonical starting state for gameplay testing (refinery, assembler, maintenance bay, 2 labs, 500 kg Fe, 10 repair kits, 50 m³ ship cargo, 2,000 m³ station cargo)
 - `content/constants.json` — game constants (already rebalanced for hard sci-fi pacing)
 - `content/module_defs.json` — module behavior parameters (intervals, wear, recipes)
-- `build_initial_state()` in sim_world should stay in sync with `dev_base_state.json`
+- `build_initial_state()` in sim_world should stay in sync with `dev_advanced_state.json`
 
 Scenarios support: `"state"` (path to initial state JSON), `"overrides"` (constants + `module.*` keys), `"seeds"` (list or `{"range": [1, 5]}`).
 
@@ -290,6 +290,6 @@ This opens the Firefox Profiler in your browser automatically. Use the **Call Tr
 
 - Use `--ticks 10000` minimum for meaningful samples (250K for thorough analysis)
 - `--no-metrics` avoids metrics I/O noise in the profile
-- `--state content/dev_base_state.json` to profile with a specific game state
+- `--state content/dev_advanced_state.json` to profile with a specific game state
 - `CARGO_PROFILE_RELEASE_DEBUG=true` adds debug symbols to release builds (needed for function names in the profiler)
 - Export profiles from the Firefox Profiler UI for sharing

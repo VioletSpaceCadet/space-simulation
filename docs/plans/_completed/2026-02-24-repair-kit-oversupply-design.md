@@ -28,7 +28,7 @@ Add `SetAssemblerCap { station_id, module_id, component_id, max_stock }` command
 
 - Assembler recipe structure, output specs, wear mechanics
 - Maintenance bay behavior
-- `dev_base_state.json` (starts with 10 kits, well under cap)
+- `dev_advanced_state.json` (starts with 10 kits, well under cap)
 
 ## Expected impact
 

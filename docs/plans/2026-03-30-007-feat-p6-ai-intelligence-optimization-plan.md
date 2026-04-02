@@ -70,7 +70,7 @@ The autopilot detects which phase of the game it's in and adjusts strategy autom
 **Phase detection** reads `ProgressionState.phase` (from P1) and game state signals (station count, fleet size, logistics activity). Strategy mode auto-adjusts unless manually overridden.
 
 **Multi-station state + scenarios** (absorbs Phase D remnants):
-- VIO-485: Multi-station dev_base_state (for testing multi-station AI)
+- VIO-485: Multi-station dev_advanced_state (for testing multi-station AI)
 - VIO-487: Station-scoped ship assignment + pre-partitioning
 - VIO-489: Multi-station sim_bench regression scenarios
 
@@ -227,7 +227,7 @@ Already detailed. get_strategy_config, suggest_strategy_change MCP tools.
 
 ---
 
-#### Ticket 11 (VIO-485): Multi-station dev_base_state + world gen
+#### Ticket 11 (VIO-485): Multi-station dev_advanced_state + world gen
 
 Already detailed. Second station in dev state, extended build_initial_state(). Needed for testing multi-station AI.
 

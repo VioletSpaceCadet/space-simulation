@@ -43,7 +43,7 @@ With Phases A+B complete (VIO-445 through VIO-454), the autopilot is now a clean
 
 Phase C adds a **strategic layer** above station agents — a config-driven rule interpreter that reads game state and produces priority scores that influence station agent behavior. This completes the "strategy interface" from the AI progression roadmap (Phase 1), enabling: hand-tuned configs, sim_bench parameter sweeps, and eventually LLM-generated strategies — all through the same interface.
 
-Phase D adds **multi-station support** — a second station in dev_base_state, ship-to-station assignment, cross-station asteroid deduplication, and the AI coordination logic to manage stations at different orbital bodies independently.
+Phase D adds **multi-station support** — a second station in dev_advanced_state, ship-to-station assignment, cross-station asteroid deduplication, and the AI coordination logic to manage stations at different orbital bodies independently.
 
 ## Problem Statement
 
@@ -435,7 +435,7 @@ New command path: daemon `POST /api/v1/strategy` → queues `SetStrategyConfig` 
 
 ### Phase D: Functional Requirements
 
-- [ ] `dev_base_state.json` has 2+ stations at different orbital bodies
+- [ ] `dev_advanced_state.json` has 2+ stations at different orbital bodies
 - [ ] `build_initial_state()` can generate multi-station starting state
 - [ ] `home_station: Option<StationId>` on `ShipState` with `serde(default)`
 - [ ] Ships assigned to building station at construction
@@ -500,7 +500,7 @@ New command path: daemon `POST /api/v1/strategy` → queues `SetStrategyConfig` 
 
 | Ticket | Title | Blocked By | Key Deliverable |
 |--------|-------|------------|-----------------|
-| D1 | Multi-station dev_base_state + world gen | C3 | 2 stations at different orbital bodies, both init paths updated |
+| D1 | Multi-station dev_advanced_state + world gen | C3 | 2 stations at different orbital bodies, both init paths updated |
 | D2 | Ship home_station field + construction assignment | D1 | `ShipState.home_station`, assigned at build time, `serde(default)` |
 | D3 | Station-scoped ship assignment + pre-partitioning | D2 | Filter by home_station, pre-partition in controller |
 | D4 | Cross-station asteroid deduplication (claim map) | D3 | Strategic layer assigns asteroids to nearest station, gated rebuild |
@@ -531,7 +531,7 @@ Per `docs/solutions/patterns/cross-layer-feature-development.md`:
 4. **PR 4 — Integration (C4 + C6):** sim_bench `strategy.*` overrides, MCP tools. Multi-seed comparison scenarios.
 
 **Phase D (after Phase C):**
-5. **PR 5 — Multi-station state (D1 + D2):** Second station in dev_base_state + build_initial_state. `home_station` field on ShipState. Both init paths updated together.
+5. **PR 5 — Multi-station state (D1 + D2):** Second station in dev_advanced_state + build_initial_state. `home_station` field on ShipState. Both init paths updated together.
 6. **PR 6 — Station-scoped assignment + dedup (D3 + D4):** Filter by home_station, pre-partition ships, claim map for asteroid deduplication.
 7. **PR 7 — Multi-station scenario (D5):** sim_bench scenario with 2 stations, regression test.
 
@@ -539,9 +539,9 @@ Per `docs/solutions/patterns/cross-layer-feature-development.md`:
 
 #### D1. Multi-Station Dev Base State + World Gen
 
-Add a second station to `dev_base_state.json` at a different orbital body (e.g., Inner Belt or Mars). Extend `build_initial_state()` to support multi-station generation.
+Add a second station to `dev_advanced_state.json` at a different orbital body (e.g., Inner Belt or Mars). Extend `build_initial_state()` to support multi-station generation.
 
-Per `docs/solutions/patterns/multi-epic-project-execution.md`: **update both `dev_base_state.json` AND `build_initial_state()` together.** If one path has 2 stations and the other has 1, MCP-started simulations will diverge from dev testing.
+Per `docs/solutions/patterns/multi-epic-project-execution.md`: **update both `dev_advanced_state.json` AND `build_initial_state()` together.** If one path has 2 stations and the other has 1, MCP-started simulations will diverge from dev testing.
 
 Station placement uses existing `solar_system.json` resource zones:
 - Station A at Earth orbit (existing) — balanced resource access

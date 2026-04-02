@@ -3,7 +3,7 @@
   "ticks": 336,
   "metrics_every": 1,
   "seeds": [1, 2, 3, 4, 5],
-  "state": "./content/dev_base_state.json",
+  "state": "./content/dev_advanced_state.json",
   "overrides": {
     "module.lab.research_interval_minutes": 1,
     "module.lab.wear_per_run": 0.002,

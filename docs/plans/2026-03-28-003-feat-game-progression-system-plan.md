@@ -27,7 +27,7 @@ The simulation currently has no progression. Analysis of the current state revea
 | Trade gated by time (1 year), not achievement | Waiting is the "strategy" |
 | Autopilot handles everything | No strategic decisions to make |
 
-The `dev_base_state.json` is a development convenience, not a game. A player watching this simulation sees an autopilot efficiently running a pre-built industrial complex. There is no arc of: struggle → discovery → capability → mastery.
+The `dev_advanced_state.json` is a development convenience, not a game. A player watching this simulation sees an autopilot efficiently running a pre-built industrial complex. There is no arc of: struggle → discovery → capability → mastery.
 
 ## The Progression Arc
 
@@ -161,7 +161,7 @@ Inspired by proven patterns across Factorio (production-as-gate), Stellaris (par
 
 ### Project 1: Starting State Rework & Progression Engine
 
-**What it delivers:** The mechanical infrastructure for progression — a milestone/grant economy, achievement-gated trade, and critically, the split of dev_base_state into a proper progression starting state and an advanced development state.
+**What it delivers:** The mechanical infrastructure for progression — a milestone/grant economy, achievement-gated trade, and critically, the split of dev_advanced_state into a proper progression starting state and an advanced development state.
 
 **Why it follows scoring:** With scoring in place, we can immediately measure whether the new starting state + progression mechanics produce better, more interesting runs than the current "start with everything" approach.
 

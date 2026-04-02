@@ -340,7 +340,7 @@ mod tests {
     #[test]
     fn test_run_seed_with_base_state() {
         let content = sim_world::load_content("../../content").unwrap();
-        let json = std::fs::read_to_string("../../content/dev_base_state.json").unwrap();
+        let json = std::fs::read_to_string("../../content/dev_advanced_state.json").unwrap();
         let mut base_state: GameState = serde_json::from_str(&json).unwrap();
         base_state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
         let temp_dir = TempDir::new().unwrap();

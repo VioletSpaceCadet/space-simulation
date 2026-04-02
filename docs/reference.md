@@ -93,7 +93,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 | `component_defs.json` | 1 component: `repair_kit` (50kg, 0.1 m³) |
 | `pricing.json` | Import/export pricing: surcharges per kg, per-item base prices, importable/exportable flags |
 | `scoring.json` | Run scoring config: 6 dimensions (id, name, weight, ceiling), 5 named thresholds (Startup→Space Magnate), computation_interval_ticks (default 24), scale_factor (default 2500). See Scoring section below. |
-| `dev_base_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
+| `dev_advanced_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
 
 ## Inventory & Refinery Design
 

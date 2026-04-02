@@ -323,7 +323,7 @@ The propellant tank creates a core fitting tradeoff: a mining barge with 2 indus
 
 **Updated: `content/component_defs.json`** — ship modules as assembled components need ComponentDef entries with mass/volume.
 
-**Updated: `content/dev_base_state.json`** — initial ship gets `hull_id: "hull_general_purpose"`, `fitted_modules: []`.
+**Updated: `content/dev_advanced_state.json`** — initial ship gets `hull_id: "hull_general_purpose"`, `fitted_modules: []`.
 
 **Updated: shipyard recipe** — `OutputSpec::Ship { hull_id: "hull_general_purpose" }`.
 
@@ -366,7 +366,7 @@ The propellant tank creates a core fitting tradeoff: a mining barge with 2 indus
 
 1. **SH-01: Data model + content loading** — HullId/SlotType/ModuleDefId newtypes, HullDef struct (includes base_propellant_capacity_kg), hull_defs.json loading + BTreeMap on GameContent, ModuleDef additions (compatible_slots, ship_modifiers), Equipment behavior variant, ModifierSource::Hull + FittedModule variants, StatId::{CargoCapacity, PropellantCapacity}, content validation, content endpoint hull catalog
 2. **SH-02: Fitting commands + stat computation** — ShipState hull_id/fitted_modules/propellant_kg fields, FitShipModule/UnfitShipModule commands + validation, recompute_ship_stats() (cargo, speed, propellant capacity, exhaust velocity), debug assertion, OutputSpec::Ship hull_id migration, ShipModuleFitted/ShipModuleUnfitted events
-3. **SH-03: Hull + ship module content** — 4 hull classes in hull_defs.json (with propellant/Ve stats), 5 ship modules in module_defs.json (including propellant tank), ComponentDef entries, fitting_templates.json, dev_base_state.json update, shipyard recipe migration, pricing updates
+3. **SH-03: Hull + ship module content** — 4 hull classes in hull_defs.json (with propellant/Ve stats), 5 ship modules in module_defs.json (including propellant tank), ComponentDef entries, fitting_templates.json, dev_advanced_state.json update, shipyard recipe migration, pricing updates
 4. **SH-04: Autopilot fitting behavior** — ShipFittingBehavior (every-tick idle ship check), fitting template loading + validation (negative tests), retrofit trigger, multi-ship deterministic allocation
 5. **SH-05: SSE + frontend data layer** — Zod schemas for ShipModuleFitted/ShipModuleUnfitted, applyEvents handlers, types.ts hull/fitting fields, FleetPanel hull display (read-only), ci_event_sync.sh update
 6. **SH-06: Testing + determinism validation** — Unit tests, hull bonus modifier lifecycle, fitting template validation negatives, integration tests (multi-ship, retrofit timing, full lifecycle), determinism regression, sim_bench hull_fitting.json scenario

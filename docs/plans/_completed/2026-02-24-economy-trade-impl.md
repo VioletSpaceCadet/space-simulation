@@ -45,7 +45,7 @@ Every place that constructs a `GameState` needs the new field. Key locations:
 - All test files constructing GameState directly — add `balance: 1_000_000_000.0`
 - Search with: `GameState {` across all `.rs` files
 
-Use `#[serde(default)]` on the `balance` field so existing JSON state files (like `dev_base_state.json`) deserialize without breaking. Default should be 0.0 (loaded states don't auto-get money).
+Use `#[serde(default)]` on the `balance` field so existing JSON state files (like `dev_advanced_state.json`) deserialize without breaking. Default should be 0.0 (loaded states don't auto-get money).
 
 **Step 3: Run tests**
 
@@ -572,13 +572,13 @@ git add -A && git commit -m "feat(core): implement ship construction via OutputS
 
 ## Phase 3: Content & World Integration
 
-### Task 8: Update dev_base_state.json and build_initial_state()
+### Task 8: Update dev_advanced_state.json and build_initial_state()
 
 **Files:**
-- Modify: `content/dev_base_state.json`
+- Modify: `content/dev_advanced_state.json`
 - Modify: `crates/sim_world/src/lib.rs:243-334`
 
-**Step 1: Add engineering lab and shipyard to dev_base_state.json**
+**Step 1: Add engineering lab and shipyard to dev_advanced_state.json**
 
 Add to station inventory:
 

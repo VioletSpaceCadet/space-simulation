@@ -518,7 +518,7 @@ pub enum Command {
 
 #### F4. Dev base state explorer ship + validation
 
-**Add to `content/dev_base_state.json`:**
+**Add to `content/dev_advanced_state.json`:**
 
 ```json
 {
@@ -908,7 +908,7 @@ A separate "antimatter" or "warp fuel" resource consumed per warp jump. Creates 
 - Station agent: `crates/sim_control/src/agents/station_agent.rs`
 - Ship agent: `crates/sim_control/src/agents/ship_agent.rs`
 - Current solar system content: `content/solar_system.json`
-- Dev base state: `content/dev_base_state.json`
+- Dev base state: `content/dev_advanced_state.json`
 
 ### Learnings Applied
 

@@ -25,7 +25,7 @@ Key flags:
 - `--save-only` captures the profile without opening a browser (use for headless capture)
 - `--ticks 500000` minimum for meaningful samples (short runs produce sparse data)
 - `--no-metrics` avoids I/O noise in the profile
-- `--state content/dev_base_state.json` to profile with a specific game state
+- `--state content/dev_advanced_state.json` to profile with a specific game state
 - `--seed 42` for reproducibility
 
 To view the profile in Chrome (requires `--chrome` flag):

@@ -517,12 +517,12 @@ feat(sim_core): derive TRADE_UNLOCK_TICK from minutes_per_tick
 
 ---
 
-### Task 9: Update `dev_base_state.json` if needed
+### Task 9: Update `dev_advanced_state.json` if needed
 
 **Files:**
-- Modify: `content/dev_base_state.json`
+- Modify: `content/dev_advanced_state.json`
 
-**Step 1: Check if any tick-denominated values exist in dev_base_state**
+**Step 1: Check if any tick-denominated values exist in dev_advanced_state**
 
 Read the file. It contains initial game state (stations, ships, etc). Key concern:
 - `power_available_per_tick` on stations — this mirrors the constant and should match the new value (6000.0).
@@ -538,7 +538,7 @@ Expected: Pass.
 **Step 3: Commit (only if changes needed)**
 
 ```
-chore(content): update dev_base_state.json for hourly tick scale
+chore(content): update dev_advanced_state.json for hourly tick scale
 ```
 
 ---
@@ -602,7 +602,7 @@ chore(scenarios): rescale all scenario files for hourly ticks
 
 **Files:**
 - Modify: `content/techs.json` (line 2: `"content_version": "0.0.1"` → `"0.1.0"`)
-- Modify: `content/dev_base_state.json` (update `content_version` field to match)
+- Modify: `content/dev_advanced_state.json` (update `content_version` field to match)
 
 **Step 1: Update content_version**
 

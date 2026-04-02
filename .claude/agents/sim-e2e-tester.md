@@ -156,7 +156,7 @@ cargo test -p sim_core                                    # Test sim_core only
 cargo clippy                                              # Lint
 cargo fmt                                                 # Format
 cargo run -p sim_cli -- run --ticks 1000 --seed 42        # CLI runner
-cargo run -p sim_cli -- run --state content/dev_base_state.json
+cargo run -p sim_cli -- run --state content/dev_advanced_state.json
 cargo run -p sim_daemon -- run --seed 42                  # HTTP daemon (:3001)
 cd ui_web && npm run dev                                  # React UI (:5173)
 cd ui_web && npm test                                     # vitest

@@ -3,6 +3,6 @@
   "ticks": 34,
   "metrics_every": 2,
   "seeds": [1, 2],
-  "state": "./content/dev_base_state.json",
+  "state": "./content/dev_advanced_state.json",
   "content_dir": "./content"
 }

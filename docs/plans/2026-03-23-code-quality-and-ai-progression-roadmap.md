@@ -143,7 +143,7 @@ Adding a new `ModuleBehaviorDef` variant requires:
 | `sim_world/lib.rs` — `build_initial_state()` | Starting loadout entry |
 | `content/module_defs.json` | JSON definition |
 | `applyEvents.ts:22` — `MODULE_KIND_STATE_MAP` | TS state mapping |
-| `content/dev_base_state.json` | Starting state entry |
+| `content/dev_advanced_state.json` | Starting state entry |
 
 #### The "Add an Inventory Type" Tax — 136 Match Sites
 

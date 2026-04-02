@@ -5,7 +5,7 @@
 
 **Goal:** Add rich inventory, station modules, and a basic iron refinery that converts ore to Fe material + slag.
 
-**Architecture:** Replace `cargo: HashMap<ElementId, f32>` on ships/stations with `inventory: Vec<InventoryItem>` (a tagged enum carrying per-item metadata). Station modules are physical inventory items auto-installed by the autopilot; the refinery runs every 60 ticks when enabled and above a threshold. A `dev_base_state.json` file provides the initial world state as the foundation for save/load.
+**Architecture:** Replace `cargo: HashMap<ElementId, f32>` on ships/stations with `inventory: Vec<InventoryItem>` (a tagged enum carrying per-item metadata). Station modules are physical inventory items auto-installed by the autopilot; the refinery runs every 60 ticks when enabled and above a threshold. A `dev_advanced_state.json` file provides the initial world state as the foundation for save/load.
 
 **Tech Stack:** Rust (sim_core, sim_control, sim_cli), serde_json, TypeScript/React (ui_web).
 
@@ -1573,7 +1573,7 @@ git commit -m "feat: add refinery tick logic and module command resolution"
 **Files:**
 - Modify: `content/elements.json`
 - Create: `content/module_defs.json`
-- Create: `content/dev_base_state.json`
+- Create: `content/dev_advanced_state.json`
 - Modify: `crates/sim_cli/src/main.rs`
 
 **Step 1: Update `content/elements.json`**
@@ -1676,7 +1676,7 @@ Ok(GameContent {
 
 Also update `ElementsFile` to include `refined_name`. Since `ElementDef` has `#[serde(default)]` on `refined_name`, the existing `ElementsFile` will work without changes — `elements_file.elements` will deserialize correctly.
 
-**Step 4: Create `content/dev_base_state.json`**
+**Step 4: Create `content/dev_advanced_state.json`**
 
 Check `content/solar_system.json` to get exact node IDs. The nodes are: `node_earth_orbit`, `node_belt_inner`, `node_belt_mid`, `node_belt_outer`.
 
@@ -1762,8 +1762,8 @@ Expected: Runs 10 ticks, prints status.
 **Step 6: Commit**
 
 ```bash
-git add content/elements.json content/module_defs.json content/dev_base_state.json crates/sim_cli/src/main.rs
-git commit -m "feat: add module content, dev_base_state, and module loading to sim_cli"
+git add content/elements.json content/module_defs.json content/dev_advanced_state.json crates/sim_cli/src/main.rs
+git commit -m "feat: add module content, dev_advanced_state, and module loading to sim_cli"
 ```
 
 ---
@@ -1838,7 +1838,7 @@ Update `main()` to pass both `seed` and `state_file` to `run`.
 
 **Step 4: Verify**
 
-Run: `cargo run -p sim_cli -- run --state content/dev_base_state.json --ticks 50`
+Run: `cargo run -p sim_cli -- run --state content/dev_advanced_state.json --ticks 50`
 Expected: Loads state from file, runs 50 ticks.
 
 Run: `cargo run -p sim_cli -- run --seed 42 --ticks 10`
