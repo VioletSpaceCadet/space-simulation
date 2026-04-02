@@ -612,6 +612,25 @@ fn load_crew_roles(
     Ok(defs.into_iter().map(|d| (d.id.clone(), d)).collect())
 }
 
+/// Load recipe definitions from `recipes.json`, validating unique IDs.
+fn load_recipes(
+    dir: &Path,
+) -> Result<std::collections::BTreeMap<sim_core::RecipeId, sim_core::RecipeDef>> {
+    let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
+    )
+    .context("parsing recipes.json")?;
+    let mut seen = std::collections::HashSet::new();
+    for recipe in &recipes {
+        assert!(
+            seen.insert(&recipe.id),
+            "duplicate recipe id '{}'",
+            recipe.id
+        );
+    }
+    Ok(recipes.into_iter().map(|r| (r.id.clone(), r)).collect())
+}
+
 pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let dir = Path::new(content_dir);
     let constants: Constants = serde_json::from_str(
@@ -673,21 +692,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let scoring: sim_core::ScoringConfig = load_optional_json(dir, "scoring.json")?;
     let milestones: Vec<sim_core::MilestoneDef> = load_optional_json(dir, "milestones.json")?;
     let crew_roles = load_crew_roles(dir)?;
-    let recipes: Vec<sim_core::RecipeDef> = serde_json::from_str(
-        &std::fs::read_to_string(dir.join("recipes.json")).context("reading recipes.json")?,
-    )
-    .context("parsing recipes.json")?;
-    // Check for duplicate recipe IDs before converting to map
-    let mut recipe_ids_seen = std::collections::HashSet::new();
-    for recipe in &recipes {
-        assert!(
-            recipe_ids_seen.insert(&recipe.id),
-            "duplicate recipe id '{}'",
-            recipe.id
-        );
-    }
-    let recipe_map: std::collections::BTreeMap<sim_core::RecipeId, sim_core::RecipeDef> =
-        recipes.into_iter().map(|r| (r.id.clone(), r)).collect();
+    let recipe_map = load_recipes(dir)?;
     let mut content = GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
