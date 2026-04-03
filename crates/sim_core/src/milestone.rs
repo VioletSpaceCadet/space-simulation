@@ -36,9 +36,9 @@ fn condition_met(cond: &MilestoneCondition, state: &GameState, metrics: &Metrics
     match cond {
         MilestoneCondition::MetricAbove { field, threshold } => metrics
             .get_field_f64(field)
-            .map_or(false, |val| val >= *threshold),
+            .is_some_and(|val| val >= *threshold),
         MilestoneCondition::CounterAbove { counter, threshold } => {
-            resolve_counter(state, counter).map_or(false, |val| val >= *threshold)
+            resolve_counter(state, counter).is_some_and(|val| val >= *threshold)
         }
         MilestoneCondition::MilestoneCompleted { milestone_id } => {
             state.progression.is_milestone_completed(milestone_id)
