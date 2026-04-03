@@ -1103,9 +1103,11 @@ fn manufacturing_pipeline_ore_to_cast_part() {
 /// progression_start.json within 200 ticks using real content.
 #[test]
 fn progression_start_reaches_first_survey() {
-    let content = sim_world::load_content("../../content").expect("load content");
-    let state_json =
-        std::fs::read_to_string("../../content/progression_start.json").expect("read state");
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+    let content_dir = format!("{manifest}/../../content");
+    let content = sim_world::load_content(&content_dir).expect("load content");
+    let state_json = std::fs::read_to_string(format!("{content_dir}/progression_start.json"))
+        .expect("read state");
     let mut state: GameState = serde_json::from_str(&state_json).expect("parse state");
     state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
 
@@ -1115,8 +1117,7 @@ fn progression_start_reaches_first_survey() {
 
     for _ in 0..200 {
         let commands = autopilot.generate_commands(&state, &content, &mut next_id);
-        let envelopes: Vec<CommandEnvelope> = commands;
-        sim_core::tick(&mut state, &envelopes, &content, &mut rng, None);
+        sim_core::tick(&mut state, &commands, &content, &mut rng, None);
     }
 
     assert!(

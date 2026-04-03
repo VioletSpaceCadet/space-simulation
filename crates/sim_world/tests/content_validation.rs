@@ -1760,3 +1760,54 @@ fn progression_start_is_minimal() {
         .count();
     assert_eq!(module_count, 7, "should have exactly 7 modules");
 }
+
+/// All crew roles in progression_start exist in content.
+#[test]
+fn progression_start_crew_roles_exist() {
+    let content = load_test_content();
+    let state = load_progression_start();
+
+    for station in state.stations.values() {
+        for role in station.crew.keys() {
+            assert!(
+                content.crew_roles.contains_key(role),
+                "progression_start has unknown crew role '{}'",
+                role.0
+            );
+        }
+    }
+}
+
+/// Ships in progression_start have valid hulls and propellant.
+#[test]
+fn progression_start_ships_valid() {
+    let content = load_test_content();
+    let state = load_progression_start();
+
+    for ship in state.ships.values() {
+        assert!(
+            content.hulls.contains_key(&ship.hull_id),
+            "progression_start ship references unknown hull '{}'",
+            ship.hull_id
+        );
+        assert!(ship.cargo_capacity_m3 > 0.0, "ship has zero cargo");
+        assert!(ship.propellant_kg > 0.0, "ship has no propellant");
+    }
+}
+
+/// Ship fitted modules in progression_start reference valid defs.
+#[test]
+fn progression_start_ship_modules_exist() {
+    let content = load_test_content();
+    let state = load_progression_start();
+
+    for ship in state.ships.values() {
+        for fitted in &ship.fitted_modules {
+            assert!(
+                content.module_defs.contains_key(&fitted.module_def_id.0),
+                "progression_start ship fitted module references unknown def '{}'",
+                fitted.module_def_id.0
+            );
+        }
+    }
+}
