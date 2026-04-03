@@ -1170,3 +1170,246 @@ fn progression_start_multi_seed_validation() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// VIO-541: 100-seed autopilot progression regression test
+// ---------------------------------------------------------------------------
+
+/// Ordered milestone IDs matching milestones.json progression sequence.
+const MILESTONE_IDS: &[&str] = &[
+    "first_survey",
+    "first_ore",
+    "first_material",
+    "first_component",
+    "first_tech",
+    "first_export",
+    "fleet_expansion",
+    "self_sustaining",
+];
+
+/// Run from `progression_start.json` with autopilot, tracking the tick each
+/// milestone is first completed. Returns a map of milestone_id -> tick reached
+/// (only for milestones actually reached).
+fn run_progression_tracking(
+    content: &GameContent,
+    state_json: &str,
+    seed: u64,
+    max_ticks: u64,
+) -> HashMap<String, u64> {
+    let mut state: GameState = serde_json::from_str(state_json).expect("parse state");
+    state.meta.seed = seed;
+    state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
+
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+    let mut autopilot = AutopilotController::new();
+    let mut next_id = 0u64;
+    let mut milestone_ticks: HashMap<String, u64> = HashMap::new();
+
+    for tick_num in 1..=max_ticks {
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+        sim_core::tick(&mut state, &commands, &content, &mut rng, None);
+
+        // Check for newly completed milestones
+        for milestone_id in MILESTONE_IDS {
+            if !milestone_ticks.contains_key(*milestone_id)
+                && state.progression.is_milestone_completed(milestone_id)
+            {
+                milestone_ticks.insert((*milestone_id).to_string(), tick_num);
+            }
+        }
+
+        // Early exit if all milestones reached
+        if milestone_ticks.len() == MILESTONE_IDS.len() {
+            break;
+        }
+    }
+
+    milestone_ticks
+}
+
+/// Quick regression test: 5 seeds, 2000 ticks from progression_start.json.
+/// Validates early milestone reachability. Runs in regular `cargo test`.
+#[test]
+fn progression_regression_quick() {
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+    let content_dir = format!("{manifest}/../../content");
+    let content = sim_world::load_content(&content_dir).expect("load content");
+    let state_json = std::fs::read_to_string(format!("{content_dir}/progression_start.json"))
+        .expect("read state");
+
+    let seeds = [1, 42, 123, 456, 789];
+    let mut failures: Vec<String> = Vec::new();
+
+    for seed in seeds {
+        let results = run_progression_tracking(&content, &state_json, seed, 2000);
+
+        // Milestone 1 (first_survey) must be reached by tick 200
+        match results.get("first_survey") {
+            Some(&tick) if tick <= 200 => {}
+            Some(&tick) => {
+                failures.push(format!(
+                    "seed {seed}: first_survey at tick {tick} (expected <= 200)"
+                ));
+            }
+            None => {
+                failures.push(format!(
+                    "seed {seed}: first_survey never reached in 2000 ticks"
+                ));
+            }
+        }
+
+        // Milestone 3 (first_material) should be reached by tick 500
+        match results.get("first_material") {
+            Some(&tick) if tick <= 500 => {}
+            Some(&tick) => {
+                failures.push(format!(
+                    "seed {seed}: first_material at tick {tick} (expected <= 500)"
+                ));
+            }
+            None => {
+                failures.push(format!(
+                    "seed {seed}: first_material never reached in 2000 ticks"
+                ));
+            }
+        }
+
+        // Milestone 5 (first_tech) should be reached by tick 1000
+        match results.get("first_tech") {
+            Some(&tick) if tick <= 1000 => {}
+            Some(&tick) => {
+                failures.push(format!(
+                    "seed {seed}: first_tech at tick {tick} (expected <= 1000)"
+                ));
+            }
+            None => {
+                failures.push(format!(
+                    "seed {seed}: first_tech never reached in 2000 ticks"
+                ));
+            }
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "Progression regression failures:\n  {}",
+        failures.join("\n  ")
+    );
+}
+
+/// Full regression test: 100 seeds, 5000 ticks from progression_start.json.
+/// Reports per-seed milestone completion ticks and validates threshold
+/// percentages. Run with `cargo test --ignored -p sim_control progression_regression_full`.
+#[test]
+#[ignore]
+fn progression_regression_full() {
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+    let content_dir = format!("{manifest}/../../content");
+    let content = sim_world::load_content(&content_dir).expect("load content");
+    let state_json = std::fs::read_to_string(format!("{content_dir}/progression_start.json"))
+        .expect("read state");
+
+    let seed_count: u64 = 100;
+    let max_ticks: u64 = 5000;
+
+    // Collect results per seed
+    let all_results: Vec<(u64, HashMap<String, u64>)> = (1..=seed_count)
+        .map(|seed| {
+            let results = run_progression_tracking(&content, &state_json, seed, max_ticks);
+            (seed, results)
+        })
+        .collect();
+
+    // Compute per-milestone statistics
+    eprintln!("\n=== Progression Regression Report (100 seeds, 5000 ticks) ===\n");
+
+    for milestone_id in MILESTONE_IDS {
+        let ticks: Vec<u64> = all_results
+            .iter()
+            .filter_map(|(_, results)| results.get(*milestone_id).copied())
+            .collect();
+
+        let reached = ticks.len();
+        let pct = (reached as f64 / seed_count as f64) * 100.0;
+
+        if ticks.is_empty() {
+            eprintln!("  {milestone_id}: 0/{seed_count} seeds (0.0%)");
+            continue;
+        }
+
+        let mean = ticks.iter().sum::<u64>() as f64 / reached as f64;
+        let variance = ticks
+            .iter()
+            .map(|&t| (t as f64 - mean).powi(2))
+            .sum::<f64>()
+            / reached as f64;
+        let stddev = variance.sqrt();
+        let min = ticks.iter().copied().min().unwrap();
+        let max = ticks.iter().copied().max().unwrap();
+
+        let mut sorted = ticks.clone();
+        sorted.sort_unstable();
+        let p50 = sorted[sorted.len() / 2];
+        let p95 = sorted[(sorted.len() as f64 * 0.95) as usize];
+
+        eprintln!(
+            "  {milestone_id}: {reached}/{seed_count} ({pct:.1}%) | \
+             mean={mean:.0} stddev={stddev:.0} min={min} p50={p50} p95={p95} max={max}"
+        );
+    }
+
+    // Report seeds that failed to reach milestone 1
+    let failed_seeds: Vec<u64> = all_results
+        .iter()
+        .filter(|(_, results)| !results.contains_key("first_survey"))
+        .map(|(seed, _)| *seed)
+        .collect();
+    if !failed_seeds.is_empty() {
+        eprintln!("\n  FAILED seeds (no first_survey): {failed_seeds:?}");
+    }
+
+    eprintln!();
+
+    // Threshold assertions
+    let mut failures: Vec<String> = Vec::new();
+
+    // 100% of seeds reach milestone 1 (first_survey) by tick 200
+    let m1_count = all_results
+        .iter()
+        .filter(|(_, r)| r.get("first_survey").is_some_and(|&t| t <= 200))
+        .count();
+    if m1_count < seed_count as usize {
+        failures.push(format!(
+            "first_survey by tick 200: {m1_count}/{seed_count} (need 100%)"
+        ));
+    }
+
+    // 95%+ reach milestone 3 (first_material) by tick 500
+    let m3_count = all_results
+        .iter()
+        .filter(|(_, r)| r.get("first_material").is_some_and(|&t| t <= 500))
+        .count();
+    let m3_threshold = (seed_count as f64 * 0.95).ceil() as usize;
+    if m3_count < m3_threshold {
+        failures.push(format!(
+            "first_material by tick 500: {m3_count}/{seed_count} (need 95%+)"
+        ));
+    }
+
+    // 90%+ reach milestone 5 (first_tech) by tick 1000
+    let m5_count = all_results
+        .iter()
+        .filter(|(_, r)| r.get("first_tech").is_some_and(|&t| t <= 1000))
+        .count();
+    let m5_threshold = (seed_count as f64 * 0.90).ceil() as usize;
+    if m5_count < m5_threshold {
+        failures.push(format!(
+            "first_tech by tick 1000: {m5_count}/{seed_count} (need 90%+)"
+        ));
+    }
+
+    assert!(
+        failures.is_empty(),
+        "Progression regression failures:\n  {}",
+        failures.join("\n  ")
+    );
+}
