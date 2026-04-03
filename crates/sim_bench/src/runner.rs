@@ -286,7 +286,7 @@ mod tests {
         let timing_stats = &parsed["timing_stats"];
         assert!(timing_stats.is_object(), "timing_stats should be present");
         let steps = timing_stats["steps"].as_array().unwrap();
-        assert_eq!(steps.len(), 14, "should have 14 step timing entries");
+        assert_eq!(steps.len(), 15, "should have 15 step timing entries");
         // Verify first step has expected fields
         let first = &steps[0];
         assert_eq!(first["name"], "apply_commands");

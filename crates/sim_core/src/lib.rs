@@ -9,6 +9,7 @@ mod engine;
 mod id;
 pub mod instrumentation;
 pub mod metrics;
+pub mod milestone;
 pub mod modifiers;
 pub mod propulsion;
 mod research;

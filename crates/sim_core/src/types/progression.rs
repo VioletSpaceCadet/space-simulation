@@ -125,6 +125,12 @@ pub struct ProgressionState {
     /// Current trade capability tier.
     #[serde(default)]
     pub trade_tier: TradeTier,
+    /// Zone IDs unlocked by milestone rewards.
+    #[serde(default)]
+    pub unlocked_zone_ids: BTreeSet<String>,
+    /// Module def IDs unlocked by milestone rewards.
+    #[serde(default)]
+    pub unlocked_module_ids: BTreeSet<String>,
 }
 
 impl ProgressionState {

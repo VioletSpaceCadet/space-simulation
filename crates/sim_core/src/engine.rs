@@ -17,7 +17,8 @@ pub fn trade_unlock_tick(constants: &crate::Constants) -> u64 {
 /// 2. Resolve ship tasks whose eta has arrived.
 /// 3. Tick station modules (refinery processors).
 /// 4. Advance station research on all eligible techs.
-///    4.5. Evaluate sim events (content-driven random events).
+///    4.5. Evaluate milestones (content-driven progression).
+///    4.6. Evaluate sim events (content-driven random events).
 /// 5. Replenish scan sites if below threshold.
 /// 6. Increment tick counter.
 ///
@@ -57,6 +58,11 @@ pub fn tick(
         timings,
         advance_research,
         advance_research(state, content, &mut events)
+    );
+    timed!(
+        timings,
+        evaluate_milestones,
+        crate::milestone::evaluate_milestones(state, content, &mut events)
     );
     timed!(
         timings,
