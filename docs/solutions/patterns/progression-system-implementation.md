@@ -1,7 +1,7 @@
 ---
 title: "Progression System Implementation — P1 Project Patterns"
 category: patterns
-date: 2026-04-03
+date: 2026-04-02
 tags: [progression, milestones, game-phase, trade-gating, starting-state, multi-ticket, tick-integration]
 component: sim_core, sim_world, sim_control, ui_web
 severity: info

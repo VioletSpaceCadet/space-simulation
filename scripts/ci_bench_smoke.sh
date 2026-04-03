@@ -75,7 +75,8 @@ if [ -z "$PROG_RUN_DIR" ] || [ ! -f "$PROG_RUN_DIR/batch_summary.json" ]; then
   exit 1
 fi
 
-echo "  progression smoke passed (5 seeds, 200 ticks)"
+# Validate no collapses (progression_start.json must not deadlock)
+python3 "$REPO_ROOT/scripts/validate_progression_smoke.py" "$PROG_RUN_DIR/batch_summary.json"
 
 # Data gap detection (warning only — does not block CI)
 echo "  running data gap analysis..."
