@@ -64,6 +64,20 @@ fi
 
 python3 "$REPO_ROOT/scripts/validate_scoring_smoke.py" "$SCORE_RUN_DIR/summary.json"
 
+# Progression smoke (validates progression_start.json doesn't deadlock)
+echo "  running progression_ci_smoke scenario..."
+"$BENCH" run --scenario "$REPO_ROOT/scenarios/progression_ci_smoke.json" --output-dir "$OUTPUT_DIR"
+
+PROG_RUN_DIR=$(find "$OUTPUT_DIR" -maxdepth 1 -type d -name 'progression_ci_smoke_*' | sort | tail -1)
+
+if [ -z "$PROG_RUN_DIR" ] || [ ! -f "$PROG_RUN_DIR/batch_summary.json" ]; then
+  echo "ERROR: batch_summary.json not found in $OUTPUT_DIR/progression_ci_smoke_*/"
+  exit 1
+fi
+
+# Validate no collapses (progression_start.json must not deadlock)
+python3 "$REPO_ROOT/scripts/validate_progression_smoke.py" "$PROG_RUN_DIR/batch_summary.json"
+
 # Data gap detection (warning only — does not block CI)
 echo "  running data gap analysis..."
 if python3 -m scripts.analysis.data_gaps "$RUN_DIR" --json "$OUTPUT_DIR/gap_report.json" 2>/dev/null; then
