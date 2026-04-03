@@ -338,5 +338,21 @@
     "next_asteroid_id": 0,
     "next_lot_id": 0,
     "next_module_instance_id": 1
+  },
+  "progression": {
+    "completed_milestones": [
+      "first_survey",
+      "first_ore",
+      "first_material",
+      "first_component",
+      "first_tech",
+      "first_export",
+      "fleet_expansion",
+      "self_sustaining"
+    ],
+    "phase": "Expansion",
+    "grant_history": [],
+    "reputation": 210.0,
+    "trade_tier": "Full"
   }
 }

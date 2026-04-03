@@ -46,6 +46,9 @@ pub struct GameState {
     /// Cumulative propellant consumed (kg) since simulation start.
     #[serde(default)]
     pub propellant_consumed_total: f64,
+    /// Progression system state (milestones, phase, grants, trade tier).
+    #[serde(default)]
+    pub progression: crate::ProgressionState,
     /// Cached absolute positions for orbital bodies. Not serialized -- recomputed on load.
     #[serde(skip, default)]
     pub body_cache: AHashMap<BodyId, crate::spatial::BodyCache>,

@@ -1,4 +1,6 @@
-//! Progression system types: milestones, phases, trade tiers, grants.
+//! Progression system types: milestones, phases, trade tiers, grants, progression state.
+
+use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
@@ -99,4 +101,95 @@ pub struct MilestoneReward {
     /// Module def IDs to make available.
     #[serde(default)]
     pub unlock_module_ids: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Progression state (runtime)
+// ---------------------------------------------------------------------------
+
+/// Runtime progression state stored in `GameState`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ProgressionState {
+    /// IDs of completed milestones.
+    #[serde(default)]
+    pub completed_milestones: BTreeSet<String>,
+    /// Current game phase (descriptive label derived from milestones).
+    #[serde(default)]
+    pub phase: GamePhase,
+    /// Record of all grants received.
+    #[serde(default)]
+    pub grant_history: Vec<GrantRecord>,
+    /// Cumulative reputation score.
+    #[serde(default)]
+    pub reputation: f64,
+    /// Current trade capability tier.
+    #[serde(default)]
+    pub trade_tier: TradeTier,
+}
+
+impl ProgressionState {
+    /// Check if a specific milestone has been completed.
+    pub fn is_milestone_completed(&self, milestone_id: &str) -> bool {
+        self.completed_milestones.contains(milestone_id)
+    }
+
+    /// Check if the current trade tier is at least the given tier.
+    pub fn trade_tier_unlocked(&self, required: TradeTier) -> bool {
+        self.trade_tier >= required
+    }
+}
+
+/// Record of a grant payment received from a milestone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrantRecord {
+    pub milestone_id: String,
+    pub amount: f64,
+    pub tick: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_progression_state() {
+        let state = ProgressionState::default();
+        assert!(state.completed_milestones.is_empty());
+        assert_eq!(state.phase, GamePhase::Startup);
+        assert_eq!(state.trade_tier, TradeTier::None);
+        assert_eq!(state.reputation, 0.0);
+        assert!(state.grant_history.is_empty());
+    }
+
+    #[test]
+    fn is_milestone_completed() {
+        let mut state = ProgressionState::default();
+        assert!(!state.is_milestone_completed("first_survey"));
+        state
+            .completed_milestones
+            .insert("first_survey".to_string());
+        assert!(state.is_milestone_completed("first_survey"));
+        assert!(!state.is_milestone_completed("first_ore"));
+    }
+
+    #[test]
+    fn trade_tier_unlocked() {
+        let mut state = ProgressionState::default();
+        assert!(state.trade_tier_unlocked(TradeTier::None));
+        assert!(!state.trade_tier_unlocked(TradeTier::BasicImport));
+
+        state.trade_tier = TradeTier::Export;
+        assert!(state.trade_tier_unlocked(TradeTier::None));
+        assert!(state.trade_tier_unlocked(TradeTier::BasicImport));
+        assert!(state.trade_tier_unlocked(TradeTier::Export));
+        assert!(!state.trade_tier_unlocked(TradeTier::Full));
+    }
+
+    #[test]
+    fn game_phase_ordering() {
+        assert!(GamePhase::Startup < GamePhase::Orbital);
+        assert!(GamePhase::Orbital < GamePhase::Industrial);
+        assert!(GamePhase::Industrial < GamePhase::Expansion);
+        assert!(GamePhase::Expansion < GamePhase::DeepSpace);
+    }
 }

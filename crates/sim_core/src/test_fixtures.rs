@@ -11,10 +11,10 @@ use crate::{
     CrewRole, DataKind, ElementDef, GameContent, GameState, HullId, InitialStationDef, InputAmount,
     InputFilter, ItemKind, LotId, MetaState, ModuleBehaviorDef, ModuleDef, ModuleInstanceId,
     ModuleKindState, ModulePort, ModuleState, NodeDef, NodeId, OrbitalBodyDef, OutputSpec,
-    PricingTable, PrincipalId, ProcessorDef, ProcessorState, QualityFormula, RadiatorDef,
-    RadiatorState, RecipeDef, RecipeId, RecipeThermalReq, ResearchState, ScanSite, ShipId,
-    ShipState, SiteId, SlotType, SolarSystemDef, StationId, StationState, TechDef, TechEffect,
-    TechId, ThermalDef, ThermalState, WearState, YieldFormula,
+    PricingTable, PrincipalId, ProcessorDef, ProcessorState, ProgressionState, QualityFormula,
+    RadiatorDef, RadiatorState, RecipeDef, RecipeId, RecipeThermalReq, ResearchState, ScanSite,
+    ShipId, ShipState, SiteId, SlotType, SolarSystemDef, StationId, StationState, TechDef,
+    TechEffect, TechId, ThermalDef, ThermalState, WearState, YieldFormula,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -744,6 +744,7 @@ pub fn base_state(content: &GameContent) -> GameState {
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
         propellant_consumed_total: 0.0,
+        progression: ProgressionState::default(),
         body_cache: crate::build_body_cache(&content.solar_system.bodies),
     }
 }
