@@ -1,0 +1,7 @@
+{
+  "name": "scoring_advanced",
+  "ticks": 2000,
+  "metrics_every": 100,
+  "seeds": [1, 2, 3, 4, 5],
+  "state": "./content/dev_advanced_state.json"
+}
