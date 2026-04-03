@@ -1094,3 +1094,36 @@ fn manufacturing_pipeline_ore_to_cast_part() {
         "casting mold should produce cast_fe_part from crucible Fe"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Progression starting state: milestone reachability (VIO-536)
+// ---------------------------------------------------------------------------
+
+/// Verify the autopilot reaches milestone 1 (first_survey) from
+/// progression_start.json within 200 ticks using real content.
+#[test]
+fn progression_start_reaches_first_survey() {
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+    let content_dir = format!("{manifest}/../../content");
+    let content = sim_world::load_content(&content_dir).expect("load content");
+    let state_json = std::fs::read_to_string(format!("{content_dir}/progression_start.json"))
+        .expect("read state");
+    let mut state: GameState = serde_json::from_str(&state_json).expect("parse state");
+    state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let mut autopilot = AutopilotController::new();
+    let mut next_id = 0u64;
+
+    for _ in 0..200 {
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+        sim_core::tick(&mut state, &commands, &content, &mut rng, None);
+    }
+
+    assert!(
+        state.progression.is_milestone_completed("first_survey"),
+        "autopilot should reach first_survey milestone within 200 ticks from progression_start. \
+         Asteroids discovered: {}",
+        state.asteroids.len()
+    );
+}
