@@ -15,7 +15,7 @@ impl StationConcern for ComponentImport {
         "component_import"
     }
     fn should_run(&self, ctx: &StationContext) -> bool {
-        ctx.trade_unlocked
+        ctx.trade_import_unlocked
     }
     fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
         let Some(station) = ctx.state.stations.get(ctx.station_id) else {

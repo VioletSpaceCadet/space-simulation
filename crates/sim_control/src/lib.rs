@@ -1245,9 +1245,9 @@ mod tests {
             .unlocked
             .insert(TechId("tech_ship_construction".to_string()));
 
-        // Set high balance and advance past trade unlock
+        // Set high balance and enable trade
         state.balance = 10_000_000.0;
-        state.meta.tick = sim_core::trade_unlock_tick(&content.constants);
+        state.progression.trade_tier = sim_core::TradeTier::Full;
 
         rebuild_station_indexes(&mut state, &content);
         (content, state)
@@ -1415,8 +1415,8 @@ mod tests {
         });
 
         let mut state = autopilot_state(&content);
-        // Set tick past trade unlock (minutes_per_tick=1 → unlock at 525,600)
-        state.meta.tick = 525_601;
+        // Enable trade via progression tier
+        state.progression.trade_tier = sim_core::TradeTier::Full;
         (content, state)
     }
 
@@ -1628,8 +1628,8 @@ mod tests {
         let (content, mut state) = export_setup();
         let station_id = StationId("station_earth_orbit".to_string());
 
-        // Set tick before trade unlock
-        state.meta.tick = 100;
+        // Disable trade via progression tier
+        state.progression.trade_tier = sim_core::TradeTier::None;
 
         state
             .stations

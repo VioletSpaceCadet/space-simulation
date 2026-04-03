@@ -106,7 +106,7 @@ fn trade_content() -> GameContent {
 fn trade_state(content: &GameContent) -> GameState {
     let mut state = test_fixtures::base_state(content);
     state.balance = 10_000_000.0;
-    state.meta.tick = trade_unlock_tick(&content.constants);
+    state.progression.trade_tier = crate::TradeTier::Full;
     // Pre-fill 5 scan sites to avoid replenish noise
     for index in 0..5 {
         state.scan_sites.push(ScanSite {
@@ -119,14 +119,11 @@ fn trade_state(content: &GameContent) -> GameState {
 }
 
 fn make_command(command: Command) -> CommandEnvelope {
-    // Test fixtures use minutes_per_tick = 1, trade_unlock_delay_minutes = 525_600
-    let content = crate::test_fixtures::base_content();
-    let unlock_tick = trade_unlock_tick(&content.constants);
     CommandEnvelope {
         id: CommandId(0),
         issued_by: PrincipalId("principal_autopilot".to_string()),
-        issued_tick: unlock_tick,
-        execute_at_tick: unlock_tick,
+        issued_tick: 0,
+        execute_at_tick: 0,
         command,
     }
 }
@@ -586,10 +583,10 @@ fn import_merges_material_with_existing() {
 }
 
 #[test]
-fn import_rejected_before_trade_unlock_tick() {
+fn import_rejected_without_trade_tier() {
     let content = trade_content();
     let mut state = trade_state(&content);
-    state.meta.tick = trade_unlock_tick(&content.constants) - 1;
+    state.progression.trade_tier = crate::TradeTier::None;
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let station_id = StationId("station_earth_orbit".to_string());
     let balance_before = state.balance;
@@ -622,10 +619,10 @@ fn import_rejected_before_trade_unlock_tick() {
 }
 
 #[test]
-fn export_rejected_before_trade_unlock_tick() {
+fn export_rejected_without_export_tier() {
     let content = trade_content();
     let mut state = trade_state(&content);
-    state.meta.tick = trade_unlock_tick(&content.constants) - 1;
+    state.progression.trade_tier = crate::TradeTier::BasicImport; // below Export
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let station_id = StationId("station_earth_orbit".to_string());
 

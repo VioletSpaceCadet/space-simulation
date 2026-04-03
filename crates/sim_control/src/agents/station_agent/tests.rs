@@ -88,7 +88,8 @@ fn manage_modules_installs_from_inventory() {
         content: &content,
         owner: &owner,
         next_id: &mut next_id,
-        trade_unlocked: false,
+        trade_import_unlocked: false,
+        trade_export_unlocked: false,
         decisions: None,
     };
 
@@ -129,7 +130,8 @@ fn jettison_slag_fires_above_threshold() {
         content: &content,
         owner: &owner,
         next_id: &mut next_id,
-        trade_unlocked: false,
+        trade_import_unlocked: false,
+        trade_export_unlocked: false,
         decisions: None,
     };
 
@@ -205,7 +207,8 @@ fn recruit_crew_skips_when_salary_would_bankrupt() {
         content: &content,
         owner: &owner,
         next_id: &mut next_id,
-        trade_unlocked: true,
+        trade_import_unlocked: true,
+        trade_export_unlocked: true,
         decisions: None,
     };
 
@@ -733,7 +736,8 @@ fn manage_modules_sheds_load_during_power_deficit() {
         content: &content,
         owner: &owner,
         next_id: &mut next_id,
-        trade_unlocked: false,
+        trade_import_unlocked: false,
+        trade_export_unlocked: false,
         decisions: None,
     };
 

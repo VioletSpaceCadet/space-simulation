@@ -11,8 +11,6 @@ use crate::{
 };
 use rand::Rng;
 
-use crate::engine::trade_unlock_tick;
-
 /// Validate an `AssignShipTask` command and collect it into the assignments vec
 /// for deferred processing. Returns `false` if the command should be skipped.
 pub(crate) fn handle_assign_ship_task(
@@ -344,7 +342,10 @@ pub(crate) fn handle_import(
     rng: &mut impl Rng,
     events: &mut Vec<EventEnvelope>,
 ) -> bool {
-    if current_tick < trade_unlock_tick(&content.constants) {
+    if !state
+        .progression
+        .trade_tier_unlocked(crate::TradeTier::BasicImport)
+    {
         return false;
     }
     if !state.stations.contains_key(station_id) {
@@ -433,7 +434,10 @@ pub(crate) fn handle_export(
     current_tick: u64,
     events: &mut Vec<EventEnvelope>,
 ) -> bool {
-    if current_tick < trade_unlock_tick(&content.constants) {
+    if !state
+        .progression
+        .trade_tier_unlocked(crate::TradeTier::Export)
+    {
         return false;
     }
     let Some(station) = state.stations.get(station_id) else {

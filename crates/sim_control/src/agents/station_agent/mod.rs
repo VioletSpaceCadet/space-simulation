@@ -34,7 +34,8 @@ pub(crate) struct StationContext<'a> {
     pub content: &'a GameContent,
     pub owner: &'a PrincipalId,
     pub next_id: &'a mut u64,
-    pub trade_unlocked: bool,
+    pub trade_import_unlocked: bool,
+    pub trade_export_unlocked: bool,
     pub decisions: Option<&'a mut Vec<DecisionRecord>>,
 }
 
@@ -97,14 +98,18 @@ impl StationAgent {
         next_id: &mut u64,
         commands: &mut Vec<CommandEnvelope>,
     ) {
-        let trade_unlocked = state.meta.tick >= sim_core::trade_unlock_tick(&content.constants);
         let mut ctx = StationContext {
             station_id: &self.station_id,
             state,
             content,
             owner,
             next_id,
-            trade_unlocked,
+            trade_import_unlocked: state
+                .progression
+                .trade_tier_unlocked(sim_core::TradeTier::BasicImport),
+            trade_export_unlocked: state
+                .progression
+                .trade_tier_unlocked(sim_core::TradeTier::Export),
             decisions: None,
         };
         let mut concern = PropellantManagement;
@@ -129,7 +134,12 @@ impl Agent for StationAgent {
             return Vec::new();
         }
 
-        let trade_unlocked = state.meta.tick >= sim_core::trade_unlock_tick(&content.constants);
+        let trade_import_unlocked = state
+            .progression
+            .trade_tier_unlocked(sim_core::TradeTier::BasicImport);
+        let trade_export_unlocked = state
+            .progression
+            .trade_tier_unlocked(sim_core::TradeTier::Export);
         let mut commands = Vec::new();
 
         // Build context; disjoint field borrows allow &self.station_id + &mut self.concerns.
@@ -141,7 +151,8 @@ impl Agent for StationAgent {
                 content,
                 owner,
                 next_id,
-                trade_unlocked,
+                trade_import_unlocked,
+                trade_export_unlocked,
                 #[allow(clippy::option_as_ref_deref)] // Need &mut Vec, not &mut [T]
                 decisions: decisions.as_mut().map(|v| &mut **v),
             };
