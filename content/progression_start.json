@@ -1,0 +1,175 @@
+{
+  "meta": {
+    "tick": 0,
+    "seed": 42,
+    "schema_version": 1,
+    "content_version": "0.1.0"
+  },
+  "scan_sites": [
+    {
+      "id": "site_0001",
+      "position": {
+        "parent_body": "earth_orbit_zone",
+        "radius_au_um": 5000,
+        "angle_mdeg": 0
+      },
+      "template_id": "tmpl_iron_rich"
+    },
+    {
+      "id": "site_0002",
+      "position": {
+        "parent_body": "earth_orbit_zone",
+        "radius_au_um": 7000,
+        "angle_mdeg": 120000
+      },
+      "template_id": "tmpl_silicate"
+    },
+    {
+      "id": "site_0003",
+      "position": {
+        "parent_body": "earth_neos",
+        "radius_au_um": 900000,
+        "angle_mdeg": 45000
+      },
+      "template_id": "tmpl_iron_rich"
+    },
+    {
+      "id": "site_0004",
+      "position": {
+        "parent_body": "earth_neos",
+        "radius_au_um": 1000000,
+        "angle_mdeg": 180000
+      },
+      "template_id": "tmpl_silicate"
+    }
+  ],
+  "asteroids": {},
+  "ships": {
+    "ship_0001": {
+      "id": "ship_0001",
+      "position": {
+        "parent_body": "earth_orbit_zone",
+        "radius_au_um": 3000,
+        "angle_mdeg": 0
+      },
+      "owner": "principal_autopilot",
+      "inventory": [],
+      "cargo_capacity_m3": 65.0,
+      "task": null,
+      "hull_id": "hull_general_purpose",
+      "fitted_modules": [
+        {
+          "slot_index": 0,
+          "module_def_id": "module_cargo_expander"
+        },
+        {
+          "slot_index": 1,
+          "module_def_id": "module_propellant_tank"
+        },
+        {
+          "slot_index": 2,
+          "module_def_id": "module_mining_laser"
+        }
+      ],
+      "propellant_kg": 15000.0,
+      "propellant_capacity_kg": 15000.0,
+      "speed_ticks_per_au": 2133
+    }
+  },
+  "stations": {
+    "station_earth_orbit": {
+      "id": "station_earth_orbit",
+      "position": {
+        "parent_body": "earth_orbit_zone",
+        "radius_au_um": 3000,
+        "angle_mdeg": 0
+      },
+      "inventory": [
+        {
+          "kind": "Module",
+          "item_id": "module_item_0001",
+          "module_def_id": "module_basic_iron_refinery"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0002",
+          "module_def_id": "module_maintenance_bay"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0003",
+          "module_def_id": "module_basic_assembler"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0004",
+          "module_def_id": "module_exploration_lab"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0005",
+          "module_def_id": "module_sensor_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0006",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0007",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Component",
+          "component_id": "repair_kit",
+          "count": 5,
+          "quality": 1.0
+        },
+        {
+          "kind": "Material",
+          "element": "Fe",
+          "kg": 300.0,
+          "quality": 0.7
+        },
+        {
+          "kind": "Material",
+          "element": "H2O",
+          "kg": 3000.0,
+          "quality": 1.0
+        }
+      ],
+      "cargo_capacity_m3": 2000.0,
+      "power_available_per_tick": 6000.0,
+      "modules": [],
+      "crew": {
+        "operator": 4,
+        "pilot": 1,
+        "technician": 2,
+        "scientist": 1
+      },
+      "leaders": []
+    }
+  },
+  "balance": 75000000.0,
+  "research": {
+    "unlocked": [],
+    "data_pool": {},
+    "evidence": {},
+    "action_counts": {}
+  },
+  "counters": {
+    "next_event_id": 0,
+    "next_command_id": 0,
+    "next_asteroid_id": 0,
+    "next_lot_id": 0,
+    "next_module_instance_id": 1
+  },
+  "progression": {
+    "completed_milestones": [],
+    "phase": "Startup",
+    "grant_history": [],
+    "reputation": 0.0,
+    "trade_tier": "None"
+  }
+}

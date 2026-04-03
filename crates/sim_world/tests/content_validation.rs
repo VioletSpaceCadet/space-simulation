@@ -1699,3 +1699,64 @@ fn dev_advanced_state_ship_modules_exist() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// progression_start.json coherence (VIO-536)
+// ---------------------------------------------------------------------------
+
+fn load_progression_start() -> GameState {
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+    let path = format!("{manifest}/../../content/progression_start.json");
+    let json = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
+    serde_json::from_str(&json).unwrap_or_else(|e| panic!("parse {path}: {e}"))
+}
+
+/// progression_start.json loads without error.
+#[test]
+fn progression_start_loads() {
+    let _state = load_progression_start();
+}
+
+/// All module_def_ids in progression_start reference valid content.
+#[test]
+fn progression_start_module_defs_exist() {
+    let content = load_test_content();
+    let state = load_progression_start();
+
+    for station in state.stations.values() {
+        for item in &station.inventory {
+            if let InventoryItem::Module { module_def_id, .. } = item {
+                assert!(
+                    content.module_defs.contains_key(module_def_id),
+                    "progression_start references unknown module_def_id '{module_def_id}'"
+                );
+            }
+        }
+    }
+}
+
+/// progression_start has expected minimal starting conditions.
+#[test]
+fn progression_start_is_minimal() {
+    let state = load_progression_start();
+    assert_eq!(state.ships.len(), 1, "should have exactly 1 ship");
+    assert_eq!(state.stations.len(), 1, "should have exactly 1 station");
+    assert_eq!(
+        state.balance, 75_000_000.0,
+        "starting balance should be $75M"
+    );
+    assert!(
+        state.progression.completed_milestones.is_empty(),
+        "should start with no milestones completed"
+    );
+    assert_eq!(state.progression.phase, sim_core::GamePhase::Startup);
+    assert_eq!(state.progression.trade_tier, sim_core::TradeTier::None);
+
+    let station = state.stations.values().next().unwrap();
+    let module_count = station
+        .inventory
+        .iter()
+        .filter(|i| matches!(i, InventoryItem::Module { .. }))
+        .count();
+    assert_eq!(module_count, 7, "should have exactly 7 modules");
+}
