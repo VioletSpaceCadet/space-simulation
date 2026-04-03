@@ -583,7 +583,7 @@ fn import_merges_material_with_existing() {
 }
 
 #[test]
-fn import_rejected_before_trade_unlock_tick() {
+fn import_rejected_without_trade_tier() {
     let content = trade_content();
     let mut state = trade_state(&content);
     state.progression.trade_tier = crate::TradeTier::None;
@@ -619,7 +619,7 @@ fn import_rejected_before_trade_unlock_tick() {
 }
 
 #[test]
-fn export_rejected_before_trade_unlock_tick() {
+fn export_rejected_without_export_tier() {
     let content = trade_content();
     let mut state = trade_state(&content);
     state.progression.trade_tier = crate::TradeTier::BasicImport; // below Export

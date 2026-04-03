@@ -12,7 +12,7 @@ impl StationConcern for MaterialExport {
         "material_export"
     }
     fn should_run(&self, ctx: &StationContext) -> bool {
-        ctx.trade_unlocked
+        ctx.trade_export_unlocked
     }
     fn generate(&mut self, ctx: &mut StationContext) -> Vec<CommandEnvelope> {
         let Some(station) = ctx.state.stations.get(ctx.station_id) else {
