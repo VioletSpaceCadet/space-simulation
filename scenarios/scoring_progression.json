@@ -1,0 +1,7 @@
+{
+  "name": "scoring_progression",
+  "ticks": 2000,
+  "metrics_every": 100,
+  "seeds": [1, 2, 3, 4, 5],
+  "state": "./content/progression_start.json"
+}
