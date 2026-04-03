@@ -1127,3 +1127,46 @@ fn progression_start_reaches_first_survey() {
         state.asteroids.len()
     );
 }
+
+/// Multi-seed validation: autopilot handles limited starting conditions (VIO-538).
+/// Runs 5 seeds for 500 ticks each from progression_start.json.
+/// Validates: no panics, first_survey in all seeds, first_tech in all seeds.
+#[test]
+fn progression_start_multi_seed_validation() {
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+    let content_dir = format!("{manifest}/../../content");
+    let content = sim_world::load_content(&content_dir).expect("load content");
+    let state_json = std::fs::read_to_string(format!("{content_dir}/progression_start.json"))
+        .expect("read state");
+
+    let seeds = [1, 42, 123, 456, 789];
+    for seed in seeds {
+        let mut state: GameState = serde_json::from_str(&state_json).expect("parse state");
+        state.meta.seed = seed;
+        state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
+
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+
+        for _ in 0..500 {
+            let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+            sim_core::tick(&mut state, &commands, &content, &mut rng, None);
+        }
+
+        assert!(
+            state.progression.is_milestone_completed("first_survey"),
+            "seed {seed}: first_survey not reached by tick 500. Asteroids: {}",
+            state.asteroids.len()
+        );
+        assert!(
+            state.progression.is_milestone_completed("first_tech"),
+            "seed {seed}: first_tech not reached by tick 500. Techs: {}",
+            state.research.unlocked.len()
+        );
+        assert!(
+            state.balance > 0.0,
+            "seed {seed}: balance hit zero by tick 500"
+        );
+    }
+}
