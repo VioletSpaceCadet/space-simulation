@@ -57,7 +57,9 @@ pub fn evaluate_milestones(
     content: &GameContent,
     events: &mut Vec<crate::EventEnvelope>,
 ) -> Vec<String> {
-    if content.milestones.is_empty() {
+    if content.milestones.is_empty()
+        || state.progression.completed_milestones.len() >= content.milestones.len()
+    {
         return Vec::new();
     }
 
@@ -101,7 +103,7 @@ pub fn evaluate_milestones(
                     }
                 }
 
-                // Record grant (actual balance application is VIO-534)
+                // Apply grant
                 if milestone.rewards.grant_amount > 0.0 {
                     state.progression.grant_history.push(GrantRecord {
                         milestone_id: milestone.id.clone(),
@@ -119,6 +121,17 @@ pub fn evaluate_milestones(
                     if new_tier > state.progression.trade_tier {
                         state.progression.trade_tier = new_tier;
                     }
+                }
+
+                // Record zone and module unlocks
+                for zone_id in &milestone.rewards.unlock_zone_ids {
+                    state.progression.unlocked_zone_ids.insert(zone_id.clone());
+                }
+                for module_id in &milestone.rewards.unlock_module_ids {
+                    state
+                        .progression
+                        .unlocked_module_ids
+                        .insert(module_id.clone());
                 }
 
                 // Emit event
