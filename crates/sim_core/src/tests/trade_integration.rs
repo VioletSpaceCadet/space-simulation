@@ -127,7 +127,7 @@ fn economy_content() -> GameContent {
 fn economy_state(content: &GameContent) -> GameState {
     let mut state = test_fixtures::base_state(content);
     state.balance = 1_000_000_000.0;
-    state.meta.tick = trade_unlock_tick(&content.constants);
+    state.progression.trade_tier = crate::TradeTier::Full;
     // Pre-fill 5 scan sites to avoid replenish noise
     for index in 0..5 {
         state.scan_sites.push(ScanSite {

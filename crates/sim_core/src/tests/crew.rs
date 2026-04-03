@@ -276,9 +276,9 @@ fn crew_import_via_trade() {
         },
     );
 
-    content.constants.trade_unlock_delay_minutes = 0;
     let mut state = base_state(&content);
     state.balance = 1_000_000.0;
+    state.progression.trade_tier = crate::TradeTier::Full;
     let mut rng = make_rng();
 
     let cmd = Command::Import {

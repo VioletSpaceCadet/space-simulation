@@ -97,7 +97,9 @@ impl StationAgent {
         next_id: &mut u64,
         commands: &mut Vec<CommandEnvelope>,
     ) {
-        let trade_unlocked = state.meta.tick >= sim_core::trade_unlock_tick(&content.constants);
+        let trade_unlocked = state
+            .progression
+            .trade_tier_unlocked(sim_core::TradeTier::BasicImport);
         let mut ctx = StationContext {
             station_id: &self.station_id,
             state,
@@ -129,7 +131,9 @@ impl Agent for StationAgent {
             return Vec::new();
         }
 
-        let trade_unlocked = state.meta.tick >= sim_core::trade_unlock_tick(&content.constants);
+        let trade_unlocked = state
+            .progression
+            .trade_tier_unlocked(sim_core::TradeTier::BasicImport);
         let mut commands = Vec::new();
 
         // Build context; disjoint field borrows allow &self.station_id + &mut self.concerns.

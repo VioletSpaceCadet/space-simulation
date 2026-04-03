@@ -577,8 +577,8 @@ fn ships_built_after_tech_unlock_and_trade_available() {
     let mut state = production_like_state(&content);
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-    // Start past trade unlock (1 year = 8760 ticks at mpt=60)
-    state.meta.tick = sim_core::trade_unlock_tick(&content.constants);
+    // Enable trade via progression tier
+    state.progression.trade_tier = sim_core::TradeTier::Full;
 
     // Pre-unlock all techs
     state
