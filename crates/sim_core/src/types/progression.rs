@@ -146,3 +146,50 @@ pub struct GrantRecord {
     pub amount: f64,
     pub tick: u64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_progression_state() {
+        let state = ProgressionState::default();
+        assert!(state.completed_milestones.is_empty());
+        assert_eq!(state.phase, GamePhase::Startup);
+        assert_eq!(state.trade_tier, TradeTier::None);
+        assert_eq!(state.reputation, 0.0);
+        assert!(state.grant_history.is_empty());
+    }
+
+    #[test]
+    fn is_milestone_completed() {
+        let mut state = ProgressionState::default();
+        assert!(!state.is_milestone_completed("first_survey"));
+        state
+            .completed_milestones
+            .insert("first_survey".to_string());
+        assert!(state.is_milestone_completed("first_survey"));
+        assert!(!state.is_milestone_completed("first_ore"));
+    }
+
+    #[test]
+    fn trade_tier_unlocked() {
+        let mut state = ProgressionState::default();
+        assert!(state.trade_tier_unlocked(TradeTier::None));
+        assert!(!state.trade_tier_unlocked(TradeTier::BasicImport));
+
+        state.trade_tier = TradeTier::Export;
+        assert!(state.trade_tier_unlocked(TradeTier::None));
+        assert!(state.trade_tier_unlocked(TradeTier::BasicImport));
+        assert!(state.trade_tier_unlocked(TradeTier::Export));
+        assert!(!state.trade_tier_unlocked(TradeTier::Full));
+    }
+
+    #[test]
+    fn game_phase_ordering() {
+        assert!(GamePhase::Startup < GamePhase::Orbital);
+        assert!(GamePhase::Orbital < GamePhase::Industrial);
+        assert!(GamePhase::Industrial < GamePhase::Expansion);
+        assert!(GamePhase::Expansion < GamePhase::DeepSpace);
+    }
+}

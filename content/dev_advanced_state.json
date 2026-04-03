@@ -350,7 +350,7 @@
       "fleet_expansion",
       "self_sustaining"
     ],
-    "phase": "Industrial",
+    "phase": "Expansion",
     "grant_history": [],
     "reputation": 210.0,
     "trade_tier": "Full"
