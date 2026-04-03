@@ -366,4 +366,8 @@ pub enum Event {
         new_threshold: String,
         composite_score: f64,
     },
+    /// Emitted when a progression milestone is completed.
+    MilestoneCompleted {
+        milestone_id: String,
+    },
 }

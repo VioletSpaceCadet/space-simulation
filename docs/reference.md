@@ -337,7 +337,7 @@ runs/<name>_<timestamp>/
 
 ## Milestones
 
-**Milestone system** provides progression through content-driven conditions and rewards. Milestones are evaluated after research advancement (tick step 4.5, planned in VIO-533).
+**Milestone system** provides progression through content-driven conditions and rewards. Milestones are evaluated after research advancement (tick step 4.5).
 
 **Content schema** (`content/milestones.json`):
 - `id` (string) — unique identifier

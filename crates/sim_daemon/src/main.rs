@@ -906,7 +906,7 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(json["sample_count"], 10);
         let steps = json["steps"].as_array().expect("should be array");
-        assert_eq!(steps.len(), 14, "should have 14 step entries");
+        assert_eq!(steps.len(), 15, "should have 15 step entries");
         assert_eq!(steps[0]["name"], "apply_commands");
         assert!(steps[0]["mean_us"].is_f64());
         assert!(steps[0]["p50_us"].is_f64());

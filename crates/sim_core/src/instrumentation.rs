@@ -2,18 +2,19 @@ use std::time::Duration;
 
 /// Per-step timing data for a single tick.
 ///
-/// 14 duration fields: 6 top-level tick steps + 8 station sub-steps.
+/// 15 duration fields: 7 top-level tick steps + 8 station sub-steps.
 /// Station sub-steps are aggregated across all stations (not per-station).
 ///
 /// Active in debug builds by default; compiled away in release builds unless
 /// the `instrumentation` feature is enabled.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TickTimings {
-    // Top-level steps (6)
+    // Top-level steps (7)
     pub apply_commands: Duration,
     pub resolve_ship_tasks: Duration,
     pub tick_stations: Duration,
     pub advance_research: Duration,
+    pub evaluate_milestones: Duration,
     pub evaluate_events: Duration,
     pub replenish_scan_sites: Duration,
 
@@ -36,6 +37,7 @@ impl TickTimings {
             ("resolve_ship_tasks", self.resolve_ship_tasks),
             ("tick_stations", self.tick_stations),
             ("advance_research", self.advance_research),
+            ("evaluate_milestones", self.evaluate_milestones),
             ("evaluate_events", self.evaluate_events),
             ("replenish_scan_sites", self.replenish_scan_sites),
             ("power_budget", self.power_budget),
@@ -63,7 +65,7 @@ pub struct StepStats {
 
 /// Compute per-step summary statistics from a collection of `TickTimings`.
 ///
-/// Returns one `StepStats` entry per field (14 total), with mean/p50/p95/max
+/// Returns one `StepStats` entry per field (15 total), with mean/p50/p95/max
 /// in microseconds.
 pub fn compute_step_stats(timings: &[TickTimings]) -> Vec<StepStats> {
     if timings.is_empty() {
@@ -157,7 +159,7 @@ mod tests {
     #[test]
     fn tick_timings_has_14_fields() {
         let timings = TickTimings::default();
-        assert_eq!(timings.iter_fields().count(), 14);
+        assert_eq!(timings.iter_fields().count(), 15);
     }
 
     #[test]
@@ -214,9 +216,9 @@ mod tests {
     fn compute_step_stats_returns_14_entries() {
         let timings = vec![TickTimings::default(); 10];
         let stats = compute_step_stats(&timings);
-        assert_eq!(stats.len(), 14);
+        assert_eq!(stats.len(), 15);
         assert_eq!(stats[0].name, "apply_commands");
-        assert_eq!(stats[13].name, "boiloff");
+        assert_eq!(stats[14].name, "boiloff");
     }
 
     #[test]
