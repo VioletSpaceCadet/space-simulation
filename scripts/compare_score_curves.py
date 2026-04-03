@@ -16,7 +16,6 @@ Exits 0 on success, 1 on any gate failure.
 """
 
 import glob
-import json
 import os
 import sys
 from collections import defaultdict
@@ -40,21 +39,11 @@ def read_score_curve(run_dir: str) -> dict[int, float]:
         table = pq.read_table(parquet_file, columns=["tick", "score_composite"])
         ticks = table.column("tick").to_pylist()
         scores = table.column("score_composite").to_pylist()
-        for tick, score in zip(ticks, scores, strict=True):
+        assert len(ticks) == len(scores)
+        for tick, score in zip(ticks, scores):  # noqa: B905
             tick_scores[tick].append(score)
 
     return {tick: sum(scores) / len(scores) for tick, scores in tick_scores.items()}
-
-
-def read_summary_score(run_dir: str) -> float:
-    """Read mean composite score from summary.json."""
-    summary_path = os.path.join(run_dir, "summary.json")
-    with open(summary_path) as f:
-        summary = json.load(f)
-    for metric in summary.get("metrics", []):
-        if metric["name"] == "score_composite":
-            return metric["mean"]
-    return 0.0
 
 
 def main() -> int:
@@ -95,7 +84,7 @@ def main() -> int:
         late_tick = prog_ticks[-1]
         early_score = prog_curve[early_tick]
         late_score = prog_curve[late_tick]
-        growth_pct = ((late_score - early_score) / early_score) * 100
+        growth_pct = ((late_score - early_score) / early_score) * 100 if early_score > 0 else float("inf")
 
         print(f"\nProgression growth: {early_score:.1f} → {late_score:.1f} ({growth_pct:+.1f}%)")
 
@@ -132,12 +121,15 @@ def main() -> int:
             )
 
     # Gate 4: Progression final score is competitive with advanced
-    #   (progression should catch up or exceed by tick 2000)
+    #   (progression should reach at least 80% of advanced by final tick)
     if prog_ticks and adv_ticks:
         prog_final = prog_curve[prog_ticks[-1]]
         adv_final = adv_curve[adv_ticks[-1]]
         ratio = prog_final / adv_final if adv_final > 0 else 0
         print(f"Final score ratio (prog/adv): {ratio:.2f}")
+
+        if ratio < 0.80:
+            failures.append(f"Progression score too low vs advanced: ratio={ratio:.2f} (need >= 0.80)")
 
     print()
 
