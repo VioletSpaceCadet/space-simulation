@@ -924,7 +924,9 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   StationBankrupt: noOp,
   ModuleEfficiencyChanged: handleModuleEfficiencyChanged,
   ScoreThresholdCrossed: noOp,
-  MilestoneCompleted: noOp,
+  MilestoneReached: noOp,
+  PhaseAdvanced: noOp,
+  GrantAwarded: noOp,
 };
 
 export function applyEvents(

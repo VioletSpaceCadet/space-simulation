@@ -367,7 +367,18 @@ pub enum Event {
         composite_score: f64,
     },
     /// Emitted when a progression milestone is completed.
-    MilestoneCompleted {
+    MilestoneReached {
         milestone_id: String,
+        milestone_name: String,
+    },
+    /// Emitted when the game phase advances due to a milestone.
+    PhaseAdvanced {
+        from_phase: String,
+        to_phase: String,
+    },
+    /// Emitted when a grant is awarded from a milestone reward.
+    GrantAwarded {
+        milestone_id: String,
+        amount: f64,
     },
 }

@@ -99,7 +99,16 @@ pub fn evaluate_milestones(
                 // Advance phase if specified
                 if let Some(new_phase) = milestone.phase_advance {
                     if new_phase > state.progression.phase {
+                        let from = state.progression.phase.to_string();
                         state.progression.phase = new_phase;
+                        events.push(crate::emit(
+                            &mut state.counters,
+                            state.meta.tick,
+                            crate::Event::PhaseAdvanced {
+                                from_phase: from,
+                                to_phase: new_phase.to_string(),
+                            },
+                        ));
                     }
                 }
 
@@ -111,6 +120,14 @@ pub fn evaluate_milestones(
                         tick: state.meta.tick,
                     });
                     state.balance += milestone.rewards.grant_amount;
+                    events.push(crate::emit(
+                        &mut state.counters,
+                        state.meta.tick,
+                        crate::Event::GrantAwarded {
+                            milestone_id: milestone.id.clone(),
+                            amount: milestone.rewards.grant_amount,
+                        },
+                    ));
                 }
 
                 // Advance reputation
@@ -134,12 +151,13 @@ pub fn evaluate_milestones(
                         .insert(module_id.clone());
                 }
 
-                // Emit event
+                // Emit milestone reached event
                 events.push(crate::emit(
                     &mut state.counters,
                     state.meta.tick,
-                    crate::Event::MilestoneCompleted {
+                    crate::Event::MilestoneReached {
                         milestone_id: milestone.id.clone(),
+                        milestone_name: milestone.name.clone(),
                     },
                 ));
             }
@@ -337,6 +355,26 @@ mod tests {
         assert_eq!(state.balance, 5_000_000.0);
         assert_eq!(state.progression.reputation, 10.0);
         assert_eq!(state.progression.grant_history.len(), 1);
+
+        // Verify all 3 event types emitted: PhaseAdvanced, GrantAwarded, MilestoneReached
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(&e.event, crate::Event::PhaseAdvanced { .. })),
+            "should emit PhaseAdvanced"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(&e.event, crate::Event::GrantAwarded { amount, .. } if *amount == 5_000_000.0)),
+            "should emit GrantAwarded"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(&e.event, crate::Event::MilestoneReached { milestone_name, .. } if milestone_name == "Phase Test")),
+            "should emit MilestoneReached with name"
+        );
     }
 
     #[test]
