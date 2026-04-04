@@ -675,6 +675,10 @@ pub struct ModuleDef {
     /// Declared input/output ports for directed material flow. Empty = no ports.
     #[serde(default)]
     pub ports: Vec<ModulePort>,
+    /// Per-tick operating cost deducted from balance when the module is enabled.
+    /// Ground facility modules have positive costs; orbital station modules default to 0.
+    #[serde(default)]
+    pub operating_cost_per_tick: f64,
 }
 
 impl ModuleDef {

@@ -33,6 +33,7 @@ mod determinism_canary;
 mod efficiency;
 mod manufacturing;
 mod module_index;
+mod operating_costs;
 mod replenish;
 mod salary;
 mod thermal_link;

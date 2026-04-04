@@ -927,6 +927,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   MilestoneReached: noOp,
   PhaseAdvanced: noOp,
   GrantAwarded: noOp,
+  OperatingCostDeducted: noOp,
 };
 
 export function applyEvents(

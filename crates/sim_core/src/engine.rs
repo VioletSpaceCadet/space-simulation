@@ -55,6 +55,8 @@ pub fn tick(
         tick_stations,
         tick_stations(state, content, rng, &mut events, timings.as_deref_mut())
     );
+    // Deduct per-module operating costs for ground facilities.
+    deduct_operating_costs(state, content, &mut events);
     timed!(
         timings,
         tick_ground_facilities,
@@ -104,6 +106,39 @@ pub fn tick(
 
     state.meta.tick += 1;
     events
+}
+
+/// Deduct per-module operating costs for all ground facilities.
+/// Only enabled modules incur costs. Costs are content-driven via `ModuleDef.operating_cost_per_tick`.
+fn deduct_operating_costs(
+    state: &mut GameState,
+    content: &GameContent,
+    events: &mut Vec<crate::EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+    for gf in state.ground_facilities.values() {
+        let total_cost: f64 = gf
+            .core
+            .modules
+            .iter()
+            .filter(|m| m.enabled)
+            .filter_map(|m| content.module_defs.get(&m.def_id))
+            .map(|def| def.operating_cost_per_tick)
+            .sum();
+
+        if total_cost > 0.0 {
+            state.balance -= total_cost;
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                crate::Event::OperatingCostDeducted {
+                    facility_name: gf.name.clone(),
+                    amount: total_cost,
+                    balance_after: state.balance,
+                },
+            ));
+        }
+    }
 }
 
 #[allow(clippy::too_many_lines)] // Thin dispatcher — all logic in commands.rs
