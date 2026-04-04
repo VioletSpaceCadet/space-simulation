@@ -1,12 +1,14 @@
 use crate::{
     research::generate_data, Event, EventEnvelope, GameContent, GameState, ModuleBehaviorDef,
-    StationId,
+    SiteId, StationId,
 };
+use rand::Rng;
 
 pub(super) fn tick_sensor_array_modules(
     state: &mut GameState,
     station_id: &StationId,
     content: &GameContent,
+    rng: &mut impl Rng,
     events: &mut Vec<EventEnvelope>,
 ) {
     super::ensure_station_index(state, station_id, content);
@@ -30,7 +32,7 @@ pub(super) fn tick_sensor_array_modules(
             continue;
         }
 
-        let outcome = execute(&ctx, &sensor_def, state, content, events);
+        let outcome = execute(&ctx, &sensor_def, state, content, rng, events);
         super::apply_run_result(state, &ctx, outcome, content, events);
     }
 }
@@ -40,6 +42,7 @@ fn execute(
     sensor_def: &crate::SensorArrayDef,
     state: &mut GameState,
     content: &GameContent,
+    rng: &mut impl Rng,
     events: &mut Vec<EventEnvelope>,
 ) -> super::RunOutcome {
     let current_tick = state.meta.tick;
@@ -60,7 +63,61 @@ fn execute(
         },
     ));
 
+    // Discovery: sensors with discovery_zones can spawn scan sites.
+    if !sensor_def.discovery_zones.is_empty() && sensor_def.discovery_probability > 0.0 {
+        let roll: f64 = rng.gen();
+        if roll < sensor_def.discovery_probability {
+            try_discover_scan_site(sensor_def, state, content, rng, events);
+        }
+    }
+
     super::RunOutcome::Completed
+}
+
+/// Attempt to discover a new scan site in one of the sensor's target zones.
+fn try_discover_scan_site(
+    sensor_def: &crate::SensorArrayDef,
+    state: &mut GameState,
+    content: &GameContent,
+    rng: &mut impl Rng,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    // Find zone bodies matching the sensor's discovery zones.
+    let zone_bodies: Vec<&crate::OrbitalBodyDef> = content
+        .solar_system
+        .bodies
+        .iter()
+        .filter(|b| b.zone.is_some() && sensor_def.discovery_zones.contains(&b.id.0))
+        .collect();
+
+    if zone_bodies.is_empty() {
+        return;
+    }
+
+    let body = crate::pick_zone_weighted(&zone_bodies, rng);
+    let zone_class = body.zone.as_ref().expect("zone body").resource_class;
+    let template = crate::pick_template_biased(&content.asteroid_templates, zone_class, rng);
+    let position = crate::random_position_in_zone(body, rng);
+    let uuid = crate::generate_uuid(rng);
+    let site_id = SiteId(format!("site_{uuid}"));
+
+    state.scan_sites.push(crate::ScanSite {
+        id: site_id.clone(),
+        position: position.clone(),
+        template_id: template.id.clone(),
+    });
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::ScanSiteSpawned {
+            site_id,
+            position,
+            template_id: template.id.clone(),
+        },
+    ));
 }
 
 #[cfg(test)]
@@ -68,6 +125,7 @@ mod tests {
     use crate::test_fixtures::ModuleDefBuilder;
     use crate::AHashMap;
     use crate::*;
+    use rand::SeedableRng;
     use std::collections::{HashMap, HashSet};
 
     fn sensor_content() -> GameContent {
@@ -86,6 +144,8 @@ mod tests {
                     scan_interval_minutes: 5,
                     scan_interval_ticks: 5,
                     sensor_type: "orbital".to_string(),
+                    discovery_zones: vec![],
+                    discovery_probability: 0.0,
                 }))
                 .build(),
         );
@@ -173,12 +233,19 @@ mod tests {
     fn sensor_array_generates_scan_data_after_interval() {
         let content = sensor_content();
         let mut state = sensor_state(&content);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
         let station_id = StationId("station_test".to_string());
 
         // Tick 4 times — interval is 5, should not fire yet
         for _ in 0..4 {
             let mut events = Vec::new();
-            super::tick_sensor_array_modules(&mut state, &station_id, &content, &mut events);
+            super::tick_sensor_array_modules(
+                &mut state,
+                &station_id,
+                &content,
+                &mut rng,
+                &mut events,
+            );
             let generated = events
                 .iter()
                 .any(|e| matches!(&e.event, Event::DataGenerated { .. }));
@@ -187,7 +254,7 @@ mod tests {
 
         // Tick once more — should fire
         let mut events = Vec::new();
-        super::tick_sensor_array_modules(&mut state, &station_id, &content, &mut events);
+        super::tick_sensor_array_modules(&mut state, &station_id, &content, &mut rng, &mut events);
         let generated = events
             .iter()
             .any(|e| matches!(&e.event, Event::DataGenerated { .. }));
@@ -207,6 +274,7 @@ mod tests {
     fn sensor_array_uses_diminishing_returns() {
         let content = sensor_content();
         let mut state = sensor_state(&content);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
         let station_id = StationId("station_test".to_string());
 
         // Run through two complete intervals and capture amounts
@@ -215,7 +283,13 @@ mod tests {
             // Tick through interval
             for tick in 0..5 {
                 let mut events = Vec::new();
-                super::tick_sensor_array_modules(&mut state, &station_id, &content, &mut events);
+                super::tick_sensor_array_modules(
+                    &mut state,
+                    &station_id,
+                    &content,
+                    &mut rng,
+                    &mut events,
+                );
                 if tick == 4 {
                     // Last tick of interval — should fire
                     for event in &events {
@@ -241,6 +315,7 @@ mod tests {
     fn sensor_array_disabled_does_not_generate() {
         let content = sensor_content();
         let mut state = sensor_state(&content);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
         let station_id = StationId("station_test".to_string());
 
         // Disable the module
@@ -249,7 +324,13 @@ mod tests {
         // Tick through full interval
         for _ in 0..10 {
             let mut events = Vec::new();
-            super::tick_sensor_array_modules(&mut state, &station_id, &content, &mut events);
+            super::tick_sensor_array_modules(
+                &mut state,
+                &station_id,
+                &content,
+                &mut rng,
+                &mut events,
+            );
             let generated = events
                 .iter()
                 .any(|e| matches!(&e.event, Event::DataGenerated { .. }));

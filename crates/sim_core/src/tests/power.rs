@@ -486,6 +486,8 @@ fn stall_content() -> GameContent {
                 scan_interval_minutes: 120,
                 scan_interval_ticks: 120,
                 sensor_type: "orbital".to_string(),
+                discovery_zones: vec![],
+                discovery_probability: 0.0,
             }))
             .build(),
     );
