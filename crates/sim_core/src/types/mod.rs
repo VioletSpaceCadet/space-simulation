@@ -189,12 +189,14 @@ impl std::fmt::Display for DataKind {
     }
 }
 
-/// Well-known data kind constants for the 4 original data types.
+/// Well-known data kind constants.
 impl DataKind {
     pub const SURVEY: &str = "SurveyData";
     pub const ASSAY: &str = "AssayData";
     pub const MANUFACTURING: &str = "ManufacturingData";
     pub const TRANSIT: &str = "TransitData";
+    pub const OPTICAL: &str = "OpticalData";
+    pub const RADIO: &str = "RadioData";
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

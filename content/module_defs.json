@@ -234,7 +234,7 @@
     "wear_per_run": 0.002,
     "behavior": {
       "SensorArray": {
-        "data_kind": "SurveyData",
+        "data_kind": "OpticalData",
         "action_key": "optical_scan",
         "scan_interval_minutes": 180,
         "sensor_type": "optical"
@@ -255,7 +255,7 @@
     "wear_per_run": 0.003,
     "behavior": {
       "SensorArray": {
-        "data_kind": "SurveyData",
+        "data_kind": "RadioData",
         "action_key": "radio_scan",
         "scan_interval_minutes": 240,
         "sensor_type": "radio"
