@@ -31,6 +31,7 @@ mod crew;
 mod crucible;
 mod determinism_canary;
 mod efficiency;
+mod ground_trade;
 mod manufacturing;
 mod module_index;
 mod operating_costs;

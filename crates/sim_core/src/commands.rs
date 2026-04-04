@@ -499,6 +499,16 @@ pub(crate) fn handle_ground_import(
     };
 
     if state.balance < cost {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::InsufficientFunds {
+                station_id: crate::StationId(gf_id.0.clone()),
+                action: format!("import {}", item_spec.pricing_key()),
+                required: cost,
+                available: state.balance,
+            },
+        ));
         return false;
     }
 
