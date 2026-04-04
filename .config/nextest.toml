@@ -1,0 +1,14 @@
+# cargo-nextest configuration
+# See: https://nexte.st/docs/configuration/
+
+[store]
+dir = "target/nextest"
+
+[profile.default]
+fail-fast = false
+retries = 1
+
+# CI profile — stricter settings
+[profile.ci]
+fail-fast = false
+retries = 2
