@@ -261,36 +261,55 @@ fn apply_commands(
             Command::Import {
                 facility_id,
                 item_spec,
-            } => {
-                let crate::FacilityId::Station(station_id) = facility_id else {
-                    continue; // Ground facility import not yet implemented
-                };
-                commands::handle_import(
-                    state,
-                    content,
-                    station_id,
-                    item_spec,
-                    current_tick,
-                    rng,
-                    events,
-                );
-            }
+            } => match facility_id {
+                crate::FacilityId::Station(station_id) => {
+                    commands::handle_import(
+                        state,
+                        content,
+                        station_id,
+                        item_spec,
+                        current_tick,
+                        rng,
+                        events,
+                    );
+                }
+                crate::FacilityId::Ground(gf_id) => {
+                    commands::handle_ground_import(
+                        state,
+                        content,
+                        gf_id,
+                        item_spec,
+                        current_tick,
+                        rng,
+                        events,
+                    );
+                }
+            },
             Command::Export {
                 facility_id,
                 item_spec,
-            } => {
-                let crate::FacilityId::Station(station_id) = facility_id else {
-                    continue;
-                };
-                commands::handle_export(
-                    state,
-                    content,
-                    station_id,
-                    item_spec,
-                    current_tick,
-                    events,
-                );
-            }
+            } => match facility_id {
+                crate::FacilityId::Station(station_id) => {
+                    commands::handle_export(
+                        state,
+                        content,
+                        station_id,
+                        item_spec,
+                        current_tick,
+                        events,
+                    );
+                }
+                crate::FacilityId::Ground(gf_id) => {
+                    commands::handle_ground_export(
+                        state,
+                        content,
+                        gf_id,
+                        item_spec,
+                        current_tick,
+                        events,
+                    );
+                }
+            },
             Command::JettisonSlag { station_id } => {
                 commands::handle_jettison_slag(state, station_id, current_tick, events);
             }
