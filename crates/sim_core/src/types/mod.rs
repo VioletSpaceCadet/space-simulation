@@ -114,7 +114,7 @@ string_id!(LotId);
 string_id!(GroundFacilityId);
 
 /// A reference to either a station or a ground facility. Used by commands
-/// that apply to both entity types (Import, Export, InstallModule, etc.).
+/// that apply to both entity types (`Import`, `Export`, `InstallModule`, etc.).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FacilityId {
     Station(StationId),
