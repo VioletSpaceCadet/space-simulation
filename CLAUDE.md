@@ -63,7 +63,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **e2e** — Playwright E2E smoke tests. Global setup spawns daemon (port 3002) + Vite (port 5174). Kept minimal for CI stability; use Chrome browser tools for ad-hoc UI testing.
 - **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
 
-**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance, 3.6 thermal, 3.7 boiloff) → 4. Advance research → 4.5 Evaluate milestones → 4.6 Evaluate sim events → 5. Replenish scan sites → 6. Increment tick.
+**Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance, 3.6 thermal, 3.7 boiloff) → 3.5 Tick ground facility modules (same pipeline via proxy-station) → 4. Advance research → 4.5 Evaluate milestones → 4.6 Evaluate sim events → 5. Replenish scan sites → 6. Increment tick.
 
 **Key design rules:**
 - Asteroids created on discovery (scan_sites → AsteroidState), not pre-populated.
@@ -78,7 +78,7 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **Event sync:** When adding a new `Event` variant to `sim_core/src/types.rs`, you MUST also add a handler in `ui_web/src/hooks/applyEvents.ts` (or add to the allow-list in `scripts/ci_event_sync.sh` if intentionally skipped). CI enforces this.
 - **Time scale:** `minutes_per_tick` in constants.json (default 60 = 1 tick per hour). Test fixtures use 1. Helpers: `Constants::game_minutes_to_ticks()`, `Constants::rate_per_minute_to_per_tick()`. `trade_unlock_tick()` derives from this constant.
 - **Content-driven types:** `AnomalyTag`, `DataKind`, `ResearchDomain` are loaded from content JSON. Adding a new type = adding a JSON entry, not a Rust enum variant. Enums are reserved for engine mechanics (Command, Event, TaskKind), not content categories.
-- **Instrumentation:** `TickTimings` struct (14 `Duration` fields: 6 top-level tick steps + 8 station sub-steps). `timed!` macro wraps each step — active in debug builds via `debug_assertions`, compiled away in release unless `instrumentation` feature enabled. `tick()` takes `Option<&mut TickTimings>` — pass `None` for zero-cost, `Some(&mut timings)` to collect. `compute_step_stats(&[TickTimings])` returns per-step mean/p50/p95/max. sim_bench and sim_daemon both enable the feature and collect timings. Daemon exposes `GET /api/v1/perf` (rolling 1,000-tick buffer) and includes perf summary in advisor digest.
+- **Instrumentation:** `TickTimings` struct (16 `Duration` fields: 8 top-level tick steps + 8 station sub-steps). `timed!` macro wraps each step — active in debug builds via `debug_assertions`, compiled away in release unless `instrumentation` feature enabled. `tick()` takes `Option<&mut TickTimings>` — pass `None` for zero-cost, `Some(&mut timings)` to collect. `compute_step_stats(&[TickTimings])` returns per-step mean/p50/p95/max. sim_bench and sim_daemon both enable the feature and collect timings. Daemon exposes `GET /api/v1/perf` (rolling 1,000-tick buffer) and includes perf summary in advisor digest.
 
 ## Development Workflow
 

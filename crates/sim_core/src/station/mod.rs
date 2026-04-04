@@ -268,6 +268,15 @@ pub(crate) fn tick_stations(
 /// temporarily wrapped in a `StationState` and inserted into `state.stations`
 /// so the existing subsystem tickers can process it unchanged. After ticking,
 /// the core is moved back to the ground facility.
+///
+/// **Known limitation:** Events emitted during ground facility ticking carry the
+/// proxy `StationId` (e.g. `"__gf_proxy_gf_1"`), not the real `GroundFacilityId`.
+/// This is acceptable while ground facilities have no modules. When modules are
+/// added, refactor subsystem tickers to accept `FacilityId` or post-process events.
+///
+/// **Invariant:** Between `mem::take` and the put-back, the ground facility's core
+/// is temporarily empty (Default). No other code reads `ground_facilities` during
+/// this window.
 pub(crate) fn tick_ground_facilities(
     state: &mut GameState,
     content: &GameContent,
@@ -1090,6 +1099,7 @@ mod framework_tests {
     use crate::test_fixtures::ModuleDefBuilder;
     use crate::AHashMap;
     use crate::*;
+    use rand::SeedableRng;
     use std::collections::{HashMap, HashSet};
 
     fn test_content_with_processor() -> GameContent {
@@ -1551,6 +1561,110 @@ mod framework_tests {
             (station.core.modules[0].wear.wear - expected_wear).abs() < 1e-6,
             "expected wear {expected_wear}, got {}",
             station.core.modules[0].wear.wear,
+        );
+    }
+
+    #[test]
+    fn tick_ground_facilities_noop_when_empty() {
+        let content = crate::test_fixtures::base_content();
+        let mut state = crate::test_fixtures::base_state(&content);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let mut events = Vec::new();
+
+        // Ensure ground_facilities is empty (default).
+        assert!(state.ground_facilities.is_empty());
+
+        tick_ground_facilities(&mut state, &content, &mut rng, &mut events);
+
+        // No events, no side effects.
+        assert!(
+            events.is_empty(),
+            "empty ground_facilities should produce no events"
+        );
+        // Stations untouched.
+        assert!(state.stations.len() == 1, "proxy station should not remain");
+    }
+
+    #[test]
+    fn tick_ground_facilities_proxy_pattern_moves_core_correctly() {
+        let content = crate::test_fixtures::base_content();
+        let mut state = crate::test_fixtures::base_state(&content);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+
+        // Create a ground facility with a sensor + solar array.
+        let gf_id = GroundFacilityId("gf_test".to_string());
+        let solar_module = ModuleState {
+            id: ModuleInstanceId("gf_solar_001".to_string()),
+            def_id: "module_basic_solar_array".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::SolarArray(crate::SolarArrayState {
+                ticks_since_last_run: 0,
+            }),
+            wear: WearState { wear: 0.0 },
+            efficiency: 1.0,
+            power_stalled: false,
+            assigned_crew: std::collections::BTreeMap::new(),
+            prev_crew_satisfied: true,
+            thermal: None,
+            module_priority: 0,
+        };
+        let sensor_module = ModuleState {
+            id: ModuleInstanceId("gf_sensor_001".to_string()),
+            def_id: "module_sensor_array".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::SensorArray(crate::SensorArrayState {
+                ticks_since_last_run: 999, // Force immediate run
+            }),
+            wear: WearState { wear: 0.0 },
+            efficiency: 1.0,
+            power_stalled: false,
+            assigned_crew: std::collections::BTreeMap::new(),
+            prev_crew_satisfied: true,
+            thermal: None,
+            module_priority: 0,
+        };
+        let gf = crate::GroundFacilityState {
+            id: gf_id.clone(),
+            name: "Test Ground Facility".to_string(),
+            position: crate::test_fixtures::test_position(),
+            core: FacilityCore {
+                modules: vec![solar_module, sensor_module],
+                inventory: vec![],
+                cargo_capacity_m3: 1000.0,
+                power_available_per_tick: 100.0,
+                modifiers: crate::modifiers::ModifierSet::default(),
+                crew: std::collections::BTreeMap::new(),
+                thermal_links: Vec::new(),
+                power: PowerState::default(),
+                cached_inventory_volume_m3: None,
+                module_type_index: ModuleTypeIndex::default(),
+                module_id_index: HashMap::new(),
+                power_budget_cache: PowerBudgetCache::default(),
+            },
+            launch_transits: Vec::new(),
+        };
+        state.ground_facilities.insert(gf_id.clone(), gf);
+
+        let stations_before = state.stations.len();
+        let mut events = Vec::new();
+        tick_ground_facilities(&mut state, &content, &mut rng, &mut events);
+
+        // Proxy station should be removed after ticking.
+        assert_eq!(
+            state.stations.len(),
+            stations_before,
+            "proxy station should be cleaned up"
+        );
+        // Ground facility core should be restored (non-empty modules).
+        assert_eq!(state.ground_facilities[&gf_id].core.modules.len(), 2);
+        // The key assertions: proxy pattern didn't crash, core is restored,
+        // and the module type index was built (proves subsystem pipeline ran).
+        assert!(
+            state.ground_facilities[&gf_id]
+                .core
+                .module_type_index
+                .is_initialized(),
+            "module type index should be initialized after ticking"
         );
     }
 }

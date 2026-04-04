@@ -9,7 +9,7 @@ use std::time::Duration;
 /// the `instrumentation` feature is enabled.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TickTimings {
-    // Top-level steps (7)
+    // Top-level steps (8)
     pub apply_commands: Duration,
     pub resolve_ship_tasks: Duration,
     pub tick_stations: Duration,
@@ -67,7 +67,7 @@ pub struct StepStats {
 
 /// Compute per-step summary statistics from a collection of `TickTimings`.
 ///
-/// Returns one `StepStats` entry per field (15 total), with mean/p50/p95/max
+/// Returns one `StepStats` entry per field (16 total), with mean/p50/p95/max
 /// in microseconds.
 pub fn compute_step_stats(timings: &[TickTimings]) -> Vec<StepStats> {
     if timings.is_empty() {

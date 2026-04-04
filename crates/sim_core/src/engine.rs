@@ -15,8 +15,9 @@ pub fn trade_unlock_tick(constants: &crate::Constants) -> u64 {
 /// Order of operations:
 /// 1. Apply commands scheduled for this tick.
 /// 2. Resolve ship tasks whose eta has arrived.
-/// 3. Tick station modules (refinery processors).
-/// 4. Advance station research on all eligible techs.
+/// 3. Tick station modules (processors, assemblers, sensors, labs, maintenance, thermal, boiloff).
+///    3.5. Tick ground facility modules (same pipeline via proxy-station pattern).
+/// 4. Advance research on all eligible techs.
 ///    4.5. Evaluate milestones (content-driven progression).
 ///    4.6. Evaluate sim events (content-driven random events).
 /// 5. Replenish scan sites if below threshold.
