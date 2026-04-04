@@ -479,7 +479,7 @@ pub struct ThermalLink {
 
 /// Shared substrate for any entity that hosts modules, inventory, crew, and power.
 /// Both `StationState` (orbital) and `GroundFacilityState` (surface) compose this.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FacilityCore {
     pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,

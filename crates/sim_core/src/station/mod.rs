@@ -8,8 +8,9 @@ pub(crate) mod thermal;
 
 use crate::instrumentation::{timed, TickTimings};
 use crate::{
-    tasks::element_density, Event, EventEnvelope, GameContent, GameState, InputFilter,
-    InventoryItem, ItemKind, OutputSpec, RecipeDef, StationId, YieldFormula,
+    tasks::element_density, Event, EventEnvelope, GameContent, GameState, GroundFacilityId,
+    InputFilter, InventoryItem, ItemKind, OutputSpec, RecipeDef, StationId, StationState,
+    YieldFormula,
 };
 use std::collections::HashMap;
 
@@ -258,6 +259,74 @@ pub(crate) fn tick_stations(
             boiloff,
             boiloff::apply_boiloff(state, station_id, content, events)
         );
+    }
+}
+
+/// Tick ground facility modules using the same subsystem tickers as stations.
+///
+/// Uses a proxy-station pattern: each ground facility's `FacilityCore` is
+/// temporarily wrapped in a `StationState` and inserted into `state.stations`
+/// so the existing subsystem tickers can process it unchanged. After ticking,
+/// the core is moved back to the ground facility.
+pub(crate) fn tick_ground_facilities(
+    state: &mut GameState,
+    content: &GameContent,
+    rng: &mut impl rand::Rng,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let gf_ids: Vec<GroundFacilityId> = state.ground_facilities.keys().cloned().collect();
+    if gf_ids.is_empty() {
+        return;
+    }
+
+    let mut scratch_indices: Vec<usize> = Vec::new();
+
+    for gf_id in &gf_ids {
+        // Temporarily move the ground facility's core into a proxy station.
+        let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
+            continue;
+        };
+        let proxy_station_id = StationId(format!("__gf_proxy_{}", gf_id.0));
+        let proxy = StationState {
+            id: proxy_station_id.clone(),
+            position: gf.position.clone(),
+            core: std::mem::take(&mut gf.core),
+            leaders: Vec::new(),
+        };
+        state.stations.insert(proxy_station_id.clone(), proxy);
+
+        // Tick using existing subsystem pipeline.
+        ensure_station_index(state, &proxy_station_id, content);
+        update_crew_satisfaction(state, &proxy_station_id, content, events);
+        compute_power_budget(state, &proxy_station_id, content, events);
+        update_module_efficiencies(state, &proxy_station_id, content, events);
+        processor::tick_station_modules(
+            state,
+            &proxy_station_id,
+            content,
+            events,
+            &mut scratch_indices,
+        );
+        assembler::tick_assembler_modules(
+            state,
+            &proxy_station_id,
+            content,
+            rng,
+            events,
+            &mut scratch_indices,
+        );
+        sensor::tick_sensor_array_modules(state, &proxy_station_id, content, events);
+        lab::tick_lab_modules(state, &proxy_station_id, content, events);
+        maintenance::tick_maintenance_modules(state, &proxy_station_id, content, events);
+        thermal::tick_thermal(state, &proxy_station_id, content, events);
+        boiloff::apply_boiloff(state, &proxy_station_id, content, events);
+
+        // Move the core back to the ground facility.
+        if let Some(proxy) = state.stations.remove(&proxy_station_id) {
+            if let Some(gf) = state.ground_facilities.get_mut(gf_id) {
+                gf.core = proxy.core;
+            }
+        }
     }
 }
 

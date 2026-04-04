@@ -1,6 +1,6 @@
 use crate::instrumentation::{timed, TickTimings};
 use crate::research::advance_research;
-use crate::station::tick_stations;
+use crate::station::{tick_ground_facilities, tick_stations};
 use crate::tasks::resolve_task;
 use crate::{Command, CommandEnvelope, GameContent, GameState, ScanSite, ShipId, SiteId, TaskKind};
 use rand::Rng;
@@ -53,6 +53,11 @@ pub fn tick(
         timings,
         tick_stations,
         tick_stations(state, content, rng, &mut events, timings.as_deref_mut())
+    );
+    timed!(
+        timings,
+        tick_ground_facilities,
+        tick_ground_facilities(state, content, rng, &mut events)
     );
     timed!(
         timings,

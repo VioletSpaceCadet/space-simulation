@@ -2,7 +2,7 @@ use std::time::Duration;
 
 /// Per-step timing data for a single tick.
 ///
-/// 15 duration fields: 7 top-level tick steps + 8 station sub-steps.
+/// 16 duration fields: 8 top-level tick steps + 8 station sub-steps.
 /// Station sub-steps are aggregated across all stations (not per-station).
 ///
 /// Active in debug builds by default; compiled away in release builds unless
@@ -13,6 +13,7 @@ pub struct TickTimings {
     pub apply_commands: Duration,
     pub resolve_ship_tasks: Duration,
     pub tick_stations: Duration,
+    pub tick_ground_facilities: Duration,
     pub advance_research: Duration,
     pub evaluate_milestones: Duration,
     pub evaluate_events: Duration,
@@ -36,6 +37,7 @@ impl TickTimings {
             ("apply_commands", self.apply_commands),
             ("resolve_ship_tasks", self.resolve_ship_tasks),
             ("tick_stations", self.tick_stations),
+            ("tick_ground_facilities", self.tick_ground_facilities),
             ("advance_research", self.advance_research),
             ("evaluate_milestones", self.evaluate_milestones),
             ("evaluate_events", self.evaluate_events),
@@ -157,9 +159,9 @@ mod tests {
     }
 
     #[test]
-    fn tick_timings_has_14_fields() {
+    fn tick_timings_field_count() {
         let timings = TickTimings::default();
-        assert_eq!(timings.iter_fields().count(), 15);
+        assert_eq!(timings.iter_fields().count(), 16);
     }
 
     #[test]
@@ -213,12 +215,12 @@ mod tests {
     }
 
     #[test]
-    fn compute_step_stats_returns_14_entries() {
+    fn compute_step_stats_entry_count() {
         let timings = vec![TickTimings::default(); 10];
         let stats = compute_step_stats(&timings);
-        assert_eq!(stats.len(), 15);
+        assert_eq!(stats.len(), 16);
         assert_eq!(stats[0].name, "apply_commands");
-        assert_eq!(stats[14].name, "boiloff");
+        assert_eq!(stats[15].name, "boiloff");
     }
 
     #[test]
