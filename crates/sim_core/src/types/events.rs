@@ -381,4 +381,10 @@ pub enum Event {
         milestone_id: String,
         amount: f64,
     },
+    /// Per-tick operating cost deducted from balance for ground facility modules.
+    OperatingCostDeducted {
+        facility_name: String,
+        amount: f64,
+        balance_after: f64,
+    },
 }

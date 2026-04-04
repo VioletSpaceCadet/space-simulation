@@ -126,6 +126,7 @@ impl ModuleDefBuilder {
                 crew_requirement: BTreeMap::new(),
                 required_tech: None,
                 ports: Vec::new(),
+                operating_cost_per_tick: 0.0,
             },
         }
     }
