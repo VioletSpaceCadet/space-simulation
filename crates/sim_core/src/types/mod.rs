@@ -142,12 +142,29 @@ impl std::fmt::Display for AnomalyTag {
     }
 }
 
+/// Data-driven data kind. Values come from content JSON (sensor defs, lab defs, techs).
+/// Adding a new sensor/data type = adding a JSON entry, not a code change.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum DataKind {
-    SurveyData,
-    AssayData,
-    ManufacturingData,
-    TransitData,
+pub struct DataKind(pub String);
+
+impl DataKind {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+}
+
+impl std::fmt::Display for DataKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// Well-known data kind constants for the 4 original data types.
+impl DataKind {
+    pub const SURVEY: &str = "SurveyData";
+    pub const ASSAY: &str = "AssayData";
+    pub const MANUFACTURING: &str = "ManufacturingData";
+    pub const TRANSIT: &str = "TransitData";
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -116,7 +116,7 @@ fn lab_research_speed_scales_with_efficiency() {
                 domain: ResearchDomain::Survey,
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
-                accepted_data: vec![DataKind::SurveyData],
+                accepted_data: vec![DataKind::new(DataKind::SURVEY)],
                 research_interval_minutes: 1,
                 research_interval_ticks: 1,
             }))
@@ -141,7 +141,10 @@ fn lab_research_speed_scales_with_efficiency() {
     station.core.modules[lab_idx].wear.wear = 0.6;
 
     // Seed data pool
-    state.research.data_pool.insert(DataKind::SurveyData, 100.0);
+    state
+        .research
+        .data_pool
+        .insert(DataKind::new(DataKind::SURVEY), 100.0);
 
     rebuild_indices(&mut state, &content);
 

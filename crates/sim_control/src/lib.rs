@@ -658,7 +658,7 @@ mod tests {
             name: "Materials Research".to_string(),
             prereqs: vec![],
             domain_requirements: HashMap::from([(sim_core::ResearchDomain::Materials, 100.0)]),
-            accepted_data: vec![sim_core::DataKind::AssayData],
+            accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::ASSAY)],
             effects: vec![],
         });
         // Add lab module def
@@ -674,7 +674,7 @@ mod tests {
                     domain: sim_core::ResearchDomain::Materials,
                     data_consumption_per_run: 5.0,
                     research_points_per_run: 10.0,
-                    accepted_data: vec![sim_core::DataKind::AssayData],
+                    accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::ASSAY)],
                     research_interval_minutes: 10,
                     research_interval_ticks: 10,
                 }))
@@ -814,7 +814,7 @@ mod tests {
             name: "Materials Research v2".to_string(),
             prereqs: vec![TechId("tech_materials_v1".to_string())],
             domain_requirements: HashMap::from([(sim_core::ResearchDomain::Materials, 200.0)]),
-            accepted_data: vec![sim_core::DataKind::AssayData],
+            accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::ASSAY)],
             effects: vec![],
         });
 
@@ -877,7 +877,7 @@ mod tests {
             name: "Ship Construction".to_string(),
             prereqs: vec![],
             domain_requirements: HashMap::from([(sim_core::ResearchDomain::Manufacturing, 200.0)]),
-            accepted_data: vec![sim_core::DataKind::ManufacturingData],
+            accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
             effects: vec![],
         });
         content.module_defs.insert(
@@ -892,7 +892,7 @@ mod tests {
                     domain: sim_core::ResearchDomain::Manufacturing,
                     data_consumption_per_run: 10.0,
                     research_points_per_run: 5.0,
-                    accepted_data: vec![sim_core::DataKind::ManufacturingData],
+                    accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
                 }))
@@ -958,7 +958,7 @@ mod tests {
             name: "Basic".to_string(),
             prereqs: vec![],
             domain_requirements: HashMap::from([(sim_core::ResearchDomain::Manufacturing, 10.0)]),
-            accepted_data: vec![sim_core::DataKind::ManufacturingData],
+            accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
             effects: vec![],
         });
         content.techs.push(sim_core::TechDef {
@@ -966,7 +966,7 @@ mod tests {
             name: "Advanced".to_string(),
             prereqs: vec![TechId("tech_basic".to_string())],
             domain_requirements: HashMap::from([(sim_core::ResearchDomain::Manufacturing, 50.0)]),
-            accepted_data: vec![sim_core::DataKind::ManufacturingData],
+            accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
             effects: vec![],
         });
         content.module_defs.insert(
@@ -981,7 +981,7 @@ mod tests {
                     domain: sim_core::ResearchDomain::Manufacturing,
                     data_consumption_per_run: 10.0,
                     research_points_per_run: 5.0,
-                    accepted_data: vec![sim_core::DataKind::ManufacturingData],
+                    accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
                 }))

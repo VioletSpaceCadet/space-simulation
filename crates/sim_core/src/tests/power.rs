@@ -481,7 +481,7 @@ fn stall_content() -> GameContent {
             .power(8.0)
             .wear(0.003)
             .behavior(ModuleBehaviorDef::SensorArray(SensorArrayDef {
-                data_kind: crate::DataKind::SurveyData,
+                data_kind: crate::DataKind::new(DataKind::SURVEY),
                 action_key: "sensor_scan".to_string(),
                 scan_interval_minutes: 120,
                 scan_interval_ticks: 120,

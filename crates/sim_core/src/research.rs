@@ -132,7 +132,7 @@ mod data_generation_tests {
 
         let amount = generate_data(
             &mut research,
-            crate::DataKind::SurveyData,
+            crate::DataKind::new(crate::DataKind::SURVEY),
             "survey",
             &constants,
         );
@@ -140,7 +140,7 @@ mod data_generation_tests {
         assert!(
             *research
                 .data_pool
-                .get(&crate::DataKind::SurveyData)
+                .get(&crate::DataKind::new(crate::DataKind::SURVEY))
                 .unwrap()
                 > 0.0
         );
@@ -148,7 +148,7 @@ mod data_generation_tests {
 
         let amount2 = generate_data(
             &mut research,
-            crate::DataKind::SurveyData,
+            crate::DataKind::new(crate::DataKind::SURVEY),
             "survey",
             &constants,
         );
@@ -308,7 +308,7 @@ mod research_threshold_tests {
             name: "Test Modifier".to_string(),
             prereqs: vec![],
             domain_requirements: HashMap::new(),
-            accepted_data: vec![crate::DataKind::SurveyData],
+            accepted_data: vec![crate::DataKind::new(crate::DataKind::SURVEY)],
             effects: vec![TechEffect::StatModifier {
                 stat: crate::modifiers::StatId::ProcessingYield,
                 op: crate::modifiers::ModifierOp::PctAdditive,

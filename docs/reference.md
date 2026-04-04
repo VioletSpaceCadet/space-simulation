@@ -29,7 +29,7 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `TechEffect` | `EnableDeepScan`, `DeepScanCompositionNoise { sigma }`, `EnableShipConstruction`, or `StatModifier { stat, op, value }` — numeric bonuses from research |
 | `ResearchDomain` | Enum: `Survey`, `Materials`, `Manufacturing`, `Propulsion` — categorises techs and lab output |
 | `DomainProgress` | Per-tech domain point tracking: `points: HashMap<ResearchDomain, f64>` |
-| `DataKind` | Enum: `SurveyData`, `AssayData`, `ManufacturingData`, `TransitData` — type of raw data a lab consumes |
+| `DataKind` | Content-driven string newtype (like `AnomalyTag`). Well-known values: `SurveyData`, `AssayData`, `ManufacturingData`, `TransitData`. New data kinds added via content JSON. |
 | `LabDef` | Lab module behavior definition: `data_kind`, `domain`, `throughput_per_tick` |
 | `LabState` | Lab runtime state (embedded in `ModuleState::kind_state`): `assigned_tech: Option<TechId>` |
 | `ThermalDef` | Module thermal properties: `heat_capacity_j_per_k`, `passive_cooling_coefficient`, `max_temp_mk`, `operating_min_mk`, `operating_max_mk`, `thermal_group`, `idle_heat_generation_w` |

@@ -147,7 +147,7 @@ fn print_status(state: &GameState, constants: &sim_core::Constants) {
     let scan_data = state
         .research
         .data_pool
-        .get(&sim_core::DataKind::SurveyData)
+        .get(&sim_core::DataKind::new(sim_core::DataKind::SURVEY))
         .copied()
         .unwrap_or(0.0);
 

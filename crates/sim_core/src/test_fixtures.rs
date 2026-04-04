@@ -218,7 +218,7 @@ pub fn base_content() -> GameContent {
             name: "Deep Scan v1".to_string(),
             prereqs: vec![],
             domain_requirements: HashMap::new(),
-            accepted_data: vec![DataKind::SurveyData],
+            accepted_data: vec![DataKind::new(DataKind::SURVEY)],
             effects: vec![
                 TechEffect::EnableDeepScan,
                 // sigma=0: mapped composition matches true composition exactly
