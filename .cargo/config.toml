@@ -1,0 +1,20 @@
+# Build performance configuration
+#
+# Linker status (as of Rust 1.93 / 2026-04):
+#
+# Linux x86_64 CI: rust-lld is the DEFAULT linker since Rust 1.90.
+#   No configuration needed — CI gets fast linking automatically.
+#   See: https://blog.rust-lang.org/2025/09/01/rust-lld-on-1.90.0-stable/
+#
+# macOS (aarch64-apple-darwin): Apple's system linker is fast.
+#   No stable path to rust-lld on macOS without fragile absolute paths.
+#   The -Clinker-features=+lld flag is nightly-only for non-x86_64-linux targets.
+#   mold does not support macOS Mach-O targets.
+#
+# To use mold on Linux CI for maximum link speed:
+#   1. Add `uses: rui314/setup-mold@v1` to the CI workflow
+#   2. Uncomment the section below
+#
+# [target.x86_64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
