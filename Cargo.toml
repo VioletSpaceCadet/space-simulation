@@ -39,3 +39,13 @@ cast_precision_loss = "allow"
 
 [workspace.dependencies]
 parking_lot = "0.12"
+
+# --- Build performance profiles ---
+
+[profile.dev]
+# Skip dsymutil on macOS — avoids bundling debug info per link step.
+split-debuginfo = "unpacked"
+
+[profile.test]
+# Test profile inherits from dev; apply the same split-debuginfo.
+split-debuginfo = "unpacked"
