@@ -63,8 +63,9 @@ fn execute(
         },
     ));
 
-    // Discovery: sensors with discovery_zones can spawn scan sites.
-    if !sensor_def.discovery_zones.is_empty() && sensor_def.discovery_probability > 0.0 {
+    // Discovery: sensors with discovery_zones can spawn scan sites (capped).
+    let at_cap = state.scan_sites.len() >= content.constants.replenish_target_count as usize;
+    if !at_cap && !sensor_def.discovery_zones.is_empty() && sensor_def.discovery_probability > 0.0 {
         let roll: f64 = rng.gen();
         if roll < sensor_def.discovery_probability {
             try_discover_scan_site(sensor_def, state, content, rng, events);
@@ -346,6 +347,122 @@ mod tests {
         assert!(
             scan_data == 0.0,
             "no ScanData should exist when sensor is disabled"
+        );
+    }
+
+    #[test]
+    fn sensor_discovery_spawns_scan_site() {
+        // Create content with a sensor that has 100% discovery probability.
+        let mut content = crate::test_fixtures::base_content();
+        content.module_defs.insert(
+            "module_discoverer".to_string(),
+            ModuleDefBuilder::new("module_discoverer")
+                .name("Discoverer")
+                .behavior(ModuleBehaviorDef::SensorArray(SensorArrayDef {
+                    data_kind: DataKind::new(DataKind::OPTICAL),
+                    action_key: "discovery_scan".to_string(),
+                    scan_interval_minutes: 1,
+                    scan_interval_ticks: 1,
+                    sensor_type: "optical".to_string(),
+                    discovery_zones: vec!["earth_orbit_zone".to_string()],
+                    discovery_probability: 1.0,
+                }))
+                .build(),
+        );
+        // Add a zone body matching the sensor's discovery_zones.
+        content.solar_system.bodies.push(crate::OrbitalBodyDef {
+            id: crate::BodyId("earth_orbit_zone".to_string()),
+            name: "Earth Orbit".to_string(),
+            parent: None,
+            body_type: crate::BodyType::Zone,
+            radius_au_um: 1_000_000,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: Some(crate::ZoneDef {
+                radius_min_au_um: 900_000,
+                radius_max_au_um: 1_100_000,
+                angle_start_mdeg: 0,
+                angle_span_mdeg: 360_000,
+                resource_class: crate::spatial::ResourceClass::Mixed,
+                scan_site_weight: 1,
+            }),
+        });
+        let mut state = sensor_state(&content);
+        state.scan_sites.clear();
+        let station_id = StationId("station_test".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.core.modules[0].def_id = "module_discoverer".to_string();
+        station.core.module_type_index = ModuleTypeIndex::default();
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(99);
+
+        // Use full tick() — power_consumption=0 so no solar needed.
+        let events = crate::tick(&mut state, &[], &content, &mut rng, None);
+
+        // At 100% probability with earth_orbit_zone in discovery_zones,
+        // and base_content has an earth_orbit_zone body, a site should spawn.
+        let discovered = events
+            .iter()
+            .any(|e| matches!(&e.event, Event::ScanSiteSpawned { .. }));
+        assert!(
+            discovered,
+            "sensor with 100% probability should discover a scan site"
+        );
+        assert!(
+            !state.scan_sites.is_empty(),
+            "scan_sites should have the new site"
+        );
+    }
+
+    #[test]
+    fn sensor_discovery_respects_cap() {
+        let mut content = crate::test_fixtures::base_content();
+        content.constants.replenish_target_count = 2; // Low cap for test
+        content.module_defs.insert(
+            "module_discoverer".to_string(),
+            ModuleDefBuilder::new("module_discoverer")
+                .name("Discoverer")
+                .behavior(ModuleBehaviorDef::SensorArray(SensorArrayDef {
+                    data_kind: DataKind::new(DataKind::OPTICAL),
+                    action_key: "discovery_scan".to_string(),
+                    scan_interval_minutes: 1,
+                    scan_interval_ticks: 1,
+                    sensor_type: "optical".to_string(),
+                    discovery_zones: vec!["earth_orbit_zone".to_string()],
+                    discovery_probability: 1.0,
+                }))
+                .build(),
+        );
+        let mut state = sensor_state(&content);
+        state.scan_sites = vec![
+            crate::ScanSite {
+                id: SiteId("site_a".to_string()),
+                position: crate::test_fixtures::test_position(),
+                template_id: "tmpl_iron_rich".to_string(),
+            },
+            crate::ScanSite {
+                id: SiteId("site_b".to_string()),
+                position: crate::test_fixtures::test_position(),
+                template_id: "tmpl_iron_rich".to_string(),
+            },
+        ];
+        let station_id = StationId("station_test".to_string());
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.core.modules[0].def_id = "module_discoverer".to_string();
+        station.core.module_type_index = ModuleTypeIndex::default();
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(99);
+
+        let events = crate::tick(&mut state, &[], &content, &mut rng, None);
+
+        // replenish_scan_sites might also add sites, so just check discovery events
+        let sensor_discovered = events
+            .iter()
+            .filter(|e| matches!(&e.event, Event::ScanSiteSpawned { .. }))
+            .count();
+        // At cap=2 with 2 sites, the sensor should NOT discover (even at 100% prob).
+        // The replenish system also won't add since we're at target.
+        assert_eq!(
+            sensor_discovered, 0,
+            "should NOT discover when at scan site cap"
         );
     }
 }
