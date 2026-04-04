@@ -1,9 +1,9 @@
 //! Integration test: seed data → lab consumes → domain points accumulate → tech unlocks.
 
+use crate::test_fixtures::{base_content, base_state, ModuleDefBuilder};
+use crate::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use sim_core::test_fixtures::{base_content, base_state, ModuleDefBuilder};
-use sim_core::*;
 use std::collections::HashMap;
 
 #[test]

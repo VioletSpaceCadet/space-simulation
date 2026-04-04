@@ -2109,3 +2109,6 @@ mod tests {
         assert!(sim_core::TradeTier::Export < sim_core::TradeTier::Full);
     }
 }
+
+#[cfg(test)]
+mod content_validation_tests;

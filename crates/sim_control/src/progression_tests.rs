@@ -5,12 +5,17 @@
 //! expected tick windows. They catch rate/timing regressions from content
 //! rescaling or time-scale changes.
 
+use crate::{AutopilotController, CommandSource};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use sim_control::{AutopilotController, CommandSource};
 use sim_core::test_fixtures::{base_content, base_state, ModuleDefBuilder};
 use sim_core::*;
 use std::collections::HashMap;
+
+fn content_dir() -> String {
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+    format!("{manifest}/../../content")
+}
 
 /// Build content that mimics production: `minutes_per_tick=60`, full tech tree,
 /// all module types, sensor array for data generation, labs for evidence.
@@ -640,7 +645,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
 /// production failures like power cliff or module degradation.
 #[test]
 fn deep_scan_unlocks_with_production_content() {
-    let content = sim_world::load_content("../../content").unwrap();
+    let content = sim_world::load_content(&content_dir()).unwrap();
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let mut state = sim_world::build_initial_state(&content, 42, &mut rng);
 
@@ -702,7 +707,7 @@ fn lab_per_run_amounts_are_not_time_scaled() {
 /// VIO-457 (ship stranding) and VIO-458 (power deficit).
 #[test]
 fn dev_advanced_state_progression() {
-    let content = sim_world::load_content("../../content").unwrap();
+    let content = sim_world::load_content(&content_dir()).unwrap();
     let json = std::fs::read_to_string("../../content/dev_advanced_state.json").unwrap();
     let mut state: GameState = serde_json::from_str(&json).unwrap();
     state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
@@ -830,7 +835,7 @@ fn invariant_no_permanent_idle_early_game() {
 /// Invariant: ships never permanently idle when using dev_advanced_state.json.
 #[test]
 fn invariant_no_permanent_idle_dev_advanced_state() {
-    let content = sim_world::load_content("../../content").unwrap();
+    let content = sim_world::load_content(&content_dir()).unwrap();
     let json = std::fs::read_to_string("../../content/dev_advanced_state.json").unwrap();
     let mut state: GameState = serde_json::from_str(&json).unwrap();
     state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
@@ -859,7 +864,7 @@ fn invariant_no_permanent_idle_dev_advanced_state() {
 /// thermal manufacturing pipeline works after VIO-459 fix.
 #[test]
 fn manufacturing_pipeline_ore_to_cast_part() {
-    let content = sim_world::load_content("../../content").unwrap();
+    let content = sim_world::load_content(&content_dir()).unwrap();
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     let station_id = StationId("station_mfg_test".to_string());
 
@@ -1124,10 +1129,9 @@ fn manufacturing_pipeline_ore_to_cast_part() {
 /// progression_start.json within 200 ticks using real content.
 #[test]
 fn progression_start_reaches_first_survey() {
-    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
-    let content_dir = format!("{manifest}/../../content");
-    let content = sim_world::load_content(&content_dir).expect("load content");
-    let state_json = std::fs::read_to_string(format!("{content_dir}/progression_start.json"))
+    let content_path = content_dir();
+    let content = sim_world::load_content(&content_path).expect("load content");
+    let state_json = std::fs::read_to_string(format!("{content_path}/progression_start.json"))
         .expect("read state");
     let mut state: GameState = serde_json::from_str(&state_json).expect("parse state");
     state.body_cache = sim_core::build_body_cache(&content.solar_system.bodies);
@@ -1154,10 +1158,9 @@ fn progression_start_reaches_first_survey() {
 /// Validates: no panics, first_survey in all seeds, first_tech in all seeds.
 #[test]
 fn progression_start_multi_seed_validation() {
-    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
-    let content_dir = format!("{manifest}/../../content");
-    let content = sim_world::load_content(&content_dir).expect("load content");
-    let state_json = std::fs::read_to_string(format!("{content_dir}/progression_start.json"))
+    let content_path = content_dir();
+    let content = sim_world::load_content(&content_path).expect("load content");
+    let state_json = std::fs::read_to_string(format!("{content_path}/progression_start.json"))
         .expect("read state");
 
     let seeds = [1, 42, 123, 456, 789];
@@ -1252,10 +1255,9 @@ fn run_progression_tracking(
 /// Validates early milestone reachability. Runs in regular `cargo test`.
 #[test]
 fn progression_regression_quick() {
-    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
-    let content_dir = format!("{manifest}/../../content");
-    let content = sim_world::load_content(&content_dir).expect("load content");
-    let state_json = std::fs::read_to_string(format!("{content_dir}/progression_start.json"))
+    let content_path = content_dir();
+    let content = sim_world::load_content(&content_path).expect("load content");
+    let state_json = std::fs::read_to_string(format!("{content_path}/progression_start.json"))
         .expect("read state");
 
     let seeds = [1, 42, 123, 456, 789];
@@ -1323,10 +1325,9 @@ fn progression_regression_quick() {
 #[test]
 #[ignore]
 fn progression_regression_full() {
-    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
-    let content_dir = format!("{manifest}/../../content");
-    let content = sim_world::load_content(&content_dir).expect("load content");
-    let state_json = std::fs::read_to_string(format!("{content_dir}/progression_start.json"))
+    let content_path = content_dir();
+    let content = sim_world::load_content(&content_path).expect("load content");
+    let state_json = std::fs::read_to_string(format!("{content_path}/progression_start.json"))
         .expect("read state");
 
     let seed_count: u64 = 100;
