@@ -1,11 +1,16 @@
 //! Integration tests for the sim events system.
 //!
-//! Tests use real content (`load_content("../../content")`) to verify
-//! end-to-end event firing, effect application, and determinism.
+//! Tests use real content to verify end-to-end event firing, effect
+//! application, and determinism.
 
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use sim_core::{EventEnvelope, GameContent, GameState};
+
+fn content_dir() -> String {
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+    format!("{manifest}/../../content")
+}
 
 /// Run the simulation for N ticks and return the events produced.
 fn run_ticks(
@@ -25,7 +30,7 @@ fn run_ticks(
 /// Determinism regression: same seed produces identical event sequences.
 #[test]
 fn determinism_same_seed_identical_events() {
-    let mut content = sim_world::load_content("../../content").expect("load content");
+    let mut content = sim_world::load_content(&content_dir()).expect("load content");
     content.constants.event_global_cooldown_ticks = 10;
 
     let ticks = 2000;
@@ -70,7 +75,7 @@ fn determinism_same_seed_identical_events() {
 /// Different seeds produce different event sequences.
 #[test]
 fn different_seeds_produce_different_events() {
-    let mut content = sim_world::load_content("../../content").expect("load content");
+    let mut content = sim_world::load_content(&content_dir()).expect("load content");
     content.constants.event_global_cooldown_ticks = 10;
 
     let ticks = 2000;
@@ -101,7 +106,7 @@ fn different_seeds_produce_different_events() {
 /// Events produce observable state changes.
 #[test]
 fn events_mutate_state() {
-    let mut content = sim_world::load_content("../../content").expect("load content");
+    let mut content = sim_world::load_content(&content_dir()).expect("load content");
     content.constants.event_global_cooldown_ticks = 5;
 
     let ticks = 3000;
@@ -133,7 +138,7 @@ fn events_mutate_state() {
 /// Temporal modifiers expire correctly.
 #[test]
 fn temporal_modifiers_expire() {
-    let mut content = sim_world::load_content("../../content").expect("load content");
+    let mut content = sim_world::load_content(&content_dir()).expect("load content");
     content.constants.event_global_cooldown_ticks = 5;
 
     let ticks = 5000;

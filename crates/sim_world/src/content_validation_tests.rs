@@ -7,11 +7,11 @@
 //! 4. Content invariants — the game world is playable
 //! 5. Balance sanity checks — flag extreme outliers
 
+use crate::load_content;
 use sim_core::{
     ComponentId, GameContent, GameState, InputFilter, InventoryItem, ModuleBehaviorDef, OutputSpec,
     RecipeId, TechEffect, TechId,
 };
-use sim_world::load_content;
 use std::collections::HashSet;
 use std::sync::OnceLock;
 

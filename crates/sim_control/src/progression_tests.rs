@@ -5,9 +5,9 @@
 //! expected tick windows. They catch rate/timing regressions from content
 //! rescaling or time-scale changes.
 
+use crate::{AutopilotController, CommandSource};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use sim_control::{AutopilotController, CommandSource};
 use sim_core::test_fixtures::{base_content, base_state, ModuleDefBuilder};
 use sim_core::*;
 use std::collections::HashMap;

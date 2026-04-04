@@ -42,6 +42,8 @@ mod trade;
 mod trade_integration;
 mod transfer_molten;
 
+mod research_lifecycle;
+
 // --- Shared test helpers ------------------------------------------------
 
 fn test_content() -> GameContent {
