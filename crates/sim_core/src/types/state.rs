@@ -588,7 +588,7 @@ pub struct SatelliteState {
     /// Wear level 0.0 (pristine) to 1.0 (failed). Accumulates each tick.
     pub wear: f64,
     pub enabled: bool,
-    /// Content-driven type string: "survey", "communication", "navigation", "science_platform".
+    /// Content-driven type string: "survey", "communication", "navigation", "`science_platform`".
     pub satellite_type: String,
     /// Optional type-specific configuration (e.g. target sensor type for science platforms).
     #[serde(default, skip_serializing_if = "Option::is_none")]

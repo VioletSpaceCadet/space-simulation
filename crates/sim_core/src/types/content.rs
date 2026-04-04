@@ -374,7 +374,7 @@ pub struct ComponentDef {
 pub struct SatelliteDef {
     pub id: String,
     pub name: String,
-    /// Content-driven type: "survey", "communication", "navigation", "science_platform".
+    /// Content-driven type: "survey", "communication", "navigation", "`science_platform`".
     pub satellite_type: String,
     pub mass_kg: f32,
     /// Wear added per tick (e.g. 0.0001 = ~10,000 tick lifespan).
