@@ -87,6 +87,7 @@ fn production_like_content() -> GameContent {
                 action_key: "sensor_scan".to_string(),
                 scan_interval_minutes: 120,
                 scan_interval_ticks: 2, // 120 / 60
+                sensor_type: "orbital".to_string(),
             }))
             .build(),
     );

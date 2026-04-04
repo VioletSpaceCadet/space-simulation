@@ -85,6 +85,7 @@ mod tests {
                     action_key: "sensor_scan".to_string(),
                     scan_interval_minutes: 5,
                     scan_interval_ticks: 5,
+                    sensor_type: "orbital".to_string(),
                 }))
                 .build(),
         );
