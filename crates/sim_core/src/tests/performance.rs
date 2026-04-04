@@ -1,6 +1,10 @@
 use super::*;
 
+/// Performance regression gate — run with `cargo nextest run --run-ignored`
+/// or `cargo test -- --ignored`. Excluded from default test runs because
+/// throughput depends on CPU availability and fails under parallel load.
 #[test]
+#[ignore]
 fn tick_throughput_exceeds_100k_per_second() {
     let content = test_content();
     let mut state = test_state(&content);

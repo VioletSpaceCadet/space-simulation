@@ -27,6 +27,8 @@ jobs:
 
       - uses: taiki-e/install-action@cargo-llvm-cov
 
+      - uses: taiki-e/install-action@cargo-nextest
+
       - uses: taiki-e/install-action@cargo-deny
 
       - name: Format check
@@ -38,8 +40,8 @@ jobs:
       - name: Dependency audit
         run: cargo deny check
 
-      - name: Test with coverage
-        run: cargo llvm-cov --ignore-filename-regex 'tests/|test_helpers|fixtures'
+      - name: Test with coverage (nextest)
+        run: cargo llvm-cov nextest --ignore-filename-regex 'tests/|test_helpers|fixtures' --profile ci
 
       - name: Generate LCOV report
         if: always()

@@ -15,8 +15,8 @@ cargo deny check
 
 IGNORE_RE='tests/|test_helpers|fixtures'
 
-echo "  cargo llvm-cov (test + coverage)..."
-cargo llvm-cov --ignore-filename-regex "$IGNORE_RE"
+echo "  cargo llvm-cov nextest (test + coverage)..."
+cargo llvm-cov nextest --ignore-filename-regex "$IGNORE_RE" --profile ci
 
 echo "  generating lcov report..."
 cargo llvm-cov report --ignore-filename-regex "$IGNORE_RE" --lcov --output-path lcov.info
