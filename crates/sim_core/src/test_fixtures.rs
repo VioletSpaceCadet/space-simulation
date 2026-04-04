@@ -728,6 +728,7 @@ pub fn base_state(content: &GameContent) -> GameState {
         )]
         .into_iter()
         .collect(),
+        ground_facilities: std::collections::BTreeMap::new(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
             data_pool: AHashMap::default(),

@@ -1130,6 +1130,7 @@ mod tests {
             )]
             .into_iter()
             .collect(),
+            ground_facilities: std::collections::BTreeMap::new(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(),
                 data_pool: AHashMap::default(),
@@ -1526,6 +1527,7 @@ mod tests {
             )]
             .into_iter()
             .collect(),
+            ground_facilities: std::collections::BTreeMap::new(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(),
                 data_pool: AHashMap::default(),
@@ -1655,6 +1657,7 @@ mod tests {
             )]
             .into_iter()
             .collect(),
+            ground_facilities: std::collections::BTreeMap::new(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(),
                 data_pool: AHashMap::default(),
@@ -1825,6 +1828,7 @@ mod tests {
             )]
             .into_iter()
             .collect(),
+            ground_facilities: std::collections::BTreeMap::new(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(), // tech NOT unlocked
                 data_pool: AHashMap::default(),
@@ -1988,6 +1992,7 @@ mod tests {
             )]
             .into_iter()
             .collect(),
+            ground_facilities: std::collections::BTreeMap::new(),
             research: crate::ResearchState {
                 unlocked: HashSet::new(),
                 data_pool: AHashMap::default(),

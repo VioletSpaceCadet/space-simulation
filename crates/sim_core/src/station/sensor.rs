@@ -141,6 +141,7 @@ mod tests {
             )]
             .into_iter()
             .collect(),
+            ground_facilities: std::collections::BTreeMap::new(),
             research: ResearchState {
                 unlocked: HashSet::new(),
                 data_pool: AHashMap::default(),

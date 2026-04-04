@@ -41,9 +41,9 @@ pub use spatial::{
 pub use tasks::{inventory_mass_kg, inventory_volume_m3, mine_duration};
 // -- types: ID newtypes --
 pub use types::{
-    AsteroidId, BodyId, CommandId, ComponentId, CrewRole, EventId, HullId, LeaderId, LotId,
-    ModuleDefId, ModuleInstanceId, ModuleItemId, NodeId, PrincipalId, RecipeId, ShipId, SiteId,
-    SlotType, StationId, TechId,
+    AsteroidId, BodyId, CommandId, ComponentId, CrewRole, EventId, GroundFacilityId, HullId,
+    LeaderId, LotId, ModuleDefId, ModuleInstanceId, ModuleItemId, NodeId, PrincipalId, RecipeId,
+    ShipId, SiteId, SlotType, StationId, TechId,
 };
 // -- types: type aliases & constants --
 pub use types::{
@@ -58,9 +58,9 @@ pub use types::{
 };
 // -- types: game state --
 pub use types::{
-    AsteroidKnowledge, AsteroidState, Counters, FacilityCore, GameState, MetaState,
-    ModuleTypeIndex, PowerBudgetCache, PowerState, ResearchState, ScanSite, StationState,
-    TaskState, ThermalLink,
+    AsteroidKnowledge, AsteroidState, Counters, FacilityCore, GameState, GroundFacilityState,
+    LaunchPayload, LaunchTransitState, MetaState, ModuleTypeIndex, PowerBudgetCache, PowerState,
+    ResearchState, ScanSite, StationState, TaskState, ThermalLink,
 };
 // -- types: ship state --
 pub use types::{FittedModule, ShipState, TaskKind};

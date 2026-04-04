@@ -6,12 +6,16 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 
 | Type | Purpose |
 |---|---|
-| `GameState` | Full mutable simulation state (meta, scan_sites, asteroids, ships, stations, research, counters) |
+| `GameState` | Full mutable simulation state (meta, scan_sites, asteroids, ships, stations, ground_facilities, research, counters) |
 | `ScanSite` | Unscanned potential asteroid location (consumed on survey) |
 | `AsteroidState` | Created on discovery; holds `true_composition` (hidden), `knowledge`, `mass_kg`, `anomaly_tags` |
 | `ResearchState` | `unlocked`, `data_pool`, `evidence` — no active allocations |
 | `ShipState` | `id`, `position`, `owner`, `inventory: Vec<InventoryItem>`, `cargo_capacity_m3`, `task`, `speed_ticks_per_au: Option<u64>`, `modifiers` |
-| `StationState` | `id`, `location_node`, `inventory`, `cargo_capacity_m3`, `power_available_per_tick`, `facilities`, `modules: Vec<ModuleState>` |
+| `StationState` | `id`, `position`, `core: FacilityCore`, `leaders` |
+| `FacilityCore` | Shared module-hosting substrate: `inventory`, `cargo_capacity_m3`, `power_available_per_tick`, `modules`, `modifiers`, `crew`, `thermal_links`, `power`, cached indices. Composed by both `StationState` and `GroundFacilityState`. |
+| `GroundFacilityState` | Earth-based operations center: `id`, `name`, `position`, `core: FacilityCore`, `launch_transits`. Cannot dock ships. |
+| `LaunchTransitState` | In-flight launch: `rocket_def_id`, `payload: LaunchPayload`, `destination`, `arrival_tick` |
+| `LaunchPayload` | Enum: `Supplies(Vec<InventoryItem>)`, `StationKit` |
 | `InventoryItem` | Enum: `Ore { lot_id, asteroid_id, kg, composition }`, `Material { element, kg, quality }`, `Slag { kg, composition }`, `Component { component_id, count, quality }`, `Module { item_id, module_def_id }` |
 | `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, Assembler, Lab, SensorArray, SolarArray, Battery, Radiator), `wear: WearState`, optional `thermal: ThermalState`. Processor/Assembler have `stalled: bool`. Assembler also has `capped: bool`, `cap_override: HashMap<ComponentId, u32>` |
 | `WearState` | `wear: f32` (0.0–1.0). Embedded on any wearable entity. |
