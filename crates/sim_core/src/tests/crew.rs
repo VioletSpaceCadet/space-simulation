@@ -286,7 +286,7 @@ fn crew_import_via_trade() {
     let mut rng = make_rng();
 
     let cmd = Command::Import {
-        station_id: test_station_id(),
+        facility_id: test_station_id().into(),
         item_spec: TradeItemSpec::Crew {
             role: CrewRole("operator".to_string()),
             count: 2,

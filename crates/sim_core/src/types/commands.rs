@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    CommandId, ComponentId, CrewRole, ModuleDefId, ModuleInstanceId, ModuleItemId, PrincipalId,
-    RecipeId, ShipId, StationId, TaskKind, TechId, TradeItemSpec,
+    CommandId, ComponentId, CrewRole, FacilityId, ModuleDefId, ModuleInstanceId, ModuleItemId,
+    PrincipalId, RecipeId, ShipId, StationId, TaskKind, TechId, TradeItemSpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -27,20 +27,20 @@ pub enum Command {
         task_kind: TaskKind,
     },
     InstallModule {
-        station_id: StationId,
+        facility_id: FacilityId,
         module_item_id: ModuleItemId,
     },
     UninstallModule {
-        station_id: StationId,
+        facility_id: FacilityId,
         module_id: ModuleInstanceId,
     },
     SetModuleEnabled {
-        station_id: StationId,
+        facility_id: FacilityId,
         module_id: ModuleInstanceId,
         enabled: bool,
     },
     SetModuleThreshold {
-        station_id: StationId,
+        facility_id: FacilityId,
         module_id: ModuleInstanceId,
         threshold_kg: f32,
     },
@@ -56,11 +56,11 @@ pub enum Command {
         max_stock: u32,
     },
     Import {
-        station_id: StationId,
+        facility_id: FacilityId,
         item_spec: TradeItemSpec,
     },
     Export {
-        station_id: StationId,
+        facility_id: FacilityId,
         item_spec: TradeItemSpec,
     },
     JettisonSlag {

@@ -112,6 +112,35 @@ numeric_id!(EventId);
 string_id!(PrincipalId);
 string_id!(LotId);
 string_id!(GroundFacilityId);
+
+/// A reference to either a station or a ground facility. Used by commands
+/// that apply to both entity types (Import, Export, InstallModule, etc.).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FacilityId {
+    Station(StationId),
+    Ground(GroundFacilityId),
+}
+
+impl From<StationId> for FacilityId {
+    fn from(id: StationId) -> Self {
+        Self::Station(id)
+    }
+}
+
+impl From<GroundFacilityId> for FacilityId {
+    fn from(id: GroundFacilityId) -> Self {
+        Self::Ground(id)
+    }
+}
+
+impl std::fmt::Display for FacilityId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Station(id) => write!(f, "{id}"),
+            Self::Ground(id) => write!(f, "{id}"),
+        }
+    }
+}
 string_id!(ModuleItemId);
 string_id!(ModuleInstanceId);
 string_id!(ComponentId);

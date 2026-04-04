@@ -138,7 +138,7 @@ fn import_material_deducts_balance_and_adds_inventory() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let cmd = make_command(Command::Import {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Material {
             element: "Fe".to_string(),
             kg: 100.0,
@@ -186,7 +186,7 @@ fn import_component_deducts_balance_and_adds_inventory() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let cmd = make_command(Command::Import {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Component {
             component_id: ComponentId("thruster".to_string()),
             count: 2,
@@ -234,7 +234,7 @@ fn import_module_deducts_balance_and_adds_with_unique_id() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let cmd = make_command(Command::Import {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Module {
             module_def_id: "module_basic_iron_refinery".to_string(),
         },
@@ -287,7 +287,7 @@ fn import_insufficient_funds_emits_event_no_change() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let cmd = make_command(Command::Import {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Material {
             element: "Fe".to_string(),
             kg: 100.0,
@@ -323,7 +323,7 @@ fn import_non_importable_is_rejected() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let cmd = make_command(Command::Import {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Material {
             element: "ore".to_string(),
             kg: 100.0,
@@ -362,7 +362,7 @@ fn export_material_removes_from_inventory_and_adds_revenue() {
     });
 
     let cmd = make_command(Command::Export {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Material {
             element: "Fe".to_string(),
             kg: 50.0,
@@ -417,7 +417,7 @@ fn export_component_removes_and_adds_revenue() {
     });
 
     let cmd = make_command(Command::Export {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Component {
             component_id: ComponentId("repair_kit".to_string()),
             count: 2,
@@ -471,7 +471,7 @@ fn export_non_exportable_is_rejected() {
     });
 
     let cmd = make_command(Command::Export {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Material {
             element: "slag".to_string(),
             kg: 50.0,
@@ -507,7 +507,7 @@ fn export_more_than_available_is_rejected() {
     });
 
     let cmd = make_command(Command::Export {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Material {
             element: "Fe".to_string(),
             kg: 1000.0,
@@ -559,7 +559,7 @@ fn import_merges_material_with_existing() {
     });
 
     let cmd = make_command(Command::Import {
-        station_id: station_id.clone(),
+        facility_id: station_id.clone().into(),
         item_spec: TradeItemSpec::Material {
             element: "Fe".to_string(),
             kg: 100.0,
@@ -605,7 +605,7 @@ fn import_rejected_without_trade_tier() {
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
         command: Command::Import {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             item_spec: TradeItemSpec::Material {
                 element: "Fe".to_string(),
                 kg: 100.0,
@@ -650,7 +650,7 @@ fn export_rejected_without_export_tier() {
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
         command: Command::Export {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             item_spec: TradeItemSpec::Material {
                 element: "Fe".to_string(),
                 kg: 100.0,

@@ -173,7 +173,7 @@ fn economy_full_loop() {
     let cmd_thrusters = make_command(
         state.meta.tick,
         Command::Import {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             item_spec: TradeItemSpec::Component {
                 component_id: ComponentId("thruster".to_string()),
                 count: 4,
@@ -229,7 +229,7 @@ fn economy_full_loop() {
     let cmd_fe = make_command(
         state.meta.tick,
         Command::Import {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             item_spec: TradeItemSpec::Material {
                 element: "Fe".to_string(),
                 kg: 5000.0,
@@ -282,7 +282,7 @@ fn economy_full_loop() {
     let cmd_import_shipyard = make_command(
         state.meta.tick,
         Command::Import {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             item_spec: TradeItemSpec::Module {
                 module_def_id: "module_shipyard".to_string(),
             },
@@ -306,7 +306,7 @@ fn economy_full_loop() {
     let cmd_install = make_command(
         state.meta.tick,
         Command::InstallModule {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             module_item_id,
         },
     );
@@ -326,7 +326,7 @@ fn economy_full_loop() {
     let cmd_enable = make_command(
         state.meta.tick,
         Command::SetModuleEnabled {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             module_id: shipyard_module_id.clone(),
             enabled: true,
         },
@@ -431,7 +431,7 @@ fn economy_full_loop() {
     let cmd_export = make_command(
         state.meta.tick,
         Command::Export {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             item_spec: TradeItemSpec::Material {
                 element: "Fe".to_string(),
                 kg: 1000.0,

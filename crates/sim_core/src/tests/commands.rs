@@ -116,7 +116,7 @@ fn test_install_module_initializes_thermal_state_for_thermal_modules() {
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
         command: Command::InstallModule {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             module_item_id,
         },
     };
@@ -181,7 +181,7 @@ fn test_install_module_no_thermal_state_for_non_thermal_modules() {
         issued_tick: state.meta.tick,
         execute_at_tick: state.meta.tick,
         command: Command::InstallModule {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             module_item_id,
         },
     };

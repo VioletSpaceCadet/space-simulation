@@ -593,7 +593,7 @@ mod tests {
         let body = serde_json::json!({
             "command": {
                 "Import": {
-                    "station_id": "station_earth_orbit",
+                    "facility_id": { "Station": "station_earth_orbit" },
                     "item_spec": { "Component": { "component_id": "thruster", "count": 2 } }
                 }
             }

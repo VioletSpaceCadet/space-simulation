@@ -108,7 +108,7 @@ impl StationConcern for ComponentImport {
             ctx.state.meta.tick,
             ctx.next_id,
             Command::Import {
-                station_id: ctx.station_id.clone(),
+                facility_id: ctx.station_id.clone().into(),
                 item_spec,
             },
         )]

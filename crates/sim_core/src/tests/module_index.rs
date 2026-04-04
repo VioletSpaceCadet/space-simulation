@@ -38,7 +38,7 @@ fn module_id_index_after_install() {
         issued_tick: 0,
         execute_at_tick: 0,
         command: Command::InstallModule {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             module_item_id: ModuleItemId("mod_item_test".to_string()),
         },
     };
@@ -106,7 +106,7 @@ fn module_id_index_after_uninstall() {
         issued_tick: 0,
         execute_at_tick: 0,
         command: Command::UninstallModule {
-            station_id: station_id.clone(),
+            facility_id: station_id.clone().into(),
             module_id: ModuleInstanceId("mod_first".to_string()),
         },
     };

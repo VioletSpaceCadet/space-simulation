@@ -38,7 +38,7 @@ impl StationConcern for MaterialExport {
                 ctx.state.meta.tick,
                 ctx.next_id,
                 Command::Export {
-                    station_id: ctx.station_id.clone(),
+                    facility_id: ctx.station_id.clone().into(),
                     item_spec: candidate,
                 },
             ));

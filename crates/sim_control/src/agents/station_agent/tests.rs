@@ -100,7 +100,7 @@ fn manage_modules_installs_from_inventory() {
     assert!(matches!(
         &commands[0].command,
         Command::InstallModule {
-            station_id: sid,
+            facility_id: sim_core::FacilityId::Station(sid),
             ..
         } if *sid == station_id
     ));
