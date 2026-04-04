@@ -58,7 +58,7 @@ fn manage_power(
                 ctx.state.meta.tick,
                 ctx.next_id,
                 Command::SetModuleEnabled {
-                    station_id: ctx.station_id.clone(),
+                    facility_id: ctx.station_id.clone().into(),
                     module_id: module.id.clone(),
                     enabled: false,
                 },
@@ -88,7 +88,7 @@ fn manage_power(
                         ctx.state.meta.tick,
                         ctx.next_id,
                         Command::SetModuleEnabled {
-                            station_id: ctx.station_id.clone(),
+                            facility_id: ctx.station_id.clone().into(),
                             module_id: module.id.clone(),
                             enabled: true,
                         },
@@ -121,7 +121,7 @@ impl StationConcern for ModuleManagement {
                     ctx.state.meta.tick,
                     ctx.next_id,
                     Command::InstallModule {
-                        station_id: ctx.station_id.clone(),
+                        facility_id: ctx.station_id.clone().into(),
                         module_item_id: item_id.clone(),
                     },
                 ));
@@ -138,7 +138,7 @@ impl StationConcern for ModuleManagement {
                         ctx.state.meta.tick,
                         ctx.next_id,
                         Command::SetModuleThreshold {
-                            station_id: ctx.station_id.clone(),
+                            facility_id: ctx.station_id.clone().into(),
                             module_id: module.id.clone(),
                             threshold_kg: ctx.content.autopilot.refinery_threshold_kg,
                         },

@@ -168,7 +168,7 @@ export function EconomyPanel({ snapshot, events }: Props) {
       const itemSpec = buildTradeItemSpec(category, itemKey, quantity);
       const command = {
         [commandType]: {
-          station_id: stationId,
+          facility_id: { Station: stationId },
           item_spec: itemSpec,
         },
       };

@@ -41,9 +41,9 @@ pub use spatial::{
 pub use tasks::{inventory_mass_kg, inventory_volume_m3, mine_duration};
 // -- types: ID newtypes --
 pub use types::{
-    AsteroidId, BodyId, CommandId, ComponentId, CrewRole, EventId, GroundFacilityId, HullId,
-    LeaderId, LotId, ModuleDefId, ModuleInstanceId, ModuleItemId, NodeId, PrincipalId, RecipeId,
-    ShipId, SiteId, SlotType, StationId, TechId,
+    AsteroidId, BodyId, CommandId, ComponentId, CrewRole, EventId, FacilityId, GroundFacilityId,
+    HullId, LeaderId, LotId, ModuleDefId, ModuleInstanceId, ModuleItemId, NodeId, PrincipalId,
+    RecipeId, ShipId, SiteId, SlotType, StationId, TechId,
 };
 // -- types: type aliases & constants --
 pub use types::{

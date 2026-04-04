@@ -40,7 +40,7 @@ impl StationConcern for PropellantManagement {
                         ctx.state.meta.tick,
                         ctx.next_id,
                         Command::SetModuleEnabled {
-                            station_id: ctx.station_id.clone(),
+                            facility_id: ctx.station_id.clone().into(),
                             module_id: module.id.clone(),
                             enabled: false,
                         },
@@ -56,7 +56,7 @@ impl StationConcern for PropellantManagement {
                         ctx.state.meta.tick,
                         ctx.next_id,
                         Command::SetModuleEnabled {
-                            station_id: ctx.station_id.clone(),
+                            facility_id: ctx.station_id.clone().into(),
                             module_id: module.id.clone(),
                             enabled: true,
                         },

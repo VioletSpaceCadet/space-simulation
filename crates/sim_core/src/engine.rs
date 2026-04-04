@@ -131,9 +131,12 @@ fn apply_commands(
                 );
             }
             Command::InstallModule {
-                station_id,
+                facility_id,
                 module_item_id,
             } => {
+                let crate::FacilityId::Station(station_id) = facility_id else {
+                    continue; // Ground facility install not yet implemented
+                };
                 commands::handle_install_module(
                     state,
                     content,
@@ -144,9 +147,12 @@ fn apply_commands(
                 );
             }
             Command::UninstallModule {
-                station_id,
+                facility_id,
                 module_id,
             } => {
+                let crate::FacilityId::Station(station_id) = facility_id else {
+                    continue;
+                };
                 commands::handle_uninstall_module(
                     state,
                     content,
@@ -157,10 +163,13 @@ fn apply_commands(
                 );
             }
             Command::SetModuleEnabled {
-                station_id,
+                facility_id,
                 module_id,
                 enabled,
             } => {
+                let crate::FacilityId::Station(station_id) = facility_id else {
+                    continue;
+                };
                 commands::handle_set_module_enabled(
                     state,
                     station_id,
@@ -171,10 +180,13 @@ fn apply_commands(
                 );
             }
             Command::SetModuleThreshold {
-                station_id,
+                facility_id,
                 module_id,
                 threshold_kg,
             } => {
+                let crate::FacilityId::Station(station_id) = facility_id else {
+                    continue;
+                };
                 commands::handle_set_module_threshold(
                     state,
                     station_id,
@@ -206,9 +218,12 @@ fn apply_commands(
                 );
             }
             Command::Import {
-                station_id,
+                facility_id,
                 item_spec,
             } => {
+                let crate::FacilityId::Station(station_id) = facility_id else {
+                    continue; // Ground facility import not yet implemented
+                };
                 commands::handle_import(
                     state,
                     content,
@@ -220,9 +235,12 @@ fn apply_commands(
                 );
             }
             Command::Export {
-                station_id,
+                facility_id,
                 item_spec,
             } => {
+                let crate::FacilityId::Station(station_id) = facility_id else {
+                    continue;
+                };
                 commands::handle_export(
                     state,
                     content,
