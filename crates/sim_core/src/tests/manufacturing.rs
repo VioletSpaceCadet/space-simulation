@@ -9,6 +9,7 @@ use crate::test_fixtures::ModuleDefBuilder;
 /// Helper: count components of a given ID across a station's inventory.
 fn component_count(state: &GameState, station_id: &StationId, component_id_str: &str) -> u32 {
     state.stations[station_id]
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -185,7 +186,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Plate press module (produces fe_plates from Fe)
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_plate_press".to_string()),
         def_id: "module_plate_press".to_string(),
         enabled: true,
@@ -205,7 +206,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
     });
 
     // Structural assembler (priority 5) — consumes 3x fe_plate → structural_beam
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_structural_assembler".to_string()),
         def_id: "module_structural_assembler".to_string(),
         enabled: true,
@@ -226,7 +227,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
     });
 
     // Basic assembler (priority 3) — consumes 1x fe_plate + 1x repair_kit
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_basic_assembler".to_string()),
         def_id: "module_basic_assembler".to_string(),
         enabled: true,
@@ -247,7 +248,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
     });
 
     // Give Fe for plates (plate press: 500kg Fe → 1 fe_plate every 2 ticks).
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 5000.0,
         quality: 0.7,
@@ -257,14 +258,14 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
     // Pre-seed 4 fe_plates so the structural assembler (needs 3) can run
     // immediately. The basic assembler (needs 1) can also run.
     // With priority sorting, structural (priority 5) consumes first.
-    station.inventory.push(InventoryItem::Component {
+    station.core.inventory.push(InventoryItem::Component {
         component_id: ComponentId("fe_plate".to_string()),
         count: 4,
         quality: 1.0,
     });
 
     // Give repair_kits for advanced_repair_kit recipe
-    station.inventory.push(InventoryItem::Component {
+    station.core.inventory.push(InventoryItem::Component {
         component_id: ComponentId("repair_kit".to_string()),
         count: 10,
         quality: 1.0,
@@ -332,7 +333,7 @@ fn competing_demand_reversed_priority() {
 
     // Reverse priorities: basic_assembler gets 5, structural gets 3
     let station = state.stations.get_mut(&station_id).unwrap();
-    for module in &mut station.modules {
+    for module in &mut station.core.modules {
         if module.def_id == "module_basic_assembler" {
             module.module_priority = 5;
         } else if module.def_id == "module_structural_assembler" {
@@ -385,15 +386,16 @@ fn determinism_fixture_based() {
     assert_eq!(state1.meta.tick, state2.meta.tick);
 
     // Compare inventories
-    let inv1 = &state1.stations[&station_id].inventory;
-    let inv2 = &state2.stations[&station_id].inventory;
+    let inv1 = &state1.stations[&station_id].core.inventory;
+    let inv2 = &state2.stations[&station_id].core.inventory;
     assert_eq!(inv1.len(), inv2.len(), "inventory length mismatch");
 
     // Compare module wear
     for (m1, m2) in state1.stations[&station_id]
+        .core
         .modules
         .iter()
-        .zip(state2.stations[&station_id].modules.iter())
+        .zip(state2.stations[&station_id].core.modules.iter())
     {
         assert_eq!(m1.id, m2.id);
         assert!(
@@ -465,7 +467,7 @@ fn state_with_smelter_and_crucible(content: &GameContent) -> GameState {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Add crucible module
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_crucible_001".to_string()),
         def_id: "module_test_crucible".to_string(),
         enabled: true,
@@ -484,7 +486,7 @@ fn state_with_smelter_and_crucible(content: &GameContent) -> GameState {
     });
 
     // Create thermal link: smelter.molten_out → crucible.molten_in
-    station.thermal_links.push(ThermalLink {
+    station.core.thermal_links.push(ThermalLink {
         from_module_id: ModuleInstanceId("mod_smelter_001".to_string()),
         from_port_id: "molten_out".to_string(),
         to_module_id: ModuleInstanceId("mod_crucible_001".to_string()),
@@ -509,6 +511,7 @@ fn smelter_outputs_to_linked_crucible() {
 
     // Fe should NOT be in station inventory
     let station_fe: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -525,7 +528,7 @@ fn smelter_outputs_to_linked_crucible() {
     let crucible_idx = station
         .module_index_by_id(&ModuleInstanceId("mod_crucible_001".to_string()))
         .unwrap();
-    let held_items = match &station.modules[crucible_idx].kind_state {
+    let held_items = match &station.core.modules[crucible_idx].kind_state {
         ModuleKindState::ThermalContainer(c) => &c.held_items,
         _ => panic!("expected ThermalContainer"),
     };
@@ -571,6 +574,7 @@ fn smelter_without_link_falls_back_to_inventory() {
 
     let station = &state.stations[&station_id];
     let station_fe: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -595,7 +599,7 @@ fn smelter_output_to_full_crucible_falls_back() {
         .module_index_by_id(&ModuleInstanceId("mod_crucible_001".to_string()))
         .unwrap();
     if let ModuleKindState::ThermalContainer(ref mut c) =
-        state.stations.get_mut(&station_id).unwrap().modules[crucible_idx].kind_state
+        state.stations.get_mut(&station_id).unwrap().core.modules[crucible_idx].kind_state
     {
         c.held_items.push(InventoryItem::Material {
             element: "Fe".to_string(),
@@ -616,6 +620,7 @@ fn smelter_output_to_full_crucible_falls_back() {
     // so it falls back to station inventory
     let station = &state.stations[&station_id];
     let station_fe: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {

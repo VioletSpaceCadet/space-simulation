@@ -67,12 +67,13 @@ impl StationConcern for ComponentImport {
         let has_shipyard = station
             .modules_with_role(shipyard_role)
             .iter()
-            .any(|&idx| station.modules[idx].enabled);
+            .any(|&idx| station.core.modules[idx].enabled);
         if !has_shipyard {
             return Vec::new();
         }
 
         let component_count: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|item| match item {

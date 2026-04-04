@@ -94,12 +94,14 @@ fn full_sim_state_actually_changes() {
     // Station inventory should have changed (refinery processed ore)
     let station_id = test_station_id();
     let initial_ore_kg: f32 = initial_state.stations[&station_id]
+        .core
         .inventory
         .iter()
         .filter(|i| i.is_ore())
         .map(InventoryItem::mass_kg)
         .sum();
     let final_ore_kg: f32 = state.stations[&station_id]
+        .core
         .inventory
         .iter()
         .filter(|i| i.is_ore())
@@ -114,7 +116,7 @@ fn full_sim_state_actually_changes() {
 
     // Wear should have accumulated on the refinery module
     let station = &state.stations[&station_id];
-    let refinery_wear = station.modules[0].wear.wear;
+    let refinery_wear = station.core.modules[0].wear.wear;
     assert!(
         refinery_wear > 0.0,
         "refinery module should have accumulated wear (got {refinery_wear})"
@@ -155,7 +157,12 @@ fn float_field_spot_check_deterministic() {
     let station_b = &state_b.stations[&station_id];
 
     // Wear state (accumulated every tick via float addition)
-    for (module_a, module_b) in station_a.modules.iter().zip(station_b.modules.iter()) {
+    for (module_a, module_b) in station_a
+        .core
+        .modules
+        .iter()
+        .zip(station_b.core.modules.iter())
+    {
         assert_eq!(
             module_a.wear.wear.to_bits(),
             module_b.wear.wear.to_bits(),
@@ -166,11 +173,13 @@ fn float_field_spot_check_deterministic() {
 
     // Inventory masses (float arithmetic during processing)
     let masses_a: Vec<u32> = station_a
+        .core
         .inventory
         .iter()
         .map(|i| i.mass_kg().to_bits())
         .collect();
     let masses_b: Vec<u32> = station_b
+        .core
         .inventory
         .iter()
         .map(|i| i.mass_kg().to_bits())

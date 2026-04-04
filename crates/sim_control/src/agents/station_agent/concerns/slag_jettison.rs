@@ -20,14 +20,15 @@ impl StationConcern for SlagJettison {
         };
 
         let threshold = ctx.content.autopilot.slag_jettison_pct;
-        if station.cargo_capacity_m3 <= 0.0 {
+        if station.core.cargo_capacity_m3 <= 0.0 {
             return Vec::new();
         }
-        let used_m3 = inventory_volume_m3(&station.inventory, ctx.content);
-        let used_pct = used_m3 / station.cargo_capacity_m3;
+        let used_m3 = inventory_volume_m3(&station.core.inventory, ctx.content);
+        let used_pct = used_m3 / station.core.cargo_capacity_m3;
 
         if used_pct >= threshold
             && station
+                .core
                 .inventory
                 .iter()
                 .any(|i| matches!(i, InventoryItem::Slag { .. }))

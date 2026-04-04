@@ -495,7 +495,7 @@ fn validate_scoring(content: &GameContent) {
 pub fn validate_state(state: &GameState, content: &GameContent) {
     let element_ids: HashSet<&str> = content.elements.iter().map(|e| e.id.as_str()).collect();
     for station in state.stations.values() {
-        for item in &station.inventory {
+        for item in &station.core.inventory {
             if let InventoryItem::Material { element, .. } = item {
                 assert!(
                     element_ids.contains(element.as_str()),
@@ -799,19 +799,21 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     let station = StationState {
         id: station_id.clone(),
         position: earth_orbit_pos.clone(),
-        inventory: build_initial_inventory(&content.initial_station),
-        cargo_capacity_m3: c.station_cargo_capacity_m3,
-        power_available_per_tick: c.station_power_available_per_tick,
-        modules: vec![],
-        modifiers: sim_core::modifiers::ModifierSet::default(),
-        crew: content.initial_station.crew.clone(),
+        core: sim_core::FacilityCore {
+            inventory: build_initial_inventory(&content.initial_station),
+            cargo_capacity_m3: c.station_cargo_capacity_m3,
+            power_available_per_tick: c.station_power_available_per_tick,
+            modules: vec![],
+            modifiers: sim_core::modifiers::ModifierSet::default(),
+            crew: content.initial_station.crew.clone(),
+            thermal_links: Vec::new(),
+            power: PowerState::default(),
+            cached_inventory_volume_m3: None,
+            module_type_index: sim_core::ModuleTypeIndex::default(),
+            module_id_index: std::collections::HashMap::new(),
+            power_budget_cache: sim_core::PowerBudgetCache::default(),
+        },
         leaders: Vec::new(),
-        thermal_links: Vec::new(),
-        power: PowerState::default(),
-        cached_inventory_volume_m3: None,
-        module_type_index: sim_core::ModuleTypeIndex::default(),
-        module_id_index: std::collections::HashMap::new(),
-        power_budget_cache: sim_core::PowerBudgetCache::default(),
     };
     let (ship_id, ship) = build_initial_ship(content, c, &earth_orbit_pos);
     // Place scan sites in zone bodies using weighted picking + area-sampled positions.
@@ -883,20 +885,25 @@ pub fn auto_assign_initial_crew(state: &mut GameState, content: &GameContent) {
             continue;
         };
         // Collect modules with crew requirements, sorted by priority desc then ID asc
-        let mut module_order: Vec<usize> = (0..station.modules.len()).collect();
+        let mut module_order: Vec<usize> = (0..station.core.modules.len()).collect();
         module_order.sort_by(|&a, &b| {
-            station.modules[b]
+            station.core.modules[b]
                 .module_priority
-                .cmp(&station.modules[a].module_priority)
-                .then_with(|| station.modules[a].id.0.cmp(&station.modules[b].id.0))
+                .cmp(&station.core.modules[a].module_priority)
+                .then_with(|| {
+                    station.core.modules[a]
+                        .id
+                        .0
+                        .cmp(&station.core.modules[b].id.0)
+                })
         });
         // Track remaining crew
         let mut remaining: std::collections::BTreeMap<sim_core::CrewRole, u32> =
-            station.crew.clone();
+            station.core.crew.clone();
         let mut assignments: Vec<(usize, std::collections::BTreeMap<sim_core::CrewRole, u32>)> =
             Vec::new();
         for module_index in module_order {
-            let def_id = &station.modules[module_index].def_id;
+            let def_id = &station.core.modules[module_index].def_id;
             let Some(def) = content.module_defs.get(def_id) else {
                 continue;
             };
@@ -923,13 +930,13 @@ pub fn auto_assign_initial_crew(state: &mut GameState, content: &GameContent) {
         }
         let station = state.stations.get_mut(&station_id).expect("checked");
         for (module_index, assigned) in assignments {
-            station.modules[module_index].assigned_crew = assigned;
+            station.core.modules[module_index].assigned_crew = assigned;
             if let Some(def) = content
                 .module_defs
-                .get(&station.modules[module_index].def_id)
+                .get(&station.core.modules[module_index].def_id)
             {
-                station.modules[module_index].efficiency = sim_core::compute_module_efficiency(
-                    &station.modules[module_index],
+                station.core.modules[module_index].efficiency = sim_core::compute_module_efficiency(
+                    &station.core.modules[module_index],
                     def,
                     &content.constants,
                 );
@@ -1545,24 +1552,26 @@ mod tests {
                 StationState {
                     id: station_id,
                     position: test_position(),
-                    inventory: vec![InventoryItem::Material {
-                        element: "Unobtanium".to_string(),
-                        kg: 100.0,
-                        quality: 1.0,
-                        thermal: None,
-                    }],
-                    cargo_capacity_m3: 1000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![],
-                    modifiers: sim_core::modifiers::ModifierSet::default(),
-                    crew: std::collections::BTreeMap::new(),
+                    core: sim_core::FacilityCore {
+                        inventory: vec![InventoryItem::Material {
+                            element: "Unobtanium".to_string(),
+                            kg: 100.0,
+                            quality: 1.0,
+                            thermal: None,
+                        }],
+                        cargo_capacity_m3: 1000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![],
+                        modifiers: sim_core::modifiers::ModifierSet::default(),
+                        crew: std::collections::BTreeMap::new(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: sim_core::ModuleTypeIndex::default(),
+                        module_id_index: std::collections::HashMap::new(),
+                        power_budget_cache: sim_core::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: sim_core::ModuleTypeIndex::default(),
-                    module_id_index: std::collections::HashMap::new(),
-                    power_budget_cache: sim_core::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -1699,6 +1708,7 @@ mod tests {
 
         // Extract module def_ids from both, sorted for comparison
         let mut built_modules: Vec<&str> = built_station
+            .core
             .inventory
             .iter()
             .filter_map(|item| match item {
@@ -1709,6 +1719,7 @@ mod tests {
         built_modules.sort();
 
         let mut loaded_modules: Vec<&str> = loaded_station
+            .core
             .inventory
             .iter()
             .filter_map(|item| match item {

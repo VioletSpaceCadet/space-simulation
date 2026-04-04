@@ -61,7 +61,7 @@ fn crew_state(content: &GameContent, crew_count: u32) -> GameState {
     let mut state = base_state(content);
     let station_id = test_station_id();
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_crew_proc".to_string()),
         def_id: "module_crew_processor".to_string(),
         enabled: true,
@@ -84,9 +84,10 @@ fn crew_state(content: &GameContent, crew_count: u32) -> GameState {
         prev_crew_satisfied: true,
     });
     station
+        .core
         .crew
         .insert(CrewRole("operator".to_string()), crew_count);
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 10000.0,
         quality: 1.0,
@@ -110,6 +111,7 @@ fn staffed_module_runs() {
     let station = &state.stations[&test_station_id()];
     // Fe was consumed (started at 10000, processor runs each tick)
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -135,6 +137,7 @@ fn understaffed_module_skips() {
 
     let station = &state.stations[&test_station_id()];
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -155,7 +158,7 @@ fn empty_crew_requirement_always_satisfied() {
     let station = state.stations.get_mut(&test_station_id()).unwrap();
 
     // Add a no-crew processor
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_no_crew".to_string()),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -187,6 +190,7 @@ fn assign_crew_command_works() {
         .stations
         .get_mut(&test_station_id())
         .unwrap()
+        .core
         .crew
         .insert(CrewRole("operator".to_string()), 2);
 
@@ -219,7 +223,7 @@ fn assign_crew_command_works() {
         "expected CrewAssigned event"
     );
     // Module should have 1 operator assigned
-    let module = &state.stations[&test_station_id()].modules[0];
+    let module = &state.stations[&test_station_id()].core.modules[0];
     assert_eq!(
         module.assigned_crew.get(&CrewRole("operator".to_string())),
         Some(&1)
@@ -310,7 +314,7 @@ fn crew_import_via_trade() {
     );
     let station = &state.stations[&test_station_id()];
     assert_eq!(
-        station.crew.get(&CrewRole("operator".to_string())),
+        station.core.crew.get(&CrewRole("operator".to_string())),
         Some(&2),
         "station should have 2 operators after import"
     );
@@ -338,13 +342,16 @@ fn crew_determinism() {
 
     let station_a = &state_a.stations[&test_station_id()];
     let station_b = &state_b.stations[&test_station_id()];
-    assert_eq!(station_a.crew, station_b.crew, "crew rosters should match");
     assert_eq!(
-        station_a.modules[0].assigned_crew, station_b.modules[0].assigned_crew,
+        station_a.core.crew, station_b.core.crew,
+        "crew rosters should match"
+    );
+    assert_eq!(
+        station_a.core.modules[0].assigned_crew, station_b.core.modules[0].assigned_crew,
         "assigned crew should match"
     );
     assert_eq!(
-        station_a.modules[0].efficiency, station_b.modules[0].efficiency,
+        station_a.core.modules[0].efficiency, station_b.core.modules[0].efficiency,
         "efficiency should match"
     );
 }

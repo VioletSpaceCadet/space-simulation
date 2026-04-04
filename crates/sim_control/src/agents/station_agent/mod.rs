@@ -17,7 +17,7 @@ pub(in crate::agents) fn has_unsatisfied_crew_need(
     station: &sim_core::StationState,
     content: &GameContent,
 ) -> bool {
-    station.modules.iter().any(|m| {
+    station.core.modules.iter().any(|m| {
         m.enabled
             && !m.prev_crew_satisfied
             && content

@@ -34,7 +34,7 @@ fn setup_refueling_ship(
 
     // Add LH2 to station inventory
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "LH2".to_string(),
         kg: station_lh2_kg,
         quality: 1.0,
@@ -130,6 +130,7 @@ fn refuel_station_lh2_depleted() {
         .get(&StationId("station_earth_orbit".to_string()))
         .unwrap();
     let station_lh2: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -170,7 +171,7 @@ fn refuel_concurrent_pro_rata() {
 
     // Station has 60 kg LH2 — each ship requests 100 (rate), total 200 > 60
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "LH2".to_string(),
         kg: 60.0,
         quality: 1.0,

@@ -71,7 +71,7 @@ impl StationConcern for LabAssignment {
 
         let mut commands = Vec::new();
 
-        for module in &station.modules {
+        for module in &station.core.modules {
             let ModuleKindState::Lab(lab_state) = &module.kind_state else {
                 continue;
             };

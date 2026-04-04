@@ -474,23 +474,20 @@ pub struct ThermalLink {
     pub to_port_id: String,
 }
 
+/// Shared substrate for any entity that hosts modules, inventory, crew, and power.
+/// Both `StationState` (orbital) and `GroundFacilityState` (surface) compose this.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StationState {
-    pub id: StationId,
-    pub position: crate::Position,
+pub struct FacilityCore {
     pub inventory: Vec<InventoryItem>,
     pub cargo_capacity_m3: f32,
     pub power_available_per_tick: f32,
     pub modules: Vec<ModuleState>,
-    /// Per-station modifiers (from equipment, location).
+    /// Per-facility modifiers (from equipment, location).
     #[serde(default)]
     pub modifiers: crate::modifiers::ModifierSet,
-    /// Station crew roster: how many of each role are available.
+    /// Crew roster: how many of each role are available.
     #[serde(default)]
     pub crew: BTreeMap<CrewRole, u32>,
-    /// Station leaders (reserved for Phase 2 leader system).
-    #[serde(default)]
-    pub leaders: Vec<LeaderId>,
     /// Explicit module-to-module connections for material flow.
     #[serde(default)]
     pub thermal_links: Vec<ThermalLink>,
@@ -498,7 +495,7 @@ pub struct StationState {
     #[serde(skip_deserializing, default)]
     pub power: PowerState,
     /// Cached inventory volume. Set to `None` when inventory changes;
-    /// recomputed lazily via [`StationState::used_volume_m3`].
+    /// recomputed lazily via [`FacilityCore::used_volume_m3`].
     #[serde(skip, default)]
     pub cached_inventory_volume_m3: Option<f32>,
     /// Pre-computed module-type → indices mapping. Rebuilt on install/uninstall.
@@ -513,7 +510,19 @@ pub struct StationState {
     pub power_budget_cache: PowerBudgetCache,
 }
 
-impl StationState {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StationState {
+    pub id: StationId,
+    pub position: crate::Position,
+    /// Shared module-hosting fields.
+    #[serde(flatten)]
+    pub core: FacilityCore,
+    /// Station leaders (reserved for Phase 2 leader system).
+    #[serde(default)]
+    pub leaders: Vec<LeaderId>,
+}
+
+impl FacilityCore {
     /// Get the cached inventory volume, computing and caching if needed.
     pub fn used_volume_m3(&mut self, content: &GameContent) -> f32 {
         if let Some(vol) = self.cached_inventory_volume_m3 {
@@ -535,8 +544,6 @@ impl StationState {
         self.power_budget_cache.invalidate();
     }
 
-    /// Rebuild the module type index from the current modules list and content defs.
-    /// Call after install/uninstall or initial station construction.
     /// Returns how many crew of a given role are available (not assigned to modules).
     pub fn available_crew(&self, role: &CrewRole) -> u32 {
         let total = self.crew.get(role).copied().unwrap_or(0);
@@ -615,6 +622,47 @@ impl StationState {
             .roles
             .get(role)
             .map_or(&[], |v| v.as_slice())
+    }
+}
+
+impl StationState {
+    // Delegation methods — forward to self.core so external callers don't all
+    // need updating in this refactoring ticket.
+
+    pub fn used_volume_m3(&mut self, content: &GameContent) -> f32 {
+        self.core.used_volume_m3(content)
+    }
+
+    pub fn invalidate_volume_cache(&mut self) {
+        self.core.invalidate_volume_cache();
+    }
+
+    pub fn invalidate_power_cache(&mut self) {
+        self.core.invalidate_power_cache();
+    }
+
+    pub fn available_crew(&self, role: &CrewRole) -> u32 {
+        self.core.available_crew(role)
+    }
+
+    pub fn init_module_efficiency(&mut self, content: &GameContent) {
+        self.core.init_module_efficiency(content);
+    }
+
+    pub fn rebuild_module_index(&mut self, content: &GameContent) {
+        self.core.rebuild_module_index(content);
+    }
+
+    pub fn module_index_by_id(&self, id: &ModuleInstanceId) -> Option<usize> {
+        self.core.module_index_by_id(id)
+    }
+
+    pub fn has_role(&self, role: &str) -> bool {
+        self.core.has_role(role)
+    }
+
+    pub fn modules_with_role(&self, role: &str) -> &[usize] {
+        self.core.modules_with_role(role)
     }
 }
 
@@ -803,7 +851,7 @@ mod tests {
         let station = state.stations.get_mut(&test_station_id()).unwrap();
 
         // Push two modules
-        station.modules.push(ModuleState {
+        station.core.modules.push(ModuleState {
             id: ModuleInstanceId("mod_alpha".to_string()),
             def_id: "nonexistent".to_string(),
             enabled: true,
@@ -816,7 +864,7 @@ mod tests {
             prev_crew_satisfied: true,
             thermal: None,
         });
-        station.modules.push(ModuleState {
+        station.core.modules.push(ModuleState {
             id: ModuleInstanceId("mod_beta".to_string()),
             def_id: "nonexistent".to_string(),
             enabled: true,
@@ -836,8 +884,8 @@ mod tests {
         let beta_idx = station.module_index_by_id(&ModuleInstanceId("mod_beta".to_string()));
         let missing = station.module_index_by_id(&ModuleInstanceId("mod_missing".to_string()));
 
-        assert_eq!(alpha_idx, Some(station.modules.len() - 2));
-        assert_eq!(beta_idx, Some(station.modules.len() - 1));
+        assert_eq!(alpha_idx, Some(station.core.modules.len() - 2));
+        assert_eq!(beta_idx, Some(station.core.modules.len() - 1));
         assert_eq!(missing, None);
     }
 

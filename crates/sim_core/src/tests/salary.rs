@@ -30,7 +30,7 @@ fn salary_state(content: &GameContent, crew: BTreeMap<CrewRole, u32>, balance: f
     let mut state = base_state(content);
     state.balance = balance;
     let station = state.stations.get_mut(&test_station_id()).unwrap();
-    station.crew = crew;
+    station.core.crew = crew;
     state
 }
 

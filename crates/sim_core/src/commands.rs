@@ -66,14 +66,14 @@ pub(crate) fn handle_install_module(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    let item_pos = station.inventory.iter().position(
+    let item_pos = station.core.inventory.iter().position(
         |i| matches!(i, InventoryItem::Module { item_id, .. } if item_id == module_item_id),
     );
     let Some(pos) = item_pos else { return false };
     let InventoryItem::Module {
         item_id,
         module_def_id,
-    } = station.inventory.remove(pos)
+    } = station.core.inventory.remove(pos)
     else {
         return false;
     };
@@ -88,7 +88,7 @@ pub(crate) fn handle_install_module(
             let Some(station) = state.stations.get_mut(station_id) else {
                 return false;
             };
-            station.inventory.push(InventoryItem::Module {
+            station.core.inventory.push(InventoryItem::Module {
                 item_id,
                 module_def_id,
             });
@@ -115,7 +115,7 @@ pub(crate) fn handle_install_module(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    station.modules.push(crate::ModuleState {
+    station.core.modules.push(crate::ModuleState {
         id: module_id.clone(),
         def_id: module_def_id.clone(),
         enabled: false,
@@ -164,7 +164,7 @@ pub(crate) fn handle_uninstall_module(
     let Some(pos) = station.module_index_by_id(module_id) else {
         return false;
     };
-    let module = station.modules.remove(pos);
+    let module = station.core.modules.remove(pos);
 
     let item_id = crate::ModuleItemId(format!(
         "module_item_{:04}",
@@ -175,7 +175,7 @@ pub(crate) fn handle_uninstall_module(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    station.inventory.push(InventoryItem::Module {
+    station.core.inventory.push(InventoryItem::Module {
         item_id: item_id.clone(),
         module_def_id: module.def_id.clone(),
     });
@@ -207,7 +207,7 @@ pub(crate) fn handle_set_module_enabled(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+    let Some(module) = station.core.modules.iter_mut().find(|m| &m.id == module_id) else {
         return false;
     };
     module.enabled = enabled;
@@ -236,7 +236,7 @@ pub(crate) fn handle_set_module_threshold(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+    let Some(module) = station.core.modules.iter_mut().find(|m| &m.id == module_id) else {
         return false;
     };
     if let crate::ModuleKindState::Processor(ps) = &mut module.kind_state {
@@ -264,7 +264,7 @@ pub(crate) fn handle_assign_lab_tech(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+    let Some(module) = station.core.modules.iter_mut().find(|m| &m.id == module_id) else {
         return false;
     };
     if let crate::ModuleKindState::Lab(ls) = &mut module.kind_state {
@@ -288,7 +288,7 @@ pub(crate) fn handle_select_recipe(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+    let Some(module) = station.core.modules.iter_mut().find(|m| &m.id == module_id) else {
         return false;
     };
     let Some(def) = content.module_defs.get(&module.def_id) else {
@@ -323,7 +323,7 @@ pub(crate) fn handle_set_assembler_cap(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+    let Some(module) = station.core.modules.iter_mut().find(|m| &m.id == module_id) else {
         return false;
     };
     if let crate::ModuleKindState::Assembler(asmb) = &mut module.kind_state {
@@ -378,7 +378,7 @@ pub(crate) fn handle_import(
         let Some(station) = state.stations.get_mut(station_id) else {
             return false;
         };
-        *station.crew.entry(role.clone()).or_insert(0) += count;
+        *station.core.crew.entry(role.clone()).or_insert(0) += count;
         events.push(crate::emit(
             &mut state.counters,
             current_tick,
@@ -399,7 +399,7 @@ pub(crate) fn handle_import(
         return false;
     };
     let current_volume = station.used_volume_m3(content);
-    let cargo_cap = station.cargo_capacity_m3;
+    let cargo_cap = station.core.cargo_capacity_m3;
     if current_volume + new_volume > cargo_cap {
         return false; // no room
     }
@@ -409,7 +409,7 @@ pub(crate) fn handle_import(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    trade::merge_into_inventory(&mut station.inventory, new_items);
+    trade::merge_into_inventory(&mut station.core.inventory, new_items);
     station.invalidate_volume_cache();
 
     events.push(crate::emit(
@@ -450,7 +450,7 @@ pub(crate) fn handle_export(
     };
 
     // Check station has items
-    if !trade::has_enough_for_export(&station.inventory, item_spec) {
+    if !trade::has_enough_for_export(&station.core.inventory, item_spec) {
         return false;
     }
 
@@ -458,7 +458,7 @@ pub(crate) fn handle_export(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    if !trade::remove_inventory_items(&mut station.inventory, item_spec) {
+    if !trade::remove_inventory_items(&mut station.core.inventory, item_spec) {
         return false;
     }
     station.invalidate_volume_cache();
@@ -490,6 +490,7 @@ pub(crate) fn handle_jettison_slag(
         return false;
     };
     let jettisoned_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| {
@@ -501,6 +502,7 @@ pub(crate) fn handle_jettison_slag(
         })
         .sum();
     station
+        .core
         .inventory
         .retain(|i| !matches!(i, InventoryItem::Slag { .. }));
     station.invalidate_volume_cache();
@@ -528,7 +530,7 @@ pub(crate) fn handle_set_module_priority(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+    let Some(module) = station.core.modules.iter_mut().find(|m| &m.id == module_id) else {
         return false;
     };
     module.module_priority = priority;
@@ -555,7 +557,7 @@ pub(crate) fn handle_assign_crew(
     let Some(module_index) = station.module_index_by_id(module_id) else {
         return false;
     };
-    let def_id = &station.modules[module_index].def_id;
+    let def_id = &station.core.modules[module_index].def_id;
     let Some(def) = content.module_defs.get(def_id) else {
         return false;
     };
@@ -563,7 +565,7 @@ pub(crate) fn handle_assign_crew(
         return false;
     };
     // Cap: don't assign more than the requirement
-    let already_assigned = station.modules[module_index]
+    let already_assigned = station.core.modules[module_index]
         .assigned_crew
         .get(role)
         .copied()
@@ -585,16 +587,16 @@ pub(crate) fn handle_assign_crew(
         .get_mut(station_id)
         .expect("station checked above");
     let was_satisfied = crate::is_crew_satisfied(
-        &station.modules[module_index].assigned_crew,
+        &station.core.modules[module_index].assigned_crew,
         &def.crew_requirement,
     );
-    let entry = station.modules[module_index]
+    let entry = station.core.modules[module_index]
         .assigned_crew
         .entry(role.clone())
         .or_insert(0);
     *entry += count;
     let now_satisfied = crate::is_crew_satisfied(
-        &station.modules[module_index].assigned_crew,
+        &station.core.modules[module_index].assigned_crew,
         &def.crew_requirement,
     );
     events.push(crate::emit(
@@ -637,7 +639,7 @@ pub(crate) fn handle_unassign_crew(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) else {
+    let Some(module) = station.core.modules.iter_mut().find(|m| &m.id == module_id) else {
         return false;
     };
     let assigned = module.assigned_crew.get(role).copied().unwrap_or(0);
@@ -788,7 +790,7 @@ pub(crate) fn handle_fit_ship_module(
         return false;
     }
     // Station must have an InventoryItem::Module with matching module_def_id
-    let item_pos = station.inventory.iter().position(|item| {
+    let item_pos = station.core.inventory.iter().position(|item| {
         matches!(item, InventoryItem::Module { module_def_id: def_id, .. } if *def_id == module_def_id.0)
     });
     let Some(pos) = item_pos else { return false };
@@ -797,7 +799,7 @@ pub(crate) fn handle_fit_ship_module(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    station.inventory.remove(pos);
+    station.core.inventory.remove(pos);
     station.invalidate_volume_cache();
 
     // Add FittedModule to ship
@@ -881,7 +883,7 @@ pub(crate) fn handle_unfit_ship_module(
     let Some(station) = state.stations.get_mut(station_id) else {
         return false;
     };
-    station.inventory.push(InventoryItem::Module {
+    station.core.inventory.push(InventoryItem::Module {
         item_id: item_id.clone(),
         module_def_id: removed.module_def_id.0.clone(),
     });
@@ -919,8 +921,8 @@ pub(crate) fn handle_create_thermal_link(
     let Some(to_idx) = station.module_index_by_id(&link.to_module_id) else {
         return;
     };
-    let from_module = &station.modules[from_idx];
-    let to_module = &station.modules[to_idx];
+    let from_module = &station.core.modules[from_idx];
+    let to_module = &station.core.modules[to_idx];
     let Some(from_def) = content.module_defs.get(&from_module.def_id) else {
         return;
     };
@@ -943,11 +945,11 @@ pub(crate) fn handle_create_thermal_link(
         .stations
         .get_mut(station_id)
         .expect("station verified above");
-    if station.thermal_links.contains(link) {
+    if station.core.thermal_links.contains(link) {
         return;
     }
 
-    station.thermal_links.push(link.clone());
+    station.core.thermal_links.push(link.clone());
     events.push(crate::emit(
         &mut state.counters,
         state.meta.tick,
@@ -972,9 +974,9 @@ pub(crate) fn handle_remove_thermal_link(
         return;
     };
 
-    let before_len = station.thermal_links.len();
-    station.thermal_links.retain(|l| l != link);
-    if station.thermal_links.len() < before_len {
+    let before_len = station.core.thermal_links.len();
+    station.core.thermal_links.retain(|l| l != link);
+    if station.core.thermal_links.len() < before_len {
         events.push(crate::emit(
             &mut state.counters,
             state.meta.tick,
@@ -1010,10 +1012,10 @@ pub(crate) fn handle_transfer_molten(
     };
 
     // Verify a thermal link exists between these modules
-    let has_link = station
-        .thermal_links
-        .iter()
-        .any(|link| link.from_module_id == *from_module_id && link.to_module_id == *to_module_id);
+    let has_link =
+        station.core.thermal_links.iter().any(|link| {
+            link.from_module_id == *from_module_id && link.to_module_id == *to_module_id
+        });
     if !has_link {
         return;
     }
@@ -1028,11 +1030,11 @@ pub(crate) fn handle_transfer_molten(
 
     // Verify both are thermal containers
     let is_from_container = matches!(
-        station.modules[from_idx].kind_state,
+        station.core.modules[from_idx].kind_state,
         crate::ModuleKindState::ThermalContainer(_)
     );
     let is_to_container = matches!(
-        station.modules[to_idx].kind_state,
+        station.core.modules[to_idx].kind_state,
         crate::ModuleKindState::ThermalContainer(_)
     );
     if !is_from_container || !is_to_container {
@@ -1040,7 +1042,9 @@ pub(crate) fn handle_transfer_molten(
     }
 
     // Check destination capacity
-    let to_def = content.module_defs.get(&station.modules[to_idx].def_id);
+    let to_def = content
+        .module_defs
+        .get(&station.core.modules[to_idx].def_id);
     let capacity_kg = to_def
         .and_then(|d| match &d.behavior {
             crate::ModuleBehaviorDef::ThermalContainer(tc) => Some(tc.capacity_kg),
@@ -1055,7 +1059,7 @@ pub(crate) fn handle_transfer_molten(
 
     // Extract material from source container
     let crate::ModuleKindState::ThermalContainer(ref mut from_container) =
-        station.modules[from_idx].kind_state
+        station.core.modules[from_idx].kind_state
     else {
         return;
     };
@@ -1132,7 +1136,7 @@ pub(crate) fn handle_transfer_molten(
     if froze {
         // Material solidified — put it back in source and emit PipeFreeze
         let crate::ModuleKindState::ThermalContainer(ref mut from_container) =
-            station.modules[from_idx].kind_state
+            station.core.modules[from_idx].kind_state
         else {
             return;
         };
@@ -1152,7 +1156,7 @@ pub(crate) fn handle_transfer_molten(
 
     // Check destination capacity
     let crate::ModuleKindState::ThermalContainer(ref dest_container) =
-        station.modules[to_idx].kind_state
+        station.core.modules[to_idx].kind_state
     else {
         return;
     };
@@ -1160,7 +1164,7 @@ pub(crate) fn handle_transfer_molten(
     if current_dest_kg + actual_kg > capacity_kg {
         // Over capacity — put material back in source
         let crate::ModuleKindState::ThermalContainer(ref mut from_container) =
-            station.modules[from_idx].kind_state
+            station.core.modules[from_idx].kind_state
         else {
             return;
         };
@@ -1170,7 +1174,7 @@ pub(crate) fn handle_transfer_molten(
 
     // Place in destination
     let crate::ModuleKindState::ThermalContainer(ref mut dest_container) =
-        station.modules[to_idx].kind_state
+        station.core.modules[to_idx].kind_state
     else {
         return;
     };
@@ -1355,7 +1359,7 @@ mod tests {
     fn state_with_module_in_inventory(content: &GameContent) -> GameState {
         let mut state = base_state(content);
         let station = state.stations.values_mut().next().unwrap();
-        station.inventory.push(InventoryItem::Module {
+        station.core.inventory.push(InventoryItem::Module {
             item_id: ModuleItemId("mod_item_0001".to_string()),
             module_def_id: "module_cargo_expander".to_string(),
         });
@@ -1402,6 +1406,7 @@ mod tests {
         // Module removed from station inventory
         let station = state.stations.get(&station_id).unwrap();
         assert!(!station
+            .core
             .inventory
             .iter()
             .any(|i| matches!(i, InventoryItem::Module { .. })));
@@ -1500,7 +1505,7 @@ mod tests {
         assert!((ship.cargo_capacity_m3 - 50.0).abs() < 0.1);
         // Module returned to station
         let station = state.stations.get(&station_id).unwrap();
-        assert!(station.inventory.iter().any(|i| matches!(i, InventoryItem::Module { module_def_id, .. } if module_def_id == "module_cargo_expander")));
+        assert!(station.core.inventory.iter().any(|i| matches!(i, InventoryItem::Module { module_def_id, .. } if module_def_id == "module_cargo_expander")));
         assert_eq!(events.len(), 1);
         assert!(matches!(
             &events[0].event,
@@ -1575,7 +1580,7 @@ mod tests {
 
         // Add module to station inventory
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.inventory.push(InventoryItem::Module {
+        station.core.inventory.push(InventoryItem::Module {
             item_id: ModuleItemId("mod_item_laser".to_string()),
             module_def_id: "module_mining_laser".to_string(),
         });

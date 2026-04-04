@@ -185,6 +185,7 @@ fn test_full_survey_deepscan_mine_deposit_cycle() {
     );
 
     let station_ore_kg: f32 = state.stations[&station_id]
+        .core
         .inventory
         .iter()
         .filter_map(|i| {

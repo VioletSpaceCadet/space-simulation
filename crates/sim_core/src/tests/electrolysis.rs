@@ -107,7 +107,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Solar array for power (50 kW > 25 kW electrolysis)
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("solar_inst_0001".to_string()),
         def_id: "module_basic_solar_array".to_string(),
         enabled: true,
@@ -122,7 +122,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
     });
 
     // Electrolysis unit
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("electrolysis_inst_0001".to_string()),
         def_id: "module_electrolysis_unit".to_string(),
         enabled: true,
@@ -142,7 +142,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
     });
 
     // H2O Material in station inventory
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "H2O".to_string(),
         kg: 5000.0,
         quality: 1.0,
@@ -165,6 +165,7 @@ fn test_electrolysis_produces_lh2_and_lox() {
     let station = &state.stations[&station_id];
 
     let lh2_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -174,6 +175,7 @@ fn test_electrolysis_produces_lh2_and_lox() {
         .sum();
 
     let lox_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -205,6 +207,7 @@ fn test_electrolysis_stoichiometric_ratio() {
     let station = &state.stations[&station_id];
 
     let lh2_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -214,6 +217,7 @@ fn test_electrolysis_stoichiometric_ratio() {
         .sum();
 
     let lox_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -241,6 +245,7 @@ fn test_electrolysis_consumes_h2o() {
 
     let station_id = StationId("station_earth_orbit".to_string());
     let initial_h2o: f32 = state.stations[&station_id]
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -253,6 +258,7 @@ fn test_electrolysis_consumes_h2o() {
     tick(&mut state, &[], &content, &mut rng, None);
 
     let remaining_h2o: f32 = state.stations[&station_id]
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -280,6 +286,7 @@ fn test_electrolysis_accumulates_wear() {
     let station = &state.stations[&station_id];
 
     let electrolysis = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_electrolysis_unit")
@@ -305,6 +312,7 @@ fn test_electrolysis_skips_without_h2o() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .retain(|i| !matches!(i, InventoryItem::Material { element, .. } if element == "H2O"));
 
@@ -315,6 +323,7 @@ fn test_electrolysis_skips_without_h2o() {
 
     // No LH2 or LOX produced
     let lh2_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -329,6 +338,7 @@ fn test_electrolysis_skips_without_h2o() {
 
     // No wear accumulated (processor didn't run)
     let electrolysis = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_electrolysis_unit")
@@ -353,6 +363,7 @@ fn test_electrolysis_skips_without_power() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .power_available_per_tick = 0.0;
 
     tick(&mut state, &[], &content, &mut rng, None);
@@ -362,6 +373,7 @@ fn test_electrolysis_skips_without_power() {
 
     // No products
     let lh2_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -376,6 +388,7 @@ fn test_electrolysis_skips_without_power() {
 
     // No wear accumulated (processor didn't run)
     let electrolysis = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_electrolysis_unit")
@@ -402,6 +415,7 @@ fn test_electrolysis_continuous_production() {
     let station = &state.stations[&station_id];
 
     let lh2_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -411,6 +425,7 @@ fn test_electrolysis_continuous_production() {
         .sum();
 
     let lox_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -484,7 +499,7 @@ fn test_full_chain_ore_to_propellant() {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Solar array
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("solar_inst_0001".to_string()),
         def_id: "module_basic_solar_array".to_string(),
         enabled: true,
@@ -499,7 +514,7 @@ fn test_full_chain_ore_to_propellant() {
     });
 
     // Heating unit (ore → H2O)
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("heating_inst_0001".to_string()),
         def_id: "module_heating_unit".to_string(),
         enabled: true,
@@ -519,7 +534,7 @@ fn test_full_chain_ore_to_propellant() {
     });
 
     // Electrolysis unit (H2O → LH2 + LOX)
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("electrolysis_inst_0001".to_string()),
         def_id: "module_electrolysis_unit".to_string(),
         enabled: true,
@@ -539,7 +554,7 @@ fn test_full_chain_ore_to_propellant() {
     });
 
     // Ice-rich ore with 50% H2O
-    station.inventory.push(InventoryItem::Ore {
+    station.core.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_ice_001".to_string()),
         asteroid_id: AsteroidId("asteroid_ice".to_string()),
         kg: 10000.0,
@@ -560,6 +575,7 @@ fn test_full_chain_ore_to_propellant() {
     let station = &state.stations[&station_id];
 
     let lh2_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -569,6 +585,7 @@ fn test_full_chain_ore_to_propellant() {
         .sum();
 
     let lox_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -588,6 +605,7 @@ fn test_full_chain_ore_to_propellant() {
 
     // Verify some ore was consumed
     let remaining_ore: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {

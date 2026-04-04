@@ -74,6 +74,7 @@ fn manage_modules_installs_from_inventory() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .push(InventoryItem::Module {
             item_id: sim_core::ModuleItemId("item_1".to_string()),
@@ -115,12 +116,12 @@ fn jettison_slag_fires_above_threshold() {
 
     // Fill station above threshold with slag — use tiny capacity so volume ratio is high
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.cargo_capacity_m3 = 0.001;
-    station.inventory.push(InventoryItem::Slag {
+    station.core.cargo_capacity_m3 = 0.001;
+    station.core.inventory.push(InventoryItem::Slag {
         kg: 100.0,
         composition: std::collections::HashMap::new(),
     });
-    station.cached_inventory_volume_m3 = None;
+    station.core.cached_inventory_volume_m3 = None;
 
     let mut concern = SlagJettison;
     let mut next_id = 1;
@@ -184,7 +185,7 @@ fn recruit_crew_skips_when_salary_would_bankrupt() {
     let station_id = state.stations.keys().next().unwrap().clone();
 
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(sim_core::ModuleState {
+    station.core.modules.push(sim_core::ModuleState {
         id: sim_core::ModuleInstanceId("mod_1".to_string()),
         def_id: "mod_crew_test".to_string(),
         enabled: true,
@@ -680,7 +681,7 @@ fn manage_modules_sheds_load_during_power_deficit() {
 
     // Install the two modules
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(sim_core::ModuleState {
+    station.core.modules.push(sim_core::ModuleState {
         id: sim_core::ModuleInstanceId("mod_least_critical".to_string()),
         def_id: "module_least_critical".to_string(),
         enabled: true,
@@ -699,7 +700,7 @@ fn manage_modules_sheds_load_during_power_deficit() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
     });
-    station.modules.push(sim_core::ModuleState {
+    station.core.modules.push(sim_core::ModuleState {
         id: sim_core::ModuleInstanceId("mod_most_critical".to_string()),
         def_id: "module_most_critical".to_string(),
         enabled: true,
@@ -720,7 +721,7 @@ fn manage_modules_sheds_load_during_power_deficit() {
     });
 
     // Set power state with deficit: 30kW gen, 50kW consumed = 20kW deficit
-    station.power = sim_core::PowerState {
+    station.core.power = sim_core::PowerState {
         generated_kw: 30.0,
         consumed_kw: 50.0,
         deficit_kw: 20.0,

@@ -23,6 +23,7 @@ fn content_dir() -> String {
 /// Helper: count components of a given ID in a station's inventory.
 fn component_count(state: &GameState, station_id: &StationId, component_id_str: &str) -> u32 {
     state.stations[station_id]
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -39,6 +40,7 @@ fn component_count(state: &GameState, station_id: &StationId, component_id_str: 
 /// Helper: total kg of a material element in a station's inventory.
 fn material_kg(state: &GameState, station_id: &StationId, element_id: &str) -> f32 {
     state.stations[station_id]
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -84,6 +86,7 @@ fn four_tier_manufacturing_chain_with_real_content() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .push(InventoryItem::Ore {
             lot_id: LotId("lot_chain_test_001".to_string()),
@@ -161,7 +164,7 @@ fn four_tier_manufacturing_chain_with_real_content() {
 
     // Select hull_panel recipe on the structural assembler
     let station = state.stations.get_mut(&station_id).unwrap();
-    for module in &mut station.modules {
+    for module in &mut station.core.modules {
         if module.def_id == "module_structural_assembler" {
             if let ModuleKindState::Assembler(ref mut asmb) = module.kind_state {
                 asmb.selected_recipe = Some(RecipeId("recipe_hull_panel".to_string()));
@@ -174,6 +177,7 @@ fn four_tier_manufacturing_chain_with_real_content() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .push(InventoryItem::Material {
             element: "Fe".to_string(),
@@ -235,7 +239,7 @@ fn competing_demand_with_real_content() {
 
     // Set priorities: structural_assembler (5) > basic_assembler (3)
     let station = state.stations.get_mut(&station_id).unwrap();
-    for module in &mut station.modules {
+    for module in &mut station.core.modules {
         if module.def_id == "module_structural_assembler" {
             module.module_priority = 5;
         } else if module.def_id == "module_basic_assembler" {
@@ -249,13 +253,13 @@ fn competing_demand_with_real_content() {
 
     // Give Fe for plate production and pre-seed some fe_plates
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 10_000.0,
         quality: 0.7,
         thermal: None,
     });
-    station.inventory.push(InventoryItem::Component {
+    station.core.inventory.push(InventoryItem::Component {
         component_id: ComponentId("fe_plate".to_string()),
         count: 5,
         quality: 1.0,

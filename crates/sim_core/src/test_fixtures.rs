@@ -8,13 +8,14 @@ use crate::AHashMap;
 use crate::{AngleMilliDeg, BodyId, Position, RadiusAuMicro};
 use crate::{
     AnomalyTag, AsteroidId, AsteroidTemplateDef, AutopilotConfig, BodyType, Constants, Counters,
-    CrewRole, DataKind, ElementDef, GameContent, GameState, HullId, InitialStationDef, InputAmount,
-    InputFilter, ItemKind, LotId, MetaState, ModuleBehaviorDef, ModuleDef, ModuleInstanceId,
-    ModuleKindState, ModulePort, ModuleState, NodeDef, NodeId, OrbitalBodyDef, OutputSpec,
-    PricingTable, PrincipalId, ProcessorDef, ProcessorState, ProgressionState, QualityFormula,
-    RadiatorDef, RadiatorState, RecipeDef, RecipeId, RecipeThermalReq, ResearchState, ScanSite,
-    ShipId, ShipState, SiteId, SlotType, SolarSystemDef, StationId, StationState, TechDef,
-    TechEffect, TechId, ThermalDef, ThermalState, WearState, YieldFormula,
+    CrewRole, DataKind, ElementDef, FacilityCore, GameContent, GameState, HullId,
+    InitialStationDef, InputAmount, InputFilter, ItemKind, LotId, MetaState, ModuleBehaviorDef,
+    ModuleDef, ModuleInstanceId, ModuleKindState, ModulePort, ModuleState, NodeDef, NodeId,
+    OrbitalBodyDef, OutputSpec, PricingTable, PrincipalId, ProcessorDef, ProcessorState,
+    ProgressionState, QualityFormula, RadiatorDef, RadiatorState, RecipeDef, RecipeId,
+    RecipeThermalReq, ResearchState, ScanSite, ShipId, ShipState, SiteId, SlotType, SolarSystemDef,
+    StationId, StationState, TechDef, TechEffect, TechId, ThermalDef, ThermalState, WearState,
+    YieldFormula,
 };
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -708,19 +709,21 @@ pub fn base_state(content: &GameContent) -> GameState {
             StationState {
                 id: station_id,
                 position: test_position(),
-                inventory: vec![],
-                cargo_capacity_m3: 10_000.0,
-                power_available_per_tick: 100.0,
-                modules: vec![],
-                modifiers: crate::modifiers::ModifierSet::default(),
-                crew: Default::default(),
+                core: FacilityCore {
+                    inventory: vec![],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    crew: Default::default(),
+                    thermal_links: Vec::new(),
+                    power: crate::PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: std::collections::HashMap::new(),
+                    power_budget_cache: crate::PowerBudgetCache::default(),
+                },
                 leaders: Vec::new(),
-                thermal_links: Vec::new(),
-                power: crate::PowerState::default(),
-                cached_inventory_volume_m3: None,
-                module_type_index: crate::ModuleTypeIndex::default(),
-                module_id_index: std::collections::HashMap::new(),
-                power_budget_cache: crate::PowerBudgetCache::default(),
             },
         )]
         .into_iter()
@@ -890,8 +893,8 @@ pub fn state_with_smelter(content: &GameContent) -> GameState {
         .stations
         .get_mut(&StationId("station_earth_orbit".to_string()))
         .expect("station_earth_orbit missing from base_state");
-    station.modules.push(smelter_module(293_000));
-    station.inventory = ore_inventory();
+    station.core.modules.push(smelter_module(293_000));
+    station.core.inventory = ore_inventory();
     state
 }
 
@@ -903,8 +906,8 @@ pub fn state_with_smelter_at_temp(content: &GameContent, temp_mk: u32) -> GameSt
         .stations
         .get_mut(&StationId("station_earth_orbit".to_string()))
         .expect("station_earth_orbit missing from base_state");
-    station.modules.push(smelter_module(temp_mk));
-    station.inventory = ore_inventory();
+    station.core.modules.push(smelter_module(temp_mk));
+    station.core.inventory = ore_inventory();
     state
 }
 
@@ -915,7 +918,7 @@ pub fn state_with_radiator(content: &GameContent) -> GameState {
         .stations
         .get_mut(&StationId("station_earth_orbit".to_string()))
         .expect("station_earth_orbit missing from base_state");
-    station.modules.push(radiator_module());
+    station.core.modules.push(radiator_module());
     state
 }
 
@@ -927,10 +930,10 @@ pub fn state_with_smelter_and_radiators(content: &GameContent) -> GameState {
         .stations
         .get_mut(&StationId("station_earth_orbit".to_string()))
         .expect("station_earth_orbit missing from base_state");
-    station.modules.push(smelter_module(293_000));
-    station.modules.push(radiator_module());
-    station.modules.push(second_radiator_module());
-    station.inventory = ore_inventory();
+    station.core.modules.push(smelter_module(293_000));
+    station.core.modules.push(radiator_module());
+    station.core.modules.push(second_radiator_module());
+    station.core.inventory = ore_inventory();
     state
 }
 

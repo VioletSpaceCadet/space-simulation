@@ -20,9 +20,9 @@ fn cold_refinery_module_has_thermal_none() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
 
-    assert_eq!(station.modules.len(), 1);
+    assert_eq!(station.core.modules.len(), 1);
     assert!(
-        station.modules[0].thermal.is_none(),
+        station.core.modules[0].thermal.is_none(),
         "cold refinery module should have thermal: None"
     );
 }
@@ -56,6 +56,7 @@ fn cold_refinery_produces_material_and_slag() {
     let station = &state.stations[&station_id];
 
     let material_kg = station
+        .core
         .inventory
         .iter()
         .find_map(|item| match item {
@@ -65,6 +66,7 @@ fn cold_refinery_produces_material_and_slag() {
         .unwrap_or(0.0);
 
     let slag_kg = station
+        .core
         .inventory
         .iter()
         .find_map(|item| match item {
@@ -92,6 +94,7 @@ fn cold_refinery_consumes_ore() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let initial_ore_kg: f32 = state.stations[&station_id]
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -104,6 +107,7 @@ fn cold_refinery_consumes_ore() {
     tick(&mut state, &[], &content, &mut rng, None);
 
     let final_ore_kg: f32 = state.stations[&station_id]
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -181,7 +185,7 @@ fn cold_refinery_wear_accumulates_at_base_rate() {
     tick(&mut state, &[], &content, &mut rng, None);
     tick(&mut state, &[], &content, &mut rng, None);
 
-    let wear = state.stations[&station_id].modules[0].wear.wear;
+    let wear = state.stations[&station_id].core.modules[0].wear.wear;
 
     // With thermal: None, the heat_wear_multiplier defaults to 1.0, so
     // effective wear = wear_per_run * 1.0 = wear_per_run.
@@ -204,7 +208,7 @@ fn cold_refinery_thermal_none_preserved_across_ticks() {
 
     let station = &state.stations[&station_id];
     assert!(
-        station.modules[0].thermal.is_none(),
+        station.core.modules[0].thermal.is_none(),
         "cold refinery thermal should remain None after multiple ticks"
     );
 }
@@ -218,7 +222,7 @@ fn non_thermal_storage_module_has_thermal_none() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_storage_001".to_string()),
         def_id: "module_storage".to_string(),
         enabled: true,
@@ -233,7 +237,7 @@ fn non_thermal_storage_module_has_thermal_none() {
     });
 
     assert!(
-        station.modules[0].thermal.is_none(),
+        station.core.modules[0].thermal.is_none(),
         "storage module should have thermal: None"
     );
 }
@@ -246,7 +250,7 @@ fn non_thermal_assembler_module_has_thermal_none() {
     let station = &state.stations[&station_id];
 
     assert!(
-        station.modules[0].thermal.is_none(),
+        station.core.modules[0].thermal.is_none(),
         "assembler module should have thermal: None"
     );
 }
@@ -259,7 +263,7 @@ fn non_thermal_maintenance_module_has_thermal_none() {
     let station = &state.stations[&station_id];
 
     // Module 0 is the refinery, module 1 is maintenance — both should be None.
-    for module in &station.modules {
+    for module in &station.core.modules {
         assert!(
             module.thermal.is_none(),
             "module {} should have thermal: None",
@@ -275,7 +279,7 @@ fn non_thermal_lab_module_has_thermal_none() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_lab_001".to_string()),
         def_id: "module_lab".to_string(),
         enabled: true,
@@ -294,7 +298,7 @@ fn non_thermal_lab_module_has_thermal_none() {
     });
 
     assert!(
-        station.modules[0].thermal.is_none(),
+        station.core.modules[0].thermal.is_none(),
         "lab module should have thermal: None"
     );
 }
@@ -306,7 +310,7 @@ fn non_thermal_sensor_array_has_thermal_none() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_sensor_001".to_string()),
         def_id: "module_sensor_array".to_string(),
         enabled: true,
@@ -323,7 +327,7 @@ fn non_thermal_sensor_array_has_thermal_none() {
     });
 
     assert!(
-        station.modules[0].thermal.is_none(),
+        station.core.modules[0].thermal.is_none(),
         "sensor array module should have thermal: None"
     );
 }
@@ -335,7 +339,7 @@ fn non_thermal_solar_array_has_thermal_none() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_solar_001".to_string()),
         def_id: "module_solar_array".to_string(),
         enabled: true,
@@ -352,7 +356,7 @@ fn non_thermal_solar_array_has_thermal_none() {
     });
 
     assert!(
-        station.modules[0].thermal.is_none(),
+        station.core.modules[0].thermal.is_none(),
         "solar array module should have thermal: None"
     );
 }
@@ -364,7 +368,7 @@ fn non_thermal_battery_has_thermal_none() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_battery_001".to_string()),
         def_id: "module_battery".to_string(),
         enabled: true,
@@ -379,7 +383,7 @@ fn non_thermal_battery_has_thermal_none() {
     });
 
     assert!(
-        station.modules[0].thermal.is_none(),
+        station.core.modules[0].thermal.is_none(),
         "battery module should have thermal: None"
     );
 }
@@ -394,14 +398,14 @@ fn thermal_tick_noop_for_cold_modules() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     // Snapshot state before ticking
-    let module_before = state.stations[&station_id].modules[0].clone();
+    let module_before = state.stations[&station_id].core.modules[0].clone();
 
     // Run several ticks
     for _ in 0..5 {
         tick(&mut state, &[], &content, &mut rng, None);
     }
 
-    let module_after = &state.stations[&station_id].modules[0];
+    let module_after = &state.stations[&station_id].core.modules[0];
 
     // Thermal should still be None — the thermal tick step should not touch it.
     assert!(
@@ -454,7 +458,7 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Add a hot smelter module alongside the cold refinery
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_smelter_001".to_string()),
         def_id: "module_basic_smelter".to_string(),
         enabled: true,
@@ -486,13 +490,13 @@ fn mixed_station_cold_module_unaffected_by_thermal_tick() {
 
     // Cold refinery (module 0) should still have thermal: None
     assert!(
-        station.modules[0].thermal.is_none(),
+        station.core.modules[0].thermal.is_none(),
         "cold refinery should still have thermal: None even with a thermal smelter on the station"
     );
 
     // The smelter (module 1) should have thermal state (temperature may have changed)
     assert!(
-        station.modules[1].thermal.is_some(),
+        station.core.modules[1].thermal.is_some(),
         "thermal smelter should still have thermal state"
     );
 }

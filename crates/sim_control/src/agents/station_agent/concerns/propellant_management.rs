@@ -33,7 +33,7 @@ impl StationConcern for PropellantManagement {
 
         if propellant_kg > threshold * ctx.content.autopilot.lh2_abundant_multiplier {
             for &module_idx in station.modules_with_role(propellant_role) {
-                let module = &station.modules[module_idx];
+                let module = &station.core.modules[module_idx];
                 if module.enabled && module.wear.wear < 1.0 {
                     commands.push(make_cmd(
                         ctx.owner,
@@ -49,7 +49,7 @@ impl StationConcern for PropellantManagement {
             }
         } else if propellant_kg < threshold {
             for &module_idx in station.modules_with_role(support_role) {
-                let module = &station.modules[module_idx];
+                let module = &station.core.modules[module_idx];
                 if !module.enabled && module.wear.wear < 1.0 {
                     commands.push(make_cmd(
                         ctx.owner,

@@ -259,11 +259,11 @@ fn production_like_state(content: &GameContent) -> GameState {
     let mut state = base_state(content);
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.cargo_capacity_m3 = 2000.0;
-    station.power_available_per_tick = content.constants.station_power_available_per_tick;
+    station.core.cargo_capacity_m3 = 2000.0;
+    station.core.power_available_per_tick = content.constants.station_power_available_per_tick;
 
     // Put all modules in inventory for autopilot to install
-    station.inventory = vec![
+    station.core.inventory = vec![
         InventoryItem::Module {
             item_id: ModuleItemId("mi_001".to_string()),
             module_def_id: "module_sensor_array".to_string(),
@@ -300,7 +300,7 @@ fn production_like_state(content: &GameContent) -> GameState {
     ];
     state.balance = 1_000_000_000.0;
     // Add enough crew for all modules
-    station.crew = [
+    station.core.crew = [
         (sim_core::CrewRole("operator".to_string()), 10),
         (sim_core::CrewRole("technician".to_string()), 5),
         (sim_core::CrewRole("scientist".to_string()), 5),
@@ -448,8 +448,8 @@ fn sensor_data_generation_rate_at_mpt_60() {
     // Install sensor directly (bypass autopilot for precise control)
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.clear();
-    station.modules.push(ModuleState {
+    station.core.inventory.clear();
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("sensor_001".to_string()),
         def_id: "module_sensor_array".to_string(),
         enabled: true,
@@ -597,13 +597,13 @@ fn ships_built_after_tech_unlock_and_trade_available() {
     // Add shipyard module to inventory for autopilot to install
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Module {
+    station.core.inventory.push(InventoryItem::Module {
         item_id: ModuleItemId("mi_shipyard".to_string()),
         module_def_id: "module_shipyard".to_string(),
     });
 
     // Pre-stock Fe so shipyard has materials
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 50_000.0,
         quality: 0.8,
@@ -867,118 +867,120 @@ fn manufacturing_pipeline_ore_to_cast_part() {
                     radius_au_um: RadiusAuMicro(3000),
                     angle_mdeg: AngleMilliDeg(0),
                 },
-                inventory: vec![
-                    // Ore for smelting
-                    InventoryItem::Ore {
-                        lot_id: LotId("lot_mfg_001".to_string()),
-                        asteroid_id: AsteroidId("ast_mfg_001".to_string()),
-                        kg: 5000.0,
-                        composition: HashMap::from([
-                            ("Fe".to_string(), 0.7),
-                            ("Si".to_string(), 0.3),
-                        ]),
-                    },
-                ],
-                cargo_capacity_m3: 10_000.0,
-                power_available_per_tick: 200.0,
-                modules: vec![
-                    // Smelter at operating temperature
-                    ModuleState {
-                        id: ModuleInstanceId("mod_smelter".to_string()),
-                        def_id: "module_basic_smelter".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Processor(ProcessorState {
-                            threshold_kg: 100.0,
-                            ticks_since_last_run: 100,
-                            stalled: false,
-                            selected_recipe: None,
-                        }),
-                        wear: WearState::default(),
-                        thermal: Some(ThermalState {
-                            temp_mk: 2_100_000,
-                            thermal_group: Some("default".to_string()),
-                            ..Default::default()
-                        }),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: std::collections::BTreeMap::from([(
-                            CrewRole("operator".to_string()),
-                            1,
-                        )]),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                    },
-                    // Crucible for molten storage
-                    ModuleState {
-                        id: ModuleInstanceId("mod_crucible".to_string()),
-                        def_id: "module_crucible".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::ThermalContainer(ThermalContainerState {
-                            held_items: vec![],
-                        }),
-                        wear: WearState::default(),
-                        thermal: Some(ThermalState {
-                            temp_mk: 2_100_000,
-                            thermal_group: Some("default".to_string()),
-                            ..Default::default()
-                        }),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                    },
-                    // Casting mold at operating temperature
-                    ModuleState {
-                        id: ModuleInstanceId("mod_casting_mold".to_string()),
-                        def_id: "module_casting_mold".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Processor(ProcessorState {
-                            threshold_kg: 0.0,
-                            ticks_since_last_run: 100,
-                            stalled: false,
-                            selected_recipe: None,
-                        }),
-                        wear: WearState::default(),
-                        thermal: Some(ThermalState {
-                            temp_mk: 2_100_000,
-                            thermal_group: Some("default".to_string()),
-                            ..Default::default()
-                        }),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: std::collections::BTreeMap::from([(
-                            CrewRole("operator".to_string()),
-                            1,
-                        )]),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                    },
-                ],
-                crew: std::collections::BTreeMap::from([(CrewRole("operator".to_string()), 2)]),
+                core: sim_core::FacilityCore {
+                    inventory: vec![
+                        // Ore for smelting
+                        InventoryItem::Ore {
+                            lot_id: LotId("lot_mfg_001".to_string()),
+                            asteroid_id: AsteroidId("ast_mfg_001".to_string()),
+                            kg: 5000.0,
+                            composition: HashMap::from([
+                                ("Fe".to_string(), 0.7),
+                                ("Si".to_string(), 0.3),
+                            ]),
+                        },
+                    ],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 200.0,
+                    modules: vec![
+                        // Smelter at operating temperature
+                        ModuleState {
+                            id: ModuleInstanceId("mod_smelter".to_string()),
+                            def_id: "module_basic_smelter".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Processor(ProcessorState {
+                                threshold_kg: 100.0,
+                                ticks_since_last_run: 100,
+                                stalled: false,
+                                selected_recipe: None,
+                            }),
+                            wear: WearState::default(),
+                            thermal: Some(ThermalState {
+                                temp_mk: 2_100_000,
+                                thermal_group: Some("default".to_string()),
+                                ..Default::default()
+                            }),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: std::collections::BTreeMap::from([(
+                                CrewRole("operator".to_string()),
+                                1,
+                            )]),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                        },
+                        // Crucible for molten storage
+                        ModuleState {
+                            id: ModuleInstanceId("mod_crucible".to_string()),
+                            def_id: "module_crucible".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::ThermalContainer(ThermalContainerState {
+                                held_items: vec![],
+                            }),
+                            wear: WearState::default(),
+                            thermal: Some(ThermalState {
+                                temp_mk: 2_100_000,
+                                thermal_group: Some("default".to_string()),
+                                ..Default::default()
+                            }),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                        },
+                        // Casting mold at operating temperature
+                        ModuleState {
+                            id: ModuleInstanceId("mod_casting_mold".to_string()),
+                            def_id: "module_casting_mold".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Processor(ProcessorState {
+                                threshold_kg: 0.0,
+                                ticks_since_last_run: 100,
+                                stalled: false,
+                                selected_recipe: None,
+                            }),
+                            wear: WearState::default(),
+                            thermal: Some(ThermalState {
+                                temp_mk: 2_100_000,
+                                thermal_group: Some("default".to_string()),
+                                ..Default::default()
+                            }),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: std::collections::BTreeMap::from([(
+                                CrewRole("operator".to_string()),
+                                1,
+                            )]),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                        },
+                    ],
+                    crew: std::collections::BTreeMap::from([(CrewRole("operator".to_string()), 2)]),
+                    thermal_links: vec![
+                        // Smelter → Crucible
+                        ThermalLink {
+                            from_module_id: ModuleInstanceId("mod_smelter".to_string()),
+                            from_port_id: "molten_out".to_string(),
+                            to_module_id: ModuleInstanceId("mod_crucible".to_string()),
+                            to_port_id: "molten_in".to_string(),
+                        },
+                        // Crucible → Casting Mold
+                        ThermalLink {
+                            from_module_id: ModuleInstanceId("mod_crucible".to_string()),
+                            from_port_id: "molten_out".to_string(),
+                            to_module_id: ModuleInstanceId("mod_casting_mold".to_string()),
+                            to_port_id: "molten_in".to_string(),
+                        },
+                    ],
+                    modifiers: Default::default(),
+                    power: Default::default(),
+                    cached_inventory_volume_m3: None,
+                    module_type_index: Default::default(),
+                    module_id_index: HashMap::new(),
+                    power_budget_cache: Default::default(),
+                },
                 leaders: Vec::new(),
-                thermal_links: vec![
-                    // Smelter → Crucible
-                    ThermalLink {
-                        from_module_id: ModuleInstanceId("mod_smelter".to_string()),
-                        from_port_id: "molten_out".to_string(),
-                        to_module_id: ModuleInstanceId("mod_crucible".to_string()),
-                        to_port_id: "molten_in".to_string(),
-                    },
-                    // Crucible → Casting Mold
-                    ThermalLink {
-                        from_module_id: ModuleInstanceId("mod_crucible".to_string()),
-                        from_port_id: "molten_out".to_string(),
-                        to_module_id: ModuleInstanceId("mod_casting_mold".to_string()),
-                        to_port_id: "molten_in".to_string(),
-                    },
-                ],
-                modifiers: Default::default(),
-                power: Default::default(),
-                cached_inventory_volume_m3: None,
-                module_type_index: Default::default(),
-                module_id_index: HashMap::new(),
-                power_budget_cache: Default::default(),
             },
         )]
         .into_iter()
@@ -1019,6 +1021,7 @@ fn manufacturing_pipeline_ore_to_cast_part() {
 
     // 1. Ore was consumed
     let ore_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -1035,7 +1038,7 @@ fn manufacturing_pipeline_ore_to_cast_part() {
     let crucible_idx = station
         .module_index_by_id(&ModuleInstanceId("mod_crucible".to_string()))
         .expect("crucible should exist");
-    let crucible_fe: f32 = match &station.modules[crucible_idx].kind_state {
+    let crucible_fe: f32 = match &station.core.modules[crucible_idx].kind_state {
         ModuleKindState::ThermalContainer(c) => c
             .held_items
             .iter()
@@ -1078,6 +1081,7 @@ fn manufacturing_pipeline_ore_to_cast_part() {
 
     let station = &state.stations[&station_id];
     let cast_parts: u32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {

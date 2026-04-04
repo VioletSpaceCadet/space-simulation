@@ -13,7 +13,7 @@ fn test_assembler_produces_component() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
 
-    let has_repair_kit = station.inventory.iter().any(|i| {
+    let has_repair_kit = station.core.inventory.iter().any(|i| {
         matches!(i, InventoryItem::Component { component_id, count, .. }
             if component_id.0 == "repair_kit" && *count >= 1)
     });
@@ -31,6 +31,7 @@ fn test_assembler_produces_component() {
 
     // Verify Fe was consumed
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| {
@@ -62,12 +63,14 @@ fn test_assembler_skips_insufficient_material() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .retain(|i| !matches!(i, InventoryItem::Material { .. }));
     state
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .push(InventoryItem::Material {
             element: "Fe".to_string(),
@@ -90,7 +93,7 @@ fn test_assembler_skips_insufficient_material() {
     let station = &state.stations[&station_id];
     assert!(
         !station
-            .inventory
+            .core.inventory
             .iter()
             .any(|i| matches!(i, InventoryItem::Component { component_id, .. } if component_id.0 == "repair_kit")),
         "no RepairKit should be produced"
@@ -108,6 +111,7 @@ fn test_assembler_stalls_on_capacity() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.001;
 
     let mut rng = make_rng();
@@ -115,7 +119,7 @@ fn test_assembler_stalls_on_capacity() {
     let events = tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
-    if let ModuleKindState::Assembler(asmb) = &station.modules[0].kind_state {
+    if let ModuleKindState::Assembler(asmb) = &station.core.modules[0].kind_state {
         assert!(
             asmb.stalled,
             "module should be stalled when output won't fit"
@@ -142,7 +146,7 @@ fn test_assembler_accumulates_wear() {
     tick(&mut state, &[], &content, &mut rng, None);
     let events = tick(&mut state, &[], &content, &mut rng, None);
 
-    let wear = state.stations[&station_id].modules[0].wear.wear;
+    let wear = state.stations[&station_id].core.modules[0].wear.wear;
     assert!(
         (wear - 0.008).abs() < 1e-5,
         "wear should be 0.008 after one run, got {wear}"
@@ -163,7 +167,7 @@ fn test_assembler_auto_disables_at_max_wear() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     // Set wear close to max
-    state.stations.get_mut(&station_id).unwrap().modules[0]
+    state.stations.get_mut(&station_id).unwrap().core.modules[0]
         .wear
         .wear = 0.995;
 
@@ -173,7 +177,7 @@ fn test_assembler_auto_disables_at_max_wear() {
 
     let station = &state.stations[&station_id];
     assert!(
-        !station.modules[0].enabled,
+        !station.core.modules[0].enabled,
         "module should be auto-disabled at wear >= 1.0"
     );
     assert!(
@@ -190,7 +194,7 @@ fn test_assembler_skips_when_disabled() {
     let mut state = state_with_assembler(&content);
     let station_id = StationId("station_earth_orbit".to_string());
 
-    state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
+    state.stations.get_mut(&station_id).unwrap().core.modules[0].enabled = false;
 
     let mut rng = make_rng();
     tick(&mut state, &[], &content, &mut rng, None);
@@ -215,6 +219,7 @@ fn test_assembler_merges_component_stacks() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .push(InventoryItem::Component {
             component_id: ComponentId("repair_kit".to_string()),
@@ -228,6 +233,7 @@ fn test_assembler_merges_component_stacks() {
 
     let station = &state.stations[&station_id];
     let kit_count: u32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| {
@@ -254,7 +260,7 @@ fn test_assembler_merges_component_stacks() {
 
     // Should be a single stack, not two
     let kit_stacks: usize = station
-        .inventory
+        .core.inventory
         .iter()
         .filter(|i| {
             matches!(i, InventoryItem::Component { component_id, .. } if component_id.0 == "repair_kit")
@@ -284,6 +290,7 @@ fn test_assembler_stops_at_max_stock() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .push(InventoryItem::Component {
             component_id: ComponentId("repair_kit".to_string()),
@@ -310,6 +317,7 @@ fn test_assembler_stops_at_max_stock() {
 
     let station = &state.stations[&station_id];
     let kit_count: u32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -342,6 +350,7 @@ fn test_assembler_resumes_below_max_stock() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .push(InventoryItem::Component {
             component_id: ComponentId("repair_kit".to_string()),
@@ -351,7 +360,7 @@ fn test_assembler_resumes_below_max_stock() {
 
     // Set capped = true on assembler state (simulating previously capped)
     if let ModuleKindState::Assembler(ref mut asmb) =
-        state.stations.get_mut(&station_id).unwrap().modules[0].kind_state
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].kind_state
     {
         asmb.capped = true;
     }
@@ -389,7 +398,7 @@ fn test_assembler_cap_override_takes_priority() {
 
     // Set cap_override = 2 on assembler state (lower than content cap of 10)
     if let ModuleKindState::Assembler(ref mut asmb) =
-        state.stations.get_mut(&station_id).unwrap().modules[0].kind_state
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].kind_state
     {
         asmb.cap_override
             .insert(ComponentId("repair_kit".to_string()), 2);
@@ -400,6 +409,7 @@ fn test_assembler_cap_override_takes_priority() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .push(InventoryItem::Component {
             component_id: ComponentId("repair_kit".to_string()),

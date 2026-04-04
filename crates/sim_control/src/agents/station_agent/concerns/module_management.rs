@@ -15,12 +15,13 @@ fn manage_power(
     ctx: &mut StationContext,
     commands: &mut Vec<CommandEnvelope>,
 ) {
-    let has_power_gen = station.power.generated_kw > 0.0;
-    let deficit_kw = station.power.deficit_kw;
+    let has_power_gen = station.core.power.generated_kw > 0.0;
+    let deficit_kw = station.core.power.deficit_kw;
     if has_power_gen && deficit_kw > ctx.content.autopilot.power_deficit_threshold_kw {
         // Power deficit: disable least-critical consumers to shed load.
         // Uses power_priority() — None = infrastructure (never shed), lower = shed first.
         let mut shedding_candidates: Vec<(usize, f32, u8)> = station
+            .core
             .modules
             .iter()
             .enumerate()
@@ -51,7 +52,7 @@ fn manage_power(
             if remaining_deficit <= 0.0 {
                 break;
             }
-            let module = &station.modules[*index];
+            let module = &station.core.modules[*index];
             commands.push(make_cmd(
                 ctx.owner,
                 ctx.state.meta.tick,
@@ -67,8 +68,9 @@ fn manage_power(
     } else {
         // No deficit (or no power infrastructure): re-enable disabled modules.
         // When power infra exists, respect headroom; otherwise re-enable all.
-        let mut available_headroom = station.power.generated_kw - station.power.consumed_kw;
-        for module in &station.modules {
+        let mut available_headroom =
+            station.core.power.generated_kw - station.core.power.consumed_kw;
+        for module in &station.core.modules {
             if !module.enabled
                 && module.wear.wear < 1.0
                 && !ctx
@@ -112,7 +114,7 @@ impl StationConcern for ModuleManagement {
 
         let mut commands = Vec::new();
 
-        for item in &station.inventory {
+        for item in &station.core.inventory {
             if let InventoryItem::Module { item_id, .. } = item {
                 commands.push(make_cmd(
                     ctx.owner,
@@ -128,7 +130,7 @@ impl StationConcern for ModuleManagement {
 
         manage_power(station, ctx, &mut commands);
 
-        for module in &station.modules {
+        for module in &station.core.modules {
             if let ModuleKindState::Processor(processor_state) = &module.kind_state {
                 if processor_state.threshold_kg == 0.0 {
                     commands.push(make_cmd(

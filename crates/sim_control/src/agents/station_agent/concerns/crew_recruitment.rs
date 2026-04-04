@@ -29,7 +29,7 @@ impl StationConcern for CrewRecruitment {
 
         let mut demand: std::collections::BTreeMap<sim_core::CrewRole, u32> =
             std::collections::BTreeMap::new();
-        for module in &station.modules {
+        for module in &station.core.modules {
             if !module.enabled {
                 continue;
             }
@@ -42,7 +42,7 @@ impl StationConcern for CrewRecruitment {
         }
 
         for (role, needed) in &demand {
-            let supply = station.crew.get(role).copied().unwrap_or(0);
+            let supply = station.core.crew.get(role).copied().unwrap_or(0);
             if supply >= *needed {
                 continue;
             }
@@ -70,7 +70,7 @@ impl StationConcern for CrewRecruitment {
                 .state
                 .stations
                 .values()
-                .flat_map(|s| s.crew.iter())
+                .flat_map(|s| s.core.crew.iter())
                 .map(|(r, &c)| {
                     ctx.content
                         .crew_roles

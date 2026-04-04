@@ -104,7 +104,7 @@ fn test_install_module_initializes_thermal_state_for_thermal_modules() {
 
     // Add smelter module item to station inventory
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Module {
+    station.core.inventory.push(InventoryItem::Module {
         item_id: module_item_id.clone(),
         module_def_id: "module_basic_smelter".to_string(),
     });
@@ -125,6 +125,7 @@ fn test_install_module_initializes_thermal_state_for_thermal_modules() {
 
     let station = state.stations.get(&station_id).unwrap();
     let smelter = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_basic_smelter")
@@ -168,7 +169,7 @@ fn test_install_module_no_thermal_state_for_non_thermal_modules() {
 
     // Add a non-thermal module (refinery) to station inventory
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Module {
+    station.core.inventory.push(InventoryItem::Module {
         item_id: module_item_id.clone(),
         module_def_id: "module_basic_iron_refinery".to_string(),
     });
@@ -189,6 +190,7 @@ fn test_install_module_no_thermal_state_for_non_thermal_modules() {
 
     let station = state.stations.get(&station_id).unwrap();
     let refinery = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_basic_iron_refinery")
@@ -210,7 +212,7 @@ fn test_select_recipe_updates_processor_state() {
 
     // Add a processor module directly to the station.
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: module_id.clone(),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -244,7 +246,12 @@ fn test_select_recipe_updates_processor_state() {
     tick(&mut state, &[select_cmd], &content, &mut rng, None);
 
     let station = state.stations.get(&station_id).unwrap();
-    let module = station.modules.iter().find(|m| m.id == module_id).unwrap();
+    let module = station
+        .core
+        .modules
+        .iter()
+        .find(|m| m.id == module_id)
+        .unwrap();
     if let ModuleKindState::Processor(ps) = &module.kind_state {
         assert_eq!(
             ps.selected_recipe,
@@ -265,7 +272,7 @@ fn test_select_recipe_out_of_bounds_rejected() {
 
     // Add a processor module directly.
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: module_id.clone(),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -300,7 +307,12 @@ fn test_select_recipe_out_of_bounds_rejected() {
 
     // selected_recipe should still be None (unchanged — command was rejected).
     let station = state.stations.get(&station_id).unwrap();
-    let module = station.modules.iter().find(|m| m.id == module_id).unwrap();
+    let module = station
+        .core
+        .modules
+        .iter()
+        .find(|m| m.id == module_id)
+        .unwrap();
     if let ModuleKindState::Processor(ps) = &module.kind_state {
         assert_eq!(
             ps.selected_recipe, None,

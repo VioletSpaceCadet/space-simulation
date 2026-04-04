@@ -37,7 +37,7 @@ fn state_with_solar_array(content: &GameContent) -> GameState {
     let mut state = test_state(content);
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("solar_inst_0001".to_string()),
         def_id: "module_basic_solar_array".to_string(),
         enabled: true,
@@ -67,19 +67,19 @@ fn power_budget_solar_only() {
         .unwrap();
     // Earth orbit has solar_intensity = 1.0, base_output = 50 kW, no wear
     assert!(
-        (station.power.generated_kw - 50.0).abs() < f32::EPSILON,
+        (station.core.power.generated_kw - 50.0).abs() < f32::EPSILON,
         "generated_kw should be 50.0, got {}",
-        station.power.generated_kw
+        station.core.power.generated_kw
     );
     assert!(
-        station.power.consumed_kw.abs() < f32::EPSILON,
+        station.core.power.consumed_kw.abs() < f32::EPSILON,
         "consumed_kw should be 0.0, got {}",
-        station.power.consumed_kw
+        station.core.power.consumed_kw
     );
     assert!(
-        station.power.deficit_kw.abs() < f32::EPSILON,
+        station.core.power.deficit_kw.abs() < f32::EPSILON,
         "deficit_kw should be 0.0, got {}",
-        station.power.deficit_kw
+        station.core.power.deficit_kw
     );
 }
 
@@ -91,7 +91,7 @@ fn power_budget_with_consumer() {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Add a refinery consuming 10 kW
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("refinery_inst_0001".to_string()),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -115,19 +115,19 @@ fn power_budget_with_consumer() {
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
-        (station.power.generated_kw - 50.0).abs() < f32::EPSILON,
+        (station.core.power.generated_kw - 50.0).abs() < f32::EPSILON,
         "generated = {}",
-        station.power.generated_kw
+        station.core.power.generated_kw
     );
     assert!(
-        (station.power.consumed_kw - 10.0).abs() < f32::EPSILON,
+        (station.core.power.consumed_kw - 10.0).abs() < f32::EPSILON,
         "consumed = {}",
-        station.power.consumed_kw
+        station.core.power.consumed_kw
     );
     assert!(
-        station.power.deficit_kw.abs() < f32::EPSILON,
+        station.core.power.deficit_kw.abs() < f32::EPSILON,
         "deficit should be 0 (50 > 10), got {}",
-        station.power.deficit_kw
+        station.core.power.deficit_kw
     );
 }
 
@@ -153,7 +153,7 @@ fn power_budget_deficit_when_insufficient() {
     let mut state = state_with_solar_array(&content);
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("hungry_inst_0001".to_string()),
         def_id: "module_power_hungry".to_string(),
         enabled: true,
@@ -177,19 +177,19 @@ fn power_budget_deficit_when_insufficient() {
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
-        (station.power.generated_kw - 50.0).abs() < f32::EPSILON,
+        (station.core.power.generated_kw - 50.0).abs() < f32::EPSILON,
         "generated = {}",
-        station.power.generated_kw
+        station.core.power.generated_kw
     );
     assert!(
-        (station.power.consumed_kw - 80.0).abs() < f32::EPSILON,
+        (station.core.power.consumed_kw - 80.0).abs() < f32::EPSILON,
         "consumed = {}",
-        station.power.consumed_kw
+        station.core.power.consumed_kw
     );
     assert!(
-        (station.power.deficit_kw - 30.0).abs() < f32::EPSILON,
+        (station.core.power.deficit_kw - 30.0).abs() < f32::EPSILON,
         "deficit should be 30 (80 - 50), got {}",
-        station.power.deficit_kw
+        station.core.power.deficit_kw
     );
 }
 
@@ -217,9 +217,9 @@ fn power_budget_solar_intensity_affects_output() {
         .unwrap();
     // 50 kW * 0.4 = 20 kW
     assert!(
-        (station.power.generated_kw - 20.0).abs() < f32::EPSILON,
+        (station.core.power.generated_kw - 20.0).abs() < f32::EPSILON,
         "generated_kw should be 20.0 at solar_intensity 0.4, got {}",
-        station.power.generated_kw
+        station.core.power.generated_kw
     );
 }
 
@@ -231,7 +231,7 @@ fn power_budget_wear_reduces_output() {
 
     // Set solar array to degraded wear level
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules[0].wear.wear = content.constants.wear_band_degraded_threshold;
+    station.core.modules[0].wear.wear = content.constants.wear_band_degraded_threshold;
 
     let mut rng = make_rng();
     tick(&mut state, &[], &content, &mut rng, None);
@@ -239,9 +239,9 @@ fn power_budget_wear_reduces_output() {
     let station = state.stations.get(&station_id).unwrap();
     let expected = 50.0 * content.constants.wear_band_degraded_efficiency;
     assert!(
-        (station.power.generated_kw - expected).abs() < 0.01,
+        (station.core.power.generated_kw - expected).abs() < 0.01,
         "generated_kw should be {expected} with degraded wear, got {}",
-        station.power.generated_kw
+        station.core.power.generated_kw
     );
 }
 
@@ -253,16 +253,16 @@ fn power_budget_disabled_modules_excluded() {
 
     // Disable the solar array
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules[0].enabled = false;
+    station.core.modules[0].enabled = false;
 
     let mut rng = make_rng();
     tick(&mut state, &[], &content, &mut rng, None);
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
-        station.power.generated_kw.abs() < f32::EPSILON,
+        station.core.power.generated_kw.abs() < f32::EPSILON,
         "disabled solar array should generate 0 kW, got {}",
-        station.power.generated_kw
+        station.core.power.generated_kw
     );
 }
 
@@ -289,9 +289,9 @@ fn solar_output_boosted_by_tech_modifier() {
         .unwrap();
     // Base 50 kW * (1 + 0.5) = 75 kW
     assert!(
-        (station.power.generated_kw - 75.0).abs() < 0.01,
+        (station.core.power.generated_kw - 75.0).abs() < 0.01,
         "solar output should be 75.0 with +50% tech modifier, got {}",
-        station.power.generated_kw
+        station.core.power.generated_kw
     );
 }
 
@@ -303,7 +303,7 @@ fn solar_tech_modifier_does_not_affect_battery() {
 
     // Add battery at full capacity
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("battery_inst_0001".to_string()),
         def_id: "module_basic_battery".to_string(),
         enabled: true,
@@ -333,9 +333,9 @@ fn solar_tech_modifier_does_not_affect_battery() {
     // Battery capacity should still be 100 kWh (no SolarOutput effect on battery)
     // With 95 kWh stored, headroom = 5 kWh, charge limited to 5 kW
     assert!(
-        (station.power.battery_charge_kw - 5.0).abs() < f32::EPSILON,
+        (station.core.power.battery_charge_kw - 5.0).abs() < f32::EPSILON,
         "battery charge should be 5 kW (headroom limited, unaffected by solar tech), got {}",
-        station.power.battery_charge_kw
+        station.core.power.battery_charge_kw
     );
 }
 
@@ -349,7 +349,7 @@ fn power_consumption_reduced_by_tech_modifier() {
 
     // Add a refinery consuming 10 kW
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("refinery_inst_0001".to_string()),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -383,9 +383,9 @@ fn power_consumption_reduced_by_tech_modifier() {
     let station = state.stations.get(&station_id).unwrap();
     // 10 kW * (1 - 0.4) = 6 kW consumed
     assert!(
-        (station.power.consumed_kw - 6.0).abs() < 0.01,
+        (station.core.power.consumed_kw - 6.0).abs() < 0.01,
         "consumed_kw should be 6.0 with -40% modifier, got {}",
-        station.power.consumed_kw
+        station.core.power.consumed_kw
     );
 }
 
@@ -398,7 +398,7 @@ fn power_consumption_modifier_prevents_stall() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("refinery_inst_0001".to_string()),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -416,7 +416,7 @@ fn power_consumption_modifier_prevents_stall() {
         prev_crew_satisfied: true,
         thermal: None,
     });
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("sensor_inst_0001".to_string()),
         def_id: "module_sensor_array".to_string(),
         enabled: true,
@@ -445,16 +445,16 @@ fn power_consumption_modifier_prevents_stall() {
     let station = state.stations.get(&station_id).unwrap();
     // (10 + 8) * 0.6 = 10.8 kW < 15 kW → no deficit, no stall
     assert!(
-        station.power.deficit_kw.abs() < f32::EPSILON,
+        station.core.power.deficit_kw.abs() < f32::EPSILON,
         "should have no deficit with -40% consumption, got {}",
-        station.power.deficit_kw
+        station.core.power.deficit_kw
     );
     assert!(
-        !station.modules[1].power_stalled,
+        !station.core.modules[1].power_stalled,
         "refinery should not be stalled with reduced consumption"
     );
     assert!(
-        !station.modules[2].power_stalled,
+        !station.core.modules[2].power_stalled,
         "sensor should not be stalled with reduced consumption"
     );
 }
@@ -499,7 +499,7 @@ fn power_stall_lowest_priority_first() {
 
     // Override solar array to 15 kW
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules[0] = ModuleState {
+    station.core.modules[0] = ModuleState {
         id: ModuleInstanceId("solar_inst_0001".to_string()),
         def_id: "module_basic_solar_array".to_string(),
         enabled: true,
@@ -516,7 +516,7 @@ fn power_stall_lowest_priority_first() {
     // Add refinery (priority 3, 10 kW) and sensor (priority 0, 8 kW)
     // Total consumption: 18 kW, generation: 15 kW, deficit: 3 kW
     // Sensor (lowest priority) should be stalled first
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("refinery_inst_0001".to_string()),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -534,7 +534,7 @@ fn power_stall_lowest_priority_first() {
         prev_crew_satisfied: true,
         thermal: None,
     });
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("sensor_inst_0001".to_string()),
         def_id: "module_sensor_array".to_string(),
         enabled: true,
@@ -554,17 +554,17 @@ fn power_stall_lowest_priority_first() {
     let station = state.stations.get(&station_id).unwrap();
     // Solar array (idx 0) should not be stalled
     assert!(
-        !station.modules[0].power_stalled,
+        !station.core.modules[0].power_stalled,
         "solar array should not be stalled"
     );
     // Refinery (idx 1, priority 3) should NOT be stalled
     assert!(
-        !station.modules[1].power_stalled,
+        !station.core.modules[1].power_stalled,
         "refinery (higher priority) should not be stalled"
     );
     // Sensor (idx 2, priority 0) should be stalled
     assert!(
-        station.modules[2].power_stalled,
+        station.core.modules[2].power_stalled,
         "sensor (lowest priority) should be stalled"
     );
 }
@@ -578,7 +578,7 @@ fn power_stall_no_stalling_without_solar_arrays() {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Add just a refinery, no solar array
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("refinery_inst_0001".to_string()),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -602,7 +602,7 @@ fn power_stall_no_stalling_without_solar_arrays() {
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
-        !station.modules[0].power_stalled,
+        !station.core.modules[0].power_stalled,
         "modules should not be stalled when no solar arrays exist"
     );
 }
@@ -615,7 +615,7 @@ fn power_stall_clears_when_power_restored() {
 
     let station = state.stations.get_mut(&station_id).unwrap();
     // Add refinery (10 kW) and sensor (8 kW) — total 18 kW vs 15 kW solar = deficit
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("refinery_inst_0001".to_string()),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -633,7 +633,7 @@ fn power_stall_clears_when_power_restored() {
         prev_crew_satisfied: true,
         thermal: None,
     });
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("sensor_inst_0001".to_string()),
         def_id: "module_sensor_array".to_string(),
         enabled: true,
@@ -653,23 +653,23 @@ fn power_stall_clears_when_power_restored() {
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
-        station.modules[2].power_stalled,
+        station.core.modules[2].power_stalled,
         "sensor should be stalled during deficit (18 kW > 15 kW)"
     );
 
     // Phase 2: disable the sensor to restore surplus, then tick again
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules[2].enabled = false;
+    station.core.modules[2].enabled = false;
 
     tick(&mut state, &[], &content, &mut rng, None);
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
-        !station.modules[1].power_stalled,
+        !station.core.modules[1].power_stalled,
         "refinery should not be stalled after power restored (15 kW > 10 kW)"
     );
     assert!(
-        station.power.deficit_kw.abs() < f32::EPSILON,
+        station.core.power.deficit_kw.abs() < f32::EPSILON,
         "no deficit expected after disabling sensor"
     );
 }
@@ -703,7 +703,7 @@ fn battery_charges_from_surplus() {
 
     // Solar: 50 kW, no consumers. Surplus = 50 kW, charge rate = 20 kW.
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("battery_inst_0001".to_string()),
         def_id: "module_basic_battery".to_string(),
         enabled: true,
@@ -723,11 +723,11 @@ fn battery_charges_from_surplus() {
     let station = state.stations.get(&station_id).unwrap();
     // Charge rate is 20 kW, surplus is 50 kW, so should charge at 20 kW
     assert!(
-        (station.power.battery_charge_kw - 20.0).abs() < f32::EPSILON,
+        (station.core.power.battery_charge_kw - 20.0).abs() < f32::EPSILON,
         "battery should charge at charge_rate_kw, got {}",
-        station.power.battery_charge_kw
+        station.core.power.battery_charge_kw
     );
-    if let ModuleKindState::Battery(ref bs) = station.modules[1].kind_state {
+    if let ModuleKindState::Battery(ref bs) = station.core.modules[1].kind_state {
         assert!(
             (bs.charge_kwh - 20.0).abs() < f32::EPSILON,
             "battery charge should be 20 kWh, got {}",
@@ -762,7 +762,7 @@ fn battery_discharges_to_cover_deficit() {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Battery with 50 kWh charge, discharge_rate = 30 kW
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("battery_inst_0001".to_string()),
         def_id: "module_basic_battery".to_string(),
         enabled: true,
@@ -775,7 +775,7 @@ fn battery_discharges_to_cover_deficit() {
         prev_crew_satisfied: true,
         thermal: None,
     });
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("hungry_inst_0001".to_string()),
         def_id: "module_power_hungry".to_string(),
         enabled: true,
@@ -801,22 +801,22 @@ fn battery_discharges_to_cover_deficit() {
     // Deficit = 80 - 50 = 30 kW, discharge rate = 30 kW, battery has 50 kWh
     // Battery discharges 30 kW, fully covering deficit
     assert!(
-        (station.power.battery_discharge_kw - 30.0).abs() < f32::EPSILON,
+        (station.core.power.battery_discharge_kw - 30.0).abs() < f32::EPSILON,
         "battery should discharge 30 kW, got {}",
-        station.power.battery_discharge_kw
+        station.core.power.battery_discharge_kw
     );
     assert!(
-        station.power.deficit_kw.abs() < f32::EPSILON,
+        station.core.power.deficit_kw.abs() < f32::EPSILON,
         "deficit should be 0 after battery discharge, got {}",
-        station.power.deficit_kw
+        station.core.power.deficit_kw
     );
     // No modules should be stalled since battery covers deficit
     assert!(
-        !station.modules[2].power_stalled,
+        !station.core.modules[2].power_stalled,
         "consumer should not be stalled when battery covers deficit"
     );
     // Battery charge should decrease
-    if let ModuleKindState::Battery(ref bs) = station.modules[1].kind_state {
+    if let ModuleKindState::Battery(ref bs) = station.core.modules[1].kind_state {
         assert!(
             (bs.charge_kwh - 20.0).abs() < f32::EPSILON,
             "battery charge should be 20 kWh after discharging 30, got {}",
@@ -851,7 +851,7 @@ fn battery_partial_discharge_then_stall() {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Battery with only 10 kWh — not enough to cover 30 kW deficit
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("battery_inst_0001".to_string()),
         def_id: "module_basic_battery".to_string(),
         enabled: true,
@@ -864,7 +864,7 @@ fn battery_partial_discharge_then_stall() {
         prev_crew_satisfied: true,
         thermal: None,
     });
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("hungry_inst_0001".to_string()),
         def_id: "module_power_hungry".to_string(),
         enabled: true,
@@ -889,18 +889,18 @@ fn battery_partial_discharge_then_stall() {
     let station = state.stations.get(&station_id).unwrap();
     // Battery discharges 10 kW (limited by stored charge), deficit = 30 - 10 = 20 kW
     assert!(
-        (station.power.battery_discharge_kw - 10.0).abs() < f32::EPSILON,
+        (station.core.power.battery_discharge_kw - 10.0).abs() < f32::EPSILON,
         "battery should discharge 10 kW (all it has), got {}",
-        station.power.battery_discharge_kw
+        station.core.power.battery_discharge_kw
     );
     assert!(
-        (station.power.deficit_kw - 20.0).abs() < f32::EPSILON,
+        (station.core.power.deficit_kw - 20.0).abs() < f32::EPSILON,
         "remaining deficit should be 20 kW, got {}",
-        station.power.deficit_kw
+        station.core.power.deficit_kw
     );
     // Consumer should be stalled since battery can't cover full deficit
     assert!(
-        station.modules[2].power_stalled,
+        station.core.modules[2].power_stalled,
         "consumer should be stalled when battery can't fully cover deficit"
     );
 }
@@ -913,7 +913,7 @@ fn battery_charge_limited_by_capacity() {
 
     // Battery nearly full — only 5 kWh headroom (capacity = 100 kWh)
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("battery_inst_0001".to_string()),
         def_id: "module_basic_battery".to_string(),
         enabled: true,
@@ -933,9 +933,9 @@ fn battery_charge_limited_by_capacity() {
     let station = state.stations.get(&station_id).unwrap();
     // Charge limited by headroom (5 kWh), not charge_rate (20 kW)
     assert!(
-        (station.power.battery_charge_kw - 5.0).abs() < f32::EPSILON,
+        (station.core.power.battery_charge_kw - 5.0).abs() < f32::EPSILON,
         "battery should charge only 5 kW (headroom limited), got {}",
-        station.power.battery_charge_kw
+        station.core.power.battery_charge_kw
     );
 }
 
@@ -947,7 +947,7 @@ fn battery_wear_reduces_effective_capacity() {
 
     // Battery at degraded wear — effective capacity reduced
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("battery_inst_0001".to_string()),
         def_id: "module_basic_battery".to_string(),
         enabled: true,
@@ -970,7 +970,7 @@ fn battery_wear_reduces_effective_capacity() {
     }
 
     let station = state.stations.get(&station_id).unwrap();
-    if let ModuleKindState::Battery(ref bs) = station.modules[1].kind_state {
+    if let ModuleKindState::Battery(ref bs) = station.core.modules[1].kind_state {
         let effective_capacity = 100.0 * content.constants.wear_band_degraded_efficiency;
         assert!(
             bs.charge_kwh <= effective_capacity + 0.01,
@@ -990,7 +990,7 @@ fn battery_not_stalled_by_power_system() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("battery_inst_0001".to_string()),
         def_id: "module_basic_battery".to_string(),
         enabled: true,
@@ -1009,7 +1009,7 @@ fn battery_not_stalled_by_power_system() {
 
     let station = state.stations.get(&station_id).unwrap();
     assert!(
-        !station.modules[1].power_stalled,
+        !station.core.modules[1].power_stalled,
         "battery should never be power_stalled"
     );
 }
@@ -1022,7 +1022,7 @@ fn battery_capacity_doubled_by_tech_modifier() {
 
     // Battery with 95 kWh stored (base capacity 100 kWh → headroom 5 kWh)
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("battery_inst_0001".to_string()),
         def_id: "module_basic_battery".to_string(),
         enabled: true,
@@ -1052,9 +1052,9 @@ fn battery_capacity_doubled_by_tech_modifier() {
     // With 2x capacity (200 kWh), headroom = 200 - 95 = 105 kWh
     // Charge limited by charge_rate (20 kW), not headroom
     assert!(
-        (station.power.battery_charge_kw - 20.0).abs() < f32::EPSILON,
+        (station.core.power.battery_charge_kw - 20.0).abs() < f32::EPSILON,
         "with doubled capacity, charge should be rate-limited at 20 kW, got {}",
-        station.power.battery_charge_kw
+        station.core.power.battery_charge_kw
     );
 }
 
@@ -1082,7 +1082,7 @@ fn battery_discharge_rate_unchanged_by_capacity_modifier() {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Battery with 50 kWh charge, discharge_rate = 30 kW
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("battery_inst_0001".to_string()),
         def_id: "module_basic_battery".to_string(),
         enabled: true,
@@ -1095,7 +1095,7 @@ fn battery_discharge_rate_unchanged_by_capacity_modifier() {
         prev_crew_satisfied: true,
         thermal: None,
     });
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("hungry_inst_0001".to_string()),
         def_id: "module_power_hungry".to_string(),
         enabled: true,
@@ -1129,9 +1129,9 @@ fn battery_discharge_rate_unchanged_by_capacity_modifier() {
     let station = state.stations.get(&station_id).unwrap();
     // Deficit = 80 - 50 = 30 kW, discharge rate = 30 kW (unchanged by capacity modifier)
     assert!(
-        (station.power.battery_discharge_kw - 30.0).abs() < f32::EPSILON,
+        (station.core.power.battery_discharge_kw - 30.0).abs() < f32::EPSILON,
         "discharge rate should be 30 kW (unchanged by capacity modifier), got {}",
-        station.power.battery_discharge_kw
+        station.core.power.battery_discharge_kw
     );
 }
 

@@ -47,7 +47,7 @@ fn transfer_state(content: &GameContent) -> GameState {
     let station = state.stations.get_mut(&test_station_id()).unwrap();
 
     // Crucible A: has 500kg liquid Fe
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("crucible_a".to_string()),
         def_id: "module_crucible_a".to_string(),
         enabled: true,
@@ -77,7 +77,7 @@ fn transfer_state(content: &GameContent) -> GameState {
     });
 
     // Crucible B: empty
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("crucible_b".to_string()),
         def_id: "module_crucible_b".to_string(),
         enabled: true,
@@ -96,7 +96,7 @@ fn transfer_state(content: &GameContent) -> GameState {
     });
 
     // Create a thermal link from A to B
-    station.thermal_links.push(ThermalLink {
+    station.core.thermal_links.push(ThermalLink {
         from_module_id: ModuleInstanceId("crucible_a".to_string()),
         from_port_id: "molten_out".to_string(),
         to_module_id: ModuleInstanceId("crucible_b".to_string()),
@@ -136,6 +136,7 @@ fn transfer_molten_fe_succeeds() {
     let station = &state.stations[&test_station_id()];
     // Source should have 300kg remaining
     let src = station
+        .core
         .modules
         .iter()
         .find(|m| m.id.0 == "crucible_a")
@@ -157,6 +158,7 @@ fn transfer_molten_fe_succeeds() {
 
     // Destination should have 200kg
     let dst = station
+        .core
         .modules
         .iter()
         .find(|m| m.id.0 == "crucible_b")
@@ -223,6 +225,7 @@ fn transfer_without_link_rejected() {
         .stations
         .get_mut(&test_station_id())
         .unwrap()
+        .core
         .thermal_links
         .clear();
 
@@ -258,6 +261,7 @@ fn transfer_frozen_material_emits_pipe_freeze() {
     // Cool the material below solidification point (1811K - 50K = 1761K)
     let station = state.stations.get_mut(&test_station_id()).unwrap();
     let src = station
+        .core
         .modules
         .iter_mut()
         .find(|m| m.id.0 == "crucible_a")

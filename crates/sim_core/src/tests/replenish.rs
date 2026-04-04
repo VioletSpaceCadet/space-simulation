@@ -164,19 +164,21 @@ fn empty_sites_state(content: &GameContent) -> GameState {
             StationState {
                 id: StationId("station_test".to_string()),
                 position: crate::test_fixtures::test_position(),
-                inventory: vec![],
-                cargo_capacity_m3: 10_000.0,
-                power_available_per_tick: 100.0,
-                modules: vec![],
-                modifiers: crate::modifiers::ModifierSet::default(),
-                crew: Default::default(),
+                core: FacilityCore {
+                    inventory: vec![],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    crew: Default::default(),
+                    thermal_links: Vec::new(),
+                    power: PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: HashMap::new(),
+                    power_budget_cache: crate::PowerBudgetCache::default(),
+                },
                 leaders: Vec::new(),
-                thermal_links: Vec::new(),
-                power: PowerState::default(),
-                cached_inventory_volume_m3: None,
-                module_type_index: crate::ModuleTypeIndex::default(),
-                module_id_index: HashMap::new(),
-                power_budget_cache: crate::PowerBudgetCache::default(),
             },
         )]
         .into_iter()
@@ -275,15 +277,15 @@ fn jettison_slag_removes_all_slag_and_emits_event() {
 
     let station_id = StationId("station_test".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Slag {
+    station.core.inventory.push(InventoryItem::Slag {
         kg: 100.0,
         composition: HashMap::from([("slag".to_string(), 1.0)]),
     });
-    station.inventory.push(InventoryItem::Slag {
+    station.core.inventory.push(InventoryItem::Slag {
         kg: 50.0,
         composition: HashMap::from([("slag".to_string(), 1.0)]),
     });
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 200.0,
         quality: 0.8,
@@ -307,12 +309,13 @@ fn jettison_slag_removes_all_slag_and_emits_event() {
     let station = &state.stations[&station_id];
     assert!(
         !station
+            .core
             .inventory
             .iter()
             .any(|i| matches!(i, InventoryItem::Slag { .. })),
         "all slag should be removed"
     );
-    assert_eq!(station.inventory.len(), 1, "material should remain");
+    assert_eq!(station.core.inventory.len(), 1, "material should remain");
 
     // Should have emitted SlagJettisoned event with total kg
     let jettison_events: Vec<_> = events

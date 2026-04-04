@@ -511,38 +511,39 @@ impl MetricsAccumulator {
 
     #[allow(clippy::cast_possible_truncation)]
     fn accumulate_station(&mut self, station: &crate::StationState, content: &GameContent) {
-        self.inv.accumulate(&station.inventory);
+        self.inv.accumulate(&station.core.inventory);
 
         // Crew salary
-        for (role, &count) in &station.crew {
+        for (role, &count) in &station.core.crew {
             if let Some(role_def) = content.crew_roles.get(role) {
                 self.crew_salary_per_hour += role_def.salary_per_hour * f64::from(count);
             }
         }
 
-        let volume_used = inventory_volume_m3(&station.inventory, content);
-        if station.cargo_capacity_m3 > 0.0 {
-            self.station_storage_sum += volume_used / station.cargo_capacity_m3;
+        let volume_used = inventory_volume_m3(&station.core.inventory, content);
+        if station.core.cargo_capacity_m3 > 0.0 {
+            self.station_storage_sum += volume_used / station.core.cargo_capacity_m3;
         }
         self.station_count += 1;
 
         let total_ore_at_station: f32 = station
+            .core
             .inventory
             .iter()
             .filter(|item| item.is_ore())
             .map(InventoryItem::mass_kg)
             .sum();
 
-        for module in &station.modules {
+        for module in &station.core.modules {
             self.accumulate_module(module, content, total_ore_at_station);
         }
 
-        self.power_generated_kw += station.power.generated_kw;
-        self.power_consumed_kw += station.power.consumed_kw;
-        self.power_deficit_kw += station.power.deficit_kw;
-        self.battery_stored_kwh += station.power.battery_stored_kwh;
+        self.power_generated_kw += station.core.power.generated_kw;
+        self.power_consumed_kw += station.core.power.consumed_kw;
+        self.power_deficit_kw += station.core.power.deficit_kw;
+        self.battery_stored_kwh += station.core.power.battery_stored_kwh;
 
-        for module in &station.modules {
+        for module in &station.core.modules {
             if let Some(def) = content.module_defs.get(&module.def_id) {
                 if let ModuleBehaviorDef::Battery(battery_def) = &def.behavior {
                     self.battery_capacity_kwh += battery_def.capacity_kwh;
@@ -550,7 +551,7 @@ impl MetricsAccumulator {
             }
         }
 
-        for item in &station.inventory {
+        for item in &station.core.inventory {
             if let InventoryItem::Component {
                 component_id,
                 count,
@@ -987,9 +988,9 @@ mod tests {
     use crate::{
         test_fixtures::{base_content, test_position, ModuleDefBuilder},
         AHashMap, AsteroidId, AsteroidKnowledge, AsteroidState, Counters, DataKind, DomainProgress,
-        GameState, HullId, LotId, MetaState, ModuleInstanceId, ModuleState, PrincipalId,
-        ProcessorState, ResearchDomain, ResearchState, ShipId, ShipState, StationId, StationState,
-        TaskState, TechId,
+        FacilityCore, GameState, HullId, LotId, MetaState, ModuleInstanceId, ModuleState,
+        PrincipalId, ProcessorState, ResearchDomain, ResearchState, ShipId, ShipState, StationId,
+        StationState, TaskState, TechId,
     };
     use std::collections::{HashMap, HashSet};
 
@@ -1037,19 +1038,21 @@ mod tests {
         StationState {
             id: StationId("station_0001".to_string()),
             position: test_position(),
-            inventory,
-            cargo_capacity_m3: 10_000.0,
-            power_available_per_tick: 100.0,
-            modules,
-            modifiers: crate::modifiers::ModifierSet::default(),
-            crew: Default::default(),
+            core: FacilityCore {
+                inventory,
+                cargo_capacity_m3: 10_000.0,
+                power_available_per_tick: 100.0,
+                modules,
+                modifiers: crate::modifiers::ModifierSet::default(),
+                crew: Default::default(),
+                thermal_links: Vec::new(),
+                power: crate::PowerState::default(),
+                cached_inventory_volume_m3: None,
+                module_type_index: crate::ModuleTypeIndex::default(),
+                module_id_index: HashMap::new(),
+                power_budget_cache: crate::PowerBudgetCache::default(),
+            },
             leaders: Vec::new(),
-            thermal_links: Vec::new(),
-            power: crate::PowerState::default(),
-            cached_inventory_volume_m3: None,
-            module_type_index: crate::ModuleTypeIndex::default(),
-            module_id_index: HashMap::new(),
-            power_budget_cache: crate::PowerBudgetCache::default(),
         }
     }
 
@@ -1645,7 +1648,7 @@ mod tests {
         let mut state = empty_state();
 
         let mut station = make_station(vec![], vec![]);
-        station.power = crate::PowerState {
+        station.core.power = crate::PowerState {
             generated_kw: 100.0,
             consumed_kw: 80.0,
             deficit_kw: 0.0,
@@ -1654,7 +1657,7 @@ mod tests {
             battery_stored_kwh: 50.0,
         };
         // Add a battery module so we can compute capacity for charge_pct
-        station.modules.push(ModuleState {
+        station.core.modules.push(ModuleState {
             id: ModuleInstanceId("mod_bat".to_string()),
             def_id: "module_basic_battery".to_string(),
             enabled: true,

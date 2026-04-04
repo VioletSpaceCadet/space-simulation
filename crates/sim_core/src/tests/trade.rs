@@ -159,6 +159,7 @@ fn import_material_deducts_balance_and_adds_inventory() {
 
     let station = state.stations.get(&station_id).unwrap();
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -206,6 +207,7 @@ fn import_component_deducts_balance_and_adds_inventory() {
 
     let station = state.stations.get(&station_id).unwrap();
     let thruster_count: u32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -252,6 +254,7 @@ fn import_module_deducts_balance_and_adds_with_unique_id() {
 
     let station = state.stations.get(&station_id).unwrap();
     let module_items: Vec<_> = station
+        .core
         .inventory
         .iter()
         .filter(|item| {
@@ -300,6 +303,7 @@ fn import_insufficient_funds_emits_event_no_change() {
 
     let station = state.stations.get(&station_id).unwrap();
     let has_fe = station
+        .core
         .inventory
         .iter()
         .any(|item| matches!(item, InventoryItem::Material { element, .. } if element == "Fe"));
@@ -350,7 +354,7 @@ fn export_material_removes_from_inventory_and_adds_revenue() {
 
     // Pre-add 100 kg Fe to station
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 100.0,
         quality: 1.0,
@@ -380,6 +384,7 @@ fn export_material_removes_from_inventory_and_adds_revenue() {
 
     let station = state.stations.get(&station_id).unwrap();
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -405,7 +410,7 @@ fn export_component_removes_and_adds_revenue() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Component {
+    station.core.inventory.push(InventoryItem::Component {
         component_id: ComponentId("repair_kit".to_string()),
         count: 5,
         quality: 1.0,
@@ -433,6 +438,7 @@ fn export_component_removes_and_adds_revenue() {
 
     let station = state.stations.get(&station_id).unwrap();
     let kit_count: u32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -459,7 +465,7 @@ fn export_non_exportable_is_rejected() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Slag {
+    station.core.inventory.push(InventoryItem::Slag {
         kg: 100.0,
         composition: HashMap::new(),
     });
@@ -493,7 +499,7 @@ fn export_more_than_available_is_rejected() {
     let station_id = StationId("station_earth_orbit".to_string());
 
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 100.0,
         quality: 1.0,
@@ -517,6 +523,7 @@ fn export_more_than_available_is_rejected() {
 
     let station = state.stations.get(&station_id).unwrap();
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -544,7 +551,7 @@ fn import_merges_material_with_existing() {
 
     // Pre-add 50 kg Fe with quality 1.0
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 50.0,
         quality: 1.0,
@@ -564,6 +571,7 @@ fn import_merges_material_with_existing() {
     let station = state.stations.get(&station_id).unwrap();
     // Should merge into single entry
     let fe_entries: Vec<_> = station
+        .core
         .inventory
         .iter()
         .filter(|item| matches!(item, InventoryItem::Material { element, .. } if element == "Fe"))
@@ -628,7 +636,7 @@ fn export_rejected_without_export_tier() {
 
     // Add exportable Fe
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 500.0,
         quality: 0.7,

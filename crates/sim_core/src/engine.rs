@@ -464,7 +464,7 @@ fn deduct_crew_salaries(
     let station_ids: Vec<crate::StationId> = state.stations.keys().cloned().collect();
     for station_id in &station_ids {
         let station = &state.stations[station_id];
-        for (role, &count) in &station.crew {
+        for (role, &count) in &station.core.crew {
             if let Some(role_def) = content.crew_roles.get(role) {
                 total_salary += role_def.salary_per_hour * f64::from(count) * hours_per_tick;
             }

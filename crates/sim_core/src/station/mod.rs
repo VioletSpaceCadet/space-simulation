@@ -80,7 +80,7 @@ fn matches_input_filter(item: &InventoryItem, filter: Option<&InputFilter>) -> b
 /// Ensure module type indices are initialized for all stations.
 fn ensure_indices(state: &mut GameState, content: &GameContent) {
     for station in state.stations.values_mut() {
-        if !station.module_type_index.is_initialized() {
+        if !station.core.module_type_index.is_initialized() {
             station.rebuild_module_index(content);
         }
     }
@@ -89,7 +89,7 @@ fn ensure_indices(state: &mut GameState, content: &GameContent) {
 /// Ensure module type index is initialized for a single station.
 fn ensure_station_index(state: &mut GameState, station_id: &StationId, content: &GameContent) {
     if let Some(station) = state.stations.get_mut(station_id) {
-        if !station.module_type_index.is_initialized() {
+        if !station.core.module_type_index.is_initialized() {
             station.rebuild_module_index(content);
         }
     }
@@ -108,7 +108,7 @@ fn update_crew_satisfaction(
     };
     let current_tick = state.meta.tick;
     let mut transitions: Vec<(crate::ModuleInstanceId, bool, bool)> = Vec::new();
-    for module in &station.modules {
+    for module in &station.core.modules {
         let Some(def) = content.module_defs.get(&module.def_id) else {
             continue;
         };
@@ -126,7 +126,7 @@ fn update_crew_satisfaction(
             .get_mut(station_id)
             .expect("station checked above");
         for (module_id, _, now) in &transitions {
-            if let Some(module) = station.modules.iter_mut().find(|m| &m.id == module_id) {
+            if let Some(module) = station.core.modules.iter_mut().find(|m| &m.id == module_id) {
                 module.prev_crew_satisfied = *now;
             }
         }
@@ -166,7 +166,7 @@ fn update_module_efficiencies(
         return;
     };
     let current_tick = state.meta.tick;
-    for module in &mut station.modules {
+    for module in &mut station.core.modules {
         if let Some(def) = content.module_defs.get(&module.def_id) {
             let old_efficiency = module.efficiency;
             module.efficiency = crate::compute_module_efficiency(module, def, &content.constants);
@@ -287,7 +287,7 @@ fn apply_battery_buffering(
                 continue;
             };
             if let crate::ModuleKindState::Battery(ref mut battery_state) =
-                station.modules[*module_index].kind_state
+                station.core.modules[*module_index].kind_state
             {
                 battery_state.charge_kwh -= discharge;
             }
@@ -308,7 +308,7 @@ fn apply_battery_buffering(
                 continue;
             };
             if let crate::ModuleKindState::Battery(ref mut battery_state) =
-                station.modules[*module_index].kind_state
+                station.core.modules[*module_index].kind_state
             {
                 battery_state.charge_kwh += charge;
             }
@@ -320,7 +320,7 @@ fn apply_battery_buffering(
     let Some(station) = state.stations.get(station_id) else {
         return (discharge_kw, charge_kw, stored_kwh);
     };
-    for module in &station.modules {
+    for module in &station.core.modules {
         if let crate::ModuleKindState::Battery(ref battery_state) = module.kind_state {
             stored_kwh += battery_state.charge_kwh;
         }
@@ -386,7 +386,7 @@ fn rebuild_power_cache(
     let battery_capacity_mult =
         global_modifiers.resolve_f32(crate::modifiers::StatId::BatteryCapacity, 1.0);
 
-    for (module_index, module) in station.modules.iter().enumerate() {
+    for (module_index, module) in station.core.modules.iter().enumerate() {
         if !module.enabled {
             continue;
         }
@@ -451,7 +451,7 @@ fn rebuild_power_cache(
     // Pre-sort consumers by priority so we don't need to sort every tick.
     consumers.sort_by_key(|&(_, priority, _)| priority);
 
-    let enabled_count = station.modules.iter().filter(|m| m.enabled).count();
+    let enabled_count = station.core.modules.iter().filter(|m| m.enabled).count();
 
     crate::PowerBudgetCache {
         generated_kw,
@@ -462,7 +462,7 @@ fn rebuild_power_cache(
         solar_wear_targets,
         wear_band_snapshot,
         global_modifier_generation: global_modifiers.generation(),
-        module_enabled_snapshot: (station.modules.len(), enabled_count),
+        module_enabled_snapshot: (station.core.modules.len(), enabled_count),
         ..Default::default()
     }
 }
@@ -474,17 +474,18 @@ fn ensure_power_cache(state: &mut GameState, station_id: &StationId, content: &G
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
-    let enabled_count = station.modules.iter().filter(|m| m.enabled).count();
-    let needs_rebuild = !station.power_budget_cache.is_valid()
-        || station.power_budget_cache.global_modifier_generation != state.modifiers.generation()
-        || station.power_budget_cache.module_enabled_snapshot
-            != (station.modules.len(), enabled_count);
+    let enabled_count = station.core.modules.iter().filter(|m| m.enabled).count();
+    let needs_rebuild = !station.core.power_budget_cache.is_valid()
+        || station.core.power_budget_cache.global_modifier_generation
+            != state.modifiers.generation()
+        || station.core.power_budget_cache.module_enabled_snapshot
+            != (station.core.modules.len(), enabled_count);
 
     if needs_rebuild {
         let mut cache = rebuild_power_cache(station, content, &state.modifiers);
         cache.mark_valid();
         if let Some(station) = state.stations.get_mut(station_id) {
-            station.power_budget_cache = cache;
+            station.core.power_budget_cache = cache;
         }
     }
 }
@@ -499,7 +500,7 @@ fn apply_solar_wear_and_check_bands(
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
-    let wear_targets = station.power_budget_cache.solar_wear_targets.clone();
+    let wear_targets = station.core.power_budget_cache.solar_wear_targets.clone();
     for (module_idx, wear_per_run) in &wear_targets {
         apply_wear(state, station_id, *module_idx, *wear_per_run, events);
     }
@@ -508,21 +509,21 @@ fn apply_solar_wear_and_check_bands(
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
-    let band_changed =
-        station
-            .power_budget_cache
-            .wear_band_snapshot
-            .iter()
-            .any(|&(module_index, cached_band)| {
-                module_index < station.modules.len()
-                    && crate::wear::wear_band(
-                        station.modules[module_index].wear.wear,
-                        &content.constants,
-                    ) != cached_band
-            });
+    let band_changed = station
+        .core
+        .power_budget_cache
+        .wear_band_snapshot
+        .iter()
+        .any(|&(module_index, cached_band)| {
+            module_index < station.core.modules.len()
+                && crate::wear::wear_band(
+                    station.core.modules[module_index].wear.wear,
+                    &content.constants,
+                ) != cached_band
+        });
     if band_changed {
         if let Some(station) = state.stations.get_mut(station_id) {
-            station.power_budget_cache.invalidate();
+            station.core.power_budget_cache.invalidate();
         }
     }
 }
@@ -543,7 +544,7 @@ fn compute_power_budget(
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
-    let prev_power = station.power.clone();
+    let prev_power = station.core.power.clone();
 
     ensure_power_cache(state, station_id, content);
 
@@ -551,7 +552,7 @@ fn compute_power_budget(
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
-    let cache = &station.power_budget_cache;
+    let cache = &station.core.power_budget_cache;
     let generated_kw = cache.generated_kw;
     let consumed_kw = cache.consumed_kw;
     let has_power_infrastructure = cache.has_power_infrastructure;
@@ -561,7 +562,7 @@ fn compute_power_budget(
         .battery_entries
         .iter()
         .map(|(idx, def, eff)| {
-            let charge = match &station.modules[*idx].kind_state {
+            let charge = match &station.core.modules[*idx].kind_state {
                 crate::ModuleKindState::Battery(bs) => bs.charge_kwh,
                 _ => 0.0,
             };
@@ -583,7 +584,7 @@ fn compute_power_budget(
     let Some(station) = state.stations.get_mut(station_id) else {
         return;
     };
-    for module in &mut station.modules {
+    for module in &mut station.core.modules {
         module.power_stalled = false;
     }
     if deficit_kw > 0.0 && has_power_infrastructure {
@@ -592,11 +593,11 @@ fn compute_power_budget(
             if remaining <= 0.0 {
                 break;
             }
-            station.modules[module_index].power_stalled = true;
+            station.core.modules[module_index].power_stalled = true;
             remaining -= consumption;
         }
     }
-    station.power = crate::PowerState {
+    station.core.power = crate::PowerState {
         generated_kw,
         consumed_kw,
         deficit_kw,
@@ -605,14 +606,14 @@ fn compute_power_budget(
         battery_stored_kwh,
     };
 
-    if station.power != prev_power {
+    if station.core.power != prev_power {
         let current_tick = state.meta.tick;
         events.push(crate::emit(
             &mut state.counters,
             current_tick,
             crate::Event::PowerStateUpdated {
                 station_id: station_id.clone(),
-                power: station.power.clone(),
+                power: station.core.power.clone(),
             },
         ));
     }
@@ -668,7 +669,7 @@ fn extract_context<'a>(
     content: &'a GameContent,
 ) -> Option<ModuleTickContext<'a>> {
     let station = state.stations.get(station_id)?;
-    let module = &station.modules[module_idx];
+    let module = &station.core.modules[module_idx];
 
     if !module.enabled || module.efficiency <= 0.0 {
         return None;
@@ -702,7 +703,7 @@ fn apply_wear(
     }
     let current_tick = state.meta.tick;
     if let Some(station) = state.stations.get_mut(station_id) {
-        let module = &mut station.modules[module_idx];
+        let module = &mut station.core.modules[module_idx];
         let wear_before = module.wear.wear;
         module.wear.wear = (module.wear.wear + wear_per_run).min(1.0);
         let wear_after = module.wear.wear;
@@ -746,7 +747,7 @@ fn should_run(state: &mut GameState, ctx: &ModuleTickContext) -> bool {
         let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return false;
         };
-        let module = &mut station.modules[ctx.module_idx];
+        let module = &mut station.core.modules[ctx.module_idx];
         let Some(timer) = module.kind_state.ticks_since_last_run_mut() else {
             return false;
         };
@@ -763,7 +764,7 @@ fn should_run(state: &mut GameState, ctx: &ModuleTickContext) -> bool {
     };
     // Efficiency already incorporates crew and wear factors (checked in extract_context).
     // Here we only check per-run power availability.
-    station.power_available_per_tick >= ctx.power_needed
+    station.core.power_available_per_tick >= ctx.power_needed
 }
 
 /// Reset the `ticks_since_last_run` to 0 for any module kind.
@@ -771,7 +772,7 @@ fn reset_timer(state: &mut GameState, ctx: &ModuleTickContext) {
     let Some(station) = state.stations.get_mut(&ctx.station_id) else {
         return;
     };
-    let module = &mut station.modules[ctx.module_idx];
+    let module = &mut station.core.modules[ctx.module_idx];
     if let Some(timer) = module.kind_state.ticks_since_last_run_mut() {
         *timer = 0;
     }
@@ -792,7 +793,7 @@ fn handle_stall_transition(
         let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return;
         };
-        let module = &mut station.modules[ctx.module_idx];
+        let module = &mut station.core.modules[ctx.module_idx];
 
         match reason {
             StallReason::VolumeCap { .. } => {
@@ -888,7 +889,7 @@ fn handle_resume_if_stalled(
         let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return;
         };
-        let module = &mut station.modules[ctx.module_idx];
+        let module = &mut station.core.modules[ctx.module_idx];
 
         match &mut module.kind_state {
             crate::ModuleKindState::Processor(s) => {
@@ -969,7 +970,7 @@ fn apply_run_result(
             let heat_multiplier = state
                 .stations
                 .get(&ctx.station_id)
-                .and_then(|s| s.modules.get(ctx.module_idx))
+                .and_then(|s| s.core.modules.get(ctx.module_idx))
                 .and_then(|m| m.thermal.as_ref())
                 .map_or(1.0, |t| {
                     crate::thermal::heat_wear_multiplier(t.overheat_zone, &content.constants)
@@ -1059,31 +1060,33 @@ mod framework_tests {
                 StationState {
                     id: station_id,
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("refinery_inst_0001".to_string()),
-                        def_id: "module_refinery".to_string(),
-                        enabled: true,
-                        kind_state,
-                        wear: WearState::default(),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                        thermal: None,
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                    core: FacilityCore {
+                        inventory: vec![],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("refinery_inst_0001".to_string()),
+                            def_id: "module_refinery".to_string(),
+                            enabled: true,
+                            kind_state,
+                            wear: WearState::default(),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                            thermal: None,
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -1148,7 +1151,7 @@ mod framework_tests {
             }),
         );
         let station_id = StationId("station_test".to_string());
-        state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].enabled = false;
         assert!(extract_context(&state, &station_id, 0, &content).is_none());
     }
 
@@ -1166,7 +1169,7 @@ mod framework_tests {
         );
         let station_id = StationId("station_test".to_string());
         // Simulate power stall via efficiency (power_stalled folds into efficiency)
-        state.stations.get_mut(&station_id).unwrap().modules[0].efficiency = 0.0;
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].efficiency = 0.0;
         assert!(extract_context(&state, &station_id, 0, &content).is_none());
     }
 
@@ -1241,6 +1244,7 @@ mod framework_tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .power_available_per_tick = 5.0;
         let ctx = extract_context(&state, &station_id, 0, &content).unwrap();
         assert!(!should_run(&mut state, &ctx));
@@ -1272,10 +1276,10 @@ mod framework_tests {
         );
 
         let station = state.stations.get(&station_id).unwrap();
-        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+        if let ModuleKindState::Processor(ps) = &station.core.modules[0].kind_state {
             assert_eq!(ps.ticks_since_last_run, 0);
         }
-        assert!((station.modules[0].wear.wear - 0.01).abs() < 1e-6);
+        assert!((station.core.modules[0].wear.wear - 0.01).abs() < 1e-6);
         assert!(events
             .iter()
             .any(|e| matches!(&e.event, Event::WearAccumulated { .. })));
@@ -1305,10 +1309,10 @@ mod framework_tests {
         );
 
         let station = state.stations.get(&station_id).unwrap();
-        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+        if let ModuleKindState::Processor(ps) = &station.core.modules[0].kind_state {
             assert_eq!(ps.ticks_since_last_run, 5);
         }
-        assert!((station.modules[0].wear.wear).abs() < 1e-6);
+        assert!((station.core.modules[0].wear.wear).abs() < 1e-6);
         assert!(events.is_empty());
     }
 
@@ -1336,10 +1340,10 @@ mod framework_tests {
         );
 
         let station = state.stations.get(&station_id).unwrap();
-        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+        if let ModuleKindState::Processor(ps) = &station.core.modules[0].kind_state {
             assert_eq!(ps.ticks_since_last_run, 0);
         }
-        assert!((station.modules[0].wear.wear).abs() < 1e-6);
+        assert!((station.core.modules[0].wear.wear).abs() < 1e-6);
         assert!(events.is_empty());
     }
 
@@ -1370,7 +1374,7 @@ mod framework_tests {
         );
 
         let station = state.stations.get(&station_id).unwrap();
-        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+        if let ModuleKindState::Processor(ps) = &station.core.modules[0].kind_state {
             assert!(ps.stalled, "should be stalled after VolumeCap");
         }
         assert!(events
@@ -1432,7 +1436,7 @@ mod framework_tests {
         );
 
         let station = state.stations.get(&station_id).unwrap();
-        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+        if let ModuleKindState::Processor(ps) = &station.core.modules[0].kind_state {
             assert!(!ps.stalled, "should be un-stalled after Completed");
         }
         assert!(events
@@ -1454,7 +1458,7 @@ mod framework_tests {
         );
         // Give the module a thermal state in the Warning zone.
         let station_id = StationId("station_test".to_string());
-        state.stations.get_mut(&station_id).unwrap().modules[0].thermal = Some(ThermalState {
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].thermal = Some(ThermalState {
             temp_mk: 300_000,
             thermal_group: None,
             overheat_zone: crate::OverheatZone::Warning,
@@ -1474,9 +1478,9 @@ mod framework_tests {
         // wear_per_run = 0.01, warning multiplier = 2.0 → effective wear = 0.02
         let expected_wear = ctx.wear_per_run * content.constants.thermal_wear_multiplier_warning;
         assert!(
-            (station.modules[0].wear.wear - expected_wear).abs() < 1e-6,
+            (station.core.modules[0].wear.wear - expected_wear).abs() < 1e-6,
             "expected wear {expected_wear}, got {}",
-            station.modules[0].wear.wear,
+            station.core.modules[0].wear.wear,
         );
     }
 }

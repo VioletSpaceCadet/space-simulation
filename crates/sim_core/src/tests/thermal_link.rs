@@ -40,7 +40,7 @@ fn link_state(content: &GameContent) -> GameState {
     let station = state.stations.get_mut(&test_station_id()).unwrap();
 
     // Add smelter module (has molten_out port from content)
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_smelter".to_string()),
         def_id: "module_basic_smelter".to_string(),
         enabled: true,
@@ -60,7 +60,7 @@ fn link_state(content: &GameContent) -> GameState {
     });
 
     // Add receiver module (has molten_in port)
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_receiver".to_string()),
         def_id: "module_test_receiver".to_string(),
         enabled: true,
@@ -106,9 +106,9 @@ fn create_valid_link() {
     let events = tick(&mut state, &[cmd], &content, &mut rng, None);
 
     let station = &state.stations[&test_station_id()];
-    assert_eq!(station.thermal_links.len(), 1);
-    assert_eq!(station.thermal_links[0].from_port_id, "molten_out");
-    assert_eq!(station.thermal_links[0].to_port_id, "molten_in");
+    assert_eq!(station.core.thermal_links.len(), 1);
+    assert_eq!(station.core.thermal_links[0].from_port_id, "molten_out");
+    assert_eq!(station.core.thermal_links[0].to_port_id, "molten_in");
     assert!(events
         .iter()
         .any(|e| matches!(&e.event, Event::ThermalLinkCreated { .. })));
@@ -138,7 +138,7 @@ fn create_link_wrong_direction_rejected() {
 
     let station = &state.stations[&test_station_id()];
     assert!(
-        station.thermal_links.is_empty(),
+        station.core.thermal_links.is_empty(),
         "wrong direction should be rejected"
     );
 }
@@ -173,7 +173,7 @@ fn duplicate_link_rejected() {
 
     let station = &state.stations[&test_station_id()];
     assert_eq!(
-        station.thermal_links.len(),
+        station.core.thermal_links.len(),
         1,
         "duplicate should be rejected"
     );
@@ -200,7 +200,10 @@ fn remove_link() {
         },
     };
     tick(&mut state, &[create_cmd], &content, &mut rng, None);
-    assert_eq!(state.stations[&test_station_id()].thermal_links.len(), 1);
+    assert_eq!(
+        state.stations[&test_station_id()].core.thermal_links.len(),
+        1
+    );
 
     // Remove link
     let remove_cmd = CommandEnvelope {
@@ -218,7 +221,10 @@ fn remove_link() {
     };
     let events = tick(&mut state, &[remove_cmd], &content, &mut rng, None);
 
-    assert!(state.stations[&test_station_id()].thermal_links.is_empty());
+    assert!(state.stations[&test_station_id()]
+        .core
+        .thermal_links
+        .is_empty());
     assert!(events
         .iter()
         .any(|e| matches!(&e.event, Event::ThermalLinkRemoved { .. })));

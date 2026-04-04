@@ -26,7 +26,7 @@ fn module_id_index_after_install() {
 
     // Put a module item in inventory to install
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.inventory.push(InventoryItem::Module {
+    station.core.inventory.push(InventoryItem::Module {
         item_id: ModuleItemId("mod_item_test".to_string()),
         module_def_id: "module_test_storage".to_string(),
     });
@@ -47,8 +47,8 @@ fn module_id_index_after_install() {
 
     let station = &state.stations[&station_id];
     // The installed module gets an auto-generated ID
-    let last_module = station.modules.last().unwrap();
-    let expected_idx = station.modules.len() - 1;
+    let last_module = station.core.modules.last().unwrap();
+    let expected_idx = station.core.modules.len() - 1;
 
     assert_eq!(
         station.module_index_by_id(&last_module.id),
@@ -82,13 +82,15 @@ fn module_id_index_after_uninstall() {
     // Install two modules directly
     let station = state.stations.get_mut(&station_id).unwrap();
     station
+        .core
         .modules
         .push(test_module("module_test_storage", ModuleKindState::Storage));
-    station.modules.last_mut().unwrap().id = ModuleInstanceId("mod_first".to_string());
+    station.core.modules.last_mut().unwrap().id = ModuleInstanceId("mod_first".to_string());
     station
+        .core
         .modules
         .push(test_module("module_test_storage", ModuleKindState::Storage));
-    station.modules.last_mut().unwrap().id = ModuleInstanceId("mod_second".to_string());
+    station.core.modules.last_mut().unwrap().id = ModuleInstanceId("mod_second".to_string());
     station.rebuild_module_index(&content);
 
     let first_idx = station.module_index_by_id(&ModuleInstanceId("mod_first".to_string()));
@@ -128,7 +130,7 @@ fn module_id_index_after_uninstall() {
     );
     let idx = second_new_idx.unwrap();
     assert_eq!(
-        station.modules[idx].id,
+        station.core.modules[idx].id,
         ModuleInstanceId("mod_second".to_string()),
         "index should point to the correct module"
     );
@@ -189,7 +191,7 @@ fn module_type_index_tracks_correct_types() {
     let station_id = test_station_id();
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(test_module(
+    station.core.modules.push(test_module(
         "module_test_proc",
         ModuleKindState::Processor(ProcessorState {
             threshold_kg: 0.0,
@@ -198,7 +200,7 @@ fn module_type_index_tracks_correct_types() {
             selected_recipe: None,
         }),
     ));
-    station.modules.push(test_module(
+    station.core.modules.push(test_module(
         "module_test_lab",
         ModuleKindState::Lab(LabState {
             ticks_since_last_run: 0,
@@ -208,23 +210,27 @@ fn module_type_index_tracks_correct_types() {
     ));
     station.rebuild_module_index(&content);
 
-    let proc_idx = station.modules.len() - 2;
-    let lab_idx = station.modules.len() - 1;
+    let proc_idx = station.core.modules.len() - 2;
+    let lab_idx = station.core.modules.len() - 1;
 
     assert!(
-        station.module_type_index.processors.contains(&proc_idx),
+        station
+            .core
+            .module_type_index
+            .processors
+            .contains(&proc_idx),
         "processor should be in processors index"
     );
     assert!(
-        station.module_type_index.labs.contains(&lab_idx),
+        station.core.module_type_index.labs.contains(&lab_idx),
         "lab should be in labs index"
     );
     assert!(
-        !station.module_type_index.processors.contains(&lab_idx),
+        !station.core.module_type_index.processors.contains(&lab_idx),
         "lab should NOT be in processors index"
     );
     assert!(
-        !station.module_type_index.labs.contains(&proc_idx),
+        !station.core.module_type_index.labs.contains(&proc_idx),
         "processor should NOT be in labs index"
     );
 }
@@ -241,18 +247,18 @@ fn empty_station_indexes() {
     let station = state.stations.get_mut(&station_id).unwrap();
 
     // Clear all modules
-    station.modules.clear();
+    station.core.modules.clear();
     station.rebuild_module_index(&content);
 
-    assert!(station.module_type_index.is_initialized());
-    assert!(station.module_type_index.processors.is_empty());
-    assert!(station.module_type_index.labs.is_empty());
-    assert!(station.module_type_index.assemblers.is_empty());
-    assert!(station.module_type_index.sensors.is_empty());
-    assert!(station.module_type_index.maintenance.is_empty());
-    assert!(station.module_type_index.thermal.is_empty());
-    assert!(station.module_type_index.roles.is_empty());
-    assert!(station.module_id_index.is_empty());
+    assert!(station.core.module_type_index.is_initialized());
+    assert!(station.core.module_type_index.processors.is_empty());
+    assert!(station.core.module_type_index.labs.is_empty());
+    assert!(station.core.module_type_index.assemblers.is_empty());
+    assert!(station.core.module_type_index.sensors.is_empty());
+    assert!(station.core.module_type_index.maintenance.is_empty());
+    assert!(station.core.module_type_index.thermal.is_empty());
+    assert!(station.core.module_type_index.roles.is_empty());
+    assert!(station.core.module_id_index.is_empty());
 
     // Lookup should return None
     assert_eq!(

@@ -17,10 +17,10 @@ pub(super) fn tick_assembler_modules(
     // Use pre-computed assembler indices, then sort by priority
     scratch.clear();
     if let Some(station) = state.stations.get(station_id) {
-        scratch.extend_from_slice(&station.module_type_index.assemblers);
+        scratch.extend_from_slice(&station.core.module_type_index.assemblers);
         scratch.sort_by(|&a, &b| {
-            let ma = &station.modules[a];
-            let mb = &station.modules[b];
+            let ma = &station.core.modules[a];
+            let mb = &station.core.modules[b];
             mb.module_priority
                 .cmp(&ma.module_priority)
                 .then_with(|| ma.id.0.cmp(&mb.id.0))
@@ -61,7 +61,7 @@ fn execute(
         let Some(station) = state.stations.get(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: true };
         };
-        match &station.modules[ctx.module_idx].kind_state {
+        match &station.core.modules[ctx.module_idx].kind_state {
             crate::ModuleKindState::Assembler(asmb) => asmb.selected_recipe.clone(),
             _ => return super::RunOutcome::Skipped { reset_timer: true },
         }
@@ -75,7 +75,7 @@ fn execute(
             let new_recipe = assembler_def.recipes.first().cloned();
             if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                 if let crate::ModuleKindState::Assembler(asmb) =
-                    &mut station.modules[ctx.module_idx].kind_state
+                    &mut station.core.modules[ctx.module_idx].kind_state
                 {
                     asmb.selected_recipe.clone_from(&new_recipe);
                 }
@@ -111,7 +111,7 @@ fn execute(
                 let Some(station) = state.stations.get(&ctx.station_id) else {
                     return super::RunOutcome::Skipped { reset_timer: false };
                 };
-                match &station.modules[ctx.module_idx].kind_state {
+                match &station.core.modules[ctx.module_idx].kind_state {
                     crate::ModuleKindState::Assembler(asmb) => {
                         asmb.ticks_since_last_run == assembler_def.assembly_interval_ticks
                     }
@@ -145,7 +145,7 @@ fn execute(
             .all(|input| match (&input.filter, &input.amount) {
                 (InputFilter::Element(el), InputAmount::Kg(required_kg)) => {
                     let available_kg: f32 = station
-                        .inventory
+                        .core.inventory
                         .iter()
                         .filter_map(|item| match item {
                             InventoryItem::Material { element, kg, .. } if element == el => {
@@ -158,7 +158,7 @@ fn execute(
                 }
                 (InputFilter::Component(cid), InputAmount::Count(required)) => {
                     let available: u32 = station
-                        .inventory
+                        .core.inventory
                         .iter()
                         .filter_map(|item| match item {
                             InventoryItem::Component {
@@ -174,7 +174,7 @@ fn execute(
                 #[allow(clippy::cast_possible_truncation)]
                 (InputFilter::Module(def_id), InputAmount::Count(required)) => {
                     let available = station
-                        .inventory
+                        .core.inventory
                         .iter()
                         .filter(|item| {
                             matches!(item, InventoryItem::Module { module_def_id, .. } if *module_def_id == *def_id)
@@ -196,7 +196,7 @@ fn execute(
             return super::RunOutcome::Skipped { reset_timer: true };
         };
 
-        let cap_override = match &station.modules[ctx.module_idx].kind_state {
+        let cap_override = match &station.core.modules[ctx.module_idx].kind_state {
             crate::ModuleKindState::Assembler(asmb) => asmb.cap_override.clone(),
             _ => std::collections::HashMap::new(),
         };
@@ -210,6 +210,7 @@ fn execute(
 
                 if let Some(cap) = effective_cap {
                     let current_count: u32 = station
+                        .core
                         .inventory
                         .iter()
                         .filter_map(|item| match item {
@@ -248,7 +249,7 @@ fn execute(
             let Some(station) = state.stations.get(&ctx.station_id) else {
                 return super::RunOutcome::Skipped { reset_timer: false };
             };
-            match &station.modules[ctx.module_idx].kind_state {
+            match &station.core.modules[ctx.module_idx].kind_state {
                 crate::ModuleKindState::Assembler(asmb) => {
                     asmb.ticks_since_last_run == assembler_def.assembly_interval_ticks
                 }
@@ -311,7 +312,7 @@ fn execute(
         return super::RunOutcome::Skipped { reset_timer: true };
     };
     let current_used = station.used_volume_m3(content);
-    let capacity = station.cargo_capacity_m3;
+    let capacity = station.core.cargo_capacity_m3;
     let shortfall = (current_used + output_volume) - capacity;
 
     if shortfall > 0.0 {
@@ -351,7 +352,7 @@ fn resolve_assembler_run(
                 let mut remaining = *required_kg;
 
                 if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                    for item in &mut station.inventory {
+                    for item in &mut station.core.inventory {
                         if remaining <= 0.0 {
                             break;
                         }
@@ -365,7 +366,7 @@ fn resolve_assembler_run(
                         }
                     }
                     // Remove empty material lots
-                    station.inventory.retain(
+                    station.core.inventory.retain(
                         |i| !matches!(i, InventoryItem::Material { kg, .. } if *kg < min_kg),
                     );
                 }
@@ -376,7 +377,7 @@ fn resolve_assembler_run(
             (InputFilter::Component(cid), InputAmount::Count(required)) => {
                 let mut remaining = *required;
                 if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                    for item in &mut station.inventory {
+                    for item in &mut station.core.inventory {
                         if remaining == 0 {
                             break;
                         }
@@ -394,7 +395,7 @@ fn resolve_assembler_run(
                         }
                     }
                     // Remove empty component stacks
-                    station.inventory.retain(
+                    station.core.inventory.retain(
                         |i| !matches!(i, InventoryItem::Component { count, .. } if *count == 0),
                     );
                 }
@@ -406,7 +407,7 @@ fn resolve_assembler_run(
                 let mut remaining = *required;
                 if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                     let mut indices_to_remove = Vec::new();
-                    for (index, item) in station.inventory.iter().enumerate() {
+                    for (index, item) in station.core.inventory.iter().enumerate() {
                         if remaining == 0 {
                             break;
                         }
@@ -417,7 +418,7 @@ fn resolve_assembler_run(
                         }
                     }
                     for index in indices_to_remove.into_iter().rev() {
-                        station.inventory.remove(index);
+                        station.core.inventory.remove(index);
                     }
                 }
                 if remaining == 0 {
@@ -453,14 +454,14 @@ fn resolve_assembler_run(
                 }
 
                 if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                    let existing = station.inventory.iter_mut().find(|i| {
+                    let existing = station.core.inventory.iter_mut().find(|i| {
                         matches!(i, InventoryItem::Component { component_id: cid, quality: q, .. }
                             if cid.0 == component_id.0 && (*q - quality).abs() < 1e-3)
                     });
                     if let Some(InventoryItem::Component { count, .. }) = existing {
                         *count += produced_count;
                     } else {
-                        station.inventory.push(InventoryItem::Component {
+                        station.core.inventory.push(InventoryItem::Component {
                             component_id: component_id.clone(),
                             count: produced_count,
                             quality,
@@ -625,49 +626,51 @@ mod assembler_component_tests {
                 StationState {
                     id: station_id,
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![
-                        InventoryItem::Material {
-                            element: "Fe".to_string(),
-                            kg: 200.0,
-                            quality: 0.8,
+                    core: FacilityCore {
+                        inventory: vec![
+                            InventoryItem::Material {
+                                element: "Fe".to_string(),
+                                kg: 200.0,
+                                quality: 0.8,
+                                thermal: None,
+                            },
+                            InventoryItem::Component {
+                                component_id: ComponentId("thruster".to_string()),
+                                count: 6,
+                                quality: 0.9,
+                            },
+                        ],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("shipyard_inst_0001".to_string()),
+                            def_id: "module_shipyard".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Assembler(AssemblerState {
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                                capped: false,
+                                cap_override: HashMap::new(),
+                                selected_recipe: None,
+                            }),
+                            wear: WearState::default(),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
                             thermal: None,
-                        },
-                        InventoryItem::Component {
-                            component_id: ComponentId("thruster".to_string()),
-                            count: 6,
-                            quality: 0.9,
-                        },
-                    ],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("shipyard_inst_0001".to_string()),
-                        def_id: "module_shipyard".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Assembler(AssemblerState {
-                            ticks_since_last_run: 0,
-                            stalled: false,
-                            capped: false,
-                            cap_override: HashMap::new(),
-                            selected_recipe: None,
-                        }),
-                        wear: WearState::default(),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                        thermal: None,
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -717,6 +720,7 @@ mod assembler_component_tests {
 
         // Fe should be consumed: 200 - 100 = 100 remaining
         let fe_remaining: f32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -731,6 +735,7 @@ mod assembler_component_tests {
 
         // Thrusters should be consumed: 6 - 4 = 2 remaining
         let thruster_count: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -749,6 +754,7 @@ mod assembler_component_tests {
 
         // Hull plate should be produced
         let hull_plate_count: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -780,7 +786,7 @@ mod assembler_component_tests {
 
         // Reduce thrusters to 3 (need 4)
         let station = state.stations.get_mut(&station_id).unwrap();
-        for item in &mut station.inventory {
+        for item in &mut station.core.inventory {
             if let InventoryItem::Component {
                 component_id,
                 count,
@@ -816,6 +822,7 @@ mod assembler_component_tests {
         // Fe should be unchanged
         let station = state.stations.get(&station_id).unwrap();
         let fe_remaining: f32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -837,7 +844,7 @@ mod assembler_component_tests {
 
         // Set thruster count to exactly 4
         let station = state.stations.get_mut(&station_id).unwrap();
-        for item in &mut station.inventory {
+        for item in &mut station.core.inventory {
             if let InventoryItem::Component {
                 component_id,
                 count,
@@ -864,7 +871,7 @@ mod assembler_component_tests {
         let station = state.stations.get(&station_id).unwrap();
 
         // Thruster stack should be removed entirely (count was 4, consumed 4)
-        let thruster_exists = station.inventory.iter().any(|i| {
+        let thruster_exists = station.core.inventory.iter().any(|i| {
             matches!(i, InventoryItem::Component { component_id, .. } if component_id.0 == "thruster")
         });
         assert!(
@@ -874,6 +881,7 @@ mod assembler_component_tests {
 
         // Hull plate should be produced
         let hull_plate_count: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -979,49 +987,51 @@ mod assembler_component_tests {
                 StationState {
                     id: station_id,
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![
-                        InventoryItem::Material {
-                            element: "Fe".to_string(),
-                            kg: 200.0,
-                            quality: 0.8,
+                    core: FacilityCore {
+                        inventory: vec![
+                            InventoryItem::Material {
+                                element: "Fe".to_string(),
+                                kg: 200.0,
+                                quality: 0.8,
+                                thermal: None,
+                            },
+                            InventoryItem::Component {
+                                component_id: ComponentId("thruster".to_string()),
+                                count: 4,
+                                quality: 0.9,
+                            },
+                        ],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("shipyard_inst_0001".to_string()),
+                            def_id: "module_shipyard".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Assembler(AssemblerState {
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                                capped: false,
+                                cap_override: HashMap::new(),
+                                selected_recipe: None,
+                            }),
+                            wear: WearState::default(),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
                             thermal: None,
-                        },
-                        InventoryItem::Component {
-                            component_id: ComponentId("thruster".to_string()),
-                            count: 4,
-                            quality: 0.9,
-                        },
-                    ],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("shipyard_inst_0001".to_string()),
-                        def_id: "module_shipyard".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Assembler(AssemblerState {
-                            ticks_since_last_run: 0,
-                            stalled: false,
-                            capped: false,
-                            cap_override: HashMap::new(),
-                            selected_recipe: None,
-                        }),
-                        wear: WearState::default(),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                        thermal: None,
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -1091,6 +1101,7 @@ mod assembler_component_tests {
         // Inputs should be consumed: Fe 200 - 100 = 100
         let station = state.stations.get(&station_id).unwrap();
         let fe_remaining: f32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -1105,6 +1116,7 @@ mod assembler_component_tests {
 
         // Thrusters: 4 - 2 = 2
         let thruster_count: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -1152,6 +1164,7 @@ mod assembler_component_tests {
         // Inputs should NOT be consumed
         let station = state.stations.get(&station_id).unwrap();
         let fe_remaining: f32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -1165,6 +1178,7 @@ mod assembler_component_tests {
         );
 
         let thruster_count: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -1187,7 +1201,7 @@ mod assembler_component_tests {
 
         // Set wear to degraded band (>= 0.5) → efficiency = 0.75
         // With floor(), this produced 0 items (VIO-460). With round(), produces 1.
-        state.stations.get_mut(&station_id).unwrap().modules[0]
+        state.stations.get_mut(&station_id).unwrap().core.modules[0]
             .wear
             .wear = 0.6;
 
@@ -1196,7 +1210,7 @@ mod assembler_component_tests {
         crate::tick(&mut state, &[], &content, &mut rng, None);
 
         let station = &state.stations[&station_id];
-        let has_output = station.inventory.iter().any(|item| {
+        let has_output = station.core.inventory.iter().any(|item| {
             matches!(item, InventoryItem::Component { component_id, .. }
                 if component_id.0 == "hull_plate")
         });
@@ -1214,7 +1228,7 @@ mod assembler_component_tests {
 
         // Set wear to critical band (>= 0.8) → efficiency = 0.5
         // round(0.5) = 1, so assembler still produces at critical wear.
-        state.stations.get_mut(&station_id).unwrap().modules[0]
+        state.stations.get_mut(&station_id).unwrap().core.modules[0]
             .wear
             .wear = 0.85;
 
@@ -1223,7 +1237,7 @@ mod assembler_component_tests {
         crate::tick(&mut state, &[], &content, &mut rng, None);
 
         let station = &state.stations[&station_id];
-        let has_output = station.inventory.iter().any(|item| {
+        let has_output = station.core.inventory.iter().any(|item| {
             matches!(item, InventoryItem::Component { component_id, .. }
                 if component_id.0 == "hull_plate")
         });

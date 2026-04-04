@@ -15,7 +15,7 @@ fn test_refinery_output_reduced_by_wear() {
     let mut state = state_with_refinery(&content);
     let station_id = StationId("station_earth_orbit".to_string());
 
-    state.stations.get_mut(&station_id).unwrap().modules[0]
+    state.stations.get_mut(&station_id).unwrap().core.modules[0]
         .wear
         .wear = 0.6;
 
@@ -25,6 +25,7 @@ fn test_refinery_output_reduced_by_wear() {
 
     let station = &state.stations[&station_id];
     let material_kg = station
+        .core
         .inventory
         .iter()
         .find_map(|i| {
@@ -56,7 +57,7 @@ fn test_refinery_accumulates_wear() {
     tick(&mut state, &[], &content, &mut rng, None);
     tick(&mut state, &[], &content, &mut rng, None);
 
-    let wear = state.stations[&station_id].modules[0].wear.wear;
+    let wear = state.stations[&station_id].core.modules[0].wear.wear;
     let expected_wear = content
         .module_defs
         .get("module_basic_iron_refinery")
@@ -74,7 +75,7 @@ fn test_refinery_auto_disables_at_max_wear() {
     let mut state = state_with_refinery(&content);
     let station_id = StationId("station_earth_orbit".to_string());
 
-    state.stations.get_mut(&station_id).unwrap().modules[0]
+    state.stations.get_mut(&station_id).unwrap().core.modules[0]
         .wear
         .wear = 0.995;
 
@@ -84,7 +85,7 @@ fn test_refinery_auto_disables_at_max_wear() {
 
     let station = &state.stations[&station_id];
     assert!(
-        !station.modules[0].enabled,
+        !station.core.modules[0].enabled,
         "module should be auto-disabled at wear >= 1.0"
     );
     assert!(
@@ -118,7 +119,7 @@ fn test_maintenance_repairs_most_worn_module() {
     let mut state = state_with_maintenance(&content);
     let station_id = StationId("station_earth_orbit".to_string());
 
-    state.stations.get_mut(&station_id).unwrap().modules[0]
+    state.stations.get_mut(&station_id).unwrap().core.modules[0]
         .wear
         .wear = 0.6;
 
@@ -128,9 +129,9 @@ fn test_maintenance_repairs_most_worn_module() {
 
     let station = &state.stations[&station_id];
     assert!(
-        (station.modules[0].wear.wear - 0.4).abs() < 0.1,
+        (station.core.modules[0].wear.wear - 0.4).abs() < 0.1,
         "wear should be reduced by ~0.2, got {}",
-        station.modules[0].wear.wear
+        station.core.modules[0].wear.wear
     );
     assert!(
         events
@@ -146,7 +147,7 @@ fn test_maintenance_consumes_repair_kit() {
     let mut state = state_with_maintenance(&content);
     let station_id = StationId("station_earth_orbit".to_string());
 
-    state.stations.get_mut(&station_id).unwrap().modules[0]
+    state.stations.get_mut(&station_id).unwrap().core.modules[0]
         .wear
         .wear = 0.6;
 
@@ -156,6 +157,7 @@ fn test_maintenance_consumes_repair_kit() {
 
     let station = &state.stations[&station_id];
     let kits = station
+        .core
         .inventory
         .iter()
         .find_map(|i| {
@@ -187,14 +189,14 @@ fn test_maintenance_skips_when_no_repair_kits() {
     let mut state = state_with_maintenance(&content);
     let station_id = StationId("station_earth_orbit".to_string());
 
-    state.stations.get_mut(&station_id).unwrap().modules[0]
+    state.stations.get_mut(&station_id).unwrap().core.modules[0]
         .wear
         .wear = 0.6;
     state
         .stations
         .get_mut(&station_id)
         .unwrap()
-        .inventory
+        .core.inventory
         .retain(|i| {
             !matches!(i, InventoryItem::Component { component_id, .. } if component_id.0 == "repair_kit")
         });
@@ -205,7 +207,7 @@ fn test_maintenance_skips_when_no_repair_kits() {
 
     let station = &state.stations[&station_id];
     assert!(
-        station.modules[0].wear.wear > 0.6,
+        station.core.modules[0].wear.wear > 0.6,
         "wear should not decrease without repair kits"
     );
 }
@@ -220,6 +222,7 @@ fn test_maintenance_skips_when_no_worn_modules() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .retain(|i| !matches!(i, InventoryItem::Ore { .. }));
 
@@ -229,6 +232,7 @@ fn test_maintenance_skips_when_no_worn_modules() {
 
     let station = &state.stations[&station_id];
     let kits = station
+        .core
         .inventory
         .iter()
         .find_map(|i| {
@@ -283,6 +287,7 @@ fn test_wear_maintenance_full_cycle() {
 
     let station = &state.stations[&station_id];
     let kits = station
+        .core
         .inventory
         .iter()
         .find_map(|i| {
@@ -319,10 +324,11 @@ fn test_maintenance_skips_below_repair_threshold() {
 
     // Give the refinery some wear below the threshold
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules[0].wear.wear = 0.3;
+    station.core.modules[0].wear.wear = 0.3;
 
     // Remove ore so the refinery won't run
     station
+        .core
         .inventory
         .retain(|i| !matches!(i, InventoryItem::Ore { .. }));
 
@@ -334,6 +340,7 @@ fn test_maintenance_skips_below_repair_threshold() {
 
     let station = &state.stations[&station_id];
     let kits = station
+        .core
         .inventory
         .iter()
         .find_map(|i| {
@@ -372,10 +379,11 @@ fn test_maintenance_repairs_above_threshold() {
 
     // Give the refinery wear above the threshold
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.modules[0].wear.wear = 0.5;
+    station.core.modules[0].wear.wear = 0.5;
 
     // Remove ore so the refinery won't run
     station
+        .core
         .inventory
         .retain(|i| !matches!(i, InventoryItem::Ore { .. }));
 
@@ -386,10 +394,11 @@ fn test_maintenance_repairs_above_threshold() {
 
     let station = &state.stations[&station_id];
     assert!(
-        station.modules[0].wear.wear < 0.5,
+        station.core.modules[0].wear.wear < 0.5,
         "wear should decrease when above threshold"
     );
     let kits = station
+        .core
         .inventory
         .iter()
         .find_map(|i| {

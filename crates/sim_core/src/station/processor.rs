@@ -19,10 +19,10 @@ pub(super) fn tick_station_modules(
     // Use pre-computed processor indices, then sort by priority
     scratch.clear();
     if let Some(station) = state.stations.get(station_id) {
-        scratch.extend_from_slice(&station.module_type_index.processors);
+        scratch.extend_from_slice(&station.core.module_type_index.processors);
         scratch.sort_by(|&a, &b| {
-            let ma = &station.modules[a];
-            let mb = &station.modules[b];
+            let ma = &station.core.modules[a];
+            let mb = &station.core.modules[b];
             mb.module_priority
                 .cmp(&ma.module_priority)
                 .then_with(|| ma.id.0.cmp(&mb.id.0))
@@ -54,7 +54,7 @@ fn execute(
     };
 
     let threshold_kg = state.stations.get(&ctx.station_id).and_then(|s| {
-        match &s.modules[ctx.module_idx].kind_state {
+        match &s.core.modules[ctx.module_idx].kind_state {
             ModuleKindState::Processor(ps) => Some(ps.threshold_kg),
             _ => None,
         }
@@ -129,9 +129,10 @@ fn execute(
             return super::RunOutcome::Skipped { reset_timer: false };
         };
         let current_used = station
+            .core
             .cached_inventory_volume_m3
-            .unwrap_or_else(|| crate::inventory_volume_m3(&station.inventory, content));
-        let shortfall = (current_used + output_volume) - station.cargo_capacity_m3;
+            .unwrap_or_else(|| crate::inventory_volume_m3(&station.core.inventory, content));
+        let shortfall = (current_used + output_volume) - station.core.cargo_capacity_m3;
         if shortfall > 0.0 {
             return super::RunOutcome::Stalled(super::StallReason::VolumeCap {
                 shortfall_m3: shortfall,
@@ -184,17 +185,20 @@ fn find_linked_output_container(
         .iter()
         .find(|p| p.direction == PortDirection::Output && p.accepts == PortFilter::AnyMolten)?;
     let link = station
+        .core
         .thermal_links
         .iter()
         .find(|l| l.from_module_id == *source_module_id && l.from_port_id == port.id)?;
     let to_idx = station.module_index_by_id(&link.to_module_id)?;
     if !matches!(
-        station.modules[to_idx].kind_state,
+        station.core.modules[to_idx].kind_state,
         ModuleKindState::ThermalContainer(_)
     ) {
         return None;
     }
-    let to_def = content.module_defs.get(&station.modules[to_idx].def_id)?;
+    let to_def = content
+        .module_defs
+        .get(&station.core.modules[to_idx].def_id)?;
     let capacity_kg = match &to_def.behavior {
         ModuleBehaviorDef::ThermalContainer(tc) => tc.capacity_kg,
         _ => return None,
@@ -214,12 +218,13 @@ fn find_linked_input_container(
         .iter()
         .find(|p| p.direction == PortDirection::Input && p.accepts == PortFilter::AnyMolten)?;
     let link = station
+        .core
         .thermal_links
         .iter()
         .find(|l| l.to_module_id == *dest_module_id && l.to_port_id == port.id)?;
     let from_idx = station.module_index_by_id(&link.from_module_id)?;
     if !matches!(
-        station.modules[from_idx].kind_state,
+        station.core.modules[from_idx].kind_state,
         ModuleKindState::ThermalContainer(_)
     ) {
         return None;
@@ -376,12 +381,12 @@ fn consume_from_source(
         return (0.0, vec![]);
     };
     let source = if let Some(cidx) = input_container_idx {
-        match &mut station.modules[cidx].kind_state {
+        match &mut station.core.modules[cidx].kind_state {
             ModuleKindState::ThermalContainer(ref mut c) => &mut c.held_items,
-            _ => &mut station.inventory,
+            _ => &mut station.core.inventory,
         }
     } else {
-        &mut station.inventory
+        &mut station.core.inventory
     };
     consume_ore_fifo_with_lots(source, rate_kg, min_kg, |item| {
         matches_input_filter(item, input_filter)
@@ -401,12 +406,12 @@ fn peek_from_source(
         return (0.0, vec![]);
     };
     let source = if let Some(cidx) = input_container_idx {
-        match &station.modules[cidx].kind_state {
+        match &station.core.modules[cidx].kind_state {
             ModuleKindState::ThermalContainer(c) => &c.held_items,
-            _ => &station.inventory,
+            _ => &station.core.inventory,
         }
     } else {
-        &station.inventory
+        &station.core.inventory
     };
     peek_ore_fifo_with_lots(source, rate_kg, |item| {
         matches_input_filter(item, input_filter)
@@ -422,12 +427,12 @@ fn scan_input_kg(
 ) -> f32 {
     state.stations.get(station_id).map_or(0.0, |s| {
         let source = if let Some(cidx) = input_container_idx {
-            match &s.modules[cidx].kind_state {
+            match &s.core.modules[cidx].kind_state {
                 ModuleKindState::ThermalContainer(c) => &c.held_items,
-                _ => &s.inventory,
+                _ => &s.core.inventory,
             }
         } else {
-            &s.inventory
+            &s.core.inventory
         };
         source
             .iter()
@@ -454,7 +459,7 @@ fn route_material_output(
         let Some(station) = state.stations.get(run.station_id) else {
             return;
         };
-        let module_temp = station.modules[run.module_idx]
+        let module_temp = station.core.modules[run.module_idx]
             .thermal
             .as_ref()
             .map_or(0, |t| t.temp_mk);
@@ -470,7 +475,7 @@ fn route_material_output(
                     Phase::Solid
                 }
             });
-        let current_kg: f32 = match &station.modules[container_idx].kind_state {
+        let current_kg: f32 = match &station.core.modules[container_idx].kind_state {
             ModuleKindState::ThermalContainer(c) => {
                 c.held_items.iter().map(InventoryItem::mass_kg).sum()
             }
@@ -485,7 +490,7 @@ fn route_material_output(
             };
             if let Some(station) = state.stations.get_mut(run.station_id) {
                 if let ModuleKindState::ThermalContainer(ref mut container) =
-                    station.modules[container_idx].kind_state
+                    station.core.modules[container_idx].kind_state
                 {
                     merge_material_lot(
                         &mut container.held_items,
@@ -498,7 +503,7 @@ fn route_material_output(
             }
         } else if let Some(station) = state.stations.get_mut(run.station_id) {
             merge_material_lot(
-                &mut station.inventory,
+                &mut station.core.inventory,
                 element.to_string(),
                 material_kg,
                 material_quality,
@@ -507,7 +512,7 @@ fn route_material_output(
         }
     } else if let Some(station) = state.stations.get_mut(run.station_id) {
         merge_material_lot(
-            &mut station.inventory,
+            &mut station.core.inventory,
             element.to_string(),
             material_kg,
             material_quality,
@@ -578,7 +583,7 @@ fn emit_slag_output(
 
     if slag_kg > run.min_meaningful_kg {
         if let Some(station) = state.stations.get_mut(run.station_id) {
-            let existing = station.inventory.iter_mut().find(|i| i.is_slag());
+            let existing = station.core.inventory.iter_mut().find(|i| i.is_slag());
             if let Some(InventoryItem::Slag {
                 kg: existing_kg,
                 composition: existing_comp,
@@ -589,7 +594,7 @@ fn emit_slag_output(
                 *existing_kg += slag_kg;
                 *existing_comp = blended;
             } else {
-                station.inventory.push(InventoryItem::Slag {
+                station.core.inventory.push(InventoryItem::Slag {
                     kg: slag_kg,
                     composition: slag_composition,
                 });
@@ -626,14 +631,14 @@ fn emit_component_output(
     );
     let produced_count = 1u32;
     if let Some(station) = state.stations.get_mut(run.station_id) {
-        let existing = station.inventory.iter_mut().find(|i| {
+        let existing = station.core.inventory.iter_mut().find(|i| {
             matches!(i, InventoryItem::Component { component_id: cid, quality: q, .. }
                 if cid.0 == component_id.0 && (*q - quality).abs() < 1e-3)
         });
         if let Some(InventoryItem::Component { count, .. }) = existing {
             *count += produced_count;
         } else {
-            station.inventory.push(InventoryItem::Component {
+            station.core.inventory.push(InventoryItem::Component {
                 component_id: component_id.clone(),
                 count: produced_count,
                 quality,
@@ -658,7 +663,7 @@ fn apply_recipe_heat(
     let Some(station) = state.stations.get_mut(&ctx.station_id) else {
         return;
     };
-    let module = &mut station.modules[ctx.module_idx];
+    let module = &mut station.core.modules[ctx.module_idx];
     let Some(thermal_def) = content
         .module_defs
         .get(&module.def_id)
@@ -696,7 +701,7 @@ fn check_thermal_gate(
     let temp_mk = state
         .stations
         .get(&ctx.station_id)
-        .and_then(|s| s.modules[ctx.module_idx].thermal.as_ref())
+        .and_then(|s| s.core.modules[ctx.module_idx].thermal.as_ref())
         .map_or(0, |t| t.temp_mk);
     if temp_mk < thermal_req.min_temp_mk {
         return Err(super::RunOutcome::Stalled(super::StallReason::TooCold {
@@ -728,7 +733,7 @@ fn check_tech_gate(
     let first_trigger = state
         .stations
         .get(&ctx.station_id)
-        .and_then(|s| match &s.modules[ctx.module_idx].kind_state {
+        .and_then(|s| match &s.core.modules[ctx.module_idx].kind_state {
             ModuleKindState::Processor(ps) => {
                 Some(ps.ticks_since_last_run == processor_def.processing_interval_ticks)
             }
@@ -763,7 +768,7 @@ fn resolve_recipe<'a>(
     events: &mut Vec<EventEnvelope>,
 ) -> Option<&'a crate::RecipeDef> {
     let selected = state.stations.get(&ctx.station_id).and_then(|s| {
-        match &s.modules[ctx.module_idx].kind_state {
+        match &s.core.modules[ctx.module_idx].kind_state {
             crate::ModuleKindState::Processor(ps) => ps.selected_recipe.clone(),
             _ => None,
         }
@@ -775,7 +780,7 @@ fn resolve_recipe<'a>(
             let new_recipe = processor_def.recipes.first().cloned();
             if let Some(station) = state.stations.get_mut(&ctx.station_id) {
                 if let ModuleKindState::Processor(ps) =
-                    &mut station.modules[ctx.module_idx].kind_state
+                    &mut station.core.modules[ctx.module_idx].kind_state
                 {
                     ps.selected_recipe.clone_from(&new_recipe);
                 }
@@ -936,7 +941,7 @@ mod tests {
     use super::*;
     use crate::test_fixtures::ModuleDefBuilder;
     use crate::AHashMap;
-    use crate::{AsteroidId, InventoryItem, LotId};
+    use crate::{AsteroidId, FacilityCore, InventoryItem, LotId};
 
     #[test]
     fn peek_ore_fifo_does_not_mutate() {
@@ -1077,48 +1082,50 @@ mod tests {
                 StationState {
                     id: station_id,
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![InventoryItem::Ore {
-                        lot_id: LotId("lot_0001".to_string()),
-                        asteroid_id: AsteroidId("ast_0001".to_string()),
-                        kg: 500.0,
-                        composition: HashMap::from([
-                            ("Fe".to_string(), 0.7),
-                            ("Si".to_string(), 0.3),
-                        ]),
-                    }],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("smelter_0001".to_string()),
-                        def_id: "module_smelter".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Processor(ProcessorState {
-                            threshold_kg: 0.0,
-                            ticks_since_last_run: 0,
-                            stalled: false,
-                            selected_recipe: None,
-                        }),
-                        wear: WearState::default(),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                        thermal: Some(ThermalState {
-                            temp_mk,
-                            thermal_group: Some("smelting".to_string()),
-                            ..Default::default()
-                        }),
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                    core: FacilityCore {
+                        inventory: vec![InventoryItem::Ore {
+                            lot_id: LotId("lot_0001".to_string()),
+                            asteroid_id: AsteroidId("ast_0001".to_string()),
+                            kg: 500.0,
+                            composition: HashMap::from([
+                                ("Fe".to_string(), 0.7),
+                                ("Si".to_string(), 0.3),
+                            ]),
+                        }],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("smelter_0001".to_string()),
+                            def_id: "module_smelter".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Processor(ProcessorState {
+                                threshold_kg: 0.0,
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                                selected_recipe: None,
+                            }),
+                            wear: WearState::default(),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                            thermal: Some(ThermalState {
+                                temp_mk,
+                                thermal_group: Some("smelting".to_string()),
+                                ..Default::default()
+                            }),
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -1179,6 +1186,7 @@ mod tests {
         // Ore should be unchanged
         let station = state.stations.get(&station_id).unwrap();
         let ore_kg: f32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -1320,7 +1328,7 @@ mod tests {
         );
 
         // Verify temp increased (heat_per_run_j = 50_000, capacity = 500 J/K → +100K = +100_000 mK)
-        let temp_after = state.stations.get(&station_id).unwrap().modules[0]
+        let temp_after = state.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1373,7 +1381,7 @@ mod tests {
         let station_id = StationId("station_test".to_string());
 
         // Remove ThermalState from the module
-        state.stations.get_mut(&station_id).unwrap().modules[0].thermal = None;
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].thermal = None;
 
         let mut events = Vec::new();
         tick_station_modules(
@@ -1452,67 +1460,68 @@ mod tests {
                 crate::StationState {
                     id: station_id.clone(),
                     position: crate::test_fixtures::test_position(),
-                    // Only 100 kg ore — enough for exactly one processor run
-                    inventory: vec![crate::InventoryItem::Ore {
-                        lot_id: crate::LotId("lot_0001".to_string()),
-                        asteroid_id: crate::AsteroidId("ast_0001".to_string()),
-                        kg: 100.0,
-                        composition: HashMap::from([
-                            ("Fe".to_string(), 0.7),
-                            ("Si".to_string(), 0.3),
-                        ]),
-                    }],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![
-                        // Low-priority processor (id comes first alphabetically)
-                        ModuleState {
-                            id: ModuleInstanceId("proc_aaa".to_string()),
-                            def_id: "module_refinery".to_string(),
-                            enabled: true,
-                            kind_state: ModuleKindState::Processor(ProcessorState {
-                                threshold_kg: 0.0,
-                                ticks_since_last_run: 0,
-                                stalled: false,
-                                selected_recipe: None,
-                            }),
-                            wear: crate::WearState::default(),
-                            thermal: None,
-                            power_stalled: false,
-                            module_priority: 0,
-                            assigned_crew: Default::default(),
-                            efficiency: 1.0,
-                            prev_crew_satisfied: true,
-                        },
-                        // High-priority processor
-                        ModuleState {
-                            id: ModuleInstanceId("proc_bbb".to_string()),
-                            def_id: "module_refinery".to_string(),
-                            enabled: true,
-                            kind_state: ModuleKindState::Processor(ProcessorState {
-                                threshold_kg: 0.0,
-                                ticks_since_last_run: 0,
-                                stalled: false,
-                                selected_recipe: None,
-                            }),
-                            wear: crate::WearState::default(),
-                            thermal: None,
-                            power_stalled: false,
-                            module_priority: 10,
-                            assigned_crew: Default::default(),
-                            efficiency: 1.0,
-                            prev_crew_satisfied: true,
-                        },
-                    ],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                    core: FacilityCore {
+                        inventory: vec![crate::InventoryItem::Ore {
+                            lot_id: crate::LotId("lot_0001".to_string()),
+                            asteroid_id: crate::AsteroidId("ast_0001".to_string()),
+                            kg: 100.0,
+                            composition: HashMap::from([
+                                ("Fe".to_string(), 0.7),
+                                ("Si".to_string(), 0.3),
+                            ]),
+                        }],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![
+                            // Low-priority processor (id comes first alphabetically)
+                            ModuleState {
+                                id: ModuleInstanceId("proc_aaa".to_string()),
+                                def_id: "module_refinery".to_string(),
+                                enabled: true,
+                                kind_state: ModuleKindState::Processor(ProcessorState {
+                                    threshold_kg: 0.0,
+                                    ticks_since_last_run: 0,
+                                    stalled: false,
+                                    selected_recipe: None,
+                                }),
+                                wear: crate::WearState::default(),
+                                thermal: None,
+                                power_stalled: false,
+                                module_priority: 0,
+                                assigned_crew: Default::default(),
+                                efficiency: 1.0,
+                                prev_crew_satisfied: true,
+                            },
+                            // High-priority processor
+                            ModuleState {
+                                id: ModuleInstanceId("proc_bbb".to_string()),
+                                def_id: "module_refinery".to_string(),
+                                enabled: true,
+                                kind_state: ModuleKindState::Processor(ProcessorState {
+                                    threshold_kg: 0.0,
+                                    ticks_since_last_run: 0,
+                                    stalled: false,
+                                    selected_recipe: None,
+                                }),
+                                wear: crate::WearState::default(),
+                                thermal: None,
+                                power_stalled: false,
+                                module_priority: 10,
+                                assigned_crew: Default::default(),
+                                efficiency: 1.0,
+                                prev_crew_satisfied: true,
+                            },
+                        ],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -1601,45 +1610,47 @@ mod tests {
                 crate::StationState {
                     id: station_id.clone(),
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![crate::InventoryItem::Ore {
-                        lot_id: crate::LotId("lot_0001".to_string()),
-                        asteroid_id: crate::AsteroidId("ast_0001".to_string()),
-                        kg: 500.0,
-                        composition: HashMap::from([
-                            ("Fe".to_string(), 0.7),
-                            ("Si".to_string(), 0.3),
-                        ]),
-                    }],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("proc_0001".to_string()),
-                        def_id: "module_refinery".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Processor(ProcessorState {
-                            threshold_kg: 0.0,
-                            ticks_since_last_run: 0,
-                            stalled: false,
-                            // Select a recipe that does NOT exist in the processor's recipe list
-                            selected_recipe: Some(RecipeId("nonexistent_recipe".to_string())),
-                        }),
-                        wear: crate::WearState::default(),
-                        thermal: None,
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                    core: FacilityCore {
+                        inventory: vec![crate::InventoryItem::Ore {
+                            lot_id: crate::LotId("lot_0001".to_string()),
+                            asteroid_id: crate::AsteroidId("ast_0001".to_string()),
+                            kg: 500.0,
+                            composition: HashMap::from([
+                                ("Fe".to_string(), 0.7),
+                                ("Si".to_string(), 0.3),
+                            ]),
+                        }],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("proc_0001".to_string()),
+                            def_id: "module_refinery".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Processor(ProcessorState {
+                                threshold_kg: 0.0,
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                                // Select a recipe that does NOT exist in the processor's recipe list
+                                selected_recipe: Some(RecipeId("nonexistent_recipe".to_string())),
+                            }),
+                            wear: crate::WearState::default(),
+                            thermal: None,
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -1691,7 +1702,7 @@ mod tests {
 
         // Processor state should have the first recipe
         let station = state.stations.get(&station_id).unwrap();
-        if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+        if let ModuleKindState::Processor(ps) = &station.core.modules[0].kind_state {
             assert_eq!(
                 ps.selected_recipe,
                 Some(first_recipe),
@@ -1770,44 +1781,46 @@ mod tests {
                 crate::StationState {
                     id: station_id.clone(),
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![crate::InventoryItem::Ore {
-                        lot_id: crate::LotId("lot_0001".to_string()),
-                        asteroid_id: crate::AsteroidId("ast_0001".to_string()),
-                        kg: 500.0,
-                        composition: HashMap::from([
-                            ("Fe".to_string(), 0.7),
-                            ("Si".to_string(), 0.3),
-                        ]),
-                    }],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("proc_0001".to_string()),
-                        def_id: "module_adv_refinery".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Processor(ProcessorState {
-                            threshold_kg: 0.0,
-                            ticks_since_last_run: 0,
-                            stalled: false,
-                            selected_recipe: None,
-                        }),
-                        wear: crate::WearState::default(),
-                        thermal: None,
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                    core: FacilityCore {
+                        inventory: vec![crate::InventoryItem::Ore {
+                            lot_id: crate::LotId("lot_0001".to_string()),
+                            asteroid_id: crate::AsteroidId("ast_0001".to_string()),
+                            kg: 500.0,
+                            composition: HashMap::from([
+                                ("Fe".to_string(), 0.7),
+                                ("Si".to_string(), 0.3),
+                            ]),
+                        }],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("proc_0001".to_string()),
+                            def_id: "module_adv_refinery".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Processor(ProcessorState {
+                                threshold_kg: 0.0,
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                                selected_recipe: None,
+                            }),
+                            wear: crate::WearState::default(),
+                            thermal: None,
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -1931,44 +1944,46 @@ mod tests {
                 crate::StationState {
                     id: station_id.clone(),
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![crate::InventoryItem::Ore {
-                        lot_id: crate::LotId("lot_0001".to_string()),
-                        asteroid_id: crate::AsteroidId("ast_0001".to_string()),
-                        kg: 300.0,
-                        composition: HashMap::from([
-                            ("Fe".to_string(), 0.7),
-                            ("Si".to_string(), 0.3),
-                        ]),
-                    }],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("ingot_maker_0001".to_string()),
-                        def_id: "module_ingot_maker".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Processor(ProcessorState {
-                            threshold_kg: 0.0,
-                            ticks_since_last_run: 0,
-                            stalled: false,
-                            selected_recipe: None,
-                        }),
-                        wear: crate::WearState::default(),
-                        thermal: None,
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                    core: FacilityCore {
+                        inventory: vec![crate::InventoryItem::Ore {
+                            lot_id: crate::LotId("lot_0001".to_string()),
+                            asteroid_id: crate::AsteroidId("ast_0001".to_string()),
+                            kg: 300.0,
+                            composition: HashMap::from([
+                                ("Fe".to_string(), 0.7),
+                                ("Si".to_string(), 0.3),
+                            ]),
+                        }],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("ingot_maker_0001".to_string()),
+                            def_id: "module_ingot_maker".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Processor(ProcessorState {
+                                threshold_kg: 0.0,
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                                selected_recipe: None,
+                            }),
+                            wear: crate::WearState::default(),
+                            thermal: None,
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -2014,6 +2029,7 @@ mod tests {
         // Should have produced a component
         let station = state.stations.get(&station_id).unwrap();
         let ingot_count: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -2028,7 +2044,7 @@ mod tests {
         assert_eq!(ingot_count, 1, "expected 1 ingot produced");
 
         // Quality should be Fixed(0.8) * 1.0 thermal_quality = 0.8
-        let quality = station.inventory.iter().find_map(|i| match i {
+        let quality = station.core.inventory.iter().find_map(|i| match i {
             InventoryItem::Component {
                 component_id,
                 quality,
@@ -2053,6 +2069,7 @@ mod tests {
 
         let station = state.stations.get(&station_id).unwrap();
         let ingot_count2: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
