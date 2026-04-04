@@ -596,10 +596,12 @@ fn avg_station_wear(station: &crate::StationState) -> f32 {
 /// Map a research domain to its corresponding data kind.
 fn domain_to_data_kind(domain: &crate::ResearchDomain) -> crate::DataKind {
     match domain {
-        crate::ResearchDomain::Survey => crate::DataKind::SurveyData,
-        crate::ResearchDomain::Materials => crate::DataKind::AssayData,
-        crate::ResearchDomain::Manufacturing => crate::DataKind::ManufacturingData,
-        crate::ResearchDomain::Propulsion => crate::DataKind::TransitData,
+        crate::ResearchDomain::Survey => crate::DataKind::new(crate::DataKind::SURVEY),
+        crate::ResearchDomain::Materials => crate::DataKind::new(crate::DataKind::ASSAY),
+        crate::ResearchDomain::Manufacturing => {
+            crate::DataKind::new(crate::DataKind::MANUFACTURING)
+        }
+        crate::ResearchDomain::Propulsion => crate::DataKind::new(crate::DataKind::TRANSIT),
     }
 }
 
@@ -1818,7 +1820,7 @@ mod tests {
         let survey_data = state
             .research
             .data_pool
-            .get(&crate::DataKind::SurveyData)
+            .get(&crate::DataKind::new(crate::DataKind::SURVEY))
             .copied()
             .unwrap_or(0.0);
         assert!(

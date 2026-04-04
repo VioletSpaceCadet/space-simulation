@@ -180,7 +180,7 @@ fn module_type_index_tracks_correct_types() {
                 domain: ResearchDomain::Survey,
                 data_consumption_per_run: 1.0,
                 research_points_per_run: 1.0,
-                accepted_data: vec![DataKind::SurveyData],
+                accepted_data: vec![DataKind::new(DataKind::SURVEY)],
                 research_interval_minutes: 1,
                 research_interval_ticks: 1,
             }))

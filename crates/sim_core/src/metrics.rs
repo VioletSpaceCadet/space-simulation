@@ -725,7 +725,7 @@ impl MetricsAccumulator {
         let total_scan_data = state
             .research
             .data_pool
-            .get(&crate::DataKind::SurveyData)
+            .get(&crate::DataKind::new(crate::DataKind::SURVEY))
             .copied()
             .unwrap_or(0.0);
         let max_tech_evidence = state
@@ -1415,7 +1415,10 @@ mod tests {
 
         state.research.unlocked.insert(TechId("tech_a".to_string()));
         state.research.unlocked.insert(TechId("tech_b".to_string()));
-        state.research.data_pool.insert(DataKind::SurveyData, 42.5);
+        state
+            .research
+            .data_pool
+            .insert(DataKind::new(crate::DataKind::SURVEY), 42.5);
         state.research.evidence.insert(
             TechId("tech_c".to_string()),
             DomainProgress {

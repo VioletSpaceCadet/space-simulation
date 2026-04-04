@@ -41,7 +41,7 @@ fn production_like_content() -> GameContent {
             name: "Deep Scan v1".to_string(),
             prereqs: vec![],
             domain_requirements: HashMap::from([(ResearchDomain::Survey, 100.0)]),
-            accepted_data: vec![DataKind::SurveyData],
+            accepted_data: vec![DataKind::new(DataKind::SURVEY)],
             effects: vec![
                 TechEffect::EnableDeepScan,
                 TechEffect::DeepScanCompositionNoise { sigma: 0.02 },
@@ -55,7 +55,10 @@ fn production_like_content() -> GameContent {
                 (ResearchDomain::Materials, 150.0),
                 (ResearchDomain::Manufacturing, 50.0),
             ]),
-            accepted_data: vec![DataKind::AssayData, DataKind::ManufacturingData],
+            accepted_data: vec![
+                DataKind::new(DataKind::ASSAY),
+                DataKind::new(DataKind::MANUFACTURING),
+            ],
             effects: vec![],
         },
         TechDef {
@@ -63,7 +66,10 @@ fn production_like_content() -> GameContent {
             name: "Ship Construction".to_string(),
             prereqs: vec![],
             domain_requirements: HashMap::from([(ResearchDomain::Manufacturing, 50.0)]),
-            accepted_data: vec![DataKind::ManufacturingData, DataKind::AssayData],
+            accepted_data: vec![
+                DataKind::new(DataKind::MANUFACTURING),
+                DataKind::new(DataKind::ASSAY),
+            ],
             effects: vec![TechEffect::EnableShipConstruction],
         },
     ];
@@ -77,7 +83,7 @@ fn production_like_content() -> GameContent {
             .volume(6.0)
             .power(8.0)
             .behavior(ModuleBehaviorDef::SensorArray(SensorArrayDef {
-                data_kind: DataKind::SurveyData,
+                data_kind: DataKind::new(DataKind::SURVEY),
                 action_key: "sensor_scan".to_string(),
                 scan_interval_minutes: 120,
                 scan_interval_ticks: 2, // 120 / 60
@@ -97,7 +103,7 @@ fn production_like_content() -> GameContent {
                 domain: ResearchDomain::Survey,
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
-                accepted_data: vec![DataKind::SurveyData],
+                accepted_data: vec![DataKind::new(DataKind::SURVEY)],
                 research_interval_minutes: 60,
                 research_interval_ticks: 1, // 60 / 60
             }))
@@ -116,7 +122,10 @@ fn production_like_content() -> GameContent {
                 domain: ResearchDomain::Materials,
                 data_consumption_per_run: 10.0,
                 research_points_per_run: 5.0,
-                accepted_data: vec![DataKind::AssayData, DataKind::ManufacturingData],
+                accepted_data: vec![
+                    DataKind::new(DataKind::ASSAY),
+                    DataKind::new(DataKind::MANUFACTURING),
+                ],
                 research_interval_minutes: 60,
                 research_interval_ticks: 1,
             }))
@@ -135,7 +144,7 @@ fn production_like_content() -> GameContent {
                 domain: ResearchDomain::Manufacturing,
                 data_consumption_per_run: 10.0,
                 research_points_per_run: 5.0,
-                accepted_data: vec![DataKind::ManufacturingData],
+                accepted_data: vec![DataKind::new(DataKind::MANUFACTURING)],
                 research_interval_minutes: 60,
                 research_interval_ticks: 1,
             }))
@@ -396,7 +405,10 @@ fn deep_scan_unlocks_within_500_ticks() {
         "tech_deep_scan_v1 should unlock within 500 ticks (~20 days). \
          Unlocked: {:?}, ScanData pool: {:?}, Exploration evidence: {:?}",
         state.research.unlocked,
-        state.research.data_pool.get(&DataKind::SurveyData),
+        state
+            .research
+            .data_pool
+            .get(&DataKind::new(DataKind::SURVEY)),
         state
             .research
             .evidence
@@ -475,7 +487,7 @@ fn sensor_data_generation_rate_at_mpt_60() {
     let scan_data = state
         .research
         .data_pool
-        .get(&DataKind::SurveyData)
+        .get(&DataKind::new(DataKind::SURVEY))
         .copied()
         .unwrap_or(0.0);
 
@@ -645,7 +657,10 @@ fn deep_scan_unlocks_with_production_content() {
         "tech_deep_scan_v1 should unlock within 1500 ticks with production content \
          (real wear rates). Unlocked: {:?}, SurveyData: {:?}, Evidence: {:?}",
         state.research.unlocked,
-        state.research.data_pool.get(&DataKind::SurveyData),
+        state
+            .research
+            .data_pool
+            .get(&DataKind::new(DataKind::SURVEY)),
         state
             .research
             .evidence

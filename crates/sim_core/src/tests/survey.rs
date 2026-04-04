@@ -89,7 +89,7 @@ fn test_survey_accumulates_scan_data() {
     let scan_data = state
         .research
         .data_pool
-        .get(&DataKind::SurveyData)
+        .get(&DataKind::new(DataKind::SURVEY))
         .copied()
         .unwrap_or(0.0);
     assert!(

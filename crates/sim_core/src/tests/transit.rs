@@ -189,7 +189,7 @@ fn transit_moves_ship_and_starts_next_task() {
     let transit_data = state
         .research
         .data_pool
-        .get(&DataKind::TransitData)
+        .get(&DataKind::new(DataKind::TRANSIT))
         .copied()
         .unwrap_or(0.0);
     assert!(
@@ -350,7 +350,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
     let first_transit_data = state
         .research
         .data_pool
-        .get(&DataKind::TransitData)
+        .get(&DataKind::new(DataKind::TRANSIT))
         .copied()
         .unwrap_or(0.0);
     assert!(
@@ -380,7 +380,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
     let total_transit_data = state
         .research
         .data_pool
-        .get(&DataKind::TransitData)
+        .get(&DataKind::new(DataKind::TRANSIT))
         .copied()
         .unwrap_or(0.0);
     let second_amount = total_transit_data - first_transit_data;

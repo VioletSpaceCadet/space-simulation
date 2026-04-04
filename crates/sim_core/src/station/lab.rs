@@ -154,7 +154,7 @@ mod tests {
                     domain: ResearchDomain::Survey,
                     data_consumption_per_run: 8.0,
                     research_points_per_run: 4.0,
-                    accepted_data: vec![DataKind::SurveyData],
+                    accepted_data: vec![DataKind::new(DataKind::SURVEY)],
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
                 }))
@@ -245,14 +245,17 @@ mod tests {
     fn lab_consumes_data_and_produces_points() {
         let content = lab_content();
         let mut state = lab_state(&content);
-        state.research.data_pool.insert(DataKind::SurveyData, 100.0);
+        state
+            .research
+            .data_pool
+            .insert(DataKind::new(DataKind::SURVEY), 100.0);
 
         let mut events = Vec::new();
         let station_id = StationId("station_test".to_string());
         super::tick_lab_modules(&mut state, &station_id, &content, &mut events);
 
         // Should have consumed 8.0 data
-        let remaining = state.research.data_pool[&DataKind::SurveyData];
+        let remaining = state.research.data_pool[&DataKind::new(DataKind::SURVEY)];
         assert!(
             (remaining - 92.0).abs() < 1e-3,
             "expected 92.0 remaining, got {remaining}"
@@ -310,14 +313,17 @@ mod tests {
         let content = lab_content();
         let mut state = lab_state(&content);
         // Lab wants 8.0 but only 4.0 available — half rate
-        state.research.data_pool.insert(DataKind::SurveyData, 4.0);
+        state
+            .research
+            .data_pool
+            .insert(DataKind::new(DataKind::SURVEY), 4.0);
 
         let mut events = Vec::new();
         let station_id = StationId("station_test".to_string());
         super::tick_lab_modules(&mut state, &station_id, &content, &mut events);
 
         // Should have consumed all 4.0
-        let remaining = state.research.data_pool[&DataKind::SurveyData];
+        let remaining = state.research.data_pool[&DataKind::new(DataKind::SURVEY)];
         assert!(
             remaining.abs() < 1e-3,
             "expected ~0.0 remaining, got {remaining}"
@@ -337,7 +343,10 @@ mod tests {
     fn lab_skips_unlocked_tech() {
         let content = lab_content();
         let mut state = lab_state(&content);
-        state.research.data_pool.insert(DataKind::SurveyData, 100.0);
+        state
+            .research
+            .data_pool
+            .insert(DataKind::new(DataKind::SURVEY), 100.0);
         state
             .research
             .unlocked
@@ -348,7 +357,7 @@ mod tests {
         super::tick_lab_modules(&mut state, &station_id, &content, &mut events);
 
         // Data should be unchanged
-        let remaining = state.research.data_pool[&DataKind::SurveyData];
+        let remaining = state.research.data_pool[&DataKind::new(DataKind::SURVEY)];
         assert!((remaining - 100.0).abs() < 1e-3, "data should be unchanged");
 
         // No LabRan events
@@ -362,7 +371,10 @@ mod tests {
     fn lab_skips_when_no_tech_assigned() {
         let content = lab_content();
         let mut state = lab_state(&content);
-        state.research.data_pool.insert(DataKind::SurveyData, 100.0);
+        state
+            .research
+            .data_pool
+            .insert(DataKind::new(DataKind::SURVEY), 100.0);
 
         // Clear assigned tech
         let station_id = StationId("station_test".to_string());
@@ -375,7 +387,7 @@ mod tests {
         super::tick_lab_modules(&mut state, &station_id, &content, &mut events);
 
         // Data should be unchanged
-        let remaining = state.research.data_pool[&DataKind::SurveyData];
+        let remaining = state.research.data_pool[&DataKind::new(DataKind::SURVEY)];
         assert!((remaining - 100.0).abs() < 1e-3, "data should be unchanged");
 
         // No LabRan events

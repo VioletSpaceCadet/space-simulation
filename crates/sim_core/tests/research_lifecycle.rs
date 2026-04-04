@@ -22,7 +22,7 @@ fn full_research_lifecycle() {
                 domain: ResearchDomain::Survey,
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
-                accepted_data: vec![DataKind::SurveyData],
+                accepted_data: vec![DataKind::new(DataKind::SURVEY)],
                 research_interval_minutes: 1,
                 research_interval_ticks: 1,
             }))
@@ -39,7 +39,7 @@ fn full_research_lifecycle() {
     *state
         .research
         .data_pool
-        .entry(DataKind::SurveyData)
+        .entry(DataKind::new(DataKind::SURVEY))
         .or_insert(0.0) = 1000.0;
 
     // Install lab with assigned tech
@@ -98,7 +98,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
                 domain: ResearchDomain::Survey,
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
-                accepted_data: vec![DataKind::SurveyData],
+                accepted_data: vec![DataKind::new(DataKind::SURVEY)],
                 research_interval_minutes: 1,
                 research_interval_ticks: 1,
             }))

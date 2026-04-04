@@ -210,7 +210,7 @@ pub(crate) fn resolve_transit(
     // Generate transit data from completed flight
     let data_amount = crate::research::generate_data(
         &mut state.research,
-        DataKind::TransitData,
+        DataKind::new(DataKind::TRANSIT),
         "transit",
         &content.constants,
     );
@@ -219,7 +219,7 @@ pub(crate) fn resolve_transit(
         &mut state.counters,
         current_tick,
         Event::DataGenerated {
-            kind: DataKind::TransitData,
+            kind: DataKind::new(DataKind::TRANSIT),
             amount: data_amount,
         },
     ));
@@ -333,7 +333,7 @@ pub(crate) fn resolve_survey(
 
     let data_amount = crate::research::generate_data(
         &mut state.research,
-        DataKind::SurveyData,
+        DataKind::new(DataKind::SURVEY),
         "survey",
         &content.constants,
     );
@@ -342,7 +342,7 @@ pub(crate) fn resolve_survey(
         &mut state.counters,
         current_tick,
         Event::DataGenerated {
-            kind: DataKind::SurveyData,
+            kind: DataKind::new(DataKind::SURVEY),
             amount: data_amount,
         },
     ));
@@ -427,7 +427,7 @@ pub(crate) fn resolve_mine(
 
     crate::research::generate_data(
         &mut state.research,
-        DataKind::AssayData,
+        DataKind::new(DataKind::ASSAY),
         "mine",
         &content.constants,
     );
@@ -638,7 +638,7 @@ pub(crate) fn resolve_deep_scan(
 
     let data_amount = crate::research::generate_data(
         &mut state.research,
-        DataKind::SurveyData,
+        DataKind::new(DataKind::SURVEY),
         "deep_scan",
         &content.constants,
     );
@@ -647,7 +647,7 @@ pub(crate) fn resolve_deep_scan(
         &mut state.counters,
         current_tick,
         Event::DataGenerated {
-            kind: DataKind::SurveyData,
+            kind: DataKind::new(DataKind::SURVEY),
             amount: data_amount,
         },
     ));
