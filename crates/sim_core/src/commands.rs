@@ -479,6 +479,135 @@ pub(crate) fn handle_export(
     true
 }
 
+/// Import items into a ground facility. Bypasses milestone trade gating
+/// (ground facilities on Earth have direct trade access).
+pub(crate) fn handle_ground_import(
+    state: &mut GameState,
+    content: &GameContent,
+    gf_id: &crate::GroundFacilityId,
+    item_spec: &crate::TradeItemSpec,
+    current_tick: u64,
+    rng: &mut impl Rng,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    if !state.ground_facilities.contains_key(gf_id) {
+        return false;
+    }
+
+    let Some(cost) = trade::compute_import_cost(item_spec, &content.pricing, content) else {
+        return false;
+    };
+
+    if state.balance < cost {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::InsufficientFunds {
+                station_id: crate::StationId(gf_id.0.clone()),
+                action: format!("import {}", item_spec.pricing_key()),
+                required: cost,
+                available: state.balance,
+            },
+        ));
+        return false;
+    }
+
+    // Crew import
+    if let crate::TradeItemSpec::Crew { role, count } = item_spec {
+        state.balance -= cost;
+        let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
+            return false;
+        };
+        *gf.core.crew.entry(role.clone()).or_insert(0) += count;
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::ItemImported {
+                station_id: crate::StationId(gf_id.0.clone()),
+                item_spec: item_spec.clone(),
+                cost,
+                balance_after: state.balance,
+            },
+        ));
+        return true;
+    }
+
+    // Check cargo capacity
+    let new_items = trade::create_inventory_items(item_spec, rng);
+    let new_volume = inventory_volume_m3(&new_items, content);
+    let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
+        return false;
+    };
+    let current_volume = gf.core.used_volume_m3(content);
+    if current_volume + new_volume > gf.core.cargo_capacity_m3 {
+        return false;
+    }
+
+    state.balance -= cost;
+    let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
+        return false;
+    };
+    trade::merge_into_inventory(&mut gf.core.inventory, new_items);
+    gf.core.invalidate_volume_cache();
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::ItemImported {
+            station_id: crate::StationId(gf_id.0.clone()),
+            item_spec: item_spec.clone(),
+            cost,
+            balance_after: state.balance,
+        },
+    ));
+    true
+}
+
+/// Export items from a ground facility. Bypasses milestone trade gating.
+pub(crate) fn handle_ground_export(
+    state: &mut GameState,
+    content: &GameContent,
+    gf_id: &crate::GroundFacilityId,
+    item_spec: &crate::TradeItemSpec,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    let Some(gf) = state.ground_facilities.get(gf_id) else {
+        return false;
+    };
+
+    let Some(revenue) = trade::compute_export_revenue(item_spec, &content.pricing, content) else {
+        return false;
+    };
+
+    if !trade::has_enough_for_export(&gf.core.inventory, item_spec) {
+        return false;
+    }
+
+    let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
+        return false;
+    };
+    if !trade::remove_inventory_items(&mut gf.core.inventory, item_spec) {
+        return false;
+    }
+    gf.core.invalidate_volume_cache();
+    state.balance += revenue;
+    state.export_revenue_total += revenue;
+    state.export_count += 1;
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::ItemExported {
+            station_id: crate::StationId(gf_id.0.clone()),
+            item_spec: item_spec.clone(),
+            revenue,
+            balance_after: state.balance,
+        },
+    ));
+    true
+}
+
 /// Jettison all slag from a station's inventory.
 pub(crate) fn handle_jettison_slag(
     state: &mut GameState,
