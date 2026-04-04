@@ -27,6 +27,9 @@ pub struct GameState {
     pub asteroids: std::collections::BTreeMap<AsteroidId, AsteroidState>,
     pub ships: std::collections::BTreeMap<ShipId, ShipState>,
     pub stations: std::collections::BTreeMap<StationId, StationState>,
+    /// Earth-based (or planetary surface) operations centers.
+    #[serde(default)]
+    pub ground_facilities: std::collections::BTreeMap<crate::GroundFacilityId, GroundFacilityState>,
     pub research: ResearchState,
     #[serde(default)]
     pub balance: f64,
@@ -520,6 +523,48 @@ pub struct StationState {
     /// Station leaders (reserved for Phase 2 leader system).
     #[serde(default)]
     pub leaders: Vec<LeaderId>,
+}
+
+// ---------------------------------------------------------------------------
+// Ground facility state
+// ---------------------------------------------------------------------------
+
+/// An Earth-based (or planetary surface) operations center.
+/// Hosts modules via `FacilityCore` but cannot dock ships. Uses launch
+/// mechanics to deliver payloads to orbit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroundFacilityState {
+    pub id: crate::GroundFacilityId,
+    pub name: String,
+    pub position: crate::Position,
+    /// Shared module-hosting fields (same substrate as `StationState`).
+    #[serde(flatten)]
+    pub core: FacilityCore,
+    /// In-flight launches from this facility.
+    #[serde(default)]
+    pub launch_transits: Vec<LaunchTransitState>,
+}
+
+/// A payload currently in transit from a ground facility launch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaunchTransitState {
+    /// Which rocket was used.
+    pub rocket_def_id: String,
+    /// What is being delivered.
+    pub payload: LaunchPayload,
+    /// Destination position.
+    pub destination: crate::Position,
+    /// Tick at which the payload arrives.
+    pub arrival_tick: u64,
+}
+
+/// The payload of a launch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LaunchPayload {
+    /// Deliver supplies to an existing orbital station.
+    Supplies(Vec<InventoryItem>),
+    /// Deploy a new orbital station.
+    StationKit,
 }
 
 impl FacilityCore {

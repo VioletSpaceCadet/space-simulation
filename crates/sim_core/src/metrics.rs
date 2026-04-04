@@ -1010,6 +1010,7 @@ mod tests {
             asteroids: std::collections::BTreeMap::new(),
             ships: std::collections::BTreeMap::new(),
             stations: std::collections::BTreeMap::new(),
+            ground_facilities: std::collections::BTreeMap::new(),
             research: ResearchState {
                 unlocked: HashSet::new(),
                 data_pool: AHashMap::default(),

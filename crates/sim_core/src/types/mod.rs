@@ -111,6 +111,7 @@ numeric_id!(CommandId);
 numeric_id!(EventId);
 string_id!(PrincipalId);
 string_id!(LotId);
+string_id!(GroundFacilityId);
 string_id!(ModuleItemId);
 string_id!(ModuleInstanceId);
 string_id!(ComponentId);

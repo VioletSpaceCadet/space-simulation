@@ -852,6 +852,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         asteroids: std::collections::BTreeMap::new(),
         ships: [(ship_id, ship)].into_iter().collect(),
         stations: [(station_id, station)].into_iter().collect(),
+        ground_facilities: std::collections::BTreeMap::new(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
             data_pool: AHashMap::default(),
@@ -1576,6 +1577,7 @@ mod tests {
             )]
             .into_iter()
             .collect(),
+            ground_facilities: std::collections::BTreeMap::new(),
             research: ResearchState {
                 unlocked: std::collections::HashSet::new(),
                 data_pool: AHashMap::default(),
