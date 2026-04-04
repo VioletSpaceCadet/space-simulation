@@ -141,6 +141,7 @@ fn replenish_test_content() -> GameContent {
         crew_roles: std::collections::BTreeMap::new(),
         scoring: Default::default(),
         milestones: Vec::new(),
+        satellite_defs: std::collections::BTreeMap::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -184,6 +185,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
         .into_iter()
         .collect(),
         ground_facilities: std::collections::BTreeMap::new(),
+        satellites: std::collections::BTreeMap::new(),
         research: ResearchState {
             unlocked: HashSet::new(),
             data_pool: AHashMap::default(),

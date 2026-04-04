@@ -43,7 +43,7 @@ pub use tasks::{inventory_mass_kg, inventory_volume_m3, mine_duration};
 pub use types::{
     AsteroidId, BodyId, CommandId, ComponentId, CrewRole, EventId, FacilityId, GroundFacilityId,
     HullId, LeaderId, LotId, ModuleDefId, ModuleInstanceId, ModuleItemId, NodeId, PrincipalId,
-    RecipeId, ShipId, SiteId, SlotType, StationId, TechId,
+    RecipeId, SatelliteId, ShipId, SiteId, SlotType, StationId, TechId,
 };
 // -- types: type aliases & constants --
 pub use types::{
@@ -60,7 +60,7 @@ pub use types::{
 pub use types::{
     AsteroidKnowledge, AsteroidState, Counters, FacilityCore, GameState, GroundFacilityState,
     LaunchPayload, LaunchTransitState, MetaState, ModuleTypeIndex, PowerBudgetCache, PowerState,
-    ResearchState, ScanSite, StationState, TaskState, ThermalLink,
+    ResearchState, SatelliteState, ScanSite, StationState, TaskState, ThermalLink,
 };
 // -- types: ship state --
 pub use types::{FittedModule, ShipState, TaskKind};
@@ -77,8 +77,8 @@ pub use types::{
     AlertRuleDef, AlertRuleType, AsteroidTemplateDef, AutopilotConfig, BodyType, BoiloffCurveDef,
     ComponentDef, CrewRoleDef, DeepScanTargetConfig, ElementDef, ExportComponentConfig,
     ExportElementConfig, GameContent, HullDef, InitialComponent, InitialMaterial,
-    InitialStationDef, NodeDef, OrbitalBodyDef, SlotDef, SolarSystemDef, TechDef, TechEffect,
-    ThermalDef, ZoneDef,
+    InitialStationDef, NodeDef, OrbitalBodyDef, SatelliteDef, SlotDef, SolarSystemDef, TechDef,
+    TechEffect, ThermalDef, ZoneDef,
 };
 // -- types: module & recipe definitions --
 pub use types::{

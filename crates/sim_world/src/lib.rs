@@ -612,6 +612,21 @@ fn load_crew_roles(
     Ok(defs.into_iter().map(|d| (d.id.clone(), d)).collect())
 }
 
+fn load_satellite_defs(
+    dir: &Path,
+) -> Result<std::collections::BTreeMap<String, sim_core::SatelliteDef>> {
+    let defs: Vec<sim_core::SatelliteDef> = load_optional_json(dir, "satellite_defs.json")?;
+    let mut seen = std::collections::HashSet::new();
+    for def in &defs {
+        assert!(
+            seen.insert(&def.id),
+            "duplicate satellite def id '{}'",
+            def.id
+        );
+    }
+    Ok(defs.into_iter().map(|d| (d.id.clone(), d)).collect())
+}
+
 /// Load recipe definitions from `recipes.json`, validating unique IDs.
 fn load_recipes(
     dir: &Path,
@@ -693,6 +708,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let milestones: Vec<sim_core::MilestoneDef> = load_optional_json(dir, "milestones.json")?;
     let crew_roles = load_crew_roles(dir)?;
     let recipe_map = load_recipes(dir)?;
+    let satellite_defs = load_satellite_defs(dir)?;
     let mut content = GameContent {
         content_version: techs_file.content_version,
         techs: techs_file.techs,
@@ -713,6 +729,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         crew_roles,
         scoring,
         milestones,
+        satellite_defs,
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -853,6 +870,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         ships: [(ship_id, ship)].into_iter().collect(),
         stations: [(station_id, station)].into_iter().collect(),
         ground_facilities: std::collections::BTreeMap::new(),
+        satellites: std::collections::BTreeMap::new(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
             data_pool: AHashMap::default(),
@@ -1578,6 +1596,7 @@ mod tests {
             .into_iter()
             .collect(),
             ground_facilities: std::collections::BTreeMap::new(),
+            satellites: std::collections::BTreeMap::new(),
             research: ResearchState {
                 unlocked: std::collections::HashSet::new(),
                 data_pool: AHashMap::default(),
