@@ -876,6 +876,10 @@ pub struct SensorArrayDef {
     pub scan_interval_minutes: u64,
     #[serde(skip_deserializing, default)]
     pub scan_interval_ticks: u64,
+    /// Sensor type identifier (e.g., `"optical"`, `"radio"`). Content-driven —
+    /// new sensor types are added via `module_defs.json`, not code changes.
+    #[serde(default)]
+    pub sensor_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -216,13 +216,57 @@
       "SensorArray": {
         "data_kind": "SurveyData",
         "action_key": "sensor_scan",
-        "scan_interval_minutes": 120
+        "scan_interval_minutes": 120,
+        "sensor_type": "orbital"
       }
     },
     "power_stall_priority": 0,
     "crew_requirement": {
       "operator": 1
     }
+  },
+  {
+    "id": "module_optical_telescope",
+    "name": "Optical Telescope",
+    "mass_kg": 3000.0,
+    "volume_m3": 8.0,
+    "power_consumption_per_run": 5.0,
+    "wear_per_run": 0.002,
+    "behavior": {
+      "SensorArray": {
+        "data_kind": "SurveyData",
+        "action_key": "optical_scan",
+        "scan_interval_minutes": 180,
+        "sensor_type": "optical"
+      }
+    },
+    "power_stall_priority": 0,
+    "crew_requirement": {
+      "operator": 1
+    },
+    "operating_cost_per_tick": 100.0
+  },
+  {
+    "id": "module_radio_telescope",
+    "name": "Radio Telescope",
+    "mass_kg": 5000.0,
+    "volume_m3": 15.0,
+    "power_consumption_per_run": 12.0,
+    "wear_per_run": 0.003,
+    "behavior": {
+      "SensorArray": {
+        "data_kind": "SurveyData",
+        "action_key": "radio_scan",
+        "scan_interval_minutes": 240,
+        "sensor_type": "radio"
+      }
+    },
+    "power_stall_priority": 0,
+    "crew_requirement": {
+      "operator": 1,
+      "scientist": 1
+    },
+    "operating_cost_per_tick": 250.0
   },
   {
     "id": "module_shipyard",
