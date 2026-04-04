@@ -8,9 +8,10 @@ Space industry simulation game. Deterministic Rust sim core, HTTP daemon with SS
 
 ```bash
 cargo build                                               # Build all crates
-cargo test                                                # Run all tests
-cargo test -p sim_core                                    # Test sim_core only
-cargo test <name>                                         # Run a single test by name
+cargo nextest run                                         # Run all tests (parallel)
+cargo nextest run -p sim_core                             # Test sim_core only
+cargo nextest run -E 'test(my_test)'                      # Run a single test by name
+cargo test                                                # Run all tests (fallback)
 cargo clippy                                              # Lint
 cargo fmt                                                 # Format
 
@@ -28,7 +29,7 @@ cd mcp_advisor && npm start                               # Run MCP advisor (std
 cd e2e && npx playwright test                             # E2E tests
 cd e2e && npx playwright test --headed                    # E2E tests (visible browser)
 
-cargo llvm-cov --fail-under-lines 83                      # Rust coverage (83% line threshold)
+cargo llvm-cov nextest --fail-under-lines 83              # Rust coverage (83% line threshold)
 cd ui_web && npm run test:coverage                        # FE coverage (thresholds in vite.config.ts)
 
 pip install duckdb pyarrow ruff pytest pytest-cov mypy    # Install Python deps (once, in venv)

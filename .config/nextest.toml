@@ -6,7 +6,6 @@ dir = "target/nextest"
 
 [profile.default]
 fail-fast = false
-retries = 1
 
 # CI profile — stricter settings
 [profile.ci]
