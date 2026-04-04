@@ -22,7 +22,7 @@ fn resolve_counter(state: &GameState, counter: &str) -> Option<f64> {
             let count: usize = state
                 .stations
                 .values()
-                .flat_map(|s| s.inventory.iter())
+                .flat_map(|s| s.core.inventory.iter())
                 .filter(|item| matches!(item, crate::InventoryItem::Component { .. }))
                 .count();
             Some(count as f64)
@@ -212,6 +212,7 @@ mod tests {
             .values_mut()
             .next()
             .unwrap()
+            .core
             .inventory
             .push(crate::InventoryItem::Ore {
                 lot_id: crate::LotId("lot_1".to_string()),

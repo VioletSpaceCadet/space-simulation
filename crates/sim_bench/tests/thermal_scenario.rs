@@ -41,12 +41,13 @@ fn thermal_30d_scenario_completes_no_collapse() {
 
     // Station should still be operational
     assert!(
-        !station.modules.is_empty(),
+        !station.core.modules.is_empty(),
         "station should still have modules after 30 days"
     );
 
     // Check thermal modules exist and have warmed up
     let thermal_modules: Vec<_> = station
+        .core
         .modules
         .iter()
         .filter(|m| m.thermal.is_some())
@@ -110,12 +111,13 @@ fn thermal_stress_90d_completes_with_degraded_cooling() {
 
     // Station should still be operational after 90 days with degraded cooling
     assert!(
-        !station.modules.is_empty(),
+        !station.core.modules.is_empty(),
         "station should have modules after 90 days"
     );
 
     // Thermal modules should still have temps — not all at ambient
     let thermal_modules: Vec<_> = station
+        .core
         .modules
         .iter()
         .filter(|m| m.thermal.is_some())
@@ -123,6 +125,6 @@ fn thermal_stress_90d_completes_with_degraded_cooling() {
     assert!(!thermal_modules.is_empty());
 
     // Production should still be happening (modules still active)
-    let has_active_module = station.modules.iter().any(|m| m.enabled);
+    let has_active_module = station.core.modules.iter().any(|m| m.enabled);
     assert!(has_active_module, "station should have active modules");
 }

@@ -58,8 +58,9 @@ pub use types::{
 };
 // -- types: game state --
 pub use types::{
-    AsteroidKnowledge, AsteroidState, Counters, GameState, MetaState, ModuleTypeIndex,
-    PowerBudgetCache, PowerState, ResearchState, ScanSite, StationState, TaskState, ThermalLink,
+    AsteroidKnowledge, AsteroidState, Counters, FacilityCore, GameState, MetaState,
+    ModuleTypeIndex, PowerBudgetCache, PowerState, ResearchState, ScanSite, StationState,
+    TaskState, ThermalLink,
 };
 // -- types: ship state --
 pub use types::{FittedModule, ShipState, TaskKind};

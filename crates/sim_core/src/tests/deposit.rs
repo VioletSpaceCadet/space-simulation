@@ -29,6 +29,7 @@ fn test_deposit_moves_inventory_to_station() {
 
     let station_id = StationId("station_earth_orbit".to_string());
     let station_has_ore = state.stations[&station_id]
+        .core
         .inventory
         .iter()
         .any(|i| matches!(i, InventoryItem::Ore { kg, .. } if *kg == 100.0));
@@ -119,11 +120,11 @@ fn test_station_starts_with_empty_inventory() {
     let state = test_state(&content);
     let station = state.stations.values().next().unwrap();
     assert!(
-        station.inventory.is_empty(),
+        station.core.inventory.is_empty(),
         "station inventory should be empty at start"
     );
     assert!(
-        (station.cargo_capacity_m3 - 10_000.0).abs() < 1e-5,
+        (station.core.cargo_capacity_m3 - 10_000.0).abs() < 1e-5,
         "station capacity should be 10,000 m³"
     );
 }
@@ -139,6 +140,7 @@ fn test_deposit_respects_station_capacity() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.001;
 
     let ship_id = ShipId("ship_0001".to_string());
@@ -160,7 +162,7 @@ fn test_deposit_respects_station_capacity() {
     tick(&mut state, &[], &content, &mut rng, None);
 
     assert!(
-        state.stations[&station_id].inventory.is_empty(),
+        state.stations[&station_id].core.inventory.is_empty(),
         "station should not accept ore beyond its capacity"
     );
     assert!(
@@ -184,6 +186,7 @@ fn test_deposit_partial_when_station_partially_full() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.04;
     content.constants.station_cargo_capacity_m3 = 0.04;
 
@@ -208,6 +211,7 @@ fn test_deposit_partial_when_station_partially_full() {
     tick(&mut state, &[], &content, &mut rng, None);
 
     let station_ore_kg: f32 = state.stations[&station_id]
+        .core
         .inventory
         .iter()
         .filter_map(|i| {
@@ -250,6 +254,7 @@ fn test_deposit_ship_waits_when_station_full() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.001;
 
     let ship_id = ShipId("ship_0001".to_string());
@@ -298,6 +303,7 @@ fn test_deposit_unblocks_when_space_opens() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.001;
 
     let ship_id = ShipId("ship_0001".to_string());
@@ -322,6 +328,7 @@ fn test_deposit_unblocks_when_space_opens() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 10_000.0;
     let events = tick(&mut state, &[], &content, &mut rng, None);
 
@@ -347,6 +354,7 @@ fn test_deposit_blocked_event_only_emitted_once() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.001;
 
     let ship_id = ShipId("ship_0001".to_string());

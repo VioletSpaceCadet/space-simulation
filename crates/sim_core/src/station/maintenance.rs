@@ -12,7 +12,7 @@ pub(super) fn tick_maintenance_modules(
     let indices: Vec<usize> = state
         .stations
         .get(station_id)
-        .map(|s| s.module_type_index.maintenance.clone())
+        .map(|s| s.core.module_type_index.maintenance.clone())
         .unwrap_or_default();
 
     for module_idx in indices {
@@ -31,6 +31,21 @@ pub(super) fn tick_maintenance_modules(
         let outcome = execute(&ctx, state, events);
         super::apply_run_result(state, &ctx, outcome, content, events);
     }
+}
+
+/// Count how many of a specific component are in inventory.
+fn count_component(inventory: &[InventoryItem], component_id_str: &str) -> u32 {
+    inventory
+        .iter()
+        .filter_map(|i| match i {
+            InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } if component_id.0 == *component_id_str => Some(*count),
+            _ => None,
+        })
+        .sum()
 }
 
 fn execute(
@@ -54,8 +69,9 @@ fn execute(
         let Some(station) = state.stations.get(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: true };
         };
-        let self_id = &station.modules[ctx.module_idx].id;
+        let self_id = &station.core.modules[ctx.module_idx].id;
         let mut candidates: Vec<(usize, f32, String)> = station
+            .core
             .modules
             .iter()
             .enumerate()
@@ -76,7 +92,7 @@ fn execute(
         let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: true };
         };
-        let kit_slot = station.inventory.iter_mut().find(|i| {
+        let kit_slot = station.core.inventory.iter_mut().find(|i| {
             matches!(i, InventoryItem::Component { component_id, count, .. }
                 if component_id.0 == *component_id_str && *count >= kit_cost)
         });
@@ -91,10 +107,10 @@ fn execute(
     if !has_kit {
         return super::RunOutcome::Skipped { reset_timer: true };
     }
-
     // Remove empty component stacks
     if let Some(station) = state.stations.get_mut(&ctx.station_id) {
         station
+            .core
             .inventory
             .retain(|i| !matches!(i, InventoryItem::Component { count, .. } if *count == 0));
     }
@@ -104,7 +120,7 @@ fn execute(
         let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: true };
         };
-        let target_module = &mut station.modules[target_idx];
+        let target_module = &mut station.core.modules[target_idx];
         let wear_before = target_module.wear.wear;
         target_module.wear.wear = (target_module.wear.wear - repair_reduction).max(0.0);
         let wear_after = target_module.wear.wear;
@@ -116,30 +132,10 @@ fn execute(
             station.invalidate_power_cache();
         }
 
-        let kits_remaining: u32 = station
-            .inventory
-            .iter()
-            .filter_map(|i| {
-                if let InventoryItem::Component {
-                    component_id,
-                    count,
-                    ..
-                } = i
-                {
-                    if component_id.0 == *component_id_str {
-                        Some(*count)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .sum();
+        let kits_remaining = count_component(&station.core.inventory, component_id_str);
 
         (target_module_id, wear_before, wear_after, kits_remaining)
     };
-
     events.push(crate::emit(
         &mut state.counters,
         current_tick,

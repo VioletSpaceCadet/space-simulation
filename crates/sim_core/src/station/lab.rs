@@ -13,7 +13,7 @@ pub(super) fn tick_lab_modules(
     let indices: Vec<usize> = state
         .stations
         .get(station_id)
-        .map(|s| s.module_type_index.labs.clone())
+        .map(|s| s.core.module_type_index.labs.clone())
         .unwrap_or_default();
 
     for module_idx in indices {
@@ -50,7 +50,7 @@ fn execute(
         let Some(station) = state.stations.get(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: true };
         };
-        if let ModuleKindState::Lab(ls) = &station.modules[ctx.module_idx].kind_state {
+        if let ModuleKindState::Lab(ls) = &station.core.modules[ctx.module_idx].kind_state {
             ls.assigned_tech.clone()
         } else {
             return super::RunOutcome::Skipped { reset_timer: true };
@@ -180,35 +180,37 @@ mod tests {
                 StationState {
                     id: station_id,
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("lab_inst_0001".to_string()),
-                        def_id: "module_exploration_lab".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Lab(LabState {
-                            ticks_since_last_run: 0,
-                            assigned_tech: Some(TechId("tech_deep_scan_v1".to_string())),
-                            starved: false,
-                        }),
-                        wear: WearState::default(),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                        thermal: None,
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                    core: FacilityCore {
+                        inventory: vec![],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("lab_inst_0001".to_string()),
+                            def_id: "module_exploration_lab".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Lab(LabState {
+                                ticks_since_last_run: 0,
+                                assigned_tech: Some(TechId("tech_deep_scan_v1".to_string())),
+                                starved: false,
+                            }),
+                            wear: WearState::default(),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                            thermal: None,
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -284,7 +286,7 @@ mod tests {
 
         // Should be starved
         let station = state.stations.get(&station_id).unwrap();
-        if let ModuleKindState::Lab(ls) = &station.modules[0].kind_state {
+        if let ModuleKindState::Lab(ls) = &station.core.modules[0].kind_state {
             assert!(ls.starved, "expected starved=true");
         } else {
             panic!("expected Lab module");
@@ -365,7 +367,7 @@ mod tests {
         // Clear assigned tech
         let station_id = StationId("station_test".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        if let ModuleKindState::Lab(ls) = &mut station.modules[0].kind_state {
+        if let ModuleKindState::Lab(ls) = &mut station.core.modules[0].kind_state {
             ls.assigned_tech = None;
         }
 

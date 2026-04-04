@@ -28,11 +28,11 @@ pub(crate) fn tick_thermal(
     };
 
     // Use pre-computed thermal indices to build groups.
-    let thermal_indices = station.module_type_index.thermal.clone();
+    let thermal_indices = station.core.module_type_index.thermal.clone();
     let mut groups: BTreeMap<String, Vec<(String, usize)>> = BTreeMap::new();
 
     for &module_index in &thermal_indices {
-        let module = &station.modules[module_index];
+        let module = &station.core.modules[module_index];
         let Some(ref _thermal_state) = module.thermal else {
             continue;
         };
@@ -63,7 +63,7 @@ pub(crate) fn tick_thermal(
     // Build radiator cooling using thermal indices (radiators have ThermalDef).
     let mut radiator_cooling_by_group: BTreeMap<String, f32> = BTreeMap::new();
     for &module_index in &thermal_indices {
-        let module = &station.modules[module_index];
+        let module = &station.core.modules[module_index];
         if !module.enabled {
             continue;
         }
@@ -160,6 +160,7 @@ fn tick_thermal_containers(
 
     // Collect container module indices
     let container_indices: Vec<usize> = station
+        .core
         .modules
         .iter()
         .enumerate()
@@ -177,7 +178,7 @@ fn tick_thermal_containers(
         .expect("station verified above");
 
     for module_idx in container_indices {
-        let module = &station.modules[module_idx];
+        let module = &station.core.modules[module_idx];
         let Some(def) = content.module_defs.get(&module.def_id) else {
             continue;
         };
@@ -188,7 +189,7 @@ fn tick_thermal_containers(
         let cooling_coeff = thermal_def.passive_cooling_coefficient;
 
         let crate::ModuleKindState::ThermalContainer(ref mut container) =
-            station.modules[module_idx].kind_state
+            station.core.modules[module_idx].kind_state
         else {
             continue;
         };
@@ -232,7 +233,7 @@ fn apply_idle_heat(
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
-    let module = &station.modules[module_index];
+    let module = &station.core.modules[module_index];
 
     // Only enabled modules generate idle heat.
     if !module.enabled {
@@ -258,7 +259,7 @@ fn apply_idle_heat(
     let Some(station) = state.stations.get_mut(station_id) else {
         return;
     };
-    if let Some(ref mut thermal) = station.modules[module_index].thermal {
+    if let Some(ref mut thermal) = station.core.modules[module_index].thermal {
         // idle_w > 0 guaranteed by early return, so delta_mk is always non-negative.
         debug_assert!(
             delta_mk >= 0,
@@ -286,7 +287,7 @@ fn apply_passive_cooling(
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
-    let module = &station.modules[module_index];
+    let module = &station.core.modules[module_index];
 
     let Some(ref thermal_state) = module.thermal else {
         return;
@@ -337,7 +338,7 @@ fn apply_passive_cooling(
     let Some(station) = state.stations.get_mut(station_id) else {
         return;
     };
-    if let Some(ref mut thermal) = station.modules[module_index].thermal {
+    if let Some(ref mut thermal) = station.core.modules[module_index].thermal {
         thermal.temp_mk = clamped_temp;
     }
 }
@@ -357,7 +358,7 @@ fn apply_radiator_cooling(
     let Some(station) = state.stations.get(station_id) else {
         return;
     };
-    let module = &station.modules[module_index];
+    let module = &station.core.modules[module_index];
 
     let Some(ref thermal_state) = module.thermal else {
         return;
@@ -392,7 +393,7 @@ fn apply_radiator_cooling(
     let Some(station) = state.stations.get_mut(station_id) else {
         return;
     };
-    if let Some(ref mut thermal) = station.modules[module_index].thermal {
+    if let Some(ref mut thermal) = station.core.modules[module_index].thermal {
         thermal.temp_mk = clamped_temp;
     }
 }
@@ -439,7 +440,7 @@ fn check_overheat_zones(
     // Collect zone transitions before mutating state.
     let mut transitions: Vec<(usize, OverheatZone, OverheatZone, u32, u32)> = Vec::new();
 
-    for (module_index, module) in station.modules.iter().enumerate() {
+    for (module_index, module) in station.core.modules.iter().enumerate() {
         let Some(ref thermal_state) = module.thermal else {
             continue;
         };
@@ -486,7 +487,7 @@ fn check_overheat_zones(
     }
 
     for (module_index, old_zone, new_zone, temp_mk, max_temp_mk) in transitions {
-        let module = &mut station.modules[module_index];
+        let module = &mut station.core.modules[module_index];
         let module_id = module.id.clone();
 
         // Update zone.
@@ -632,40 +633,42 @@ mod tests {
                 StationState {
                     id: station_id,
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![],
-                    cargo_capacity_m3: 10_000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("smelter_0001".to_string()),
-                        def_id: "module_smelter".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::Processor(ProcessorState {
-                            threshold_kg: 0.0,
-                            ticks_since_last_run: 0,
-                            stalled: false,
-                            selected_recipe: None,
-                        }),
-                        wear: WearState::default(),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                        thermal: Some(ThermalState {
-                            temp_mk,
-                            thermal_group: Some("smelting".to_string()),
-                            ..Default::default()
-                        }),
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                    core: FacilityCore {
+                        inventory: vec![],
+                        cargo_capacity_m3: 10_000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("smelter_0001".to_string()),
+                            def_id: "module_smelter".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::Processor(ProcessorState {
+                                threshold_kg: 0.0,
+                                ticks_since_last_run: 0,
+                                stalled: false,
+                                selected_recipe: None,
+                            }),
+                            wear: WearState::default(),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                            thermal: Some(ThermalState {
+                                temp_mk,
+                                thermal_group: Some("smelting".to_string()),
+                                ..Default::default()
+                            }),
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -706,7 +709,7 @@ mod tests {
         for _ in 0..10 {
             tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
             let station = state.stations.get(&station_id).unwrap();
-            let temp = station.modules[0].thermal.as_ref().unwrap().temp_mk;
+            let temp = station.core.modules[0].thermal.as_ref().unwrap().temp_mk;
             assert!(
                 temp < prev_temp,
                 "temperature should decrease: was {prev_temp}, now {temp}"
@@ -729,7 +732,7 @@ mod tests {
         tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
 
         let station = state.stations.get(&station_id).unwrap();
-        let temp = station.modules[0].thermal.as_ref().unwrap().temp_mk;
+        let temp = station.core.modules[0].thermal.as_ref().unwrap().temp_mk;
         assert_eq!(temp, sink, "temperature should remain at sink temp");
     }
 
@@ -743,7 +746,7 @@ mod tests {
         let mut history1 = Vec::new();
         for _ in 0..20 {
             tick_thermal(&mut state1, &station_id, &content, &mut Vec::new());
-            let temp = state1.stations.get(&station_id).unwrap().modules[0]
+            let temp = state1.stations.get(&station_id).unwrap().core.modules[0]
                 .thermal
                 .as_ref()
                 .unwrap()
@@ -756,7 +759,7 @@ mod tests {
         let mut history2 = Vec::new();
         for _ in 0..20 {
             tick_thermal(&mut state2, &station_id, &content, &mut Vec::new());
-            let temp = state2.stations.get(&station_id).unwrap().modules[0]
+            let temp = state2.stations.get(&station_id).unwrap().core.modules[0]
                 .thermal
                 .as_ref()
                 .unwrap()
@@ -774,7 +777,7 @@ mod tests {
         let station_id = StationId("station_test".to_string());
 
         // Remove thermal state from the module.
-        state.stations.get_mut(&station_id).unwrap().modules[0].thermal = None;
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].thermal = None;
 
         // Should not panic or error.
         tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
@@ -796,7 +799,7 @@ mod tests {
         tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
 
         // Temperature should be unchanged since no ThermalDef means no processing.
-        let temp = state.stations.get(&station_id).unwrap().modules[0]
+        let temp = state.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -838,7 +841,7 @@ mod tests {
 
         // Add a reactor module to the station (different group, "reactor" < "smelting").
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.modules.push(ModuleState {
+        station.core.modules.push(ModuleState {
             id: ModuleInstanceId("reactor_0001".to_string()),
             def_id: "module_reactor".to_string(),
             enabled: true,
@@ -865,8 +868,8 @@ mod tests {
 
         // Both modules should have cooled (both above sink temp).
         let station = state.stations.get(&station_id).unwrap();
-        let smelter_temp = station.modules[0].thermal.as_ref().unwrap().temp_mk;
-        let reactor_temp = station.modules[1].thermal.as_ref().unwrap().temp_mk;
+        let smelter_temp = station.core.modules[0].thermal.as_ref().unwrap().temp_mk;
+        let reactor_temp = station.core.modules[1].thermal.as_ref().unwrap().temp_mk;
         assert!(smelter_temp < 600_000, "smelter should have cooled");
         assert!(reactor_temp < 600_000, "reactor should have cooled");
     }
@@ -904,7 +907,7 @@ mod tests {
                 .build(),
         );
         let station = state.stations.get_mut(station_id).unwrap();
-        station.modules.push(ModuleState {
+        station.core.modules.push(ModuleState {
             id: ModuleInstanceId(format!("radiator_{radiator_id}")),
             def_id,
             enabled: true,
@@ -961,12 +964,18 @@ mod tests {
             .stations
             .get(&station_id)
             .unwrap()
+            .core
             .modules[0]
             .thermal
             .as_ref()
             .unwrap()
             .temp_mk;
-        let temp_without = state_no_radiator.stations.get(&station_id).unwrap().modules[0]
+        let temp_without = state_no_radiator
+            .stations
+            .get(&station_id)
+            .unwrap()
+            .core
+            .modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1015,12 +1024,12 @@ mod tests {
         tick_thermal(&mut state_one, &station_id, &content_one, &mut Vec::new());
         tick_thermal(&mut state_two, &station_id, &content_two, &mut Vec::new());
 
-        let temp_one = state_one.stations.get(&station_id).unwrap().modules[0]
+        let temp_one = state_one.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
             .temp_mk;
-        let temp_two = state_two.stations.get(&station_id).unwrap().modules[0]
+        let temp_two = state_two.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1065,12 +1074,17 @@ mod tests {
         );
         tick_thermal(&mut state_worn, &station_id, &content_worn, &mut Vec::new());
 
-        let temp_pristine = state_pristine.stations.get(&station_id).unwrap().modules[0]
+        let temp_pristine = state_pristine
+            .stations
+            .get(&station_id)
+            .unwrap()
+            .core
+            .modules[0]
             .thermal
             .as_ref()
             .unwrap()
             .temp_mk;
-        let temp_worn = state_worn.stations.get(&station_id).unwrap().modules[0]
+        let temp_worn = state_worn.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1095,7 +1109,12 @@ mod tests {
             &content,
             &mut Vec::new(),
         );
-        let temp_no_radiator = state_no_radiator.stations.get(&station_id).unwrap().modules[0]
+        let temp_no_radiator = state_no_radiator
+            .stations
+            .get(&station_id)
+            .unwrap()
+            .core
+            .modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1113,10 +1132,15 @@ mod tests {
         );
         // Disable the radiator
         let station = state_disabled.stations.get_mut(&station_id).unwrap();
-        station.modules.last_mut().unwrap().enabled = false;
+        station.core.modules.last_mut().unwrap().enabled = false;
 
         tick_thermal(&mut state_disabled, &station_id, &content, &mut Vec::new());
-        let temp_disabled = state_disabled.stations.get(&station_id).unwrap().modules[0]
+        let temp_disabled = state_disabled
+            .stations
+            .get(&station_id)
+            .unwrap()
+            .core
+            .modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1172,7 +1196,11 @@ mod tests {
             "should emit OverheatWarning event"
         );
         let station = state.stations.get(&station_id).unwrap();
-        let zone = station.modules[0].thermal.as_ref().unwrap().overheat_zone;
+        let zone = station.core.modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .overheat_zone;
         assert_eq!(zone, OverheatZone::Warning);
     }
 
@@ -1194,10 +1222,14 @@ mod tests {
         );
         let station = state.stations.get(&station_id).unwrap();
         assert!(
-            !station.modules[0].enabled,
+            !station.core.modules[0].enabled,
             "module should be auto-disabled in critical zone"
         );
-        let zone = station.modules[0].thermal.as_ref().unwrap().overheat_zone;
+        let zone = station.core.modules[0]
+            .thermal
+            .as_ref()
+            .unwrap()
+            .overheat_zone;
         assert_eq!(zone, OverheatZone::Critical);
     }
 
@@ -1212,7 +1244,7 @@ mod tests {
         let mut events = Vec::new();
         tick_thermal(&mut state, &station_id, &content, &mut events);
         assert_eq!(
-            state.stations.get(&station_id).unwrap().modules[0]
+            state.stations.get(&station_id).unwrap().core.modules[0]
                 .thermal
                 .as_ref()
                 .unwrap()
@@ -1221,7 +1253,7 @@ mod tests {
         );
 
         // Manually cool below warning threshold
-        state.stations.get_mut(&station_id).unwrap().modules[0]
+        state.stations.get_mut(&station_id).unwrap().core.modules[0]
             .thermal
             .as_mut()
             .unwrap()
@@ -1236,7 +1268,7 @@ mod tests {
             "should emit OverheatCleared when cooling below threshold"
         );
         assert_eq!(
-            state.stations.get(&station_id).unwrap().modules[0]
+            state.stations.get(&station_id).unwrap().core.modules[0]
                 .thermal
                 .as_ref()
                 .unwrap()
@@ -1262,7 +1294,7 @@ mod tests {
         assert_eq!(warning_count1, 1);
 
         // Manually keep temp in warning range (cooling would drop it)
-        state.stations.get_mut(&station_id).unwrap().modules[0]
+        state.stations.get_mut(&station_id).unwrap().core.modules[0]
             .thermal
             .as_mut()
             .unwrap()
@@ -1291,11 +1323,11 @@ mod tests {
         // Enter critical — module gets disabled
         let mut events = Vec::new();
         tick_thermal(&mut state, &station_id, &content, &mut events);
-        assert!(!state.stations.get(&station_id).unwrap().modules[0].enabled);
+        assert!(!state.stations.get(&station_id).unwrap().core.modules[0].enabled);
 
         // Cool down to nominal
         {
-            let module = &mut state.stations.get_mut(&station_id).unwrap().modules[0];
+            let module = &mut state.stations.get_mut(&station_id).unwrap().core.modules[0];
             module.thermal.as_mut().unwrap().temp_mk = 2_000_000;
             // Re-enable so tick_thermal processes it (disabled modules still have thermal state)
             // Actually, we don't need to re-enable — the check_overheat_zones function handles it.
@@ -1304,7 +1336,7 @@ mod tests {
         let mut events2 = Vec::new();
         tick_thermal(&mut state, &station_id, &content, &mut events2);
         assert!(
-            state.stations.get(&station_id).unwrap().modules[0].enabled,
+            state.stations.get(&station_id).unwrap().core.modules[0].enabled,
             "module should be re-enabled after cooling below critical"
         );
         assert!(
@@ -1323,13 +1355,13 @@ mod tests {
         let mut state = thermal_test_state(&content, 3_100_000);
 
         // Manually disable the module BEFORE the overheat system runs
-        state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].enabled = false;
 
         // Tick to enter critical zone — sets overheat_disabled=true even though already disabled
         let mut events = Vec::new();
         tick_thermal(&mut state, &station_id, &content, &mut events);
 
-        let module = &state.stations[&station_id].modules[0];
+        let module = &state.stations[&station_id].core.modules[0];
         assert!(!module.enabled, "module should still be disabled");
         assert!(
             module.thermal.as_ref().unwrap().overheat_disabled,
@@ -1338,7 +1370,7 @@ mod tests {
 
         // Cool down below thresholds
         {
-            let module = &mut state.stations.get_mut(&station_id).unwrap().modules[0];
+            let module = &mut state.stations.get_mut(&station_id).unwrap().core.modules[0];
             module.thermal.as_mut().unwrap().temp_mk = 2_000_000;
         }
 
@@ -1349,7 +1381,7 @@ mod tests {
         // overheat_disabled. This is correct — the overheat system "owns" the disable
         // and re-enables on recovery. A separate test verifies wear-disabled modules
         // are NOT re-enabled by the overheat system.
-        let module = &state.stations[&station_id].modules[0];
+        let module = &state.stations[&station_id].core.modules[0];
         assert!(
             module.enabled,
             "module should be re-enabled after overheat clears (overheat system owns the disable)"
@@ -1370,18 +1402,18 @@ mod tests {
         // Enter critical zone — sets overheat_disabled
         let mut events = Vec::new();
         tick_thermal(&mut state, &station_id, &content, &mut events);
-        assert!(!state.stations.get(&station_id).unwrap().modules[0].enabled);
+        assert!(!state.stations.get(&station_id).unwrap().core.modules[0].enabled);
 
         // Simulate wear-based disable: clear overheat_disabled but keep enabled=false
         {
-            let module = &mut state.stations.get_mut(&station_id).unwrap().modules[0];
+            let module = &mut state.stations.get_mut(&station_id).unwrap().core.modules[0];
             module.thermal.as_mut().unwrap().overheat_disabled = false;
             module.wear.wear = 1.0; // max wear
         }
 
         // Cool down
         {
-            let module = &mut state.stations.get_mut(&station_id).unwrap().modules[0];
+            let module = &mut state.stations.get_mut(&station_id).unwrap().core.modules[0];
             module.thermal.as_mut().unwrap().temp_mk = 2_000_000;
         }
 
@@ -1390,7 +1422,7 @@ mod tests {
 
         // Module should NOT be re-enabled because overheat_disabled was cleared
         assert!(
-            !state.stations.get(&station_id).unwrap().modules[0].enabled,
+            !state.stations.get(&station_id).unwrap().core.modules[0].enabled,
             "wear-disabled module should stay disabled even after overheat clears"
         );
     }
@@ -1434,7 +1466,7 @@ mod tests {
         let initial_temp = content.constants.thermal_sink_temp_mk;
         tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
 
-        let temp = state.stations.get(&station_id).unwrap().modules[0]
+        let temp = state.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1452,11 +1484,11 @@ mod tests {
         let station_id = StationId("station_test".to_string());
 
         // Disable the module.
-        state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].enabled = false;
 
         tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
 
-        let temp = state.stations.get(&station_id).unwrap().modules[0]
+        let temp = state.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1478,7 +1510,7 @@ mod tests {
             tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
         }
 
-        let temp_a = state.stations.get(&station_id).unwrap().modules[0]
+        let temp_a = state.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1486,7 +1518,7 @@ mod tests {
 
         // One more tick should produce negligible change.
         tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
-        let temp_b = state.stations.get(&station_id).unwrap().modules[0]
+        let temp_b = state.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1515,7 +1547,7 @@ mod tests {
 
         tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
 
-        let temp = state.stations.get(&station_id).unwrap().modules[0]
+        let temp = state.stations.get(&station_id).unwrap().core.modules[0]
             .thermal
             .as_ref()
             .unwrap()
@@ -1537,14 +1569,14 @@ mod tests {
         let station_id = StationId("station_test".to_string());
 
         // Set initial wear to something low.
-        state.stations.get_mut(&station_id).unwrap().modules[0]
+        state.stations.get_mut(&station_id).unwrap().core.modules[0]
             .wear
             .wear = 0.1;
 
         let mut events = Vec::new();
         tick_thermal(&mut state, &station_id, &content, &mut events);
 
-        let module = &state.stations.get(&station_id).unwrap().modules[0];
+        let module = &state.stations.get(&station_id).unwrap().core.modules[0];
         let thermal = module.thermal.as_ref().unwrap();
 
         assert_eq!(
@@ -1580,13 +1612,13 @@ mod tests {
         let station_id = StationId("station_test".to_string());
 
         // Module already has high wear.
-        state.stations.get_mut(&station_id).unwrap().modules[0]
+        state.stations.get_mut(&station_id).unwrap().core.modules[0]
             .wear
             .wear = 0.95;
 
         tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
 
-        let wear = state.stations.get(&station_id).unwrap().modules[0]
+        let wear = state.stations.get(&station_id).unwrap().core.modules[0]
             .wear
             .wear;
         assert!(

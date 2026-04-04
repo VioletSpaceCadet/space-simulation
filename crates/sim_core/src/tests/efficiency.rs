@@ -24,8 +24,11 @@ fn processor_output_scales_with_crew_efficiency() {
 
     // Assign 1 of 2 required operators → crew_factor = 0.5
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.crew.insert(CrewRole("operator".to_string()), 1);
-    station.modules[0]
+    station
+        .core
+        .crew
+        .insert(CrewRole("operator".to_string()), 1);
+    station.core.modules[0]
         .assigned_crew
         .insert(CrewRole("operator".to_string()), 1);
     rebuild_indices(&mut state, &content);
@@ -37,6 +40,7 @@ fn processor_output_scales_with_crew_efficiency() {
 
     let station = &state.stations[&station_id];
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -65,7 +69,7 @@ fn processor_output_zero_when_power_stalled() {
 
     // Starve it of power: set available power to 0
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.power_available_per_tick = 0.0;
+    station.core.power_available_per_tick = 0.0;
     rebuild_indices(&mut state, &content);
 
     let mut rng = make_rng();
@@ -75,6 +79,7 @@ fn processor_output_zero_when_power_stalled() {
 
     let station = &state.stations[&station_id];
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -122,7 +127,7 @@ fn lab_research_speed_scales_with_efficiency() {
     let station_id = test_station_id();
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(crate::test_fixtures::test_module(
+    station.core.modules.push(crate::test_fixtures::test_module(
         "module_exploration_lab",
         ModuleKindState::Lab(LabState {
             ticks_since_last_run: 0,
@@ -132,8 +137,8 @@ fn lab_research_speed_scales_with_efficiency() {
     ));
 
     // Set wear to degraded band (0.6 → efficiency_factor = 0.75)
-    let lab_idx = station.modules.len() - 1;
-    station.modules[lab_idx].wear.wear = 0.6;
+    let lab_idx = station.core.modules.len() - 1;
+    station.core.modules[lab_idx].wear.wear = 0.6;
 
     // Seed data pool
     state.research.data_pool.insert(DataKind::SurveyData, 100.0);
@@ -183,11 +188,14 @@ fn compound_efficiency_stacking() {
     let station_id = test_station_id();
 
     let station = state.stations.get_mut(&station_id).unwrap();
-    station.crew.insert(CrewRole("operator".to_string()), 1);
-    station.modules[0]
+    station
+        .core
+        .crew
+        .insert(CrewRole("operator".to_string()), 1);
+    station.core.modules[0]
         .assigned_crew
         .insert(CrewRole("operator".to_string()), 1);
-    station.modules[0].wear.wear = 0.6; // degraded band → 0.75
+    station.core.modules[0].wear.wear = 0.6; // degraded band → 0.75
 
     rebuild_indices(&mut state, &content);
 
@@ -197,6 +205,7 @@ fn compound_efficiency_stacking() {
 
     let station = &state.stations[&station_id];
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -245,6 +254,7 @@ fn assembler_zero_output_below_half_efficiency() {
 
     let station = &state.stations[&station_id];
     let repair_kit_count: u32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {

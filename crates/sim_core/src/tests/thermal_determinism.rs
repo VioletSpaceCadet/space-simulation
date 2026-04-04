@@ -29,7 +29,7 @@ fn hot_smelter_with_radiators_state(content: &crate::GameContent) -> crate::Game
         .expect("station should exist");
 
     // Add two radiators in the same thermal group as the smelter ("default").
-    station.modules.push(crate::ModuleState {
+    station.core.modules.push(crate::ModuleState {
         id: ModuleInstanceId("mod_radiator_001".to_string()),
         def_id: "module_basic_radiator".to_string(),
         enabled: true,
@@ -46,7 +46,7 @@ fn hot_smelter_with_radiators_state(content: &crate::GameContent) -> crate::Game
         efficiency: 1.0,
         prev_crew_satisfied: true,
     });
-    station.modules.push(crate::ModuleState {
+    station.core.modules.push(crate::ModuleState {
         id: ModuleInstanceId("mod_radiator_002".to_string()),
         def_id: "module_basic_radiator".to_string(),
         enabled: true,
@@ -111,7 +111,7 @@ fn thermal_state_actually_changes() {
 
     let station_id = StationId("station_earth_orbit".to_string());
 
-    let initial_smelter_temp = state.stations[&station_id].modules[0]
+    let initial_smelter_temp = state.stations[&station_id].core.modules[0]
         .thermal
         .as_ref()
         .expect("smelter should have thermal state")
@@ -125,7 +125,7 @@ fn thermal_state_actually_changes() {
         tick(&mut state, &[], &content, &mut rng, None);
     }
 
-    let final_smelter_temp = state.stations[&station_id].modules[0]
+    let final_smelter_temp = state.stations[&station_id].core.modules[0]
         .thermal
         .as_ref()
         .expect("smelter should still have thermal state after ticks")

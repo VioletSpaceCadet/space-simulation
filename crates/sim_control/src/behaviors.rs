@@ -97,7 +97,7 @@ pub(crate) fn try_refuel(
             &s.position,
             &state.body_cache,
             content.constants.docking_range_au_um,
-        ) && s.inventory.iter().any(|item| {
+        ) && s.core.inventory.iter().any(|item| {
             matches!(item, InventoryItem::Material { element, kg, .. }
                 if *element == content.autopilot.propellant_element && *kg > content.constants.min_meaningful_kg)
         })
@@ -171,7 +171,7 @@ pub(crate) fn total_element_inventory(state: &GameState, element: &str) -> f32 {
     state
         .stations
         .values()
-        .flat_map(|s| s.inventory.iter())
+        .flat_map(|s| s.core.inventory.iter())
         .filter_map(|item| match item {
             InventoryItem::Material {
                 element: el, kg, ..
@@ -254,6 +254,7 @@ pub(crate) fn build_export_candidates(
     // 1. Export component surplus above reserve
     let export_comp = &autopilot.export_component;
     let comp_count: u32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -275,6 +276,7 @@ pub(crate) fn build_export_candidates(
     // 2+. Materials in priority order from config
     for entry in &autopilot.export_elements {
         let available_kg: f32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|item| match item {

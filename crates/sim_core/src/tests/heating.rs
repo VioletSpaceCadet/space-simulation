@@ -69,7 +69,7 @@ fn state_with_heating(content: &GameContent) -> GameState {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("module_inst_heat_001".to_string()),
         def_id: "module_heating_unit".to_string(),
         enabled: true,
@@ -89,7 +89,7 @@ fn state_with_heating(content: &GameContent) -> GameState {
     });
 
     // Ice ore with 50% H2O, 10% Fe, 40% Si
-    station.inventory.push(InventoryItem::Ore {
+    station.core.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_ice_001".to_string()),
         asteroid_id: AsteroidId("asteroid_ice".to_string()),
         kg: 1000.0,
@@ -115,7 +115,7 @@ fn test_heating_produces_h2o_and_slag() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
 
-    let has_h2o = station.inventory.iter().any(|i| {
+    let has_h2o = station.core.inventory.iter().any(|i| {
         matches!(i, InventoryItem::Material { element, kg, .. } if element == "H2O" && *kg > 0.0)
     });
     assert!(
@@ -124,6 +124,7 @@ fn test_heating_produces_h2o_and_slag() {
     );
 
     let has_slag = station
+        .core
         .inventory
         .iter()
         .any(|i| matches!(i, InventoryItem::Slag { kg, .. } if *kg > 0.0));
@@ -143,6 +144,7 @@ fn test_heating_h2o_yield_matches_fraction() {
     let station = &state.stations[&station_id];
 
     let h2o_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {
@@ -172,6 +174,7 @@ fn test_heating_accumulates_wear() {
     let station = &state.stations[&station_id];
 
     let heating_module = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_heating_unit")
@@ -191,7 +194,7 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("module_inst_heat_002".to_string()),
         def_id: "module_heating_unit".to_string(),
         enabled: true,
@@ -211,7 +214,7 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
     });
 
     // Ore with 0% H2O — should produce no water
-    station.inventory.push(InventoryItem::Ore {
+    station.core.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_dry_001".to_string()),
         asteroid_id: AsteroidId("asteroid_dry".to_string()),
         kg: 1000.0,
@@ -225,6 +228,7 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
     let station = &state.stations[&station_id];
 
     let h2o_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|i| match i {

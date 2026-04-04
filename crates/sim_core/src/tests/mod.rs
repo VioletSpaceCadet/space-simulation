@@ -174,7 +174,7 @@ fn state_with_refinery(content: &GameContent) -> GameState {
     let station_id = test_station_id();
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(test_module(
+    station.core.modules.push(test_module(
         "module_basic_iron_refinery",
         ModuleKindState::Processor(ProcessorState {
             threshold_kg: 100.0,
@@ -184,7 +184,7 @@ fn state_with_refinery(content: &GameContent) -> GameState {
         }),
     ));
 
-    station.inventory.push(InventoryItem::Ore {
+    station.core.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_0001".to_string()),
         asteroid_id: AsteroidId("asteroid_0001".to_string()),
         kg: 1000.0,
@@ -247,7 +247,7 @@ fn state_with_assembler(content: &GameContent) -> GameState {
     let station_id = test_station_id();
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(test_module(
+    station.core.modules.push(test_module(
         "module_basic_assembler",
         ModuleKindState::Assembler(AssemblerState {
             ticks_since_last_run: 0,
@@ -258,7 +258,7 @@ fn state_with_assembler(content: &GameContent) -> GameState {
         }),
     ));
 
-    station.inventory.push(InventoryItem::Material {
+    station.core.inventory.push(InventoryItem::Material {
         element: "Fe".to_string(),
         kg: 500.0,
         quality: 0.7,
@@ -295,14 +295,14 @@ fn state_with_maintenance(content: &GameContent) -> GameState {
     let station_id = test_station_id();
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(test_module(
+    station.core.modules.push(test_module(
         "module_maintenance_bay",
         ModuleKindState::Maintenance(MaintenanceState {
             ticks_since_last_run: 0,
         }),
     ));
 
-    station.inventory.push(InventoryItem::Component {
+    station.core.inventory.push(InventoryItem::Component {
         component_id: ComponentId("repair_kit".to_string()),
         count: 5,
         quality: 1.0,
@@ -319,14 +319,14 @@ fn test_station_volume_cache_invalidation() {
 
     let station = state.stations.get_mut(&station_id).unwrap();
     assert!(
-        station.cached_inventory_volume_m3.is_none(),
+        station.core.cached_inventory_volume_m3.is_none(),
         "cache starts empty"
     );
 
     // First call computes and caches.
     let vol1 = station.used_volume_m3(&content);
     assert!(
-        station.cached_inventory_volume_m3.is_some(),
+        station.core.cached_inventory_volume_m3.is_some(),
         "cache populated after first call"
     );
     assert!(
@@ -335,7 +335,7 @@ fn test_station_volume_cache_invalidation() {
     );
 
     // Mutate inventory and invalidate.
-    station.inventory.push(InventoryItem::Ore {
+    station.core.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_cache_test".to_string()),
         asteroid_id: AsteroidId("asteroid_test".to_string()),
         kg: 100.0,
@@ -343,7 +343,7 @@ fn test_station_volume_cache_invalidation() {
     });
     station.invalidate_volume_cache();
     assert!(
-        station.cached_inventory_volume_m3.is_none(),
+        station.core.cached_inventory_volume_m3.is_none(),
         "cache cleared after invalidation"
     );
 
@@ -354,7 +354,7 @@ fn test_station_volume_cache_invalidation() {
         "volume increased after adding ore (was {vol1}, now {vol2})"
     );
     assert!(
-        station.cached_inventory_volume_m3.is_some(),
+        station.core.cached_inventory_volume_m3.is_some(),
         "cache repopulated"
     );
 }

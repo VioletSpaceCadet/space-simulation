@@ -47,6 +47,7 @@ fn full_research_lifecycle() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .modules
         .push(ModuleState {
             id: ModuleInstanceId("module_inst_lab_001".to_string()),
@@ -115,6 +116,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .modules
         .push(ModuleState {
             id: ModuleInstanceId("module_inst_lab_001".to_string()),

@@ -44,7 +44,7 @@ fn crucible_content() -> GameContent {
 fn crucible_state(content: &GameContent) -> GameState {
     let mut state = crate::test_fixtures::base_state(content);
     let station = state.stations.get_mut(&test_station_id()).unwrap();
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("mod_crucible".to_string()),
         def_id: "module_crucible".to_string(),
         enabled: true,
@@ -81,6 +81,7 @@ fn crucible_holds_molten_fe() {
     let state = crucible_state(&content);
     let station = &state.stations[&test_station_id()];
     let crucible = &station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_crucible")
@@ -113,6 +114,7 @@ fn crucible_material_cools_slowly() {
 
     let station = &state.stations[&test_station_id()];
     let crucible = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_crucible")
@@ -160,6 +162,7 @@ fn crucible_material_eventually_solidifies() {
 
     let station = &state.stations[&test_station_id()];
     let crucible = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_crucible")
@@ -190,6 +193,7 @@ fn crucible_serde_round_trip() {
     let loaded: GameState = serde_json::from_str(&json).unwrap();
     let station = &loaded.stations[&test_station_id()];
     let crucible = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_crucible")

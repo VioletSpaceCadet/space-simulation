@@ -50,7 +50,7 @@ impl StationConcern for ShipFitting {
 
                 let module_def_id_str = &entry.module_def_id.0;
                 let in_inventory = station
-                    .inventory
+                    .core.inventory
                     .iter()
                     .filter(|item| {
                         matches!(item, InventoryItem::Module { module_def_id, .. } if module_def_id == module_def_id_str)

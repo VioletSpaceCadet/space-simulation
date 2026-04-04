@@ -448,7 +448,7 @@ fn extract_condition_value(field: &ConditionField, state: &GameState) -> f64 {
             let mut total_wear = 0.0f64;
             let mut module_count = 0u64;
             for station in state.stations.values() {
-                for module in &station.modules {
+                for module in &station.core.modules {
                     total_wear += f64::from(module.wear.wear);
                     module_count += 1;
                 }
@@ -517,13 +517,13 @@ pub fn resolve_target(
             let selected_station_id = select_station(station, state, rng)?;
             let station_state = state.stations.get(&selected_station_id)?;
 
-            if station_state.modules.is_empty() {
+            if station_state.core.modules.is_empty() {
                 return None;
             }
 
             // Pick a random module (sorted by ID for determinism)
             let mut module_ids: Vec<&ModuleInstanceId> =
-                station_state.modules.iter().map(|m| &m.id).collect();
+                station_state.core.modules.iter().map(|m| &m.id).collect();
             module_ids.sort();
             let index = rng.gen_range(0..module_ids.len());
             Some(ResolvedTarget::Module {
@@ -560,7 +560,7 @@ fn select_station(
         TargetStation::MostModules => {
             let best = station_ids
                 .iter()
-                .max_by_key(|id| state.stations[*id].modules.len())
+                .max_by_key(|id| state.stations[*id].core.modules.len())
                 .expect("non-empty stations");
             Some((*best).clone())
         }
@@ -582,11 +582,11 @@ fn select_station(
 
 /// Compute average wear across all modules in a station.
 fn avg_station_wear(station: &crate::StationState) -> f32 {
-    if station.modules.is_empty() {
+    if station.core.modules.is_empty() {
         return 0.0;
     }
-    let total: f32 = station.modules.iter().map(|m| m.wear.wear).sum();
-    total / station.modules.len() as f32
+    let total: f32 = station.core.modules.iter().map(|m| m.wear.wear).sum();
+    total / station.core.modules.len() as f32
 }
 
 // ---------------------------------------------------------------------------
@@ -708,7 +708,11 @@ fn apply_damage_module(
 ) -> Option<AppliedEffect> {
     let (station_id, module_id) = resolve_module_target(target, state, rng)?;
     let station = state.stations.get_mut(&station_id)?;
-    let module = station.modules.iter_mut().find(|m| m.id == module_id)?;
+    let module = station
+        .core
+        .modules
+        .iter_mut()
+        .find(|m| m.id == module_id)?;
     let wear_before = module.wear.wear;
     module.wear.wear = (module.wear.wear + wear_amount).min(1.0);
     events.push(crate::emit(
@@ -740,7 +744,7 @@ fn apply_add_inventory(
     let station_id = resolve_station_target(target)?;
     let station = state.stations.get_mut(&station_id)?;
     let new_items = crate::trade::create_inventory_items(item, rng);
-    station.inventory.extend(new_items);
+    station.core.inventory.extend(new_items);
     station.invalidate_volume_cache();
     Some(AppliedEffect {
         effect: effect.clone(),
@@ -804,7 +808,12 @@ fn apply_modifier(
     match target {
         ResolvedTarget::Global | ResolvedTarget::Zone { .. } => state.modifiers.add(modifier),
         ResolvedTarget::Station { station_id } | ResolvedTarget::Module { station_id, .. } => {
-            state.stations.get_mut(station_id)?.modifiers.add(modifier);
+            state
+                .stations
+                .get_mut(station_id)?
+                .core
+                .modifiers
+                .add(modifier);
         }
         ResolvedTarget::Ship { ship_id } => {
             state.ships.get_mut(ship_id)?.modifiers.add(modifier);
@@ -835,11 +844,11 @@ fn resolve_module_target(
         } => Some((station_id.clone(), module_id.clone())),
         ResolvedTarget::Station { station_id } => {
             let station = state.stations.get(station_id)?;
-            if station.modules.is_empty() {
+            if station.core.modules.is_empty() {
                 return None;
             }
             let mut module_ids: Vec<&ModuleInstanceId> =
-                station.modules.iter().map(|m| &m.id).collect();
+                station.core.modules.iter().map(|m| &m.id).collect();
             module_ids.sort();
             let index = rng.gen_range(0..module_ids.len());
             Some((station_id.clone(), module_ids[index].clone()))
@@ -890,7 +899,7 @@ fn sweep_expired_effects(state: &mut GameState, events: &mut Vec<EventEnvelope>)
             }
             ResolvedTarget::Station { station_id } | ResolvedTarget::Module { station_id, .. } => {
                 if let Some(station) = state.stations.get_mut(station_id) {
-                    station.modifiers.remove_by_source(&source);
+                    station.core.modifiers.remove_by_source(&source);
                 }
             }
             ResolvedTarget::Ship { ship_id } => {
@@ -1737,7 +1746,7 @@ mod tests {
     /// Add a test module to the first station.
     fn add_test_module(state: &mut crate::GameState) {
         let station = state.stations.values_mut().next().expect("station");
-        station.modules.push(crate::ModuleState {
+        station.core.modules.push(crate::ModuleState {
             id: ModuleInstanceId("mod_test".to_string()),
             def_id: "module_basic_iron_refinery".to_string(),
             enabled: true,
@@ -1769,7 +1778,7 @@ mod tests {
 
         // Check wear increased from 0.1
         let station = state.stations.values().next().expect("station");
-        let module = &station.modules[0];
+        let module = &station.core.modules[0];
         assert!(
             module.wear.wear > 0.1,
             "wear should have increased from 0.1 to {}",
@@ -1922,6 +1931,7 @@ mod tests {
         // Count initial repair kits
         let station = state.stations.values().next().expect("station");
         let initial_kits: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|item| match item {
@@ -1938,6 +1948,7 @@ mod tests {
 
         let station = state.stations.values().next().expect("station");
         let final_kits: u32 = station
+            .core
             .inventory
             .iter()
             .filter_map(|item| match item {

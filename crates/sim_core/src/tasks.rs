@@ -490,9 +490,10 @@ pub(crate) fn resolve_deposit(
     // Split items into those that fit in the station and those that don't.
     // SAFETY: cache warmed via used_volume_m3() above; no intervening invalidation.
     let mut station_volume = station
+        .core
         .cached_inventory_volume_m3
-        .unwrap_or_else(|| inventory_volume_m3(&station.inventory, content));
-    let station_capacity = station.cargo_capacity_m3;
+        .unwrap_or_else(|| inventory_volume_m3(&station.core.inventory, content));
+    let station_capacity = station.core.cargo_capacity_m3;
     let mut to_deposit = Vec::new();
     let mut to_return = Vec::new();
     for item in items {
@@ -550,7 +551,7 @@ pub(crate) fn resolve_deposit(
     }
 
     if let Some(station) = state.stations.get_mut(station_id) {
-        station.inventory.extend(to_deposit.clone());
+        station.core.inventory.extend(to_deposit.clone());
         station.invalidate_volume_cache();
     }
 
@@ -700,7 +701,8 @@ pub(crate) fn resolve_refuels(
 /// Get total LH2 (kg) in a station's inventory.
 fn station_lh2_kg(state: &GameState, station_id: &StationId) -> f32 {
     state.stations.get(station_id).map_or(0.0, |s| {
-        s.inventory
+        s.core
+            .inventory
             .iter()
             .filter_map(|item| match item {
                 InventoryItem::Material { element, kg, .. } if element == "LH2" => Some(*kg),
@@ -872,7 +874,7 @@ fn deduct_station_lh2(
 ) {
     if let Some(station) = state.stations.get_mut(station_id) {
         let mut remaining = amount;
-        for item in &mut station.inventory {
+        for item in &mut station.core.inventory {
             if remaining <= 0.0 {
                 break;
             }
@@ -885,6 +887,7 @@ fn deduct_station_lh2(
             }
         }
         station
+            .core
             .inventory
             .retain(|item| item.mass_kg() > content.constants.min_meaningful_kg);
     }

@@ -201,6 +201,7 @@ fn economy_full_loop() {
     // Verify thrusters in inventory
     let station = state.stations.get(&station_id).unwrap();
     let thruster_count: u32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -254,6 +255,7 @@ fn economy_full_loop() {
     // Verify Fe in inventory
     let station = state.stations.get(&station_id).unwrap();
     let fe_kg: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -291,6 +293,7 @@ fn economy_full_loop() {
     // Find the module item_id in inventory
     let station = state.stations.get(&station_id).unwrap();
     let module_item_id = station
+        .core
         .inventory
         .iter()
         .find_map(|item| match item {
@@ -312,6 +315,7 @@ fn economy_full_loop() {
     // Enable the module
     let station = state.stations.get(&station_id).unwrap();
     let shipyard_module_id = station
+        .core
         .modules
         .iter()
         .find(|m| m.def_id == "module_shipyard")
@@ -387,6 +391,7 @@ fn economy_full_loop() {
     // Verify inputs were consumed proportional to ships built
     let station = state.stations.get(&station_id).unwrap();
     let fe_after: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -401,6 +406,7 @@ fn economy_full_loop() {
     );
 
     let thruster_after: u32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {
@@ -448,6 +454,7 @@ fn economy_full_loop() {
     // Verify Fe reduced: started with expected_fe, exported 1000
     let station = state.stations.get(&station_id).unwrap();
     let fe_final: f32 = station
+        .core
         .inventory
         .iter()
         .filter_map(|item| match item {

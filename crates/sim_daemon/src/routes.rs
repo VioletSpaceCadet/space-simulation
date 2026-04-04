@@ -382,7 +382,7 @@ pub async fn content_handler(State(app_state): State<AppState>) -> Json<ContentR
     let mut data_rates: std::collections::HashMap<DataKind, f64> = std::collections::HashMap::new();
 
     for (station_id, station) in &sim.game_state.stations {
-        for module in &station.modules {
+        for module in &station.core.modules {
             let Some(mod_def) = sim.content.module_defs.get(&module.def_id) else {
                 continue;
             };

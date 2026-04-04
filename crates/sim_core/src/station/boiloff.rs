@@ -55,7 +55,7 @@ pub(super) fn apply_boiloff(
     let mut losses: Vec<(String, f32)> = Vec::new();
     let default_curve = BoiloffCurveDef::default();
 
-    for item in &mut station.inventory {
+    for item in &mut station.core.inventory {
         let InventoryItem::Material {
             element,
             kg,
@@ -105,7 +105,7 @@ pub(super) fn apply_boiloff(
 
     // Remove material items below threshold
     let min_kg = content.constants.min_meaningful_kg;
-    station.inventory.retain(|item| match item {
+    station.core.inventory.retain(|item| match item {
         InventoryItem::Material { kg, .. } => *kg >= min_kg,
         _ => true,
     });
@@ -169,7 +169,7 @@ mod tests {
         let mut state = base_state(content);
         let station_id = crate::StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.inventory.push(InventoryItem::Material {
+        station.core.inventory.push(InventoryItem::Material {
             element: "LH2".to_string(),
             kg,
             quality: 1.0,
@@ -190,6 +190,7 @@ mod tests {
         tick(&mut state, &[], &content, &mut rng, None);
 
         let remaining: f32 = state.stations[&station_id]
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -216,7 +217,7 @@ mod tests {
         let mut state = base_state(&content);
         let station_id = crate::StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.inventory.push(InventoryItem::Material {
+        station.core.inventory.push(InventoryItem::Material {
             element: "Fe".to_string(),
             kg: 1000.0,
             quality: 1.0,
@@ -227,6 +228,7 @@ mod tests {
         tick(&mut state, &[], &content, &mut rng, None);
 
         let remaining: f32 = state.stations[&station_id]
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -254,6 +256,7 @@ mod tests {
 
         let station_id = crate::StationId("station_earth_orbit".to_string());
         let remaining: f32 = state.stations[&station_id]
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -293,13 +296,13 @@ mod tests {
         let mut state = base_state(&content);
         let station_id = crate::StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.inventory.push(InventoryItem::Material {
+        station.core.inventory.push(InventoryItem::Material {
             element: "LH2".to_string(),
             kg: 10_000.0,
             quality: 1.0,
             thermal: None,
         });
-        station.inventory.push(InventoryItem::Material {
+        station.core.inventory.push(InventoryItem::Material {
             element: "LOX".to_string(),
             kg: 10_000.0,
             quality: 1.0,
@@ -310,6 +313,7 @@ mod tests {
         tick(&mut state, &[], &content, &mut rng, None);
 
         let lh2_remaining: f32 = state.stations[&station_id]
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -319,6 +323,7 @@ mod tests {
             .sum();
 
         let lox_remaining: f32 = state.stations[&station_id]
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -347,6 +352,7 @@ mod tests {
 
         let station_id = crate::StationId("station_earth_orbit".to_string());
         let baseline_remaining: f32 = state_baseline.stations[&station_id]
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -369,6 +375,7 @@ mod tests {
         tick(&mut state_tech, &[], &content, &mut rng, None);
 
         let tech_remaining: f32 = state_tech.stations[&station_id]
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {
@@ -392,7 +399,7 @@ mod tests {
         let mut state = base_state(&content);
         let station_id = crate::StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.inventory.push(InventoryItem::Material {
+        station.core.inventory.push(InventoryItem::Material {
             element: "Fe".to_string(),
             kg: 1000.0,
             quality: 1.0,
@@ -412,6 +419,7 @@ mod tests {
         tick(&mut state, &[], &content, &mut rng, None);
 
         let remaining: f32 = state.stations[&station_id]
+            .core
             .inventory
             .iter()
             .filter_map(|i| match i {

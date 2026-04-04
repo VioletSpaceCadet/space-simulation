@@ -30,7 +30,7 @@ impl StationConcern for MaterialExport {
             {
                 continue;
             }
-            if !trade::has_enough_for_export(&station.inventory, &candidate) {
+            if !trade::has_enough_for_export(&station.core.inventory, &candidate) {
                 continue;
             }
             commands.push(make_cmd(

@@ -13,7 +13,7 @@ pub(super) fn tick_sensor_array_modules(
     let indices: Vec<usize> = state
         .stations
         .get(station_id)
-        .map(|s| s.module_type_index.sensors.clone())
+        .map(|s| s.core.module_type_index.sensors.clone())
         .unwrap_or_default();
 
     for module_idx in indices {
@@ -108,33 +108,35 @@ mod tests {
                 StationState {
                     id: station_id,
                     position: crate::test_fixtures::test_position(),
-                    inventory: vec![],
-                    cargo_capacity_m3: 2000.0,
-                    power_available_per_tick: 100.0,
-                    modules: vec![ModuleState {
-                        id: ModuleInstanceId("sensor_inst_0001".to_string()),
-                        def_id: "module_sensor_array".to_string(),
-                        enabled: true,
-                        kind_state: ModuleKindState::SensorArray(SensorArrayState {
-                            ticks_since_last_run: 0,
-                        }),
-                        wear: WearState::default(),
-                        power_stalled: false,
-                        module_priority: 0,
-                        assigned_crew: Default::default(),
-                        efficiency: 1.0,
-                        prev_crew_satisfied: true,
-                        thermal: None,
-                    }],
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    crew: Default::default(),
+                    core: FacilityCore {
+                        inventory: vec![],
+                        cargo_capacity_m3: 2000.0,
+                        power_available_per_tick: 100.0,
+                        modules: vec![ModuleState {
+                            id: ModuleInstanceId("sensor_inst_0001".to_string()),
+                            def_id: "module_sensor_array".to_string(),
+                            enabled: true,
+                            kind_state: ModuleKindState::SensorArray(SensorArrayState {
+                                ticks_since_last_run: 0,
+                            }),
+                            wear: WearState::default(),
+                            power_stalled: false,
+                            module_priority: 0,
+                            assigned_crew: Default::default(),
+                            efficiency: 1.0,
+                            prev_crew_satisfied: true,
+                            thermal: None,
+                        }],
+                        modifiers: crate::modifiers::ModifierSet::default(),
+                        crew: Default::default(),
+                        thermal_links: Vec::new(),
+                        power: PowerState::default(),
+                        cached_inventory_volume_m3: None,
+                        module_type_index: crate::ModuleTypeIndex::default(),
+                        module_id_index: HashMap::new(),
+                        power_budget_cache: crate::PowerBudgetCache::default(),
+                    },
                     leaders: Vec::new(),
-                    thermal_links: Vec::new(),
-                    power: PowerState::default(),
-                    cached_inventory_volume_m3: None,
-                    module_type_index: crate::ModuleTypeIndex::default(),
-                    module_id_index: HashMap::new(),
-                    power_budget_cache: crate::PowerBudgetCache::default(),
                 },
             )]
             .into_iter()
@@ -240,7 +242,7 @@ mod tests {
         let station_id = StationId("station_test".to_string());
 
         // Disable the module
-        state.stations.get_mut(&station_id).unwrap().modules[0].enabled = false;
+        state.stations.get_mut(&station_id).unwrap().core.modules[0].enabled = false;
 
         // Tick through full interval
         for _ in 0..10 {

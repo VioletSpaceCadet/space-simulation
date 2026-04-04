@@ -12,7 +12,7 @@ fn test_refinery_produces_material_and_slag() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
 
-    let has_material = station.inventory.iter().any(|i| {
+    let has_material = station.core.inventory.iter().any(|i| {
         matches!(i, InventoryItem::Material { element, kg, .. } if element == "Fe" && *kg > 0.0)
     });
     assert!(
@@ -21,6 +21,7 @@ fn test_refinery_produces_material_and_slag() {
     );
 
     let has_slag = station
+        .core
         .inventory
         .iter()
         .any(|i| matches!(i, InventoryItem::Slag { kg, .. } if *kg > 0.0));
@@ -39,7 +40,7 @@ fn test_refinery_quality_equals_fe_fraction() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = &state.stations[&station_id];
 
-    let quality = station.inventory.iter().find_map(|i| {
+    let quality = station.core.inventory.iter().find_map(|i| {
         if let InventoryItem::Material {
             element, quality, ..
         } = i
@@ -67,7 +68,7 @@ fn test_refinery_skips_when_below_threshold() {
     let station_id = StationId("station_earth_orbit".to_string());
     let station = state.stations.get_mut(&station_id).unwrap();
 
-    station.modules.push(ModuleState {
+    station.core.modules.push(ModuleState {
         id: ModuleInstanceId("module_inst_0001".to_string()),
         def_id: "module_basic_iron_refinery".to_string(),
         enabled: true,
@@ -85,7 +86,7 @@ fn test_refinery_skips_when_below_threshold() {
         prev_crew_satisfied: true,
         thermal: None,
     });
-    station.inventory.push(InventoryItem::Ore {
+    station.core.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_0001".to_string()),
         asteroid_id: AsteroidId("asteroid_0001".to_string()),
         kg: 1000.0,
@@ -102,6 +103,7 @@ fn test_refinery_skips_when_below_threshold() {
     let station = &state.stations[&station_id];
     assert!(
         !station
+            .core
             .inventory
             .iter()
             .any(|i| matches!(i, InventoryItem::Material { .. })),
@@ -136,6 +138,7 @@ fn test_refinery_stalls_when_station_full() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.34;
 
     let mut rng = make_rng();
@@ -143,7 +146,7 @@ fn test_refinery_stalls_when_station_full() {
     let events = tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
-    if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+    if let ModuleKindState::Processor(ps) = &station.core.modules[0].kind_state {
         assert!(ps.stalled, "module should be stalled when output won't fit");
         assert_eq!(ps.ticks_since_last_run, 0, "timer should reset on stall");
     } else {
@@ -159,6 +162,7 @@ fn test_refinery_stalls_when_station_full() {
 
     assert!(
         !station
+            .core
             .inventory
             .iter()
             .any(|i| matches!(i, InventoryItem::Material { .. })),
@@ -166,6 +170,7 @@ fn test_refinery_stalls_when_station_full() {
     );
     assert!(
         !station
+            .core
             .inventory
             .iter()
             .any(|i| matches!(i, InventoryItem::Slag { .. })),
@@ -183,13 +188,15 @@ fn test_refinery_resumes_after_stall_cleared() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.34;
 
     let mut rng = make_rng();
     tick(&mut state, &[], &content, &mut rng, None);
     tick(&mut state, &[], &content, &mut rng, None);
 
-    if let ModuleKindState::Processor(ps) = &state.stations[&station_id].modules[0].kind_state {
+    if let ModuleKindState::Processor(ps) = &state.stations[&station_id].core.modules[0].kind_state
+    {
         assert!(ps.stalled);
     }
 
@@ -197,13 +204,14 @@ fn test_refinery_resumes_after_stall_cleared() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 10_000.0;
 
     tick(&mut state, &[], &content, &mut rng, None);
     let events = tick(&mut state, &[], &content, &mut rng, None);
 
     let station = &state.stations[&station_id];
-    if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+    if let ModuleKindState::Processor(ps) = &station.core.modules[0].kind_state {
         assert!(!ps.stalled, "module should no longer be stalled");
     }
 
@@ -231,6 +239,7 @@ fn test_stall_event_only_emitted_once() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.34;
 
     let mut rng = make_rng();
@@ -266,6 +275,7 @@ fn test_storage_pressure_cascade() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .cargo_capacity_m3 = 0.50;
 
     let mut rng = make_rng();
@@ -283,6 +293,7 @@ fn test_storage_pressure_cascade() {
     let station = &state.stations[&station_id];
     assert!(
         station
+            .core
             .inventory
             .iter()
             .any(|i| matches!(i, InventoryItem::Material { .. })),
@@ -293,6 +304,7 @@ fn test_storage_pressure_cascade() {
         .stations
         .get_mut(&station_id)
         .unwrap()
+        .core
         .inventory
         .push(InventoryItem::Material {
             element: "Fe".to_string(),
@@ -318,7 +330,7 @@ fn test_storage_pressure_cascade() {
     );
 
     let station = &state.stations[&station_id];
-    if let ModuleKindState::Processor(ps) = &station.modules[0].kind_state {
+    if let ModuleKindState::Processor(ps) = &station.core.modules[0].kind_state {
         assert!(ps.stalled, "module should be stalled");
     }
 }

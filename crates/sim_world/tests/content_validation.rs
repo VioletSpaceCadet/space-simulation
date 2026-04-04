@@ -1578,7 +1578,7 @@ fn dev_advanced_state_module_defs_exist() {
     let state = load_dev_advanced_state();
 
     for station in state.stations.values() {
-        for item in &station.inventory {
+        for item in &station.core.inventory {
             if let InventoryItem::Module { module_def_id, .. } = item {
                 assert!(
                     content.module_defs.contains_key(module_def_id),
@@ -1600,7 +1600,7 @@ fn dev_advanced_state_power_budget_positive() {
         let mut generation_kw = 0.0_f32;
         let mut consumption_kw = 0.0_f32;
 
-        for item in &station.inventory {
+        for item in &station.core.inventory {
             if let InventoryItem::Module { module_def_id, .. } = item {
                 if let Some(def) = content.module_defs.get(module_def_id) {
                     if let ModuleBehaviorDef::SolarArray(solar) = &def.behavior {
@@ -1614,7 +1614,7 @@ fn dev_advanced_state_power_budget_positive() {
         }
 
         // Also count installed modules
-        for module in &station.modules {
+        for module in &station.core.modules {
             if let Some(def) = content.module_defs.get(&module.def_id) {
                 if let ModuleBehaviorDef::SolarArray(solar) = &def.behavior {
                     generation_kw += solar.base_output_kw;
@@ -1640,7 +1640,7 @@ fn dev_advanced_state_crew_roles_exist() {
     let state = load_dev_advanced_state();
 
     for station in state.stations.values() {
-        for role in station.crew.keys() {
+        for role in station.core.crew.keys() {
             assert!(
                 content.crew_roles.contains_key(role),
                 "station '{}' has unknown crew role '{}'",
@@ -1724,7 +1724,7 @@ fn progression_start_module_defs_exist() {
     let state = load_progression_start();
 
     for station in state.stations.values() {
-        for item in &station.inventory {
+        for item in &station.core.inventory {
             if let InventoryItem::Module { module_def_id, .. } = item {
                 assert!(
                     content.module_defs.contains_key(module_def_id),
@@ -1754,6 +1754,7 @@ fn progression_start_is_minimal() {
 
     let station = state.stations.values().next().unwrap();
     let module_count = station
+        .core
         .inventory
         .iter()
         .filter(|i| matches!(i, InventoryItem::Module { .. }))
@@ -1768,7 +1769,7 @@ fn progression_start_crew_roles_exist() {
     let state = load_progression_start();
 
     for station in state.stations.values() {
-        for role in station.crew.keys() {
+        for role in station.core.crew.keys() {
             assert!(
                 content.crew_roles.contains_key(role),
                 "progression_start has unknown crew role '{}'",

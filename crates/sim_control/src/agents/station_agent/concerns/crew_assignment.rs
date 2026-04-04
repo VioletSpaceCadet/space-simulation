@@ -19,24 +19,29 @@ impl StationConcern for CrewAssignment {
             return Vec::new();
         };
 
-        if !has_unsatisfied_crew_need(station, ctx.content) || station.crew.is_empty() {
+        if !has_unsatisfied_crew_need(station, ctx.content) || station.core.crew.is_empty() {
             return Vec::new();
         }
 
         let tick = ctx.state.meta.tick;
         let mut commands = Vec::new();
 
-        let mut module_order: Vec<usize> = (0..station.modules.len()).collect();
+        let mut module_order: Vec<usize> = (0..station.core.modules.len()).collect();
         module_order.sort_by(|&a, &b| {
-            station.modules[b]
+            station.core.modules[b]
                 .module_priority
-                .cmp(&station.modules[a].module_priority)
-                .then_with(|| station.modules[a].id.0.cmp(&station.modules[b].id.0))
+                .cmp(&station.core.modules[a].module_priority)
+                .then_with(|| {
+                    station.core.modules[a]
+                        .id
+                        .0
+                        .cmp(&station.core.modules[b].id.0)
+                })
         });
 
         let mut available: std::collections::BTreeMap<sim_core::CrewRole, u32> =
-            station.crew.clone();
-        for module in &station.modules {
+            station.core.crew.clone();
+        for module in &station.core.modules {
             for (role, &count) in &module.assigned_crew {
                 if let Some(entry) = available.get_mut(role) {
                     *entry = entry.saturating_sub(count);
@@ -45,7 +50,7 @@ impl StationConcern for CrewAssignment {
         }
 
         for &module_index in &module_order {
-            let module = &station.modules[module_index];
+            let module = &station.core.modules[module_index];
             if !module.enabled || module.prev_crew_satisfied {
                 continue;
             }

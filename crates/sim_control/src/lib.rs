@@ -188,7 +188,7 @@ mod tests {
         // Autopilot tests don't need research compute power on the station.
         let station_id = StationId("station_earth_orbit".to_string());
         if let Some(station) = state.stations.get_mut(&station_id) {
-            station.power_available_per_tick = 0.0;
+            station.core.power_available_per_tick = 0.0;
         }
         state
     }
@@ -287,12 +287,16 @@ mod tests {
         let mut state = autopilot_state(&content);
 
         let station_id = sim_core::StationId("station_earth_orbit".to_string());
-        state.stations.get_mut(&station_id).unwrap().inventory.push(
-            sim_core::InventoryItem::Module {
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .core
+            .inventory
+            .push(sim_core::InventoryItem::Module {
                 item_id: sim_core::ModuleItemId("module_item_0001".to_string()),
                 module_def_id: "module_basic_iron_refinery".to_string(),
-            },
-        );
+            });
 
         let mut autopilot = AutopilotController::new();
         let mut next_id = 0u64;
@@ -316,6 +320,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .modules
             .push(sim_core::ModuleState {
                 id: sim_core::ModuleInstanceId("module_inst_0001".to_string()),
@@ -374,12 +379,16 @@ mod tests {
         let mut state = autopilot_state(&content);
 
         let station_id = StationId("station_earth_orbit".to_string());
-        state.stations.get_mut(&station_id).unwrap().inventory.push(
-            sim_core::InventoryItem::Module {
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .core
+            .inventory
+            .push(sim_core::InventoryItem::Module {
                 item_id: sim_core::ModuleItemId("module_item_maint".to_string()),
                 module_def_id: "module_maintenance_bay".to_string(),
-            },
-        );
+            });
 
         let mut autopilot = AutopilotController::new();
         let mut next_id = 0u64;
@@ -548,6 +557,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .modules
             .push(sim_core::ModuleState {
                 id: sim_core::ModuleInstanceId("module_inst_0001".to_string()),
@@ -591,11 +601,11 @@ mod tests {
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
         // Set small capacity so slag easily exceeds 75% threshold
-        station.cargo_capacity_m3 = 100.0;
+        station.core.cargo_capacity_m3 = 100.0;
         // Add slag that takes up ~80% of capacity (slag density = 2500 kg/m3, 200kg = 0.08 m3)
         // Actually, let's use a volume that makes sense. We need volume > 75 m3.
         // Slag density is 2500 kg/m3. So 200_000 kg = 80 m3
-        station.inventory.push(sim_core::InventoryItem::Slag {
+        station.core.inventory.push(sim_core::InventoryItem::Slag {
             kg: 200_000.0,
             composition: HashMap::from([("slag".to_string(), 1.0)]),
         });
@@ -620,7 +630,7 @@ mod tests {
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
         // Small amount of slag, well below 75% of 10,000 m3
-        station.inventory.push(sim_core::InventoryItem::Slag {
+        station.core.inventory.push(sim_core::InventoryItem::Slag {
             kg: 10.0,
             composition: HashMap::from([("slag".to_string(), 1.0)]),
         });
@@ -675,7 +685,7 @@ mod tests {
         state.scan_sites.clear();
         let station_id = StationId("station_earth_orbit".to_string());
         if let Some(station) = state.stations.get_mut(&station_id) {
-            station.power_available_per_tick = 0.0;
+            station.core.power_available_per_tick = 0.0;
         }
         (content, state)
     }
@@ -685,12 +695,16 @@ mod tests {
         let (content, mut state) = lab_content_and_state();
 
         let station_id = StationId("station_earth_orbit".to_string());
-        state.stations.get_mut(&station_id).unwrap().inventory.push(
-            sim_core::InventoryItem::Module {
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .core
+            .inventory
+            .push(sim_core::InventoryItem::Module {
                 item_id: sim_core::ModuleItemId("module_item_lab_001".to_string()),
                 module_def_id: "module_materials_lab".to_string(),
-            },
-        );
+            });
 
         let mut autopilot = AutopilotController::new();
         let mut next_id = 0u64;
@@ -713,6 +727,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .modules
             .push(sim_core::ModuleState {
                 id: sim_core::ModuleInstanceId("module_inst_lab_001".to_string()),
@@ -757,6 +772,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .modules
             .push(sim_core::ModuleState {
                 id: sim_core::ModuleInstanceId("module_inst_lab_001".to_string()),
@@ -814,6 +830,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .modules
             .push(sim_core::ModuleState {
                 id: sim_core::ModuleInstanceId("module_inst_lab_001".to_string()),
@@ -887,7 +904,7 @@ mod tests {
         state.scan_sites.clear();
         let station_id = StationId("station_earth_orbit".to_string());
         if let Some(station) = state.stations.get_mut(&station_id) {
-            station.power_available_per_tick = 0.0;
+            station.core.power_available_per_tick = 0.0;
         }
 
         // Install engineering lab module on the station
@@ -895,6 +912,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .modules
             .push(sim_core::ModuleState {
                 id: sim_core::ModuleInstanceId("module_inst_eng_lab_001".to_string()),
@@ -975,8 +993,8 @@ mod tests {
         state.scan_sites.clear();
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.power_available_per_tick = 0.0;
-        station.modules.push(sim_core::ModuleState {
+        station.core.power_available_per_tick = 0.0;
+        station.core.modules.push(sim_core::ModuleState {
             id: sim_core::ModuleInstanceId("lab_inst_001".to_string()),
             def_id: "module_mfg_lab".to_string(),
             enabled: true,
@@ -1015,7 +1033,7 @@ mod tests {
             .insert(TechId("tech_basic".to_string()));
         // Clear lab assignment so it needs reassignment
         let station = state.stations.get_mut(&station_id).unwrap();
-        if let sim_core::ModuleKindState::Lab(ref mut lab) = station.modules[0].kind_state {
+        if let sim_core::ModuleKindState::Lab(ref mut lab) = station.core.modules[0].kind_state {
             lab.assigned_tech = Some(TechId("tech_basic".to_string()));
         }
 
@@ -1208,10 +1226,10 @@ mod tests {
 
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.power_available_per_tick = 0.0;
+        station.core.power_available_per_tick = 0.0;
 
         // Install enabled shipyard module
-        station.modules.push(sim_core::ModuleState {
+        station.core.modules.push(sim_core::ModuleState {
             id: sim_core::ModuleInstanceId("module_inst_shipyard_001".to_string()),
             def_id: "module_shipyard".to_string(),
             enabled: true,
@@ -1232,12 +1250,15 @@ mod tests {
         });
 
         // Add 5000 kg Fe to station inventory
-        station.inventory.push(sim_core::InventoryItem::Material {
-            element: "Fe".to_string(),
-            kg: 5000.0,
-            quality: 1.0,
-            thermal: None,
-        });
+        station
+            .core
+            .inventory
+            .push(sim_core::InventoryItem::Material {
+                element: "Fe".to_string(),
+                kg: 5000.0,
+                quality: 1.0,
+                thermal: None,
+            });
 
         // Unlock tech_ship_construction
         state
@@ -1430,6 +1451,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .inventory
             .push(InventoryItem::Component {
                 component_id: ComponentId("repair_kit".to_string()),
@@ -1474,6 +1496,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .inventory
             .push(InventoryItem::Component {
                 component_id: ComponentId("repair_kit".to_string()),
@@ -1508,6 +1531,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .inventory
             .push(InventoryItem::Material {
                 element: "Fe".to_string(),
@@ -1542,6 +1566,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .inventory
             .push(InventoryItem::Material {
                 element: "Si".to_string(),
@@ -1588,6 +1613,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .inventory
             .push(InventoryItem::Material {
                 element: "He".to_string(),
@@ -1635,6 +1661,7 @@ mod tests {
             .stations
             .get_mut(&station_id)
             .unwrap()
+            .core
             .inventory
             .push(InventoryItem::Component {
                 component_id: ComponentId("repair_kit".to_string()),
@@ -1662,7 +1689,7 @@ mod tests {
         // Install a heating module on the station
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.modules.push(sim_core::ModuleState {
+        station.core.modules.push(sim_core::ModuleState {
             id: sim_core::ModuleInstanceId("mod_heat_001".to_string()),
             def_id: "module_heating_unit".to_string(),
             enabled: true,
@@ -1874,7 +1901,7 @@ mod tests {
         // Install heating module
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.modules.push(sim_core::ModuleState {
+        station.core.modules.push(sim_core::ModuleState {
             id: sim_core::ModuleInstanceId("mod_heat_001".to_string()),
             def_id: "module_heating_unit".to_string(),
             enabled: true,
@@ -1898,7 +1925,7 @@ mod tests {
             .stations
             .get_mut(&StationId("station_earth_orbit".to_string()))
             .unwrap();
-        station.inventory.push(InventoryItem::Material {
+        station.core.inventory.push(InventoryItem::Material {
             element: "H2O".to_string(),
             kg: 600.0,
             quality: 1.0,
@@ -1976,7 +2003,7 @@ mod tests {
     fn add_electrolysis_module(state: &mut sim_core::GameState, enabled: bool) {
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.modules.push(sim_core::ModuleState {
+        station.core.modules.push(sim_core::ModuleState {
             id: sim_core::ModuleInstanceId("electrolysis_inst_001".to_string()),
             def_id: "module_electrolysis_unit".to_string(),
             enabled,
@@ -1999,7 +2026,7 @@ mod tests {
     fn add_heating_module(state: &mut sim_core::GameState, enabled: bool) {
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.modules.push(sim_core::ModuleState {
+        station.core.modules.push(sim_core::ModuleState {
             id: sim_core::ModuleInstanceId("heating_inst_001".to_string()),
             def_id: "module_heating_unit".to_string(),
             enabled,
@@ -2022,7 +2049,7 @@ mod tests {
     fn add_lh2_inventory(state: &mut sim_core::GameState, kg: f32) {
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.inventory.push(InventoryItem::Material {
+        station.core.inventory.push(InventoryItem::Material {
             element: "LH2".to_string(),
             kg,
             quality: 1.0,
@@ -2138,7 +2165,7 @@ mod tests {
         let mut state = autopilot_state(&content);
         let station_id = StationId("station_earth_orbit".to_string());
         let station = state.stations.get_mut(&station_id).unwrap();
-        station.modules.push(sim_core::ModuleState {
+        station.core.modules.push(sim_core::ModuleState {
             id: sim_core::ModuleInstanceId("electrolysis_inst_001".to_string()),
             def_id: "module_electrolysis_unit".to_string(),
             enabled: false,
@@ -2288,7 +2315,7 @@ mod tests {
         // Add module to station inventory
         let station_id = StationId("station_earth_orbit".to_string());
         if let Some(station) = state.stations.get_mut(&station_id) {
-            station.inventory.push(InventoryItem::Module {
+            station.core.inventory.push(InventoryItem::Module {
                 item_id: ModuleItemId("mod_item_fit_test".to_string()),
                 module_def_id: "module_cargo_expander".to_string(),
             });
@@ -2377,7 +2404,7 @@ mod tests {
         // Module available but slot already occupied
         let station_id = StationId("station_earth_orbit".to_string());
         if let Some(station) = state.stations.get_mut(&station_id) {
-            station.inventory.push(InventoryItem::Module {
+            station.core.inventory.push(InventoryItem::Module {
                 item_id: ModuleItemId("mod_item_skip".to_string()),
                 module_def_id: "module_cargo_expander".to_string(),
             });
