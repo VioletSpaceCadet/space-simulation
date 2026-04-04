@@ -95,6 +95,8 @@ export const DATA_KIND_COLORS: Record<string, string> = {
   AssayData: '#c89a4a',
   ManufacturingData: '#4caf7d',
   TransitData: '#a78bfa',
+  OpticalData: '#7ec8e3',
+  RadioData: '#e0a84c',
 };
 
 export const DATA_KIND_LABELS: Record<string, string> = {
@@ -102,6 +104,8 @@ export const DATA_KIND_LABELS: Record<string, string> = {
   AssayData: 'Assay',
   ManufacturingData: 'Manufacturing',
   TransitData: 'Transit',
+  OpticalData: 'Optical',
+  RadioData: 'Radio',
 };
 
 // --- Research domains ---

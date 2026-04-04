@@ -9,7 +9,8 @@
         "Survey": 20.0
       },
       "accepted_data": [
-        "SurveyData"
+        "SurveyData",
+        "OpticalData"
       ],
       "effects": [
         {
@@ -31,6 +32,7 @@
       },
       "accepted_data": [
         "AssayData",
+        "RadioData",
         "ManufacturingData"
       ],
       "effects": [
@@ -51,7 +53,8 @@
       },
       "accepted_data": [
         "ManufacturingData",
-        "AssayData"
+        "AssayData",
+        "RadioData"
       ],
       "effects": [
         {
@@ -117,7 +120,8 @@
       },
       "accepted_data": [
         "ManufacturingData",
-        "SurveyData"
+        "SurveyData",
+        "OpticalData"
       ],
       "effects": [
         {
@@ -138,6 +142,7 @@
       },
       "accepted_data": [
         "AssayData",
+        "RadioData",
         "ManufacturingData"
       ],
       "effects": [
@@ -159,6 +164,7 @@
       },
       "accepted_data": [
         "AssayData",
+        "RadioData",
         "ManufacturingData"
       ],
       "effects": [
@@ -182,7 +188,8 @@
       },
       "accepted_data": [
         "TransitData",
-        "SurveyData"
+        "SurveyData",
+        "OpticalData"
       ],
       "effects": [
         {
