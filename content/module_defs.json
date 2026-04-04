@@ -237,7 +237,9 @@
         "data_kind": "OpticalData",
         "action_key": "optical_scan",
         "scan_interval_minutes": 180,
-        "sensor_type": "optical"
+        "sensor_type": "optical",
+        "discovery_zones": ["earth_orbit_zone", "earth_neos"],
+        "discovery_probability": 0.15
       }
     },
     "power_stall_priority": 0,
@@ -258,7 +260,9 @@
         "data_kind": "RadioData",
         "action_key": "radio_scan",
         "scan_interval_minutes": 240,
-        "sensor_type": "radio"
+        "sensor_type": "radio",
+        "discovery_zones": ["inner_belt", "outer_belt"],
+        "discovery_probability": 0.08
       }
     },
     "power_stall_priority": 0,

@@ -880,6 +880,13 @@ pub struct SensorArrayDef {
     /// new sensor types are added via `module_defs.json`, not code changes.
     #[serde(default)]
     pub sensor_type: String,
+    /// Zone IDs where this sensor can discover scan sites (e.g., `["earth_orbit_zone"]`).
+    /// Empty = no discovery capability (data generation only).
+    #[serde(default)]
+    pub discovery_zones: Vec<String>,
+    /// Probability (0.0–1.0) of discovering a scan site on each successful run.
+    #[serde(default)]
+    pub discovery_probability: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

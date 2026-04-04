@@ -236,7 +236,7 @@ pub(crate) fn tick_stations(
         timed!(
             timings,
             sensors,
-            sensor::tick_sensor_array_modules(state, station_id, content, events)
+            sensor::tick_sensor_array_modules(state, station_id, content, rng, events)
         );
         timed!(
             timings,
@@ -324,7 +324,7 @@ pub(crate) fn tick_ground_facilities(
             events,
             &mut scratch_indices,
         );
-        sensor::tick_sensor_array_modules(state, &proxy_station_id, content, events);
+        sensor::tick_sensor_array_modules(state, &proxy_station_id, content, rng, events);
         lab::tick_lab_modules(state, &proxy_station_id, content, events);
         maintenance::tick_maintenance_modules(state, &proxy_station_id, content, events);
         thermal::tick_thermal(state, &proxy_station_id, content, events);
