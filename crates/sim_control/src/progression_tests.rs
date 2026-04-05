@@ -44,6 +44,7 @@ fn production_like_content() -> GameContent {
         TechDef {
             id: TechId("tech_deep_scan_v1".to_string()),
             name: "Deep Scan v1".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::from([(
                 ResearchDomain::new(ResearchDomain::SURVEY),
@@ -58,6 +59,7 @@ fn production_like_content() -> GameContent {
         TechDef {
             id: TechId("tech_advanced_refining".to_string()),
             name: "Advanced Refining".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::from([
                 (ResearchDomain::new(ResearchDomain::MATERIALS), 150.0),
@@ -72,6 +74,7 @@ fn production_like_content() -> GameContent {
         TechDef {
             id: TechId("tech_ship_construction".to_string()),
             name: "Ship Construction".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::from([(
                 ResearchDomain::new(ResearchDomain::MANUFACTURING),

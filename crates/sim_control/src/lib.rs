@@ -681,6 +681,7 @@ mod tests {
         content.techs.push(sim_core::TechDef {
             id: TechId("tech_materials_v1".to_string()),
             name: "Materials Research".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::from([(
                 sim_core::ResearchDomain::new(sim_core::ResearchDomain::MATERIALS),
@@ -840,6 +841,7 @@ mod tests {
         content.techs.push(sim_core::TechDef {
             id: TechId("tech_materials_v2".to_string()),
             name: "Materials Research v2".to_string(),
+            tier: 1,
             prereqs: vec![TechId("tech_materials_v1".to_string())],
             domain_requirements: HashMap::from([(
                 sim_core::ResearchDomain::new(sim_core::ResearchDomain::MATERIALS),
@@ -906,6 +908,7 @@ mod tests {
         content.techs.push(sim_core::TechDef {
             id: TechId("tech_ship_construction".to_string()),
             name: "Ship Construction".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::from([(
                 sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),
@@ -990,6 +993,7 @@ mod tests {
         content.techs.push(sim_core::TechDef {
             id: TechId("tech_basic".to_string()),
             name: "Basic".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::from([(
                 sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),
@@ -1001,6 +1005,7 @@ mod tests {
         content.techs.push(sim_core::TechDef {
             id: TechId("tech_advanced".to_string()),
             name: "Advanced".to_string(),
+            tier: 1,
             prereqs: vec![TechId("tech_basic".to_string())],
             domain_requirements: HashMap::from([(
                 sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),

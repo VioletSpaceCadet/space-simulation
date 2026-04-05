@@ -263,6 +263,35 @@
         "ManufacturingData"
       ],
       "effects": []
+    },
+    {
+      "id": "tech_satellite_basics",
+      "name": "Satellite Basics",
+      "prereqs": ["tech_basic_rocketry"],
+      "domain_requirements": {
+        "Survey": 30.0,
+        "Manufacturing": 20.0
+      },
+      "accepted_data": [
+        "SurveyData",
+        "ManufacturingData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_orbital_science",
+      "name": "Orbital Science",
+      "prereqs": ["tech_satellite_basics"],
+      "domain_requirements": {
+        "Survey": 50.0,
+        "Materials": 30.0
+      },
+      "accepted_data": [
+        "SurveyData",
+        "OpticalData",
+        "RadioData"
+      ],
+      "effects": []
     }
   ]
 }

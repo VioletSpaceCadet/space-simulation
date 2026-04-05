@@ -12,6 +12,7 @@ fn economy_content() -> GameContent {
     content.techs.push(TechDef {
         id: TechId("tech_ship_construction".to_string()),
         name: "Ship Construction".to_string(),
+        tier: 1,
         prereqs: vec![],
         domain_requirements: HashMap::from([(
             ResearchDomain::new(ResearchDomain::MANUFACTURING),

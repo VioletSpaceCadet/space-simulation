@@ -309,6 +309,7 @@ mod research_threshold_tests {
         content.techs = vec![TechDef {
             id: TechId("tech_test_modifier".to_string()),
             name: "Test Modifier".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::new(),
             accepted_data: vec![crate::DataKind::new(crate::DataKind::SURVEY)],
@@ -368,6 +369,7 @@ mod research_threshold_tests {
             TechDef {
                 id: TechId("tech_a".to_string()),
                 name: "Tech A".to_string(),
+                tier: 1,
                 prereqs: vec![],
                 domain_requirements: HashMap::new(),
                 accepted_data: vec![],
@@ -376,6 +378,7 @@ mod research_threshold_tests {
             TechDef {
                 id: TechId("tech_b".to_string()),
                 name: "Tech B".to_string(),
+                tier: 1,
                 prereqs: vec![TechId("tech_a".to_string())],
                 domain_requirements: HashMap::new(),
                 accepted_data: vec![],

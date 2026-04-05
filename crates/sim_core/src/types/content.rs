@@ -490,11 +490,18 @@ pub struct SatelliteDef {
 pub struct TechDef {
     pub id: TechId,
     pub name: String,
+    /// Tier for progression pacing. Tier 1 = ground phase, Tier 2 = orbital, Tier 3 = industrial.
+    #[serde(default = "default_tech_tier")]
+    pub tier: u32,
     pub prereqs: Vec<TechId>,
     #[serde(default)]
     pub domain_requirements: HashMap<ResearchDomain, f32>,
     pub accepted_data: Vec<DataKind>,
     pub effects: Vec<TechEffect>,
+}
+
+fn default_tech_tier() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

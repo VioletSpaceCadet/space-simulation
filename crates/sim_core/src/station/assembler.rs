@@ -906,6 +906,7 @@ mod assembler_component_tests {
         content.techs.push(TechDef {
             id: TechId("tech_ship_construction".to_string()),
             name: "Ship Construction".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::new(),
             accepted_data: vec![],
