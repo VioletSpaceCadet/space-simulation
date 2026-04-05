@@ -44,7 +44,8 @@
         "angle_start_mdeg": 0,
         "angle_span_mdeg": 360000,
         "resource_class": "Mixed",
-        "scan_site_weight": 1
+        "scan_site_weight": 1,
+        "implicit_comm_tier": "Advanced"
       }
     },
     {
@@ -61,7 +62,8 @@
         "angle_start_mdeg": 0,
         "angle_span_mdeg": 360000,
         "resource_class": "Mixed",
-        "scan_site_weight": 1
+        "scan_site_weight": 1,
+        "implicit_comm_tier": "Advanced"
       }
     },
     {
@@ -122,7 +124,8 @@
         "angle_start_mdeg": 0,
         "angle_span_mdeg": 360000,
         "resource_class": "Mixed",
-        "scan_site_weight": 1
+        "scan_site_weight": 1,
+        "implicit_comm_tier": "Advanced"
       }
     },
     {

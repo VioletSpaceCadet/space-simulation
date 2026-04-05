@@ -213,6 +213,28 @@ pub struct DomainProgress {
     pub points: HashMap<ResearchDomain, f32>,
 }
 
+/// Communication tier for a zone. Determines what operations are available.
+/// None = manual commands only. Basic = autopilot + trade. Advanced = full speed.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
+pub enum CommTier {
+    #[default]
+    None,
+    Basic,
+    Advanced,
+}
+
+impl std::fmt::Display for CommTier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "None"),
+            Self::Basic => write!(f, "Basic"),
+            Self::Advanced => write!(f, "Advanced"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AlertSeverity {
     Warning,

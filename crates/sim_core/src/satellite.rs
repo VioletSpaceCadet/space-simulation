@@ -4,10 +4,55 @@
 //! Iterates satellites sorted by `SatelliteId` (`BTreeMap` order) for determinism.
 
 use crate::{
-    research::generate_data, DataKind, Event, EventEnvelope, GameContent, GameState, SatelliteId,
-    SiteId,
+    research::generate_data, CommTier, DataKind, Event, EventEnvelope, GameContent, GameState,
+    SatelliteId, SiteId,
 };
 use rand::Rng;
+
+/// Compute the communication tier for a zone based on deployed comm satellites
+/// and content-defined implicit tiers (near-Earth zones).
+///
+/// Returns `Advanced` for zones not found in the solar system body list
+/// (backward compat — only zones with explicit `ZoneDef` config get gating).
+pub fn zone_comm_tier(zone_id: &str, state: &GameState, content: &GameContent) -> CommTier {
+    // Find the zone body in content.
+    let zone_body = content
+        .solar_system
+        .bodies
+        .iter()
+        .find(|b| b.id.0 == zone_id);
+
+    // Check for content-defined implicit tier (e.g. near-Earth zones).
+    // Only bodies with an explicit ZoneDef participate in comm tier gating.
+    let zone_def = zone_body.and_then(|b| b.zone.as_ref());
+    match zone_def {
+        Some(zone) => {
+            if let Some(tier) = zone.implicit_comm_tier {
+                return tier;
+            }
+        }
+        // Body not found or has no ZoneDef — default to Advanced (no gating).
+        None => return CommTier::Advanced,
+    }
+
+    // Count active comm satellites in this zone.
+    let comm_count = state
+        .satellites
+        .values()
+        .filter(|sat| {
+            sat.enabled
+                && sat.wear < 1.0
+                && sat.satellite_type == "communication"
+                && sat.position.parent_body.0 == zone_id
+        })
+        .count();
+
+    match comm_count {
+        0 => CommTier::None,
+        1 => CommTier::Basic,
+        _ => CommTier::Advanced,
+    }
+}
 
 /// Tick all deployed satellites. Skips disabled or worn-out satellites.
 /// Each satellite type dispatches to its own behavior via string match.
@@ -395,6 +440,7 @@ mod tests {
                 angle_span_mdeg: 360_000,
                 resource_class: crate::spatial::ResourceClass::MetalRich,
                 scan_site_weight: 10,
+                implicit_comm_tier: None,
             }),
         });
         // Ensure we have at least one template.
@@ -498,6 +544,173 @@ mod tests {
             fail_events.len(),
             1,
             "should emit exactly one SatelliteFailed event"
+        );
+    }
+
+    /// Add a body without implicit comm tier to content (distant zone).
+    fn add_distant_zone(content: &mut GameContent) {
+        content.solar_system.bodies.push(crate::OrbitalBodyDef {
+            id: crate::BodyId("distant_belt".to_string()),
+            name: "Distant Belt".to_string(),
+            parent: Option::None,
+            body_type: crate::BodyType::Belt,
+            radius_au_um: 3_000_000,
+            angle_mdeg: 0,
+            solar_intensity: 0.5,
+            zone: Some(crate::ZoneDef {
+                radius_min_au_um: 2_500_000,
+                radius_max_au_um: 3_500_000,
+                angle_start_mdeg: 0,
+                angle_span_mdeg: 360_000,
+                resource_class: crate::spatial::ResourceClass::MetalRich,
+                scan_site_weight: 5,
+                implicit_comm_tier: None,
+            }),
+        });
+    }
+
+    #[test]
+    fn zone_comm_tier_default_is_none() {
+        let mut content = base_content();
+        add_distant_zone(&mut content);
+        let state = base_state(&content);
+        // Distant zone has no implicit_comm_tier and no satellites.
+        assert_eq!(
+            zone_comm_tier("distant_belt", &state, &content),
+            CommTier::None
+        );
+    }
+
+    #[test]
+    fn zone_comm_tier_unknown_zone_defaults_advanced() {
+        let content = base_content();
+        let state = base_state(&content);
+        // Zone not in solar system defaults to Advanced (backward compat).
+        assert_eq!(
+            zone_comm_tier("nonexistent_zone", &state, &content),
+            CommTier::Advanced
+        );
+    }
+
+    #[test]
+    fn zone_comm_tier_implicit_from_content() {
+        let mut content = base_content();
+        // Add a body with implicit Advanced comm tier.
+        content.solar_system.bodies.push(crate::OrbitalBodyDef {
+            id: crate::BodyId("earth_orbit".to_string()),
+            name: "Earth Orbit".to_string(),
+            parent: Option::None,
+            body_type: crate::BodyType::Zone,
+            radius_au_um: 0,
+            angle_mdeg: 0,
+            solar_intensity: 1.0,
+            zone: Some(crate::ZoneDef {
+                radius_min_au_um: 0,
+                radius_max_au_um: 10000,
+                angle_start_mdeg: 0,
+                angle_span_mdeg: 360_000,
+                resource_class: crate::spatial::ResourceClass::Mixed,
+                scan_site_weight: 1,
+                implicit_comm_tier: Some(CommTier::Advanced),
+            }),
+        });
+        let state = base_state(&content);
+        assert_eq!(
+            zone_comm_tier("earth_orbit", &state, &content),
+            CommTier::Advanced
+        );
+    }
+
+    fn belt_position() -> crate::Position {
+        crate::Position {
+            parent_body: crate::BodyId("distant_belt".to_string()),
+            radius_au_um: crate::RadiusAuMicro(0),
+            angle_mdeg: crate::AngleMilliDeg(0),
+        }
+    }
+
+    #[test]
+    fn zone_comm_tier_from_satellite() {
+        let mut content = base_content();
+        add_distant_zone(&mut content);
+        add_satellite_def(&mut content, "sat_comm", "communication", 0.0001);
+        let mut state = base_state(&content);
+
+        // No comm satellite deployed -> None.
+        assert_eq!(
+            zone_comm_tier("distant_belt", &state, &content),
+            CommTier::None
+        );
+
+        // Deploy one comm satellite -> Basic.
+        let id1 = SatelliteId("sat_comm_1".to_string());
+        state.satellites.insert(
+            id1.clone(),
+            SatelliteState {
+                id: id1,
+                def_id: "sat_comm".to_string(),
+                name: "Comm 1".to_string(),
+                position: belt_position(),
+                deployed_tick: 0,
+                wear: 0.0,
+                enabled: true,
+                satellite_type: "communication".to_string(),
+                payload_config: None,
+            },
+        );
+        assert_eq!(
+            zone_comm_tier("distant_belt", &state, &content),
+            CommTier::Basic
+        );
+
+        // Deploy second comm satellite -> Advanced.
+        let id2 = SatelliteId("sat_comm_2".to_string());
+        state.satellites.insert(
+            id2.clone(),
+            SatelliteState {
+                id: id2,
+                def_id: "sat_comm".to_string(),
+                name: "Comm 2".to_string(),
+                position: belt_position(),
+                deployed_tick: 0,
+                wear: 0.0,
+                enabled: true,
+                satellite_type: "communication".to_string(),
+                payload_config: None,
+            },
+        );
+        assert_eq!(
+            zone_comm_tier("distant_belt", &state, &content),
+            CommTier::Advanced
+        );
+    }
+
+    #[test]
+    fn zone_comm_tier_disabled_satellite_not_counted() {
+        let mut content = base_content();
+        add_distant_zone(&mut content);
+        add_satellite_def(&mut content, "sat_comm", "communication", 0.0001);
+        let mut state = base_state(&content);
+
+        let id = SatelliteId("sat_comm_disabled".to_string());
+        state.satellites.insert(
+            id.clone(),
+            SatelliteState {
+                id,
+                def_id: "sat_comm".to_string(),
+                name: "Disabled Comm".to_string(),
+                position: belt_position(),
+                deployed_tick: 0,
+                wear: 0.0,
+                enabled: false,
+                satellite_type: "communication".to_string(),
+                payload_config: None,
+            },
+        );
+        assert_eq!(
+            zone_comm_tier("distant_belt", &state, &content),
+            CommTier::None,
+            "disabled satellite should not provide comm coverage"
         );
     }
 }

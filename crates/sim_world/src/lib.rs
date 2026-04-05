@@ -1411,6 +1411,7 @@ mod tests {
                 angle_span_mdeg: 360_000,
                 resource_class: sim_core::ResourceClass::MetalRich,
                 scan_site_weight: 1,
+                implicit_comm_tier: None,
             }),
         });
         validate_content(&content);
@@ -1435,6 +1436,7 @@ mod tests {
                 angle_span_mdeg: 400_000,
                 resource_class: sim_core::ResourceClass::Mixed,
                 scan_site_weight: 1,
+                implicit_comm_tier: None,
             }),
         });
         validate_content(&content);

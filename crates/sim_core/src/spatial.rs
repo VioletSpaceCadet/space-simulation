@@ -970,6 +970,7 @@ mod tests {
                 angle_span_mdeg: FULL_CIRCLE,
                 resource_class: ResourceClass::MetalRich,
                 scan_site_weight: 1,
+                implicit_comm_tier: None,
             }),
         };
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
@@ -997,6 +998,7 @@ mod tests {
                 angle_span_mdeg: FULL_CIRCLE,
                 resource_class: ResourceClass::MetalRich,
                 scan_site_weight: 9,
+                implicit_comm_tier: None,
             }),
         };
         let light = OrbitalBodyDef {
@@ -1014,6 +1016,7 @@ mod tests {
                 angle_span_mdeg: FULL_CIRCLE,
                 resource_class: ResourceClass::Mixed,
                 scan_site_weight: 1,
+                implicit_comm_tier: None,
             }),
         };
         let zone_bodies: Vec<&OrbitalBodyDef> = vec![&heavy, &light];
@@ -1091,6 +1094,7 @@ mod tests {
                 angle_span_mdeg: 90_000,
                 resource_class: ResourceClass::MetalRich,
                 scan_site_weight: 1,
+                implicit_comm_tier: None,
             }),
         };
         let mut rng1 = rand_chacha::ChaCha8Rng::seed_from_u64(99);

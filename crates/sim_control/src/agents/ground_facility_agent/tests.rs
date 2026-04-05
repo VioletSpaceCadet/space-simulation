@@ -335,6 +335,7 @@ fn autopilot_managed_ground_facility_discovers_within_500_ticks() {
             angle_span_mdeg: 360_000,
             resource_class: sim_core::spatial::ResourceClass::Mixed,
             scan_site_weight: 1,
+            implicit_comm_tier: None,
         }),
     });
 

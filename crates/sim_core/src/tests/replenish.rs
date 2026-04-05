@@ -24,6 +24,7 @@ fn replenish_test_content() -> GameContent {
                     angle_span_mdeg: 360_000,
                     resource_class: ResourceClass::MetalRich,
                     scan_site_weight: 1,
+                    implicit_comm_tier: None,
                 }),
             }],
             nodes: vec![NodeDef {
