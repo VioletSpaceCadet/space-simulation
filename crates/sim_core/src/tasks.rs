@@ -76,10 +76,16 @@ pub(crate) fn resolve_construct_station(
         state.counters.stations_deployed
     ));
 
+    // VIO-594: Seed the new station's inventory from the kit def so it
+    // has a buffer of raw materials + repair kits to survive until the
+    // first module deliveries arrive.
+    let seed_inventory = build_seed_inventory(kit_component_id, content);
+
     let mut station = crate::StationState {
         id: station_id.clone(),
         position: position.clone(),
         core: crate::FacilityCore {
+            inventory: seed_inventory,
             cargo_capacity_m3: content
                 .frames
                 .get(frame_id)
@@ -105,6 +111,40 @@ pub(crate) fn resolve_construct_station(
     ));
 
     set_ship_idle(state, ship_id, current_tick);
+}
+
+/// Build the initial inventory for a station deployed from a kit
+/// (VIO-594). Reads `ComponentDef.deploys_seed_materials` and
+/// `deploys_seed_components`. Empty kits or missing kit defs yield an
+/// empty inventory — the station starts bare, matching pre-VIO-594
+/// behavior.
+fn build_seed_inventory(kit_component_id: &str, content: &GameContent) -> Vec<InventoryItem> {
+    let Some(kit_def) = content
+        .component_defs
+        .iter()
+        .find(|c| c.id == kit_component_id)
+    else {
+        return Vec::new();
+    };
+    let mut inventory = Vec::new();
+
+    for seed in &kit_def.deploys_seed_materials {
+        inventory.push(InventoryItem::Material {
+            element: seed.element.clone(),
+            kg: seed.kg,
+            quality: seed.quality,
+            thermal: None,
+        });
+    }
+
+    for seed in &kit_def.deploys_seed_components {
+        inventory.push(InventoryItem::Component {
+            component_id: crate::ComponentId(seed.id.clone()),
+            count: seed.count,
+            quality: seed.quality,
+        });
+    }
+    inventory
 }
 
 /// True if any unlocked tech grants the `EnableDeepScan` effect.

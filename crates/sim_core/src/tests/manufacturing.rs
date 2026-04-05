@@ -47,6 +47,8 @@ fn competing_demand_content() -> GameContent {
             mass_kg: 25.0,
             volume_m3: 0.05,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         },
         ComponentDef {
             id: "structural_beam".to_string(),
@@ -54,6 +56,8 @@ fn competing_demand_content() -> GameContent {
             mass_kg: 100.0,
             volume_m3: 0.3,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         },
         ComponentDef {
             id: "repair_kit".to_string(),
@@ -61,6 +65,8 @@ fn competing_demand_content() -> GameContent {
             mass_kg: 50.0,
             volume_m3: 0.1,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         },
         ComponentDef {
             id: "advanced_repair_kit".to_string(),
@@ -68,6 +74,8 @@ fn competing_demand_content() -> GameContent {
             mass_kg: 75.0,
             volume_m3: 0.15,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         },
     ];
 

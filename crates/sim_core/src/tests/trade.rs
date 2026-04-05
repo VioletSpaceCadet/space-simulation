@@ -76,6 +76,8 @@ fn trade_content() -> GameContent {
             mass_kg: 50.0,
             volume_m3: 0.1,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         },
         ComponentDef {
             id: "thruster".to_string(),
@@ -83,6 +85,8 @@ fn trade_content() -> GameContent {
             mass_kg: 200.0,
             volume_m3: 0.5,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         },
     ];
     content.module_defs = [(

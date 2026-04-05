@@ -569,6 +569,8 @@ mod assembler_component_tests {
             mass_kg: 50.0,
             volume_m3: 2.0,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         });
         content.component_defs.push(ComponentDef {
             id: "hull_plate".to_string(),
@@ -576,6 +578,8 @@ mod assembler_component_tests {
             mass_kg: 200.0,
             volume_m3: 5.0,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         });
         // Assembler recipe: 100kg Fe + 4 thrusters => 1 hull_plate
         let hull_plate_recipe = RecipeDef {
@@ -974,6 +978,8 @@ mod assembler_component_tests {
             mass_kg: 50.0,
             volume_m3: 2.0,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         });
         // Add a hull def for the shipyard test
         content.hulls.insert(
