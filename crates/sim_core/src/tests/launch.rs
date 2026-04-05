@@ -1,6 +1,38 @@
 use super::*;
 use rand::SeedableRng;
 
+fn satellite_content() -> GameContent {
+    let mut content = launch_content();
+
+    // Add a satellite def.
+    content.satellite_defs.insert(
+        "sat_survey".to_string(),
+        SatelliteDef {
+            id: "sat_survey".to_string(),
+            name: "Survey Satellite".to_string(),
+            satellite_type: "survey".to_string(),
+            mass_kg: 500.0,
+            wear_rate: 0.00015,
+            required_tech: None,
+            behavior_config: serde_json::json!({ "discovery_multiplier": 2.0 }),
+        },
+    );
+    content.satellite_defs.insert(
+        "sat_comm_relay".to_string(),
+        SatelliteDef {
+            id: "sat_comm_relay".to_string(),
+            name: "Comm Relay".to_string(),
+            satellite_type: "communication".to_string(),
+            mass_kg: 800.0,
+            wear_rate: 0.00008,
+            required_tech: Some(TechId("tech_gated".to_string())),
+            behavior_config: serde_json::json!({ "comm_tier": "Basic" }),
+        },
+    );
+
+    content
+}
+
 fn launch_content() -> GameContent {
     let mut content = base_content();
 
@@ -477,4 +509,389 @@ fn pad_recovers_after_countdown() {
     };
     assert!(pad.available, "pad should be available after recovery");
     assert_eq!(pad.recovery_ticks_remaining, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Satellite deployment tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ground_launch_satellite_creates_satellite_on_arrival() {
+    let content = satellite_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Add satellite component to facility inventory.
+    let facility = state
+        .ground_facilities
+        .get_mut(&GroundFacilityId("ground_earth".to_string()))
+        .unwrap();
+    facility.core.inventory.push(InventoryItem::Component {
+        component_id: ComponentId("sat_survey".to_string()),
+        count: 1,
+        quality: 1.0,
+    });
+    crate::test_fixtures::rebuild_indices(&mut state, &content);
+
+    let initial_sat_count = state.satellites.len();
+
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::Launch {
+            facility_id: GroundFacilityId("ground_earth".to_string()),
+            rocket_def_id: "rocket_medium".to_string(), // 16t capacity fits 500kg satellite
+            payload: LaunchPayload::Satellite {
+                satellite_def_id: "sat_survey".to_string(),
+            },
+            destination: test_position(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(&e.event, Event::PayloadLaunched { .. })),
+        "should emit PayloadLaunched"
+    );
+
+    // Component should be consumed from inventory.
+    let facility = state
+        .ground_facilities
+        .get(&GroundFacilityId("ground_earth".to_string()))
+        .unwrap();
+    let sat_count: u32 = facility
+        .core
+        .inventory
+        .iter()
+        .filter_map(|item| match item {
+            InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } if component_id.0 == "sat_survey" => Some(*count),
+            _ => None,
+        })
+        .sum();
+    assert_eq!(sat_count, 0, "satellite component should be consumed");
+
+    // Tick until transit completes.
+    let mut deployed = false;
+    for _ in 0..10 {
+        let events = tick(&mut state, &[], &content, &mut rng, None);
+        if events
+            .iter()
+            .any(|e| matches!(&e.event, Event::SatelliteDeployed { .. }))
+        {
+            deployed = true;
+            break;
+        }
+    }
+
+    assert!(deployed, "satellite should be deployed on arrival");
+    assert_eq!(
+        state.satellites.len(),
+        initial_sat_count + 1,
+        "should have one new satellite"
+    );
+    let sat = state.satellites.values().next().unwrap();
+    assert_eq!(sat.satellite_type, "survey");
+    assert_eq!(sat.def_id, "sat_survey");
+    assert!(sat.enabled);
+    // Satellite may have ticked a few times after arrival, accumulating small wear.
+    assert!(
+        sat.wear < 0.01,
+        "wear should be near-zero, got {}",
+        sat.wear
+    );
+}
+
+#[test]
+fn ground_launch_satellite_rejected_without_component() {
+    let content = satellite_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let initial_balance = state.balance;
+
+    // No satellite component in inventory.
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::Launch {
+            facility_id: GroundFacilityId("ground_earth".to_string()),
+            rocket_def_id: "rocket_sounding".to_string(),
+            payload: LaunchPayload::Satellite {
+                satellite_def_id: "sat_survey".to_string(),
+            },
+            destination: test_position(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(&e.event, Event::PayloadLaunched { .. })),
+        "should not launch without satellite component"
+    );
+    assert!(
+        (state.balance - initial_balance).abs() < f64::EPSILON,
+        "balance should not change"
+    );
+}
+
+#[test]
+fn ground_launch_satellite_rejected_tech_gated() {
+    let content = satellite_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Add gated satellite component.
+    let facility = state
+        .ground_facilities
+        .get_mut(&GroundFacilityId("ground_earth".to_string()))
+        .unwrap();
+    facility.core.inventory.push(InventoryItem::Component {
+        component_id: ComponentId("sat_comm_relay".to_string()),
+        count: 1,
+        quality: 1.0,
+    });
+    crate::test_fixtures::rebuild_indices(&mut state, &content);
+
+    // tech_gated not unlocked.
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::Launch {
+            facility_id: GroundFacilityId("ground_earth".to_string()),
+            rocket_def_id: "rocket_sounding".to_string(),
+            payload: LaunchPayload::Satellite {
+                satellite_def_id: "sat_comm_relay".to_string(),
+            },
+            destination: test_position(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(&e.event, Event::PayloadLaunched { .. })),
+        "should not launch without required tech"
+    );
+}
+
+#[test]
+fn orbital_deploy_satellite_from_station() {
+    let content = satellite_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Create a station with a satellite component.
+    let station_id = StationId("station_test".to_string());
+    state.stations.insert(
+        station_id.clone(),
+        StationState {
+            id: station_id.clone(),
+            position: test_position(),
+            core: FacilityCore {
+                inventory: vec![InventoryItem::Component {
+                    component_id: ComponentId("sat_survey".to_string()),
+                    count: 2,
+                    quality: 1.0,
+                }],
+                cargo_capacity_m3: 1000.0,
+                ..Default::default()
+            },
+            leaders: Vec::new(),
+        },
+    );
+    crate::test_fixtures::rebuild_indices(&mut state, &content);
+
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::DeploySatellite {
+            station_id: station_id.clone(),
+            satellite_def_id: "sat_survey".to_string(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(&e.event, Event::SatelliteDeployed { .. })),
+        "should emit SatelliteDeployed"
+    );
+    assert_eq!(state.satellites.len(), 1, "should have one satellite");
+
+    // Component count should be decremented.
+    let station = state.stations.get(&station_id).unwrap();
+    let remaining: u32 = station
+        .core
+        .inventory
+        .iter()
+        .filter_map(|item| match item {
+            InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } if component_id.0 == "sat_survey" => Some(*count),
+            _ => None,
+        })
+        .sum();
+    assert_eq!(remaining, 1, "should have consumed one satellite component");
+
+    let sat = state.satellites.values().next().unwrap();
+    assert_eq!(sat.satellite_type, "survey");
+    assert!(sat.enabled);
+}
+
+#[test]
+fn orbital_deploy_rejected_no_component() {
+    let content = satellite_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Station without satellite components.
+    let station_id = StationId("station_test".to_string());
+    state.stations.insert(
+        station_id.clone(),
+        StationState {
+            id: station_id.clone(),
+            position: test_position(),
+            core: FacilityCore {
+                cargo_capacity_m3: 1000.0,
+                ..Default::default()
+            },
+            leaders: Vec::new(),
+        },
+    );
+    crate::test_fixtures::rebuild_indices(&mut state, &content);
+
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::DeploySatellite {
+            station_id,
+            satellite_def_id: "sat_survey".to_string(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(&e.event, Event::SatelliteDeployed { .. })),
+        "should not deploy without component"
+    );
+    assert!(state.satellites.is_empty());
+}
+
+#[test]
+fn orbital_deploy_rejected_unknown_def() {
+    let content = satellite_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    let station_id = StationId("station_test".to_string());
+    state.stations.insert(
+        station_id.clone(),
+        StationState {
+            id: station_id.clone(),
+            position: test_position(),
+            core: FacilityCore {
+                inventory: vec![InventoryItem::Component {
+                    component_id: ComponentId("sat_nonexistent".to_string()),
+                    count: 1,
+                    quality: 1.0,
+                }],
+                cargo_capacity_m3: 1000.0,
+                ..Default::default()
+            },
+            leaders: Vec::new(),
+        },
+    );
+    crate::test_fixtures::rebuild_indices(&mut state, &content);
+
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::DeploySatellite {
+            station_id,
+            satellite_def_id: "sat_nonexistent".to_string(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(&e.event, Event::SatelliteDeployed { .. })),
+        "should not deploy unknown satellite type"
+    );
+    assert!(state.satellites.is_empty());
+}
+
+#[test]
+fn orbital_deploy_rejected_tech_gated() {
+    let content = satellite_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Station with tech-gated satellite component (sat_comm_relay requires tech_gated).
+    let station_id = StationId("station_test".to_string());
+    state.stations.insert(
+        station_id.clone(),
+        StationState {
+            id: station_id.clone(),
+            position: test_position(),
+            core: FacilityCore {
+                inventory: vec![InventoryItem::Component {
+                    component_id: ComponentId("sat_comm_relay".to_string()),
+                    count: 1,
+                    quality: 1.0,
+                }],
+                cargo_capacity_m3: 1000.0,
+                ..Default::default()
+            },
+            leaders: Vec::new(),
+        },
+    );
+    crate::test_fixtures::rebuild_indices(&mut state, &content);
+
+    // tech_gated not unlocked — deploy should be rejected.
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::DeploySatellite {
+            station_id,
+            satellite_def_id: "sat_comm_relay".to_string(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(&e.event, Event::SatelliteDeployed { .. })),
+        "should not deploy without required tech"
+    );
+    assert!(state.satellites.is_empty());
 }

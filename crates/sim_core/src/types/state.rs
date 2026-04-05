@@ -598,6 +598,12 @@ pub enum LaunchPayload {
     Supplies(Vec<InventoryItem>),
     /// Deploy a new orbital station.
     StationKit,
+    /// Deploy a satellite into orbit. The satellite component must exist in
+    /// the facility inventory and is consumed on launch.
+    Satellite {
+        /// Matches `SatelliteDef.id` in content (e.g. `sat_survey`).
+        satellite_def_id: String,
+    },
 }
 
 // ---------------------------------------------------------------------------

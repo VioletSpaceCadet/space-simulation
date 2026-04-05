@@ -472,6 +472,20 @@ fn apply_commands(
                     events,
                 );
             }
+            Command::DeploySatellite {
+                station_id,
+                satellite_def_id,
+            } => {
+                commands::handle_deploy_satellite(
+                    state,
+                    content,
+                    station_id,
+                    satellite_def_id,
+                    current_tick,
+                    rng,
+                    events,
+                );
+            }
         }
     }
 
@@ -508,64 +522,144 @@ fn resolve_launch_transits(
         facility.launch_transits = ongoing;
 
         for transit in completed {
-            let payload_for_event = transit.payload.clone();
-            match transit.payload {
-                crate::LaunchPayload::Supplies(items) => {
-                    let target_station = find_nearest_station(state, &transit.destination, content);
-                    let Some(station_id) = target_station else {
-                        continue;
-                    };
-                    let Some(station) = state.stations.get_mut(&station_id) else {
-                        continue;
-                    };
-                    crate::trade::merge_into_inventory(&mut station.core.inventory, items);
-                    station.core.invalidate_volume_cache();
-                    events.push(crate::emit(
-                        &mut state.counters,
-                        current_tick,
-                        crate::Event::PayloadDelivered {
-                            facility_id: facility_id.clone(),
-                            rocket_def_id: transit.rocket_def_id.clone(),
-                            payload: payload_for_event,
-                            destination: transit.destination.clone(),
-                        },
-                    ));
-                }
-                crate::LaunchPayload::StationKit => {
-                    let uuid = crate::generate_uuid(rng);
-                    let station_id = crate::StationId(format!("station_{uuid}"));
-                    let station = crate::StationState {
-                        id: station_id.clone(),
-                        position: transit.destination.clone(),
-                        core: crate::FacilityCore {
-                            cargo_capacity_m3: 500.0,
-                            ..Default::default()
-                        },
-                        leaders: Vec::new(),
-                    };
-                    state.stations.insert(station_id.clone(), station);
-                    events.push(crate::emit(
-                        &mut state.counters,
-                        current_tick,
-                        crate::Event::PayloadDelivered {
-                            facility_id: facility_id.clone(),
-                            rocket_def_id: transit.rocket_def_id.clone(),
-                            payload: payload_for_event,
-                            destination: transit.destination.clone(),
-                        },
-                    ));
-                    events.push(crate::emit(
-                        &mut state.counters,
-                        current_tick,
-                        crate::Event::StationDeployed {
-                            station_id,
-                            position: transit.destination,
-                        },
-                    ));
-                }
-            }
+            resolve_transit_payload(
+                state,
+                content,
+                rng,
+                events,
+                &facility_id,
+                transit,
+                current_tick,
+            );
         }
     }
+}
+
+/// Resolve a single completed launch transit payload — deliver supplies, deploy
+/// station, or create satellite.
+fn resolve_transit_payload(
+    state: &mut GameState,
+    content: &GameContent,
+    rng: &mut impl Rng,
+    events: &mut Vec<crate::EventEnvelope>,
+    facility_id: &crate::GroundFacilityId,
+    transit: crate::LaunchTransitState,
+    current_tick: u64,
+) {
+    let payload_for_event = transit.payload.clone();
+    match transit.payload {
+        crate::LaunchPayload::Supplies(items) => {
+            let target_station = find_nearest_station(state, &transit.destination, content);
+            let Some(station_id) = target_station else {
+                return;
+            };
+            let Some(station) = state.stations.get_mut(&station_id) else {
+                return;
+            };
+            crate::trade::merge_into_inventory(&mut station.core.inventory, items);
+            station.core.invalidate_volume_cache();
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                crate::Event::PayloadDelivered {
+                    facility_id: facility_id.clone(),
+                    rocket_def_id: transit.rocket_def_id.clone(),
+                    payload: payload_for_event,
+                    destination: transit.destination.clone(),
+                },
+            ));
+        }
+        crate::LaunchPayload::StationKit => {
+            let uuid = crate::generate_uuid(rng);
+            let station_id = crate::StationId(format!("station_{uuid}"));
+            let station = crate::StationState {
+                id: station_id.clone(),
+                position: transit.destination.clone(),
+                core: crate::FacilityCore {
+                    cargo_capacity_m3: 500.0,
+                    ..Default::default()
+                },
+                leaders: Vec::new(),
+            };
+            state.stations.insert(station_id.clone(), station);
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                crate::Event::PayloadDelivered {
+                    facility_id: facility_id.clone(),
+                    rocket_def_id: transit.rocket_def_id.clone(),
+                    payload: payload_for_event,
+                    destination: transit.destination.clone(),
+                },
+            ));
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                crate::Event::StationDeployed {
+                    station_id,
+                    position: transit.destination,
+                },
+            ));
+        }
+        crate::LaunchPayload::Satellite { satellite_def_id } => {
+            let Some(sat) = create_satellite(
+                &satellite_def_id,
+                transit.destination.clone(),
+                current_tick,
+                content,
+                rng,
+            ) else {
+                return;
+            };
+            let satellite_id = sat.id.clone();
+            let satellite_type = sat.satellite_type.clone();
+            let position = sat.position.clone();
+            state.satellites.insert(satellite_id.clone(), sat);
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                crate::Event::PayloadDelivered {
+                    facility_id: facility_id.clone(),
+                    rocket_def_id: transit.rocket_def_id.clone(),
+                    payload: payload_for_event,
+                    destination: position.clone(),
+                },
+            ));
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                crate::Event::SatelliteDeployed {
+                    satellite_id,
+                    position,
+                    satellite_type,
+                },
+            ));
+        }
+    }
+}
+
+/// Create a `SatelliteState` from a satellite def ID.
+pub(crate) fn create_satellite(
+    satellite_def_id: &str,
+    position: crate::Position,
+    current_tick: u64,
+    content: &GameContent,
+    rng: &mut impl Rng,
+) -> Option<crate::SatelliteState> {
+    let def = content.satellite_defs.get(satellite_def_id)?;
+    let uuid = crate::generate_uuid(rng);
+    let satellite_id = crate::SatelliteId(format!("sat_{uuid}"));
+    Some(crate::SatelliteState {
+        id: satellite_id,
+        def_id: satellite_def_id.to_string(),
+        name: def.name.clone(),
+        position,
+        deployed_tick: current_tick,
+        wear: 0.0,
+        enabled: true,
+        satellite_type: def.satellite_type.clone(),
+        payload_config: None,
+    })
 }
 
 /// Find the nearest station to a position. Returns `None` if no stations exist.

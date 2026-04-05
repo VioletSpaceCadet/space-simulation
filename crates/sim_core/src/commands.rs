@@ -752,6 +752,105 @@ fn consume_fuel(core: &mut crate::FacilityCore, fuel_element: &str, fuel_kg: f32
     core.invalidate_volume_cache();
 }
 
+/// Remove `count` units of a component from a facility's inventory.
+/// Only removes from the first matching slot. Callers must validate that
+/// the slot has sufficient count before calling.
+fn remove_component(core: &mut crate::FacilityCore, component_id: &str, count: u32) {
+    for item in &mut core.inventory {
+        if let InventoryItem::Component {
+            component_id: cid,
+            count: ref mut c,
+            ..
+        } = item
+        {
+            if cid.0 == component_id {
+                let removed = (*c).min(count);
+                *c -= removed;
+                break;
+            }
+        }
+    }
+    core.inventory
+        .retain(|item| !matches!(item, InventoryItem::Component { count, .. } if *count == 0));
+    core.invalidate_volume_cache();
+}
+
+/// Find an available launch pad with sufficient capacity.
+/// Returns `(module_index, recovery_ticks)`.
+fn find_available_pad(
+    facility: &crate::GroundFacilityState,
+    content: &GameContent,
+    min_payload_kg: f32,
+) -> Option<(usize, u64)> {
+    facility
+        .core
+        .modules
+        .iter()
+        .enumerate()
+        .find_map(|(index, module)| {
+            if !module.enabled {
+                return None;
+            }
+            let def = content.module_defs.get(&module.def_id)?;
+            let crate::ModuleBehaviorDef::LaunchPad(pad_def) = &def.behavior else {
+                return None;
+            };
+            let crate::ModuleKindState::LaunchPad(pad_state) = &module.kind_state else {
+                return None;
+            };
+            if !pad_state.available || pad_def.max_payload_kg < min_payload_kg {
+                return None;
+            }
+            Some((index, pad_def.recovery_ticks))
+        })
+}
+
+/// For `Satellite` payloads, validate the def exists, tech is unlocked, and the
+/// satellite component is in the facility's inventory. Returns `true` if valid
+/// (or if the payload is not a satellite).
+fn validate_satellite_payload(
+    payload: &crate::LaunchPayload,
+    facility: &crate::GroundFacilityState,
+    state: &GameState,
+    content: &GameContent,
+) -> bool {
+    let crate::LaunchPayload::Satellite { satellite_def_id } = payload else {
+        return true;
+    };
+    let Some(sat_def) = content.satellite_defs.get(satellite_def_id.as_str()) else {
+        return false;
+    };
+    if let Some(ref required_tech) = sat_def.required_tech {
+        if !state.research.unlocked.contains(required_tech) {
+            return false;
+        }
+    }
+    facility.core.inventory.iter().any(|item| {
+        if let InventoryItem::Component {
+            component_id,
+            count,
+            ..
+        } = item
+        {
+            component_id.0 == *satellite_def_id && *count > 0
+        } else {
+            false
+        }
+    })
+}
+
+/// Compute the mass of a launch payload in kg.
+fn compute_payload_mass(payload: &crate::LaunchPayload, content: &GameContent) -> f32 {
+    match payload {
+        crate::LaunchPayload::Supplies(items) => crate::tasks::inventory_mass_kg(items),
+        crate::LaunchPayload::StationKit => 5000.0,
+        crate::LaunchPayload::Satellite { satellite_def_id } => content
+            .satellite_defs
+            .get(satellite_def_id.as_str())
+            .map_or(0.0, |def| def.mass_kg),
+    }
+}
+
 /// Launch a rocket from a ground facility. Validates pad availability,
 /// payload weight, fuel, and balance. Deducts cost and fuel, marks pad
 /// as recovering, and creates a `LaunchTransitState`.
@@ -782,37 +881,17 @@ pub(crate) fn handle_launch(
         return false;
     };
 
-    // Find an available launch pad with sufficient capacity.
-    let pad_match = facility
-        .core
-        .modules
-        .iter()
-        .enumerate()
-        .find_map(|(index, module)| {
-            if !module.enabled {
-                return None;
-            }
-            let def = content.module_defs.get(&module.def_id)?;
-            let crate::ModuleBehaviorDef::LaunchPad(pad_def) = &def.behavior else {
-                return None;
-            };
-            let crate::ModuleKindState::LaunchPad(pad_state) = &module.kind_state else {
-                return None;
-            };
-            if !pad_state.available || pad_def.max_payload_kg < rocket_def.payload_capacity_kg {
-                return None;
-            }
-            Some((index, pad_def.recovery_ticks))
-        });
-    let Some((pad_index, recovery_ticks)) = pad_match else {
+    let Some((pad_index, recovery_ticks)) =
+        find_available_pad(facility, content, rocket_def.payload_capacity_kg)
+    else {
         return false;
     };
 
-    // Compute payload mass and check capacity.
-    let payload_mass_kg: f32 = match payload {
-        crate::LaunchPayload::Supplies(items) => crate::tasks::inventory_mass_kg(items),
-        crate::LaunchPayload::StationKit => 5000.0,
-    };
+    if !validate_satellite_payload(payload, facility, state, content) {
+        return false;
+    }
+
+    let payload_mass_kg = compute_payload_mass(payload, content);
     if payload_mass_kg > rocket_def.payload_capacity_kg {
         return false;
     }
@@ -845,6 +924,11 @@ pub(crate) fn handle_launch(
         return false;
     };
     consume_fuel(&mut facility.core, fuel_element, rocket_def.fuel_kg);
+
+    // For Satellite payloads, consume the satellite component from inventory.
+    if let crate::LaunchPayload::Satellite { satellite_def_id } = payload {
+        remove_component(&mut facility.core, satellite_def_id, 1);
+    }
 
     // Mark pad as recovering and create launch transit.
     let transit_ticks = content
@@ -881,6 +965,76 @@ pub(crate) fn handle_launch(
             fuel_cost,
             fuel_consumed_kg: rocket_def.fuel_kg,
             arrival_tick,
+        },
+    ));
+    true
+}
+
+/// Deploy a satellite from an orbital station's inventory.
+/// Removes the satellite component, creates a `SatelliteState` at the station's
+/// position, and emits `SatelliteDeployed`.
+pub(crate) fn handle_deploy_satellite(
+    state: &mut GameState,
+    content: &GameContent,
+    station_id: &crate::StationId,
+    satellite_def_id: &str,
+    current_tick: u64,
+    rng: &mut impl rand::Rng,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    // Validate satellite def exists.
+    let Some(sat_def) = content.satellite_defs.get(satellite_def_id) else {
+        return false;
+    };
+
+    // Validate tech requirement.
+    if let Some(ref required_tech) = sat_def.required_tech {
+        if !state.research.unlocked.contains(required_tech) {
+            return false;
+        }
+    }
+
+    // Validate station exists and has the satellite component.
+    let Some(station) = state.stations.get(station_id) else {
+        return false;
+    };
+    let has_component = station.core.inventory.iter().any(|item| {
+        matches!(item, InventoryItem::Component { component_id, count, .. }
+            if component_id.0 == satellite_def_id && *count > 0)
+    });
+    if !has_component {
+        return false;
+    }
+
+    let position = station.position.clone();
+
+    // Remove component from inventory.
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return false;
+    };
+    remove_component(&mut station.core, satellite_def_id, 1);
+
+    // Create satellite at station's position using the shared constructor.
+    let Some(satellite) = crate::engine::create_satellite(
+        satellite_def_id,
+        position.clone(),
+        current_tick,
+        content,
+        rng,
+    ) else {
+        return false;
+    };
+    let satellite_id = satellite.id.clone();
+    let satellite_type = satellite.satellite_type.clone();
+    state.satellites.insert(satellite_id.clone(), satellite);
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::SatelliteDeployed {
+            satellite_id,
+            position,
+            satellite_type,
         },
     ));
     true
