@@ -36,6 +36,7 @@ fn log_objective_decision(
         ShipObjective::Survey { site_id } => (site_id.0.clone(), "assign_survey"),
         ShipObjective::DeepScan { asteroid_id } => (asteroid_id.0.clone(), "assign_deep_scan"),
         ShipObjective::Deposit { station_id } => (station_id.0.clone(), "assign_deposit"),
+        ShipObjective::Transfer { to_station, .. } => (to_station.0.clone(), "assign_transfer"),
         ShipObjective::Idle => (String::new(), "idle"),
     };
     // Peek at remaining alternatives from the matching iterator.

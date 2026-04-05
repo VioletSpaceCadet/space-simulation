@@ -62,6 +62,13 @@ impl ShipAgent {
                 .is_some_and(|a| a.knowledge.composition.is_none()),
             ShipObjective::Survey { site_id } => state.scan_sites.iter().any(|s| s.id == *site_id),
             ShipObjective::Deposit { station_id } => state.stations.contains_key(station_id),
+            ShipObjective::Transfer {
+                from_station,
+                to_station,
+                ..
+            } => {
+                state.stations.contains_key(from_station) && state.stations.contains_key(to_station)
+            }
             ShipObjective::Idle => true,
         };
 
@@ -135,7 +142,8 @@ impl ShipAgent {
                     content,
                 ))
             }
-            ShipObjective::Idle => None,
+            // Transfer is handled earlier in generate() as a direct command.
+            ShipObjective::Transfer { .. } | ShipObjective::Idle => None,
         }
     }
 }
@@ -185,6 +193,29 @@ impl Agent for ShipAgent {
         // Deposit priority: if ship has cargo, deposit first regardless of objective
         if let Some(task_kind) = deposit_priority(ship, state, content) {
             return make_ship_task_cmd(ship, &self.ship_id, state.meta.tick, next_id, task_kind);
+        }
+
+        // Transfer objective emits Command::TransferItems directly (VIO-596).
+        // One-shot: the objective is cleared after the command is issued.
+        if let Some(ShipObjective::Transfer {
+            ref from_station,
+            ref to_station,
+            ref items,
+        }) = self.objective
+        {
+            let commands = vec![make_cmd(
+                &ship.owner,
+                state.meta.tick,
+                next_id,
+                Command::TransferItems {
+                    ship_id: self.ship_id.clone(),
+                    from_station: from_station.clone(),
+                    to_station: to_station.clone(),
+                    items: items.clone(),
+                },
+            )];
+            self.objective = None;
+            return commands;
         }
 
         // Convert objective to task
@@ -567,5 +598,85 @@ mod tests {
 
         let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
         assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn test_transfer_objective_generates_transfer_command() {
+        let (mut state, content) = setup_state_with_ship();
+        let owner = PrincipalId("principal_autopilot".to_string());
+        let mut agent = ShipAgent::new(test_ship_id());
+        let from = test_station_id();
+        let to = StationId("station_other".to_string());
+        // Both stations must exist for the objective to be valid.
+        let target = sim_core::StationState {
+            id: to.clone(),
+            position: sim_core::test_fixtures::test_position(),
+            core: sim_core::FacilityCore {
+                inventory: vec![],
+                cargo_capacity_m3: 500.0,
+                power_available_per_tick: 0.0,
+                modules: vec![],
+                modifiers: Default::default(),
+                crew: std::collections::BTreeMap::new(),
+                thermal_links: vec![],
+                power: Default::default(),
+                cached_inventory_volume_m3: None,
+                module_type_index: Default::default(),
+                module_id_index: Default::default(),
+                power_budget_cache: Default::default(),
+            },
+            frame_id: None,
+            leaders: vec![],
+        };
+        state.stations.insert(to.clone(), target);
+        agent.objective = Some(ShipObjective::Transfer {
+            from_station: from.clone(),
+            to_station: to.clone(),
+            items: vec![sim_core::TradeItemSpec::Module {
+                module_def_id: "module_solar_panel".to_string(),
+            }],
+        });
+        let mut next_id = 1;
+
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
+        assert_eq!(commands.len(), 1);
+        match &commands[0].command {
+            Command::TransferItems {
+                ship_id,
+                from_station,
+                to_station,
+                items,
+            } => {
+                assert_eq!(*ship_id, test_ship_id());
+                assert_eq!(*from_station, from);
+                assert_eq!(*to_station, to);
+                assert_eq!(items.len(), 1);
+            }
+            other => panic!("expected TransferItems, got {other:?}"),
+        }
+        // Objective should be cleared after command is issued
+        assert!(agent.objective.is_none());
+    }
+
+    #[test]
+    fn test_transfer_objective_invalidated_when_station_missing() {
+        let (state, content) = setup_state_with_ship();
+        let owner = PrincipalId("principal_autopilot".to_string());
+        let mut agent = ShipAgent::new(test_ship_id());
+        agent.objective = Some(ShipObjective::Transfer {
+            from_station: StationId("nonexistent_source".to_string()),
+            to_station: test_station_id(),
+            items: vec![sim_core::TradeItemSpec::Module {
+                module_def_id: "module_solar_panel".to_string(),
+            }],
+        });
+        let mut next_id = 1;
+
+        let commands = agent.generate(&state, &content, &owner, &mut next_id, None);
+        assert!(commands.is_empty());
+        assert!(
+            agent.objective.is_none(),
+            "invalid objective should be cleared"
+        );
     }
 }
