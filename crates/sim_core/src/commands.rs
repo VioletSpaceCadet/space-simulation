@@ -2643,7 +2643,7 @@ mod tests {
         assert!(
             events
                 .iter()
-                .any(|e| matches!(e.event, crate::Event::StrategyConfigChanged)),
+                .any(|e| matches!(e.event, crate::Event::StrategyConfigChanged {})),
             "expected StrategyConfigChanged event to be emitted",
         );
     }

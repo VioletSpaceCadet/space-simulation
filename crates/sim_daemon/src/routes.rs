@@ -635,9 +635,11 @@ mod tests {
     #[tokio::test]
     async fn post_strategy_enqueues_set_strategy_config_command() {
         let state = test_app_state();
-        let mut new_config = sim_core::StrategyConfig::default();
-        new_config.mode = sim_core::StrategyMode::Expand;
-        new_config.fleet_size_target = 9;
+        let new_config = sim_core::StrategyConfig {
+            mode: sim_core::StrategyMode::Expand,
+            fleet_size_target: 9,
+            ..sim_core::StrategyConfig::default()
+        };
 
         let (status, Json(_body)) =
             strategy_post_handler(State(state.clone()), Json(new_config.clone())).await;

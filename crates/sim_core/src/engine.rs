@@ -508,7 +508,7 @@ fn apply_commands(
                 events.push(crate::emit(
                     &mut state.counters,
                     current_tick,
-                    crate::Event::StrategyConfigChanged,
+                    crate::Event::StrategyConfigChanged {},
                 ));
             }
         }

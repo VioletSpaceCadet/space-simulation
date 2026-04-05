@@ -445,5 +445,11 @@ pub enum Event {
     /// `GameState.strategy_config`. Carries no payload: consumers refetch
     /// the full config from `GET /api/v1/strategy` if they need it, keeping
     /// the SSE stream small.
-    StrategyConfigChanged,
+    ///
+    /// Declared as an empty-struct variant (not a unit variant) so serde
+    /// serializes it as `{"StrategyConfigChanged": {}}` — matching the
+    /// object-shaped wire format every other Event variant uses. The FE
+    /// dispatch in `ui_web/src/utils.ts::getEventKey` assumes an object,
+    /// and `ci_event_sync.sh`'s struct-variant grep also depends on this.
+    StrategyConfigChanged {},
 }
