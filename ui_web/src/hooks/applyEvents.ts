@@ -155,7 +155,9 @@ function handleOreDeposited(state: SimState, event: EventPayload<'OreDeposited'>
 
 // VIO-595: Ship picks up items from a station during an inter-station
 // transfer. Inverse of OreDeposited — items move from station inventory
-// onto the ship.
+// onto the ship. Uses delta semantics (not set equality) because a
+// partial pickup may split a stack: the station still has the remainder
+// and the event reports only the extracted portion.
 function handleItemsPickedUp(state: SimState, event: EventPayload<'ItemsPickedUp'>): SimState {
   if (event.items.length === 0) {
     return state;
@@ -171,23 +173,79 @@ function handleItemsPickedUp(state: SimState, event: EventPayload<'ItemsPickedUp
     };
   }
   if (stations[event.station_id]) {
-    // Remove the picked-up items from station inventory by identity match
-    // against each item object. Rust emits the exact same InventoryItem
-    // values that were moved, so reference-equivalent deduplication by
-    // content is sufficient for the UI-state projection.
-    const pickedSet = new Set(event.items.map((item) => JSON.stringify(item)));
-    const remaining = stations[event.station_id].inventory.filter(
-      (item) => !pickedSet.has(JSON.stringify(item))
-    );
+    const stationInventory = [...stations[event.station_id].inventory];
+    for (const pickedItem of event.items) {
+      subtractPickedItemFromInventory(stationInventory, pickedItem);
+    }
     stations = {
       ...stations,
       [event.station_id]: {
         ...stations[event.station_id],
-        inventory: remaining,
+        inventory: stationInventory,
       },
     };
   }
   return { ...state, ships, stations };
+}
+
+// VIO-595: subtract a picked-up item from the station inventory in
+// place, matching by kind + identifier. For Material/Ore/Slag this
+// subtracts kg (removing the entry if it goes non-positive). For
+// Component this subtracts count (removing the entry when it hits 0).
+// For Module this removes the matching item_id entry. Mirrors the
+// Rust-side take_material/take_components/take_module behavior.
+function subtractPickedItemFromInventory(
+  inventory: InventoryItem[],
+  picked: InventoryItem
+): void {
+  if (picked.kind === 'Material') {
+    const idx = inventory.findIndex(
+      (i) => i.kind === 'Material' && i.element === picked.element
+    );
+    if (idx === -1) {return;}
+    const entry = inventory[idx];
+    if (entry.kind !== 'Material') {return;}
+    const newKg = entry.kg - picked.kg;
+    if (newKg <= 0) {
+      inventory.splice(idx, 1);
+    } else {
+      inventory[idx] = { ...entry, kg: newKg };
+    }
+  } else if (picked.kind === 'Component') {
+    const idx = inventory.findIndex(
+      (i) => i.kind === 'Component' && i.component_id === picked.component_id
+    );
+    if (idx === -1) {return;}
+    const entry = inventory[idx];
+    if (entry.kind !== 'Component') {return;}
+    const newCount = entry.count - picked.count;
+    if (newCount <= 0) {
+      inventory.splice(idx, 1);
+    } else {
+      inventory[idx] = { ...entry, count: newCount };
+    }
+  } else if (picked.kind === 'Module') {
+    const idx = inventory.findIndex(
+      (i) => i.kind === 'Module' && i.item_id === picked.item_id
+    );
+    if (idx >= 0) {
+      inventory.splice(idx, 1);
+    }
+  } else if (picked.kind === 'Ore') {
+    const idx = inventory.findIndex(
+      (i) => i.kind === 'Ore' && i.lot_id === picked.lot_id
+    );
+    if (idx === -1) {return;}
+    const entry = inventory[idx];
+    if (entry.kind !== 'Ore') {return;}
+    const newKg = entry.kg - picked.kg;
+    if (newKg <= 0) {
+      inventory.splice(idx, 1);
+    } else {
+      inventory[idx] = { ...entry, kg: newKg };
+    }
+  }
+  // Slag is not a transfer target — skip.
 }
 
 function handleModuleInstalled(state: SimState, event: EventPayload<'ModuleInstalled'>): SimState {

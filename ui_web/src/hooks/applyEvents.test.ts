@@ -198,6 +198,116 @@ describe('applyEvents', () => {
     });
   });
 
+  // VIO-595: Inter-station transfer Pickup event.
+  describe('ItemsPickedUp', () => {
+    it('subtracts picked kg from a material stack and adds to ship', () => {
+      const station = makeStation({
+        inventory: [{ kind: 'Material', element: 'Fe', kg: 100, quality: 0.9 }],
+      });
+      const ship = makeShip({ inventory: [] });
+      const pickedItems = [{ kind: 'Material' as const, element: 'Fe', kg: 30, quality: 0.9 }];
+      const events = [{
+        id: 1,
+        tick: 10,
+        event: {
+          ItemsPickedUp: {
+            ship_id: 'ship_0001',
+            station_id: 'station_001',
+            items: pickedItems,
+          },
+        },
+      }];
+
+      const result = applyEvents(
+        {},
+        { ship_0001: ship },
+        { station_001: station },
+        emptyResearch,
+        [],
+        defaultBalance,
+        events,
+      );
+
+      // Station should now have 70 kg remaining (100 - 30).
+      expect(result.stations['station_001'].inventory).toHaveLength(1);
+      const stationItem = result.stations['station_001'].inventory[0] as MaterialItem;
+      expect(stationItem.kind).toBe('Material');
+      expect(stationItem.element).toBe('Fe');
+      expect(stationItem.kg).toBeCloseTo(70);
+      // Ship should have the picked 30 kg.
+      expect(result.ships['ship_0001'].inventory).toHaveLength(1);
+      const shipItem = result.ships['ship_0001'].inventory[0] as MaterialItem;
+      expect(shipItem.kg).toBeCloseTo(30);
+    });
+
+    it('removes a component stack when fully transferred', () => {
+      const station = makeStation({
+        inventory: [{ kind: 'Component', component_id: 'repair_kit', count: 5, quality: 0.9 }],
+      });
+      const ship = makeShip({ inventory: [] });
+      const pickedItems = [{ kind: 'Component' as const, component_id: 'repair_kit', count: 5, quality: 0.9 }];
+      const events = [{
+        id: 1,
+        tick: 10,
+        event: {
+          ItemsPickedUp: {
+            ship_id: 'ship_0001',
+            station_id: 'station_001',
+            items: pickedItems,
+          },
+        },
+      }];
+
+      const result = applyEvents(
+        {},
+        { ship_0001: ship },
+        { station_001: station },
+        emptyResearch,
+        [],
+        defaultBalance,
+        events,
+      );
+
+      // Full transfer → station stack removed entirely.
+      expect(result.stations['station_001'].inventory).toHaveLength(0);
+      expect(result.ships['ship_0001'].inventory).toHaveLength(1);
+    });
+
+    it('splits a component stack on partial pickup', () => {
+      const station = makeStation({
+        inventory: [{ kind: 'Component', component_id: 'repair_kit', count: 10, quality: 1.0 }],
+      });
+      const ship = makeShip({ inventory: [] });
+      const pickedItems = [{ kind: 'Component' as const, component_id: 'repair_kit', count: 3, quality: 1.0 }];
+      const events = [{
+        id: 1,
+        tick: 10,
+        event: {
+          ItemsPickedUp: {
+            ship_id: 'ship_0001',
+            station_id: 'station_001',
+            items: pickedItems,
+          },
+        },
+      }];
+
+      const result = applyEvents(
+        {},
+        { ship_0001: ship },
+        { station_001: station },
+        emptyResearch,
+        [],
+        defaultBalance,
+        events,
+      );
+
+      // Station should keep 7 repair kits.
+      expect(result.stations['station_001'].inventory).toHaveLength(1);
+      const stationItem = result.stations['station_001'].inventory[0] as { count: number; kind: string };
+      expect(stationItem.count).toBe(7);
+    });
+  });
+
   describe('ItemImported', () => {
     it('updates balance and adds material to station inventory', () => {
       const station = makeStation();

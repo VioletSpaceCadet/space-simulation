@@ -927,23 +927,19 @@ fn take_components(
     component_id: &crate::ComponentId,
     requested_count: u32,
     remaining_capacity: f32,
-    content: &GameContent,
+    _content: &GameContent,
 ) -> Vec<InventoryItem> {
-    // Find the component's per-unit volume from content.
-    let Some(def) = content
-        .component_defs
-        .iter()
-        .find(|d| d.id == component_id.0)
-    else {
-        return Vec::new();
-    };
-    let per_unit_volume = def.volume_m3.max(0.0);
-    if per_unit_volume <= 0.0 {
-        return Vec::new();
-    }
-    // Safe: non-negative (volume >= 0) and clamped below u32::MAX before cast.
+    // Per-unit volume matches `item_volume_m3`: hardcoded 1.0 m^3 per
+    // component (engine-wide convention for components in cargo holds).
+    // Using `ComponentDef.volume_m3` here would create an asymmetry with
+    // the rest of the cargo system and allow overloading by a factor of
+    // 1/def.volume_m3. When item_volume_m3 is fixed to honor def values,
+    // this helper should follow suit (single source of truth).
+    const PER_UNIT_VOLUME_M3: f32 = 1.0;
+    // Safe: non-negative (remaining_capacity >= 0) and clamped below
+    // u16::MAX well below u32::MAX before cast.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let max_count_by_capacity = (remaining_capacity / per_unit_volume)
+    let max_count_by_capacity = (remaining_capacity / PER_UNIT_VOLUME_M3)
         .floor()
         .clamp(0.0, f32::from(u16::MAX)) as u32;
     let mut to_take = requested_count.min(max_count_by_capacity);
