@@ -164,15 +164,15 @@ server.tool(
   "suggest_parameter_change",
   "Save a proposed parameter change for review",
   {
-    parameter_path: z.string()
+    parameter_path: z.string().min(1)
       .describe("Dotted path like constants.survey_scan_ticks or constants.ticks_per_au"),
     current_value: z.string()
-      .describe("Current value as string"),
+      .describe("Current value as a JSON-encodable string (e.g., \"42\", \"true\", \"\\\"Balanced\\\"\")"),
     proposed_value: z.string()
-      .describe("Proposed new value as string"),
-    rationale: z.string()
+      .describe("Proposed new value as a JSON-encodable string"),
+    rationale: z.string().min(1)
       .describe("Why this change is recommended"),
-    expected_impact: z.string()
+    expected_impact: z.string().min(1)
       .describe("What should improve with this change"),
   },
   async ({ parameter_path, current_value, proposed_value, rationale, expected_impact }) => {
@@ -185,6 +185,7 @@ server.tool(
       const filePath = path.join(proposalsDir, filename);
 
       const proposal = {
+        kind: "parameter_change",
         parameter_path,
         current_value,
         proposed_value,
@@ -835,6 +836,107 @@ server.tool(
         content: [{ type: "text" as const, text: JSON.stringify({
           status: "error",
           message: `Failed to query knowledge: ${message}`,
+        }) }],
+      };
+    }
+  },
+);
+
+// ---------- Tool 13: get_strategy_config ----------
+
+server.tool(
+  "get_strategy_config",
+  "Fetch the currently active StrategyConfig from the running simulation daemon. Returns mode, priority weights, fleet_size_target, and all operational thresholds. Use this before suggest_strategy_change to see what you're modifying.",
+  {},
+  async () => {
+    let response: Response;
+    try {
+      response = await fetch(`${DAEMON_URL}/api/v1/strategy`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to connect to daemon at ${DAEMON_URL}: ${message}`,
+        }) }],
+      };
+    }
+    if (!response.ok) {
+      // Guard against the daemon returning a body stream that errors during
+      // .text(): wrap in catch so the tool still returns a structured error
+      // instead of escaping as an unhandled rejection.
+      const bodyText = await response.text().catch(() => "<body unavailable>");
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Daemon returned ${response.status}: ${bodyText}`,
+        }) }],
+      };
+    }
+    const body = await response.text();
+    return { content: [{ type: "text" as const, text: body }] };
+  },
+);
+
+// ---------- Tool 14: suggest_strategy_change ----------
+
+server.tool(
+  "suggest_strategy_change",
+  "Save a proposed StrategyConfig change for review. Writes to content/advisor_proposals/. Mirrors suggest_parameter_change but scoped to strategy fields (mode, priorities.*, fleet_size_target, operational thresholds).",
+  {
+    // Named `parameter_path` to match `suggest_parameter_change` — the LLM
+    // advisor only has to learn one key name across both tools.
+    parameter_path: z.string().min(1)
+      .describe("Dotted path scoped to StrategyConfig, e.g. 'mode', 'fleet_size_target', 'priorities.mining', 'refuel_threshold_pct'"),
+    current_value: z.string()
+      .describe("Current value as a JSON-encodable string. Fetch via get_strategy_config first. Quote strings (e.g., '\"Balanced\"') and stringify numbers/bools."),
+    proposed_value: z.string()
+      .describe("Proposed new value as a JSON-encodable string"),
+    rationale: z.string().min(1)
+      .describe("Why this change is recommended"),
+    expected_impact: z.string().min(1)
+      .describe("What metrics or behaviors should improve"),
+  },
+  async ({ parameter_path, current_value, proposed_value, rationale, expected_impact }) => {
+    try {
+      const proposalsDir = path.join(CONTENT_DIR, "advisor_proposals");
+      await fsPromises.mkdir(proposalsDir, { recursive: true });
+
+      const timestamp = Date.now();
+      const filename = `strategy_proposal_${timestamp}.json`;
+      const filePath = path.join(proposalsDir, filename);
+
+      const proposal = {
+        kind: "strategy_change",
+        parameter_path,
+        current_value,
+        proposed_value,
+        rationale,
+        expected_impact,
+        created_at: new Date(timestamp).toISOString(),
+      };
+
+      await fsPromises.writeFile(filePath, JSON.stringify(proposal, null, 2) + "\n");
+
+      const relativePath = path.relative(
+        path.resolve(CONTENT_DIR, ".."),
+        filePath,
+      );
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ status: "saved", path: relativePath }),
+          },
+        ],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          status: "error",
+          message: `Failed to save strategy proposal: ${message}`,
         }) }],
       };
     }
