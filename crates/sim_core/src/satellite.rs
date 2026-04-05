@@ -57,10 +57,11 @@ pub fn zone_comm_tier(zone_id: &str, state: &GameState, content: &GameContent) -
 /// Compute the navigation bonus multiplier for a zone based on deployed nav
 /// satellites. Returns a multiplier < 1.0 to reduce transit time.
 ///
-/// Stacking: 1 sat = 15% faster (0.85), diminishing returns via sqrt scaling.
-/// Formula: `1.0 - base_reduction * sqrt(count)` clamped to `[0.5, 1.0]`.
-pub fn zone_nav_bonus(zone_id: &str, state: &GameState) -> f64 {
-    let nav_count = state
+/// Stacking: diminishing returns via sqrt scaling.
+/// Formula: `1.0 - (transit_reduction_pct/100) * sqrt(count)` clamped to `[0.5, 1.0]`.
+/// `transit_reduction_pct` is read from nav satellite content config (default 15).
+pub fn zone_nav_bonus(zone_id: &str, state: &GameState, content: &GameContent) -> f64 {
+    let nav_sats: Vec<&crate::SatelliteState> = state
         .satellites
         .values()
         .filter(|sat| {
@@ -69,14 +70,22 @@ pub fn zone_nav_bonus(zone_id: &str, state: &GameState) -> f64 {
                 && sat.satellite_type == "navigation"
                 && sat.position.parent_body.0 == zone_id
         })
-        .count();
+        .collect();
 
-    if nav_count == 0 {
+    if nav_sats.is_empty() {
         return 1.0;
     }
 
-    let base_reduction = 0.15; // 15% per satellite (before sqrt scaling)
-    let reduction = base_reduction * (nav_count as f64).sqrt();
+    // Read base reduction from the first nav satellite's content def.
+    let base_pct = nav_sats
+        .first()
+        .and_then(|sat| content.satellite_defs.get(&sat.def_id))
+        .and_then(|def| def.behavior_config.get("transit_reduction_pct"))
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or(15.0);
+
+    let base_reduction = base_pct / 100.0;
+    let reduction = base_reduction * (nav_sats.len() as f64).sqrt();
     (1.0 - reduction).max(0.5) // Never more than 50% reduction
 }
 
@@ -833,16 +842,18 @@ mod tests {
 
     #[test]
     fn zone_nav_bonus_no_satellites() {
-        let state = base_state(&base_content());
+        let content = base_content();
+        let state = base_state(&content);
         assert!(
-            (zone_nav_bonus("test_body", &state) - 1.0).abs() < f64::EPSILON,
+            (zone_nav_bonus("test_body", &state, &content) - 1.0).abs() < f64::EPSILON,
             "no nav satellites should give 1.0 multiplier"
         );
     }
 
     #[test]
     fn zone_nav_bonus_one_satellite() {
-        let content = base_content();
+        let mut content = base_content();
+        add_satellite_def(&mut content, "sat_nav", "navigation", 0.0001);
         let mut state = base_state(&content);
 
         let id = SatelliteId("sat_nav_1".to_string());
@@ -861,7 +872,7 @@ mod tests {
             },
         );
 
-        let bonus = zone_nav_bonus("test_body", &state);
+        let bonus = zone_nav_bonus("test_body", &state, &content);
         assert!(
             (bonus - 0.85).abs() < f64::EPSILON,
             "1 nav sat should give 0.85 multiplier, got {bonus}"
@@ -870,7 +881,8 @@ mod tests {
 
     #[test]
     fn zone_nav_bonus_diminishing_returns() {
-        let content = base_content();
+        let mut content = base_content();
+        add_satellite_def(&mut content, "sat_nav", "navigation", 0.0001);
         let mut state = base_state(&content);
 
         // Deploy 3 nav satellites.
@@ -892,7 +904,7 @@ mod tests {
             );
         }
 
-        let bonus = zone_nav_bonus("test_body", &state);
+        let bonus = zone_nav_bonus("test_body", &state, &content);
         // 3 sats: 1.0 - 0.15 * sqrt(3) = 1.0 - 0.2598 = 0.7402
         let expected = 1.0 - 0.15 * 3.0_f64.sqrt();
         assert!(
@@ -903,7 +915,8 @@ mod tests {
 
     #[test]
     fn zone_nav_bonus_clamped_at_minimum() {
-        let content = base_content();
+        let mut content = base_content();
+        add_satellite_def(&mut content, "sat_nav", "navigation", 0.0001);
         let mut state = base_state(&content);
 
         // Deploy many nav satellites (enough to exceed 50% reduction).
@@ -925,7 +938,7 @@ mod tests {
             );
         }
 
-        let bonus = zone_nav_bonus("test_body", &state);
+        let bonus = zone_nav_bonus("test_body", &state, &content);
         assert!(
             (bonus - 0.5).abs() < f64::EPSILON,
             "nav bonus should be clamped at 0.5 minimum, got {bonus}"

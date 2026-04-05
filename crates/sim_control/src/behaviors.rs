@@ -54,8 +54,8 @@ pub(crate) fn maybe_transit(
         content.constants.min_transit_ticks,
     );
     // Apply navigation beacon bonus from both origin and destination zones.
-    let origin_bonus = sim_core::zone_nav_bonus(&from.parent_body.0, state);
-    let dest_bonus = sim_core::zone_nav_bonus(&to.parent_body.0, state);
+    let origin_bonus = sim_core::zone_nav_bonus(&from.parent_body.0, state, content);
+    let dest_bonus = sim_core::zone_nav_bonus(&to.parent_body.0, state, content);
     let best_bonus = origin_bonus.min(dest_bonus);
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let ticks =
