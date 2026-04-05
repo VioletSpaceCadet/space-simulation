@@ -81,8 +81,12 @@ impl StrategyMode {
 /// safety, no hash overhead, and a stable field order for the optimizer
 /// interface (`to_vec` / `from_vec`).
 ///
-/// All weights are in \[0.0, 1.0\]. The rule interpreter (VIO-480) multiplies
-/// these by state urgency to produce per-concern scores.
+/// The `priorities` field on `StrategyConfig` is in \[0.0, 1.0\]; the rule
+/// interpreter (VIO-480) multiplies these by state urgency to produce
+/// per-concern scores. `PriorityWeights` is also reused as the return type of
+/// `StrategyMode::multipliers()`, where values are unbounded positive floats
+/// (e.g. 1.3 for "boost by 30%"). `StrategyConfig::effective_priorities`
+/// multiplies the two and clamps the result back to \[0.0, 1.0\].
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PriorityWeights {
@@ -169,15 +173,26 @@ impl PriorityWeights {
 
     /// Clamp every field to \[0.0, 1.0\] in place. Used after applying mode
     /// multipliers so the rule interpreter can treat weights as probabilities.
+    /// NaN values are replaced with 0.0 (safer default for an urgency weight
+    /// than propagating NaN into downstream arithmetic and float comparisons).
     pub fn clamp_unit(&mut self) {
-        self.mining = self.mining.clamp(0.0, 1.0);
-        self.survey = self.survey.clamp(0.0, 1.0);
-        self.deep_scan = self.deep_scan.clamp(0.0, 1.0);
-        self.research = self.research.clamp(0.0, 1.0);
-        self.maintenance = self.maintenance.clamp(0.0, 1.0);
-        self.export = self.export.clamp(0.0, 1.0);
-        self.propellant = self.propellant.clamp(0.0, 1.0);
-        self.fleet_expansion = self.fleet_expansion.clamp(0.0, 1.0);
+        self.mining = sanitize_unit(self.mining);
+        self.survey = sanitize_unit(self.survey);
+        self.deep_scan = sanitize_unit(self.deep_scan);
+        self.research = sanitize_unit(self.research);
+        self.maintenance = sanitize_unit(self.maintenance);
+        self.export = sanitize_unit(self.export);
+        self.propellant = sanitize_unit(self.propellant);
+        self.fleet_expansion = sanitize_unit(self.fleet_expansion);
+    }
+}
+
+/// Clamp a float to \[0.0, 1.0\] and replace NaN with 0.0.
+fn sanitize_unit(value: f32) -> f32 {
+    if value.is_nan() {
+        0.0
+    } else {
+        value.clamp(0.0, 1.0)
     }
 }
 
@@ -400,5 +415,52 @@ mod tests {
         assert_eq!(parsed.mode, StrategyMode::Expand);
         assert_eq!(parsed.fleet_size_target, 8);
         assert_eq!(parsed.priorities, PriorityWeights::default());
+    }
+
+    #[test]
+    fn priorities_deserialize_partial_subset() {
+        // Nested partial deserialization: only some weight fields specified,
+        // the rest must fall back to `PriorityWeights::default()`.
+        let json = r#"{"priorities":{"mining":0.1,"research":0.2}}"#;
+        let parsed: StrategyConfig = serde_json::from_str(json).unwrap();
+        assert!((parsed.priorities.mining - 0.1).abs() < 1e-6);
+        assert!((parsed.priorities.research - 0.2).abs() < 1e-6);
+        // Unspecified fields preserve the struct defaults.
+        assert!((parsed.priorities.maintenance - 0.8).abs() < 1e-6);
+        assert!((parsed.priorities.propellant - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn priority_weights_len_matches_to_vec_length() {
+        // Pin the public `LEN` constant to the actual serialized width so a
+        // future field addition cannot drift the two out of sync silently.
+        let vec = PriorityWeights::default().to_vec();
+        assert_eq!(vec.len(), PriorityWeights::LEN);
+        assert_eq!(PriorityWeights::LEN, 8);
+    }
+
+    #[test]
+    fn clamp_unit_sanitizes_nan_to_zero() {
+        let mut weights = PriorityWeights {
+            mining: f32::NAN,
+            survey: 0.5,
+            deep_scan: f32::INFINITY,
+            research: f32::NEG_INFINITY,
+            maintenance: 2.0,
+            export: -0.5,
+            propellant: 1.0,
+            fleet_expansion: 0.25,
+        };
+        weights.clamp_unit();
+        // NaN becomes 0.0, not NaN-propagating downstream.
+        assert_eq!(weights.mining, 0.0);
+        assert_eq!(weights.survey, 0.5);
+        // Infinities clamp to the bounds.
+        assert_eq!(weights.deep_scan, 1.0);
+        assert_eq!(weights.research, 0.0);
+        assert_eq!(weights.maintenance, 1.0);
+        assert_eq!(weights.export, 0.0);
+        assert_eq!(weights.propellant, 1.0);
+        assert!((weights.fleet_expansion - 0.25).abs() < 1e-6);
     }
 }
