@@ -645,5 +645,107 @@
     ],
     "efficiency": 1.0,
     "required_tech": "tech_orbital_science"
+  },
+  {
+    "id": "recipe_nozzle",
+    "inputs": [
+      {
+        "filter": { "Element": "Fe" },
+        "amount": { "Kg": 500.0 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "nozzle",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0,
+    "tags": ["rocketry"]
+  },
+  {
+    "id": "recipe_sounding_rocket",
+    "inputs": [
+      {
+        "filter": { "Component": "solid_fuel_grain" },
+        "amount": { "Count": 2 }
+      },
+      {
+        "filter": { "Component": "guidance_unit" },
+        "amount": { "Count": 1 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "rocket_sounding",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0,
+    "tags": ["rocketry"]
+  },
+  {
+    "id": "recipe_light_launcher",
+    "inputs": [
+      {
+        "filter": { "Component": "solid_fuel_grain" },
+        "amount": { "Count": 4 }
+      },
+      {
+        "filter": { "Component": "guidance_unit" },
+        "amount": { "Count": 1 }
+      },
+      {
+        "filter": { "Component": "nozzle" },
+        "amount": { "Count": 2 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "rocket_light",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_basic_rocketry",
+    "tags": ["rocketry"]
+  },
+  {
+    "id": "recipe_medium_launcher",
+    "inputs": [
+      {
+        "filter": { "Component": "liquid_engine" },
+        "amount": { "Count": 1 }
+      },
+      {
+        "filter": { "Component": "fuel_tank" },
+        "amount": { "Count": 2 }
+      },
+      {
+        "filter": { "Component": "guidance_unit" },
+        "amount": { "Count": 1 }
+      },
+      {
+        "filter": { "Component": "nozzle" },
+        "amount": { "Count": 3 }
+      }
+    ],
+    "outputs": [
+      {
+        "Component": {
+          "component_id": "rocket_medium",
+          "quality_formula": { "Fixed": 1.0 }
+        }
+      }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_medium_rocketry",
+    "tags": ["rocketry"]
   }
 ]

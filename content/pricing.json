@@ -272,6 +272,36 @@
       "exportable": false,
       "category": "module"
     },
+    "solid_fuel_grain": {
+      "base_price_per_unit": 50000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "guidance_unit": {
+      "base_price_per_unit": 200000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "liquid_engine": {
+      "base_price_per_unit": 3000000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "fuel_tank": {
+      "base_price_per_unit": 500000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "module_ground_workshop": {
+      "base_price_per_unit": 15000000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "module"
+    },
     "module_crucible": {
       "base_price_per_unit": 3000000.0,
       "importable": true,

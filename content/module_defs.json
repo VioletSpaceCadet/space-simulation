@@ -703,5 +703,29 @@
     },
     "required_tech": "tech_heavy_rocketry",
     "operating_cost_per_tick": 3000.0
+  },
+  {
+    "id": "module_ground_workshop",
+    "name": "Ground Workshop",
+    "mass_kg": 8000.0,
+    "volume_m3": 30.0,
+    "power_consumption_per_run": 10.0,
+    "wear_per_run": 0.005,
+    "behavior": {
+      "Assembler": {
+        "assembly_interval_minutes": 4320,
+        "recipes": [
+          "recipe_nozzle",
+          "recipe_sounding_rocket",
+          "recipe_light_launcher",
+          "recipe_medium_launcher"
+        ]
+      }
+    },
+    "crew_requirement": {
+      "operator": 1,
+      "technician": 1
+    },
+    "operating_cost_per_tick": 200.0
   }
 ]
