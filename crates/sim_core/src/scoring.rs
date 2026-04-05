@@ -682,4 +682,139 @@ mod tests {
         assert_eq!(resolve_threshold(&thresholds, 999.0), "Enterprise");
         assert_eq!(resolve_threshold(&thresholds, 2500.0), "Space Magnate");
     }
+
+    #[test]
+    fn satellites_improve_expansion_score() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+        let metrics_no_sats = make_metrics(100);
+
+        let mut metrics_with_sats = make_metrics(100);
+        metrics_with_sats.satellites_active = 4;
+
+        let score_no_sats = compute_run_score(&metrics_no_sats, &state, &content);
+        let score_with_sats = compute_run_score(&metrics_with_sats, &state, &content);
+
+        let expansion_no = score_no_sats.dimensions.get("expansion").unwrap().raw_value;
+        let expansion_yes = score_with_sats
+            .dimensions
+            .get("expansion")
+            .unwrap()
+            .raw_value;
+        assert!(
+            expansion_yes > expansion_no,
+            "active satellites should increase expansion score: {} vs {}",
+            expansion_yes,
+            expansion_no
+        );
+    }
+
+    #[test]
+    fn satellites_improve_fleet_score() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+        let mut metrics = make_metrics(100);
+        metrics.fleet_total = 2;
+        metrics.fleet_idle = 0;
+        let score_base = compute_run_score(&metrics, &state, &content);
+
+        metrics.satellites_active = 3;
+        let score_sats = compute_run_score(&metrics, &state, &content);
+
+        let fleet_base = score_base
+            .dimensions
+            .get("fleet_operations")
+            .unwrap()
+            .raw_value;
+        let fleet_sats = score_sats
+            .dimensions
+            .get("fleet_operations")
+            .unwrap()
+            .raw_value;
+        assert!(
+            fleet_sats > fleet_base,
+            "satellites should increase fleet ops score: {} vs {}",
+            fleet_sats,
+            fleet_base
+        );
+    }
+
+    #[test]
+    fn satellite_failures_reduce_efficiency() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+
+        // All active — sat_util = 1.0
+        let mut metrics_all_active = make_metrics(100);
+        metrics_all_active.satellites_active = 4;
+        metrics_all_active.satellites_failed = 0;
+        let score_healthy = compute_run_score(&metrics_all_active, &state, &content);
+
+        // Half failed — sat_util = 0.5
+        let mut metrics_half_failed = make_metrics(100);
+        metrics_half_failed.satellites_active = 2;
+        metrics_half_failed.satellites_failed = 2;
+        let score_degraded = compute_run_score(&metrics_half_failed, &state, &content);
+
+        let eff_healthy = score_healthy
+            .dimensions
+            .get("efficiency")
+            .unwrap()
+            .raw_value;
+        let eff_degraded = score_degraded
+            .dimensions
+            .get("efficiency")
+            .unwrap()
+            .raw_value;
+        assert!(
+            eff_healthy > eff_degraded,
+            "satellite failures should reduce efficiency: {} vs {}",
+            eff_healthy,
+            eff_degraded
+        );
+    }
+
+    #[test]
+    fn science_satellites_improve_research() {
+        let content = scored_content();
+        let state_no_sats = crate::test_fixtures::base_state(&content);
+        let metrics = make_metrics(100);
+        let score_no_sats = compute_run_score(&metrics, &state_no_sats, &content);
+
+        let mut state_with_sats = crate::test_fixtures::base_state(&content);
+        for i in 0..2 {
+            state_with_sats.satellites.insert(
+                crate::SatelliteId(format!("sat_{i}")),
+                crate::SatelliteState {
+                    id: crate::SatelliteId(format!("sat_{i}")),
+                    def_id: "sat_science_platform".into(),
+                    name: format!("Science {i}"),
+                    position: crate::test_fixtures::test_position(),
+                    deployed_tick: 0,
+                    wear: 0.0,
+                    enabled: true,
+                    satellite_type: "science_platform".into(),
+                    payload_config: None,
+                },
+            );
+        }
+        let score_with_sats = compute_run_score(&metrics, &state_with_sats, &content);
+
+        let research_no = score_no_sats
+            .dimensions
+            .get("research_progress")
+            .unwrap()
+            .raw_value;
+        let research_yes = score_with_sats
+            .dimensions
+            .get("research_progress")
+            .unwrap()
+            .raw_value;
+        assert!(
+            research_yes > research_no,
+            "science satellites should increase research score: {} vs {}",
+            research_yes,
+            research_no
+        );
+    }
 }
