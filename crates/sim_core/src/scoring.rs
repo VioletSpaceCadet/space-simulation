@@ -190,7 +190,7 @@ fn compute_dimension_raw(
 ) -> f64 {
     match dimension_id {
         "industrial_output" => compute_industrial(metrics, tick),
-        "research_progress" => compute_research(metrics, content),
+        "research_progress" => compute_research(metrics, state, content),
         "economic_health" => compute_economic(metrics, state, tick),
         "fleet_operations" => compute_fleet(metrics, state),
         "efficiency" => compute_efficiency(metrics),
@@ -210,13 +210,20 @@ fn compute_industrial(metrics: &MetricsSnapshot, tick: f64) -> f64 {
     throughput + f64::from(assembler_active) * 0.1
 }
 
-/// Research Progress: fraction of techs unlocked + scan data growth.
-fn compute_research(metrics: &MetricsSnapshot, content: &GameContent) -> f64 {
+/// Research Progress: fraction of techs unlocked + scan data growth + science satellites.
+fn compute_research(metrics: &MetricsSnapshot, state: &GameState, content: &GameContent) -> f64 {
     let total_techs = content.techs.len().max(1) as f64;
     let tech_fraction = f64::from(metrics.techs_unlocked) / total_techs;
     let data_signal = (f64::from(metrics.total_scan_data) / 1000.0).min(1.0);
-    // Blend: 70% tech unlock fraction, 30% data accumulation signal
-    tech_fraction * 0.7 + data_signal * 0.3
+    // Science satellites contribute to research capability.
+    let science_count = state
+        .satellites
+        .values()
+        .filter(|s| s.enabled && s.satellite_type == "science_platform")
+        .count() as f64;
+    let science_signal = (science_count / 3.0).min(1.0);
+    // Blend: 60% tech unlocks, 25% data accumulation, 15% science infrastructure
+    tech_fraction * 0.6 + data_signal * 0.25 + science_signal * 0.15
 }
 
 /// Economic Health: balance trend + export revenue per tick.
@@ -229,18 +236,20 @@ fn compute_economic(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> 
     balance_ratio * 0.5 + revenue_signal * 0.5
 }
 
-/// Fleet Operations: utilization + fleet size.
+/// Fleet Operations: utilization + fleet size + satellite deployments.
 fn compute_fleet(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     let total = f64::from(metrics.fleet_total).max(1.0);
     let active = total - f64::from(metrics.fleet_idle);
     let utilization = active / total;
     let ships_constructed = state.ships.len().saturating_sub(1) as f64; // subtract starting ship
     let construction_signal = (ships_constructed / 5.0).min(1.0);
-    // Blend: 60% utilization, 40% fleet growth
-    utilization * 0.6 + construction_signal * 0.4
+    // Satellite deployments count as completed missions (sqrt diminishing returns).
+    let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
+    // Blend: 50% utilization, 30% fleet growth, 20% satellite deployments
+    utilization * 0.5 + construction_signal * 0.3 + satellite_signal * 0.2
 }
 
-/// Efficiency: inverted wear + power utilization + storage balance.
+/// Efficiency: inverted wear + power utilization + storage balance + satellite utilization.
 fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
     let wear_score = 1.0 - f64::from(metrics.avg_module_wear);
     let power_util = if metrics.power_generated_kw > 0.0 {
@@ -257,17 +266,26 @@ fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
     } else {
         1.0
     };
-    // Equal blend of three efficiency signals
-    (wear_score + power_util + storage_score) / 3.0
+    // Satellite utilization: active / total (1.0 if no satellites yet).
+    let total_sats = f64::from(metrics.satellites_active + metrics.satellites_failed);
+    let sat_util = if total_sats > 0.0 {
+        f64::from(metrics.satellites_active) / total_sats
+    } else {
+        1.0
+    };
+    // Blend: 25% each of four efficiency signals
+    (wear_score + power_util + storage_score + sat_util) / 4.0
 }
 
-/// Expansion: station count + fleet size (sqrt diminishing returns).
+/// Expansion: station count + fleet size + satellite count (sqrt diminishing returns).
 fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     let station_count = state.stations.len() as f64;
     let station_signal = (station_count / 3.0).min(1.0);
     let fleet_signal = (f64::from(metrics.fleet_total).sqrt() / 3.0).min(1.0);
-    // Blend: 50% stations, 50% fleet reach
-    station_signal * 0.5 + fleet_signal * 0.5
+    // Satellites contribute to expansion (orbital infrastructure).
+    let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
+    // Blend: 40% stations, 30% fleet reach, 30% satellite infrastructure
+    station_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3
 }
 
 /// Resolve the highest threshold name for a given composite score.
@@ -563,6 +581,8 @@ mod tests {
             overheat_warning_count: 0,
             overheat_critical_count: 0,
             heat_wear_multiplier_avg: 1.0,
+            satellites_active: 0,
+            satellites_failed: 0,
         }
     }
 
@@ -661,5 +681,140 @@ mod tests {
         assert_eq!(resolve_threshold(&thresholds, 200.0), "Contractor");
         assert_eq!(resolve_threshold(&thresholds, 999.0), "Enterprise");
         assert_eq!(resolve_threshold(&thresholds, 2500.0), "Space Magnate");
+    }
+
+    #[test]
+    fn satellites_improve_expansion_score() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+        let metrics_no_sats = make_metrics(100);
+
+        let mut metrics_with_sats = make_metrics(100);
+        metrics_with_sats.satellites_active = 4;
+
+        let score_no_sats = compute_run_score(&metrics_no_sats, &state, &content);
+        let score_with_sats = compute_run_score(&metrics_with_sats, &state, &content);
+
+        let expansion_no = score_no_sats.dimensions.get("expansion").unwrap().raw_value;
+        let expansion_yes = score_with_sats
+            .dimensions
+            .get("expansion")
+            .unwrap()
+            .raw_value;
+        assert!(
+            expansion_yes > expansion_no,
+            "active satellites should increase expansion score: {} vs {}",
+            expansion_yes,
+            expansion_no
+        );
+    }
+
+    #[test]
+    fn satellites_improve_fleet_score() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+        let mut metrics = make_metrics(100);
+        metrics.fleet_total = 2;
+        metrics.fleet_idle = 0;
+        let score_base = compute_run_score(&metrics, &state, &content);
+
+        metrics.satellites_active = 3;
+        let score_sats = compute_run_score(&metrics, &state, &content);
+
+        let fleet_base = score_base
+            .dimensions
+            .get("fleet_operations")
+            .unwrap()
+            .raw_value;
+        let fleet_sats = score_sats
+            .dimensions
+            .get("fleet_operations")
+            .unwrap()
+            .raw_value;
+        assert!(
+            fleet_sats > fleet_base,
+            "satellites should increase fleet ops score: {} vs {}",
+            fleet_sats,
+            fleet_base
+        );
+    }
+
+    #[test]
+    fn satellite_failures_reduce_efficiency() {
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+
+        // All active — sat_util = 1.0
+        let mut metrics_all_active = make_metrics(100);
+        metrics_all_active.satellites_active = 4;
+        metrics_all_active.satellites_failed = 0;
+        let score_healthy = compute_run_score(&metrics_all_active, &state, &content);
+
+        // Half failed — sat_util = 0.5
+        let mut metrics_half_failed = make_metrics(100);
+        metrics_half_failed.satellites_active = 2;
+        metrics_half_failed.satellites_failed = 2;
+        let score_degraded = compute_run_score(&metrics_half_failed, &state, &content);
+
+        let eff_healthy = score_healthy
+            .dimensions
+            .get("efficiency")
+            .unwrap()
+            .raw_value;
+        let eff_degraded = score_degraded
+            .dimensions
+            .get("efficiency")
+            .unwrap()
+            .raw_value;
+        assert!(
+            eff_healthy > eff_degraded,
+            "satellite failures should reduce efficiency: {} vs {}",
+            eff_healthy,
+            eff_degraded
+        );
+    }
+
+    #[test]
+    fn science_satellites_improve_research() {
+        let content = scored_content();
+        let state_no_sats = crate::test_fixtures::base_state(&content);
+        let metrics = make_metrics(100);
+        let score_no_sats = compute_run_score(&metrics, &state_no_sats, &content);
+
+        let mut state_with_sats = crate::test_fixtures::base_state(&content);
+        for i in 0..2 {
+            state_with_sats.satellites.insert(
+                crate::SatelliteId(format!("sat_{i}")),
+                crate::SatelliteState {
+                    id: crate::SatelliteId(format!("sat_{i}")),
+                    def_id: "sat_science_platform".into(),
+                    name: format!("Science {i}"),
+                    position: crate::test_fixtures::test_position(),
+                    deployed_tick: 0,
+                    wear: 0.0,
+                    enabled: true,
+                    satellite_type: "science_platform".into(),
+                    payload_config: None,
+                },
+            );
+        }
+        let score_with_sats = compute_run_score(&metrics, &state_with_sats, &content);
+
+        let research_no = score_no_sats
+            .dimensions
+            .get("research_progress")
+            .unwrap()
+            .raw_value;
+        let research_yes = score_with_sats
+            .dimensions
+            .get("research_progress")
+            .unwrap()
+            .raw_value;
+        assert!(
+            research_yes > research_no,
+            "science satellites should increase research score: {} vs {}",
+            research_yes,
+            research_no
+        );
     }
 }
