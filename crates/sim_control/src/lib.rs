@@ -1,6 +1,7 @@
 mod agents;
 mod behaviors;
 mod objectives;
+mod strategy_interpreter;
 
 use std::collections::BTreeMap;
 
@@ -11,8 +12,10 @@ use agents::Agent;
 pub use agents::DecisionRecord;
 use behaviors::AUTOPILOT_OWNER;
 use sim_core::{
-    CommandEnvelope, GameContent, GameState, GroundFacilityId, PrincipalId, ShipId, StationId,
+    CommandEnvelope, ConcernPriorities, GameContent, GameState, GroundFacilityId, PrincipalId,
+    ShipId, StationId,
 };
+pub use strategy_interpreter::StrategyRuntimeState;
 
 pub trait CommandSource {
     fn generate_commands(
@@ -37,6 +40,10 @@ pub struct AutopilotController {
     /// When `Some`, agents log structured decision records for diagnostics.
     /// Enable via `enable_decision_logging()`, consume via `take_decisions()`.
     decision_log: Option<Vec<DecisionRecord>>,
+    /// Rule interpreter runtime (VIO-480). Holds cached `ConcernPriorities`,
+    /// the last evaluation tick, the dirty flag, and per-concern last-serviced
+    /// ticks for temporal bias.
+    strategy_runtime: StrategyRuntimeState,
 }
 
 impl AutopilotController {
@@ -47,6 +54,7 @@ impl AutopilotController {
             ship_agents: BTreeMap::new(),
             owner: PrincipalId(AUTOPILOT_OWNER.to_string()),
             decision_log: None,
+            strategy_runtime: StrategyRuntimeState::default(),
         }
     }
 
@@ -60,6 +68,36 @@ impl AutopilotController {
         self.decision_log
             .as_mut()
             .map_or_else(Vec::new, std::mem::take)
+    }
+
+    /// Evaluate the strategic layer. Returns cached `ConcernPriorities` if
+    /// the gating interval has not elapsed and no dirty flag was set; otherwise
+    /// recomputes from state. See `strategy_interpreter::evaluate_strategy`
+    /// for the full algorithm.
+    ///
+    /// Called from `generate_commands` before station agents so downstream
+    /// consumers (VIO-481 wiring) see up-to-date priorities.
+    pub fn evaluate_strategy(
+        &mut self,
+        state: &GameState,
+        content: &GameContent,
+    ) -> ConcernPriorities {
+        strategy_interpreter::evaluate_strategy(state, content, &mut self.strategy_runtime)
+    }
+
+    /// Mark the strategy runtime cache dirty so the next `evaluate_strategy`
+    /// call recomputes unconditionally. Called by the `SetStrategyConfig`
+    /// command handler (VIO-483) so runtime strategy changes take effect on
+    /// the next controller pass rather than waiting for the next gate tick.
+    pub fn mark_strategy_dirty(&mut self) {
+        self.strategy_runtime.mark_dirty();
+    }
+
+    /// Current cached priorities, if the interpreter has run at least once.
+    /// Read-only view for tests and for VIO-481 station-agent wiring.
+    #[must_use]
+    pub fn cached_strategy_priorities(&self) -> Option<ConcernPriorities> {
+        self.strategy_runtime.cached_priorities
     }
 }
 
@@ -78,6 +116,12 @@ impl CommandSource for AutopilotController {
     ) -> Vec<CommandEnvelope> {
         let mut commands = Vec::new();
 
+        // Strategic-layer pass: refresh (or cache-hit) ConcernPriorities
+        // BEFORE per-station scoring so downstream consumers (VIO-481 wiring)
+        // observe consistent priorities across agents within a tick.
+        let _priorities =
+            strategy_interpreter::evaluate_strategy(state, content, &mut self.strategy_runtime);
+
         // Destructure for disjoint field borrows.
         let Self {
             station_agents,
@@ -85,6 +129,7 @@ impl CommandSource for AutopilotController {
             ship_agents,
             owner,
             decision_log,
+            strategy_runtime: _,
         } = self;
 
         // 1. Sync agent lifecycle — create for new entities, remove for deleted
