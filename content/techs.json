@@ -478,6 +478,21 @@
           "value": 0.25
         }
       ]
+    },
+    {
+      "id": "tech_station_construction",
+      "name": "Station Construction",
+      "tier": 3,
+      "prereqs": ["tech_ship_construction", "tech_advanced_manufacturing"],
+      "domain_requirements": {
+        "Manufacturing": 80.0,
+        "Engineering": 50.0
+      },
+      "accepted_data": [
+        "ManufacturingData",
+        "EngineeringData"
+      ],
+      "effects": []
     }
   ]
 }
