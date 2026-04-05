@@ -552,3 +552,223 @@ fn install_module_frameless_station_keeps_legacy_behavior() {
         "frameless install should leave slot_index None"
     );
 }
+
+// --------------------------------------------------------------------
+// VIO-592: Command::DeployStation + TaskKind::ConstructStation
+// --------------------------------------------------------------------
+
+/// Build content with the starting station's test frame catalog plus a
+/// test kit component that deploys `frame_outpost`. Returns (content,
+/// state, ship_id) with a construction vessel carrying one kit.
+fn deploy_station_setup() -> (crate::GameContent, crate::GameState, crate::ShipId) {
+    use crate::{FrameDef, FrameId, SlotType};
+
+    let mut content = test_content();
+    // Register frame_outpost so the kit has a valid target frame.
+    let frame_id = FrameId("frame_test_outpost".to_string());
+    content.frames.insert(
+        frame_id.clone(),
+        FrameDef {
+            id: frame_id.clone(),
+            name: "Test Outpost".to_string(),
+            base_cargo_capacity_m3: 500.0,
+            base_power_capacity_kw: 30.0,
+            slots: vec![crate::SlotDef {
+                slot_type: SlotType("utility".to_string()),
+                label: "U1".to_string(),
+            }],
+            bonuses: vec![],
+            required_tech: None,
+            tags: vec![],
+        },
+    );
+    // Register the kit component.
+    content.component_defs.push(crate::ComponentDef {
+        id: "test_outpost_kit".to_string(),
+        name: "Test Outpost Kit".to_string(),
+        mass_kg: 5000.0,
+        volume_m3: 30.0,
+        deploys_frame: Some(frame_id.clone()),
+    });
+
+    let mut state = test_state(&content);
+    let ship_id = test_ship_id();
+    let ship = state.ships.get_mut(&ship_id).unwrap();
+    ship.inventory.push(InventoryItem::Component {
+        component_id: crate::ComponentId("test_outpost_kit".to_string()),
+        count: 1,
+        quality: 1.0,
+    });
+    // Plenty of propellant.
+    ship.propellant_kg = 10_000.0;
+    ship.propellant_capacity_kg = 10_000.0;
+
+    (content, state, ship_id)
+}
+
+#[test]
+fn deploy_station_co_located_creates_station_on_completion() {
+    let (content, mut state, ship_id) = deploy_station_setup();
+    let mut rng = make_rng();
+
+    // Target position = ship's current position → no transit, direct
+    // into ConstructStation.
+    let target = state.ships[&ship_id].position.clone();
+    let deploy_cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("principal_autopilot".to_string()),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::DeployStation {
+            ship_id: ship_id.clone(),
+            kit_item_index: 0,
+            target_position: target.clone(),
+        },
+    };
+    let events = tick(&mut state, &[deploy_cmd], &content, &mut rng, None);
+
+    // Kit should be consumed this tick.
+    let ship = &state.ships[&ship_id];
+    assert!(
+        !ship
+            .inventory
+            .iter()
+            .any(|i| matches!(i, InventoryItem::Component { component_id, .. } if component_id.0 == "test_outpost_kit")),
+        "kit should be consumed from ship cargo"
+    );
+    // StationConstructionStarted should fire this tick.
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(&e.event, Event::StationConstructionStarted { .. })),
+        "StationConstructionStarted event expected on tick 0"
+    );
+    // Ship should have a ConstructStation task.
+    assert!(
+        matches!(
+            state.ships[&ship_id].task.as_ref().map(|t| &t.kind),
+            Some(crate::TaskKind::ConstructStation { .. })
+        ),
+        "ship should be in ConstructStation task after DeployStation command"
+    );
+
+    // Now advance ticks until assembly completes. assembly_ticks_for_kit
+    // uses mass/300 clamped to 48..=168 — a 5000 kg kit hits the floor 48.
+    let mut saw_deployed = false;
+    for _ in 0..80 {
+        let evs = tick(&mut state, &[], &content, &mut rng, None);
+        if evs
+            .iter()
+            .any(|e| matches!(&e.event, Event::StationDeployed { .. }))
+        {
+            saw_deployed = true;
+            break;
+        }
+    }
+    assert!(saw_deployed, "StationDeployed should fire within 80 ticks");
+
+    // A new station should now exist with the expected frame_id.
+    let deployed = state
+        .stations
+        .values()
+        .find(|s| s.frame_id.as_ref() == Some(&crate::FrameId("frame_test_outpost".to_string())))
+        .expect("deployed station with frame_test_outpost should exist");
+    assert_eq!(deployed.position, target);
+
+    // Ship should be idle.
+    assert!(matches!(
+        state.ships[&ship_id].task.as_ref().map(|t| &t.kind),
+        Some(crate::TaskKind::Idle)
+    ));
+}
+
+#[test]
+fn deploy_station_rejects_non_kit_component() {
+    let (content, mut state, ship_id) = deploy_station_setup();
+    let mut rng = make_rng();
+    // Replace the kit with a plain non-kit component (thruster) at index 0.
+    {
+        let ship = state.ships.get_mut(&ship_id).unwrap();
+        ship.inventory.clear();
+        ship.inventory.push(InventoryItem::Component {
+            component_id: crate::ComponentId("thruster".to_string()),
+            count: 1,
+            quality: 1.0,
+        });
+    }
+
+    let target = state.ships[&ship_id].position.clone();
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("principal_autopilot".to_string()),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::DeployStation {
+            ship_id: ship_id.clone(),
+            kit_item_index: 0,
+            target_position: target,
+        },
+    };
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+
+    // Thruster still in inventory, no station created.
+    let ship = &state.ships[&ship_id];
+    assert!(
+        ship.inventory.iter().any(|i| matches!(
+            i,
+            InventoryItem::Component { component_id, .. } if component_id.0 == "thruster"
+        )),
+        "non-kit component should not be consumed"
+    );
+    assert!(
+        state
+            .stations
+            .values()
+            .all(|s| s.frame_id.as_ref()
+                != Some(&crate::FrameId("frame_test_outpost".to_string()))),
+        "no station should be deployed from a non-kit component"
+    );
+}
+
+#[test]
+fn deploy_station_transits_first_when_not_co_located() {
+    let (content, mut state, ship_id) = deploy_station_setup();
+    let mut rng = make_rng();
+
+    // Target position is far away from the ship. Ship starts at
+    // test_position (zero radius) — pick a distant position on a
+    // different body.
+    let distant_target = crate::Position {
+        parent_body: crate::BodyId("test_body".to_string()),
+        radius_au_um: crate::RadiusAuMicro(5_000_000),
+        angle_mdeg: crate::AngleMilliDeg(90_000),
+    };
+
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("principal_autopilot".to_string()),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::DeployStation {
+            ship_id: ship_id.clone(),
+            kit_item_index: 0,
+            target_position: distant_target.clone(),
+        },
+    };
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+
+    // Ship should be in Transit with a ConstructStation follow-on.
+    let task = state.ships[&ship_id]
+        .task
+        .as_ref()
+        .expect("ship should have a task");
+    match &task.kind {
+        crate::TaskKind::Transit { then, .. } => {
+            assert!(
+                matches!(then.as_ref(), crate::TaskKind::ConstructStation { .. }),
+                "transit should chain into ConstructStation"
+            );
+        }
+        other => panic!("expected Transit task, got {other:?}"),
+    }
+}

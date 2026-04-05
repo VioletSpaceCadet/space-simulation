@@ -701,6 +701,10 @@ impl MetricsAccumulator {
             }
             Some(TaskKind::Deposit { .. }) => self.fleet_depositing += 1,
             Some(TaskKind::Refuel { .. }) => self.fleet_refueling += 1,
+            // Station construction counts as transiting-in-place for fleet
+            // aggregation. It's infrequent (large tier 3 operation) so a
+            // dedicated fleet counter is not yet justified.
+            Some(TaskKind::ConstructStation { .. }) => self.fleet_transiting += 1,
         }
     }
 

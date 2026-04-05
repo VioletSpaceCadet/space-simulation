@@ -190,6 +190,21 @@ fn apply_commands(
                     &mut assignments,
                 );
             }
+            Command::DeployStation {
+                ship_id,
+                kit_item_index,
+                target_position,
+            } => {
+                commands::handle_deploy_station(
+                    state,
+                    content,
+                    ship_id,
+                    *kit_item_index,
+                    target_position,
+                    current_tick,
+                    events,
+                );
+            }
             Command::InstallModule {
                 facility_id,
                 module_item_id,
@@ -612,6 +627,9 @@ fn resolve_transit_payload(
                 crate::Event::StationDeployed {
                     station_id,
                     position: transit.destination,
+                    ship_id: None,
+                    frame_id: None,
+                    kit_component_id: None,
                 },
             ));
         }

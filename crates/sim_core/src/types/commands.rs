@@ -27,6 +27,20 @@ pub enum Command {
         ship_id: ShipId,
         task_kind: TaskKind,
     },
+    /// Deploy a station kit at a target position. The ship is routed
+    /// through Transit → ConstructStation; on completion an empty
+    /// `StationState` with the kit's frame is created. The kit is consumed
+    /// from the ship's cargo by the command handler before transit starts
+    /// so a ship cannot deploy the same kit twice.
+    DeployStation {
+        ship_id: ShipId,
+        /// Inventory index of the station kit component in the ship's cargo.
+        /// Must reference an `InventoryItem::Component { component_id, .. }`
+        /// whose `ComponentDef.deploys_frame` is `Some(frame_id)`.
+        kit_item_index: usize,
+        /// Where to build the station. The ship will transit here first.
+        target_position: Position,
+    },
     InstallModule {
         facility_id: FacilityId,
         module_item_id: ModuleItemId,

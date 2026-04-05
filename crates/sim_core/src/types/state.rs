@@ -851,6 +851,21 @@ pub enum TaskKind {
         station_id: StationId,
         target_kg: f32,
     },
+    /// Ship is assembling a station kit on-site (VIO-592). Entered after
+    /// `Transit` delivers the ship to the target position. On completion,
+    /// a new empty `StationState` with `frame_id` is created at `position`
+    /// and the consumed kit item ID is used to emit the StationDeployed event.
+    ConstructStation {
+        frame_id: crate::FrameId,
+        position: crate::Position,
+        /// Pre-computed assembly duration in ticks (48-168 typical), set
+        /// by `handle_deploy_station` based on the kit's frame.
+        assembly_ticks: u64,
+        /// The kit that was consumed to start this construction. Already
+        /// removed from ship inventory by the command handler — this field
+        /// is preserved for the completion event payload.
+        kit_component_id: String,
+    },
 }
 
 impl TaskKind {
@@ -862,6 +877,7 @@ impl TaskKind {
             Self::DeepScan { .. } => constants.deep_scan_ticks,
             Self::Mine { duration_ticks, .. } => *duration_ticks,
             Self::Deposit { .. } => constants.deposit_ticks,
+            Self::ConstructStation { assembly_ticks, .. } => *assembly_ticks,
             Self::Idle | Self::Refuel { .. } => 0,
         }
     }
@@ -876,6 +892,7 @@ impl TaskKind {
             Self::Mine { .. } => "Mine",
             Self::Deposit { .. } => "Deposit",
             Self::Refuel { .. } => "Refuel",
+            Self::ConstructStation { .. } => "ConstructStation",
         }
     }
 
@@ -891,6 +908,7 @@ impl TaskKind {
                 station_id: station,
                 ..
             } => Some(station.0.clone()),
+            Self::ConstructStation { frame_id, .. } => Some(frame_id.0.clone()),
         }
     }
 }
