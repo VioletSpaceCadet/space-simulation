@@ -222,10 +222,10 @@
     {
       "id": "tech_basic_rocketry",
       "name": "Basic Rocketry",
-      "prereqs": [],
+      "prereqs": ["tech_deep_scan_v1"],
       "domain_requirements": {
-        "Survey": 15.0,
-        "Manufacturing": 10.0
+        "Survey": 40.0,
+        "Manufacturing": 30.0
       },
       "accepted_data": [
         "SurveyData",
@@ -239,8 +239,8 @@
       "name": "Medium Rocketry",
       "prereqs": ["tech_basic_rocketry"],
       "domain_requirements": {
-        "Survey": 30.0,
-        "Manufacturing": 25.0
+        "Survey": 60.0,
+        "Manufacturing": 50.0
       },
       "accepted_data": [
         "SurveyData",
@@ -254,9 +254,9 @@
       "name": "Heavy Rocketry",
       "prereqs": ["tech_medium_rocketry"],
       "domain_requirements": {
-        "Survey": 50.0,
-        "Manufacturing": 45.0,
-        "Materials": 30.0
+        "Survey": 80.0,
+        "Manufacturing": 70.0,
+        "Materials": 50.0
       },
       "accepted_data": [
         "RadioData",
