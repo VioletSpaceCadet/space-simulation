@@ -117,11 +117,11 @@ fn condition_met(
     cond: &MilestoneCondition,
     state: &GameState,
     content: &GameContent,
-    metrics: &MetricsSnapshot,
+    metrics: Option<&MetricsSnapshot>,
 ) -> bool {
     match cond {
         MilestoneCondition::MetricAbove { field, threshold } => metrics
-            .get_field_f64(field)
+            .and_then(|m| m.get_field_f64(field))
             .is_some_and(|val| val >= *threshold),
         MilestoneCondition::CounterAbove { counter, threshold } => {
             resolve_counter(state, content, counter).is_some_and(|val| val >= *threshold)
@@ -132,12 +132,30 @@ fn condition_met(
     }
 }
 
+/// Check whether any uncompleted milestone has a `MetricAbove` condition.
+/// If not, we can skip the expensive `compute_metrics` call entirely.
+fn needs_metrics(
+    milestones: &[MilestoneDef],
+    completed: &std::collections::BTreeSet<String>,
+) -> bool {
+    milestones.iter().any(|m| {
+        !completed.contains(&m.id)
+            && m.conditions
+                .iter()
+                .any(|c| matches!(c, MilestoneCondition::MetricAbove { .. }))
+    })
+}
+
 /// Evaluate all milestones against current state. Returns IDs of newly completed milestones.
 ///
 /// Milestones are evaluated in sorted order (by ID) for determinism.
 /// Multiple milestones can complete on the same tick, and chained milestones
 /// (condition: `MilestoneCompleted`) can trigger within the same evaluation
 /// pass because completions are applied immediately.
+///
+/// Optimization: `compute_metrics` is only called if at least one uncompleted
+/// milestone has a `MetricAbove` condition. Once all metric-based milestones
+/// complete, evaluation uses only counters and completion checks (O(1) each).
 pub fn evaluate_milestones(
     state: &mut GameState,
     content: &GameContent,
@@ -149,7 +167,14 @@ pub fn evaluate_milestones(
         return Vec::new();
     }
 
-    let metrics = crate::metrics::compute_metrics(state, content);
+    // Only compute metrics if at least one uncompleted milestone needs them.
+    // This avoids a full station/module/inventory walk on ticks where all
+    // remaining milestones use counters or completion checks only.
+    let metrics = if needs_metrics(&content.milestones, &state.progression.completed_milestones) {
+        Some(crate::metrics::compute_metrics(state, content))
+    } else {
+        None
+    };
 
     // Sort milestones by ID for deterministic evaluation order
     let mut sorted: Vec<&MilestoneDef> = content.milestones.iter().collect();
@@ -171,7 +196,7 @@ pub fn evaluate_milestones(
             let all_met = milestone
                 .conditions
                 .iter()
-                .all(|c| condition_met(c, state, content, &metrics));
+                .all(|c| condition_met(c, state, content, metrics.as_ref()));
 
             if all_met {
                 // Mark completed
@@ -896,6 +921,62 @@ mod tests {
             new_count,
             station_count + 1.0,
             "ground facility components should count in assembler_runs"
+        );
+    }
+
+    /// Pins the engine-level interval gating behavior:
+    /// `engine::tick` must only call `evaluate_milestones` every N ticks
+    /// where N == `content.scoring.computation_interval_ticks`.
+    ///
+    /// Without this test, the gate could be silently removed or changed
+    /// (e.g. to a different constant) and no other test would catch it —
+    /// the unit tests in this module call `evaluate_milestones` directly.
+    #[test]
+    fn engine_tick_gates_milestone_evaluation_to_scoring_interval() {
+        use rand::SeedableRng;
+
+        let mut content = base_content();
+        // Set a small interval so we don't have to tick hundreds of times.
+        content.scoring.computation_interval_ticks = 5;
+        // A milestone that's already satisfied at tick 0 (tick >= 0).
+        // If evaluated, it fires on the very first call.
+        content.milestones = vec![test_milestone(
+            "ticks_any",
+            vec![MilestoneCondition::MetricAbove {
+                field: "tick".to_string(),
+                threshold: 0.0,
+            }],
+        )];
+
+        let mut state = base_state(&content);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(0);
+
+        // Tick 0: gate fires (0 % 5 == 0) — milestone completes immediately.
+        let _ = crate::tick(&mut state, &[], &content, &mut rng, None);
+        assert!(
+            state.progression.is_milestone_completed("ticks_any"),
+            "milestone should fire on tick=0 when gate aligns (0 % 5 == 0)"
+        );
+
+        // Reset and test the non-aligned case: start state at tick=1 so the
+        // gate is skipped for 4 consecutive ticks before it fires at tick=5.
+        let mut state = base_state(&content);
+        state.meta.tick = 1;
+        // Ticks 1..5 skip evaluation (1,2,3,4 all fail `% 5 == 0`).
+        for _ in 0..4 {
+            let _ = crate::tick(&mut state, &[], &content, &mut rng, None);
+            assert!(
+                !state.progression.is_milestone_completed("ticks_any"),
+                "milestone should NOT fire between gate intervals (tick={})",
+                state.meta.tick
+            );
+        }
+        // Next tick moves tick from 4→5, gate fires at tick=5.
+        let _ = crate::tick(&mut state, &[], &content, &mut rng, None);
+        assert!(
+            state.progression.is_milestone_completed("ticks_any"),
+            "milestone should fire when gate re-aligns at tick={}",
+            state.meta.tick
         );
     }
 }

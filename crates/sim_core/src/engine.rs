@@ -78,11 +78,19 @@ pub fn tick(
         advance_research,
         advance_research(state, content, &mut events)
     );
-    timed!(
-        timings,
-        evaluate_milestones,
-        crate::milestone::evaluate_milestones(state, content, &mut events)
-    );
+    // Milestones don't need per-tick evaluation. Share the scoring
+    // interval so progression and scoring stay aligned — both are
+    // content-configurable via `scoring.json::computation_interval_ticks`.
+    // This avoids the per-tick overhead of iterating milestones, sorting,
+    // and potentially computing metrics (profiling showed 38% of tick time).
+    let milestone_interval = content.scoring.computation_interval_ticks.max(1);
+    if state.meta.tick.is_multiple_of(milestone_interval) {
+        timed!(
+            timings,
+            evaluate_milestones,
+            crate::milestone::evaluate_milestones(state, content, &mut events)
+        );
+    }
     timed!(
         timings,
         evaluate_events,
