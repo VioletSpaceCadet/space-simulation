@@ -70,5 +70,83 @@
     "name": "Cast Iron Part",
     "mass_kg": 30.0,
     "volume_m3": 0.05
+  },
+  {
+    "id": "solar_cell",
+    "name": "Solar Cell",
+    "mass_kg": 15.0,
+    "volume_m3": 0.08
+  },
+  {
+    "id": "camera_module",
+    "name": "Camera Module",
+    "mass_kg": 10.0,
+    "volume_m3": 0.05
+  },
+  {
+    "id": "guidance_board",
+    "name": "Guidance Board",
+    "mass_kg": 5.0,
+    "volume_m3": 0.02
+  },
+  {
+    "id": "antenna_array",
+    "name": "Antenna Array",
+    "mass_kg": 25.0,
+    "volume_m3": 0.3
+  },
+  {
+    "id": "transponder",
+    "name": "Transponder",
+    "mass_kg": 8.0,
+    "volume_m3": 0.04
+  },
+  {
+    "id": "atomic_clock",
+    "name": "Atomic Clock",
+    "mass_kg": 12.0,
+    "volume_m3": 0.03
+  },
+  {
+    "id": "signal_processor",
+    "name": "Signal Processor",
+    "mass_kg": 6.0,
+    "volume_m3": 0.02
+  },
+  {
+    "id": "sensor_payload",
+    "name": "Sensor Payload",
+    "mass_kg": 40.0,
+    "volume_m3": 0.2
+  },
+  {
+    "id": "attitude_controller",
+    "name": "Attitude Controller",
+    "mass_kg": 20.0,
+    "volume_m3": 0.1
+  },
+  {
+    "id": "survey_satellite",
+    "name": "Survey Satellite",
+    "mass_kg": 500.0,
+    "volume_m3": 5.0
+  },
+  {
+    "id": "comm_relay",
+    "name": "Communication Relay",
+    "mass_kg": 800.0,
+    "volume_m3": 8.0
+  },
+  {
+    "id": "nav_beacon",
+    "name": "Navigation Beacon",
+    "mass_kg": 600.0,
+    "volume_m3": 6.0
+  },
+  {
+    "id": "science_platform",
+    "name": "Science Platform",
+    "mass_kg": 1200.0,
+    "volume_m3": 12.0
   }
 ]

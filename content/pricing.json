@@ -295,6 +295,84 @@
       "importable": true,
       "exportable": true,
       "category": "component"
+    },
+    "solar_cell": {
+      "base_price_per_unit": 50000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "camera_module": {
+      "base_price_per_unit": 75000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "guidance_board": {
+      "base_price_per_unit": 100000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "antenna_array": {
+      "base_price_per_unit": 120000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "transponder": {
+      "base_price_per_unit": 80000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "atomic_clock": {
+      "base_price_per_unit": 200000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "signal_processor": {
+      "base_price_per_unit": 90000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "sensor_payload": {
+      "base_price_per_unit": 150000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "attitude_controller": {
+      "base_price_per_unit": 110000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "component"
+    },
+    "survey_satellite": {
+      "base_price_per_unit": 500000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "comm_relay": {
+      "base_price_per_unit": 800000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "nav_beacon": {
+      "base_price_per_unit": 600000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "science_platform": {
+      "base_price_per_unit": 1200000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
     }
   }
 }

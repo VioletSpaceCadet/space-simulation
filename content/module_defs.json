@@ -411,11 +411,19 @@
         "assembly_interval_minutes": 480,
         "recipes": [
           "recipe_structural_beam",
-          "recipe_hull_panel"
+          "recipe_hull_panel",
+          "recipe_survey_satellite",
+          "recipe_comm_relay",
+          "recipe_nav_beacon",
+          "recipe_science_platform"
         ],
         "max_stock": {
           "structural_beam": 20,
-          "hull_panel": 5
+          "hull_panel": 5,
+          "survey_satellite": 2,
+          "comm_relay": 2,
+          "nav_beacon": 2,
+          "science_platform": 1
         }
       }
     },
