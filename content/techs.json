@@ -68,6 +68,7 @@
     {
       "id": "tech_efficient_transit",
       "name": "Efficient Transit",
+      "tier": 3,
       "prereqs": [
         "tech_ship_construction"
       ],
@@ -102,6 +103,7 @@
     {
       "id": "tech_automation_basic",
       "name": "Basic Automation",
+      "tier": 3,
       "prereqs": [
         "tech_advanced_manufacturing"
       ],
@@ -186,6 +188,7 @@
     {
       "id": "tech_efficient_propulsion",
       "name": "Efficient Propulsion",
+      "tier": 3,
       "prereqs": [
         "tech_ship_construction"
       ],
@@ -262,6 +265,7 @@
     {
       "id": "tech_heavy_rocketry",
       "name": "Heavy Rocketry",
+      "tier": 3,
       "prereqs": ["tech_medium_rocketry"],
       "domain_requirements": {
         "Survey": 80.0,
@@ -395,6 +399,85 @@
         "EngineeringData"
       ],
       "effects": []
+    },
+    {
+      "id": "tech_partial_recovery",
+      "name": "Partial Recovery",
+      "tier": 3,
+      "prereqs": ["tech_heavy_rocketry"],
+      "domain_requirements": {
+        "Engineering": 80.0,
+        "Manufacturing": 60.0
+      },
+      "accepted_data": [
+        "EngineeringData",
+        "ManufacturingData",
+        "TransitData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_full_reuse",
+      "name": "Full Reusability",
+      "tier": 3,
+      "prereqs": ["tech_partial_recovery"],
+      "domain_requirements": {
+        "Engineering": 120.0,
+        "Manufacturing": 80.0,
+        "Materials": 60.0
+      },
+      "accepted_data": [
+        "EngineeringData",
+        "ManufacturingData",
+        "TransitData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_advanced_propulsion",
+      "name": "Advanced Propulsion",
+      "tier": 3,
+      "prereqs": ["tech_efficient_propulsion"],
+      "domain_requirements": {
+        "Propulsion": 90.0,
+        "Engineering": 60.0
+      },
+      "accepted_data": [
+        "TransitData",
+        "EngineeringData"
+      ],
+      "effects": [
+        {
+          "type": "StatModifier",
+          "stat": "fuel_efficiency",
+          "op": "pct_additive",
+          "value": -0.25
+        }
+      ]
+    },
+    {
+      "id": "tech_research_acceleration",
+      "name": "Research Acceleration",
+      "tier": 3,
+      "prereqs": ["tech_advanced_manufacturing"],
+      "domain_requirements": {
+        "Manufacturing": 100.0,
+        "Materials": 60.0,
+        "Engineering": 60.0
+      },
+      "accepted_data": [
+        "ManufacturingData",
+        "EngineeringData",
+        "AssayData"
+      ],
+      "effects": [
+        {
+          "type": "StatModifier",
+          "stat": "research_speed",
+          "op": "pct_additive",
+          "value": 0.25
+        }
+      ]
     }
   ]
 }
