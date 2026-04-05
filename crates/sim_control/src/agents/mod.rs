@@ -1,3 +1,4 @@
+pub(crate) mod ground_facility_agent;
 pub(crate) mod ship_agent;
 pub(crate) mod station_agent;
 

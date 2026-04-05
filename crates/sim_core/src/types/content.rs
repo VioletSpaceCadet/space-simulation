@@ -124,6 +124,16 @@ pub struct AutopilotConfig {
     pub power_deficit_threshold_kw: f32,
     /// Forward-looking salary projection window (game-minutes) for crew hiring decisions.
     pub crew_hire_projection_minutes: u64,
+
+    // -- Ground facility parameters --
+    /// Ordered list of sensor module IDs to purchase for ground facilities.
+    /// Autopilot buys in this order (optical first for discovery, then radio).
+    #[serde(default)]
+    pub ground_sensor_modules: Vec<String>,
+    /// Max fraction of balance to spend on ground facility operating costs per tick.
+    /// When total opex exceeds this, the agent disables expensive sensors first.
+    #[serde(default = "default_ground_opex_max_fraction")]
+    pub ground_opex_max_fraction: f64,
 }
 
 impl Default for AutopilotConfig {
@@ -183,6 +193,11 @@ impl Default for AutopilotConfig {
             budget_cap_fraction: 0.05,
             power_deficit_threshold_kw: 0.01,
             crew_hire_projection_minutes: 30 * 24 * 60, // 30 days
+            ground_sensor_modules: vec![
+                "module_optical_telescope".to_string(),
+                "module_radio_telescope".to_string(),
+            ],
+            ground_opex_max_fraction: default_ground_opex_max_fraction(),
         }
     }
 }
@@ -345,6 +360,10 @@ pub struct InitialComponent {
     pub count: u32,
     #[serde(default = "default_quality")]
     pub quality: f32,
+}
+
+fn default_ground_opex_max_fraction() -> f64 {
+    0.001
 }
 
 fn default_quality() -> f32 {

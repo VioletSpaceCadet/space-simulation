@@ -203,6 +203,11 @@ impl ModuleDefBuilder {
         self
     }
 
+    pub fn operating_cost(mut self, cost_per_tick: f64) -> Self {
+        self.def.operating_cost_per_tick = cost_per_tick;
+        self
+    }
+
     pub fn build(self) -> ModuleDef {
         self.def
     }

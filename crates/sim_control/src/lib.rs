@@ -4,12 +4,15 @@ mod objectives;
 
 use std::collections::BTreeMap;
 
+use agents::ground_facility_agent::GroundFacilityAgent;
 use agents::ship_agent::ShipAgent;
 use agents::station_agent::StationAgent;
 use agents::Agent;
 pub use agents::DecisionRecord;
 use behaviors::AUTOPILOT_OWNER;
-use sim_core::{CommandEnvelope, GameContent, GameState, PrincipalId, ShipId, StationId};
+use sim_core::{
+    CommandEnvelope, GameContent, GameState, GroundFacilityId, PrincipalId, ShipId, StationId,
+};
 
 pub trait CommandSource {
     fn generate_commands(
@@ -27,6 +30,7 @@ pub trait CommandSource {
 /// deposit, refuel).
 pub struct AutopilotController {
     station_agents: BTreeMap<StationId, StationAgent>,
+    ground_facility_agents: BTreeMap<GroundFacilityId, GroundFacilityAgent>,
     ship_agents: BTreeMap<ShipId, ShipAgent>,
     /// Cached owner ID — avoids per-tick String allocation.
     owner: PrincipalId,
@@ -39,6 +43,7 @@ impl AutopilotController {
     pub fn new() -> Self {
         Self {
             station_agents: BTreeMap::new(),
+            ground_facility_agents: BTreeMap::new(),
             ship_agents: BTreeMap::new(),
             owner: PrincipalId(AUTOPILOT_OWNER.to_string()),
             decision_log: None,
@@ -73,9 +78,10 @@ impl CommandSource for AutopilotController {
     ) -> Vec<CommandEnvelope> {
         let mut commands = Vec::new();
 
-        // Destructure for disjoint field borrows (decision_log + station_agents + ship_agents).
+        // Destructure for disjoint field borrows.
         let Self {
             station_agents,
+            ground_facility_agents,
             ship_agents,
             owner,
             decision_log,
@@ -88,6 +94,16 @@ impl CommandSource for AutopilotController {
             }
         }
         station_agents.retain(|id, _| state.stations.contains_key(id));
+
+        for facility_id in state.ground_facilities.keys() {
+            if !ground_facility_agents.contains_key(facility_id) {
+                ground_facility_agents.insert(
+                    facility_id.clone(),
+                    GroundFacilityAgent::new(facility_id.clone()),
+                );
+            }
+        }
+        ground_facility_agents.retain(|id, _| state.ground_facilities.contains_key(id));
 
         for (ship_id, ship) in &state.ships {
             if ship.owner == *owner && !ship_agents.contains_key(ship_id) {
@@ -108,11 +124,20 @@ impl CommandSource for AutopilotController {
             ));
         }
 
-        // 3. Station agents assign objectives to idle ships (AD1).
-        // Deduplication is per-station (each station has its own shared
-        // iterators). With multiple stations, two stations could theoretically
-        // assign the same asteroid. Acceptable for single-station game;
-        // multi-station deduplication belongs in the strategic layer.
+        // 3. Ground facility agents generate commands (sensor purchase, budget)
+        //    in BTreeMap order (deterministic by GroundFacilityId)
+        for agent in ground_facility_agents.values_mut() {
+            commands.extend(agent.generate(
+                state,
+                content,
+                owner,
+                next_command_id,
+                decision_log.as_mut(),
+            ));
+        }
+
+        // 4. Station agents assign objectives to idle ships (AD1).
+        // Deduplication is per-station; multi-station needs strategic layer.
         for station_agent in station_agents.values() {
             station_agent.assign_ship_objectives(
                 ship_agents,
@@ -123,7 +148,7 @@ impl CommandSource for AutopilotController {
             );
         }
 
-        // 4. Ship agents run in BTreeMap order (deterministic by ShipId, AD2)
+        // 5. Ship agents run in BTreeMap order (deterministic by ShipId, AD2)
         for agent in ship_agents.values_mut() {
             commands.extend(agent.generate(
                 state,

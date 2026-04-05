@@ -35,5 +35,7 @@
   "shipyard_component_count": 4,
   "budget_cap_fraction": 0.05,
   "power_deficit_threshold_kw": 0.01,
-  "crew_hire_projection_minutes": 43200
+  "crew_hire_projection_minutes": 43200,
+  "ground_sensor_modules": ["module_optical_telescope", "module_radio_telescope"],
+  "ground_opex_max_fraction": 0.001
 }
