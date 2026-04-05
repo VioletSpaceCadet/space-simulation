@@ -332,6 +332,24 @@
       "exportable": true,
       "category": "component"
     },
+    "outpost_kit": {
+      "base_price_per_unit": 1500000.0,
+      "importable": false,
+      "exportable": false,
+      "category": "component"
+    },
+    "industrial_hub_kit": {
+      "base_price_per_unit": 4000000.0,
+      "importable": false,
+      "exportable": false,
+      "category": "component"
+    },
+    "research_station_kit": {
+      "base_price_per_unit": 2500000.0,
+      "importable": false,
+      "exportable": false,
+      "category": "component"
+    },
     "module_ground_workshop": {
       "base_price_per_unit": 15000000.0,
       "importable": true,

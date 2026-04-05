@@ -420,6 +420,11 @@ pub struct ComponentDef {
     pub name: String,
     pub mass_kg: f32,
     pub volume_m3: f32,
+    /// If this component is a station kit, the frame it deploys when
+    /// consumed by a `DeployStation` command. `None` for regular components
+    /// (plates, thrusters, repair kits, rocket grains, etc.).
+    #[serde(default)]
+    pub deploys_frame: Option<FrameId>,
 }
 
 // ---------------------------------------------------------------------------
