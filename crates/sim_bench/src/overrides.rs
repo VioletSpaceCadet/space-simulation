@@ -6,14 +6,17 @@ pub fn apply_overrides(
     content: &mut GameContent,
     overrides: &HashMap<String, serde_json::Value>,
 ) -> Result<()> {
-    // Split overrides into constant, module, and autopilot groups.
+    // Split overrides into constant, module, autopilot, and strategy groups.
     let mut constant_overrides = Vec::new();
     let mut autopilot_overrides = Vec::new();
+    let mut strategy_overrides = Vec::new();
     for (key, value) in overrides {
         if let Some(rest) = key.strip_prefix("module.") {
             apply_module_override(&mut content.module_defs, rest, key, value)?;
         } else if let Some(rest) = key.strip_prefix("autopilot.") {
             autopilot_overrides.push((rest, value));
+        } else if let Some(rest) = key.strip_prefix("strategy.") {
+            strategy_overrides.push((rest, value, key.as_str()));
         } else {
             constant_overrides.push((key.as_str(), value));
         }
@@ -24,6 +27,9 @@ pub fn apply_overrides(
     }
     if !autopilot_overrides.is_empty() {
         apply_autopilot_overrides(&mut content.autopilot, &autopilot_overrides)?;
+    }
+    if !strategy_overrides.is_empty() {
+        apply_strategy_overrides(&mut content.default_strategy, &strategy_overrides)?;
     }
     Ok(())
 }
@@ -186,6 +192,78 @@ fn apply_constant_overrides(
     *constants = serde_json::from_value(serde_json::Value::Object(map))
         .context("failed to deserialize Constants after applying overrides")?;
     Ok(())
+}
+
+/// Apply overrides to `StrategyConfig` (`GameContent.default_strategy`) using
+/// the same serialize→patch→deserialize pattern as other override groups.
+/// Supports nested dotted paths for the `priorities.*` fields, e.g.
+/// `strategy.priorities.mining = 0.9`.
+///
+/// This applies to `content.default_strategy` BEFORE `build_initial_state()`
+/// seeds `GameState.strategy_config`, so the lifecycle matches constant
+/// overrides: applied once at scenario start, then frozen for the run.
+fn apply_strategy_overrides(
+    strategy: &mut sim_core::StrategyConfig,
+    // (stripped key, value, original key including prefix)
+    overrides: &[(&str, &serde_json::Value, &str)],
+) -> Result<()> {
+    let serde_json::Value::Object(mut map) =
+        serde_json::to_value(&*strategy).context("failed to serialize StrategyConfig")?
+    else {
+        unreachable!("StrategyConfig serializes to JSON object")
+    };
+
+    for &(stripped_key, value, original_key) in overrides {
+        set_nested_path(&mut map, stripped_key, value.clone())
+            .with_context(|| format!("invalid strategy override key '{original_key}'"))?;
+    }
+
+    *strategy = serde_json::from_value(serde_json::Value::Object(map))
+        .context("failed to deserialize StrategyConfig after applying overrides")?;
+    Ok(())
+}
+
+/// Walk a dotted path into a serde JSON object and replace the leaf value.
+/// Every intermediate segment must already exist in the object and be an
+/// object itself — this is what rejects unknown keys with a descriptive
+/// error instead of silently creating new fields.
+fn set_nested_path(
+    root: &mut serde_json::Map<String, serde_json::Value>,
+    dotted_path: &str,
+    value: serde_json::Value,
+) -> Result<()> {
+    let segments: Vec<&str> = dotted_path.split('.').collect();
+    if segments.is_empty() || segments.iter().any(|s| s.is_empty()) {
+        bail!("empty path segment in '{dotted_path}'");
+    }
+
+    let mut current = root;
+    for (i, segment) in segments.iter().enumerate() {
+        let is_leaf = i == segments.len() - 1;
+        if is_leaf {
+            if !current.contains_key(*segment) {
+                bail!(
+                    "unknown field '{segment}'. Valid keys at this level: {}",
+                    current
+                        .keys()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
+            current.insert((*segment).to_string(), value);
+            return Ok(());
+        }
+        // Intermediate segment — must be an object we can descend into.
+        let child = current
+            .get_mut(*segment)
+            .ok_or_else(|| anyhow::anyhow!("unknown field '{segment}' in path"))?;
+        let serde_json::Value::Object(child_map) = child else {
+            bail!("field '{segment}' is not an object; cannot descend for nested override");
+        };
+        current = child_map;
+    }
+    unreachable!("loop returns on leaf");
 }
 
 /// Apply overrides to `AutopilotConfig` using the same serialize→patch→deserialize
@@ -667,5 +745,137 @@ mod tests {
             err.contains("unknown autopilot override key"),
             "error should mention unknown key: {err}"
         );
+    }
+
+    #[test]
+    fn test_strategy_override_top_level_fields() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let overrides = HashMap::from([
+            ("strategy.mode".to_string(), serde_json::json!("Expand")),
+            (
+                "strategy.fleet_size_target".to_string(),
+                serde_json::json!(8),
+            ),
+            (
+                "strategy.refuel_threshold_pct".to_string(),
+                serde_json::json!(0.6),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert_eq!(
+            content.default_strategy.mode,
+            sim_core::StrategyMode::Expand
+        );
+        assert_eq!(content.default_strategy.fleet_size_target, 8);
+        assert!((content.default_strategy.refuel_threshold_pct - 0.6).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_strategy_override_nested_priorities() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let original = content.default_strategy.priorities.research;
+        let overrides = HashMap::from([
+            (
+                "strategy.priorities.mining".to_string(),
+                serde_json::json!(0.95),
+            ),
+            (
+                "strategy.priorities.fleet_expansion".to_string(),
+                serde_json::json!(0.8),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert!((content.default_strategy.priorities.mining - 0.95).abs() < f32::EPSILON);
+        assert!((content.default_strategy.priorities.fleet_expansion - 0.8).abs() < f32::EPSILON);
+        // Unspecified nested fields are preserved, not reset to default.
+        assert!(
+            (content.default_strategy.priorities.research - original).abs() < f32::EPSILON,
+            "untouched priorities field should be preserved",
+        );
+    }
+
+    #[test]
+    fn test_strategy_override_unknown_top_level_errors() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let overrides = HashMap::from([(
+            "strategy.nonexistent_field".to_string(),
+            serde_json::json!(42),
+        )]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("strategy.nonexistent_field") || err.contains("nonexistent_field"),
+            "error should mention the bad key: {err}",
+        );
+    }
+
+    #[test]
+    fn test_strategy_override_unknown_nested_key_errors() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let overrides = HashMap::from([(
+            "strategy.priorities.bogus_concern".to_string(),
+            serde_json::json!(0.5),
+        )]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("bogus_concern"),
+            "error should name the invalid nested key: {err}",
+        );
+    }
+
+    #[test]
+    fn test_strategy_override_type_mismatch_errors() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let overrides = HashMap::from([(
+            "strategy.fleet_size_target".to_string(),
+            serde_json::json!("not_a_number"),
+        )]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_strategy_override_invalid_mode_errors() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let overrides = HashMap::from([(
+            "strategy.mode".to_string(),
+            serde_json::json!("NotARealMode"),
+        )]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_strategy_override_mixed_with_other_groups() {
+        let mut content = sim_world::load_content("../../content").unwrap();
+        let overrides = HashMap::from([
+            (
+                "station_cargo_capacity_m3".to_string(),
+                serde_json::json!(500.0),
+            ),
+            (
+                "strategy.mode".to_string(),
+                serde_json::json!("Consolidate"),
+            ),
+            (
+                "strategy.priorities.research".to_string(),
+                serde_json::json!(1.0),
+            ),
+            (
+                "autopilot.slag_jettison_pct".to_string(),
+                serde_json::json!(0.5),
+            ),
+        ]);
+        apply_overrides(&mut content, &overrides).unwrap();
+        assert!((content.constants.station_cargo_capacity_m3 - 500.0).abs() < f32::EPSILON);
+        assert_eq!(
+            content.default_strategy.mode,
+            sim_core::StrategyMode::Consolidate
+        );
+        assert!((content.default_strategy.priorities.research - 1.0).abs() < f32::EPSILON);
+        assert!((content.autopilot.slag_jettison_pct - 0.5).abs() < f32::EPSILON);
     }
 }
