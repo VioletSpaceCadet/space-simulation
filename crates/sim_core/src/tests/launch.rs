@@ -486,21 +486,9 @@ fn ground_to_orbit_station_kit_e2e() {
     let mut state = launch_state(&content);
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
-    // Remove existing stations so StationKit is the only way to get one.
+    // Remove existing stations so StationKit creates the first one.
     state.stations.clear();
-    let initial_station_count = state.stations.len();
-    assert_eq!(initial_station_count, 0);
-
-    // Add station kit component to facility inventory.
-    let facility = state
-        .ground_facilities
-        .get_mut(&GroundFacilityId("ground_earth".to_string()))
-        .unwrap();
-    facility.core.inventory.push(InventoryItem::Component {
-        component_id: ComponentId("rocket_medium".to_string()),
-        count: 1,
-        quality: 1.0,
-    });
+    assert!(state.stations.is_empty());
 
     // Launch station kit using medium rocket (16,000 kg capacity > 5,000 kg kit).
     let cmd = CommandEnvelope {

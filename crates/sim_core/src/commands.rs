@@ -752,6 +752,18 @@ fn consume_fuel(core: &mut crate::FacilityCore, fuel_element: &str, fuel_kg: f32
     core.invalidate_volume_cache();
 }
 
+/// Compute payload mass in kg. `StationKit` mass comes from content's `station_kit` component def.
+fn compute_payload_mass(payload: &crate::LaunchPayload, content: &GameContent) -> f32 {
+    match payload {
+        crate::LaunchPayload::Supplies(items) => crate::tasks::inventory_mass_kg(items),
+        crate::LaunchPayload::StationKit => content
+            .component_defs
+            .iter()
+            .find(|d| d.id == "station_kit")
+            .map_or(5000.0, |d| d.mass_kg),
+    }
+}
+
 /// Launch a rocket from a ground facility. Validates pad availability,
 /// payload weight, fuel, and balance. Deducts cost and fuel, marks pad
 /// as recovering, and creates a `LaunchTransitState`.
@@ -808,11 +820,7 @@ pub(crate) fn handle_launch(
         return false;
     };
 
-    // Compute payload mass and check capacity.
-    let payload_mass_kg: f32 = match payload {
-        crate::LaunchPayload::Supplies(items) => crate::tasks::inventory_mass_kg(items),
-        crate::LaunchPayload::StationKit => 5000.0,
-    };
+    let payload_mass_kg = compute_payload_mass(payload, content);
     if payload_mass_kg > rocket_def.payload_capacity_kg {
         return false;
     }
