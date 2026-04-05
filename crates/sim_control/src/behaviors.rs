@@ -47,12 +47,19 @@ pub(crate) fn maybe_transit(
     }
     let from_abs = compute_entity_absolute(from, &state.body_cache);
     let to_abs = compute_entity_absolute(to, &state.body_cache);
-    let ticks = travel_ticks(
+    let base_ticks = travel_ticks(
         from_abs,
         to_abs,
         ship_ticks_per_au,
         content.constants.min_transit_ticks,
     );
+    // Apply navigation beacon bonus from both origin and destination zones.
+    let origin_bonus = sim_core::zone_nav_bonus(&from.parent_body.0, state);
+    let dest_bonus = sim_core::zone_nav_bonus(&to.parent_body.0, state);
+    let best_bonus = origin_bonus.min(dest_bonus);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let ticks =
+        ((base_ticks as f64 * best_bonus).round() as u64).max(content.constants.min_transit_ticks);
     TaskKind::Transit {
         destination: to.clone(),
         total_ticks: ticks,
