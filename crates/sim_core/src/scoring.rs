@@ -215,12 +215,15 @@ fn compute_research(metrics: &MetricsSnapshot, state: &GameState, content: &Game
     let total_techs = content.techs.len().max(1) as f64;
     let tech_fraction = f64::from(metrics.techs_unlocked) / total_techs;
     // Use all raw data kinds (SURVEY, OpticalData, RadioData, etc.) — not just SURVEY.
-    let total_raw_data: f64 = state
+    // Collect and sort for deterministic floating-point sum across AHashMap iterations.
+    let mut data_values: Vec<f64> = state
         .research
         .data_pool
         .values()
         .map(|v| f64::from(*v))
-        .sum();
+        .collect();
+    data_values.sort_by(f64::total_cmp);
+    let total_raw_data: f64 = data_values.iter().sum();
     let data_signal = (total_raw_data / 1000.0).min(1.0);
     // Science satellites contribute to research capability.
     let science_count = state
@@ -235,10 +238,10 @@ fn compute_research(metrics: &MetricsSnapshot, state: &GameState, content: &Game
 
 /// Economic Health: balance trend + export/grant revenue per tick.
 fn compute_economic(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> f64 {
-    // Use initial balance from constants for normalization (handles both $1B orbital
-    // and $50M ground starts). Falls back to $1B for backward compat.
-    let starting_balance = state.balance.max(50_000_000.0);
-    let balance_ratio = (state.balance / starting_balance).clamp(0.0, 2.0) / 2.0;
+    // Fixed reference balance for normalization. Ground starts ($50M) will have a
+    // lower ratio than orbital starts ($1B), but grant income compensates.
+    let reference_balance = 1_000_000_000.0_f64;
+    let balance_ratio = (state.balance / reference_balance).clamp(0.0, 2.0) / 2.0;
     let revenue_rate = metrics.export_revenue_total / tick;
     let revenue_signal = (revenue_rate / 10_000.0).min(1.0);
     // Grant income signals economic health for ground-start (no exports yet)
@@ -250,8 +253,8 @@ fn compute_economic(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> 
         .sum();
     let grant_rate = grant_total / tick;
     let grant_signal = (grant_rate / 50_000.0).min(1.0);
-    // Blend: 40% balance, 35% export revenue, 25% grant income
-    balance_ratio * 0.4 + revenue_signal * 0.35 + grant_signal * 0.25
+    // Blend: 30% balance, 35% export revenue, 35% grant income
+    balance_ratio * 0.3 + revenue_signal * 0.35 + grant_signal * 0.35
 }
 
 /// Fleet Operations: utilization + fleet size + satellite deployments + launches.
@@ -264,7 +267,8 @@ fn compute_fleet(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     } else {
         0.0
     };
-    let ships_constructed = state.ships.len().saturating_sub(1) as f64; // subtract starting ship
+    // ships_built counter: total ships minus any that existed at start (max 1 starting ship)
+    let ships_constructed = (state.ships.len() as f64 - 1.0).max(0.0);
     let construction_signal = (ships_constructed / 5.0).min(1.0);
     // Satellite deployments count as completed missions (sqrt diminishing returns).
     let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
