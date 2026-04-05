@@ -295,6 +295,192 @@ fn resolve_install_slot(
     SlotResolution::NoCompatibleSlot
 }
 
+/// Default assembly duration for on-site station construction (VIO-592).
+///
+/// Ticket-defined bounds: 48–168 ticks (roughly 2–7 game-hours at the
+/// standard 60 minutes-per-tick), scaled by kit mass so heavier frames
+/// take longer. The formula is deliberately simple — a future balance
+/// pass can move these knobs into content/constants.json.
+fn assembly_ticks_for_kit(kit_def: &crate::ComponentDef) -> u64 {
+    // ~1 tick per 300 kg, clamped to [48, 168].
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let raw = (kit_def.mass_kg / 300.0) as u64;
+    raw.clamp(48, 168)
+}
+
+/// Resolved kit metadata used to build the construction task.
+struct DeployKitInfo {
+    frame_id: crate::FrameId,
+    kit_component_id: String,
+    assembly_ticks: u64,
+}
+
+/// Validate the ship, kit, and target frame for a `DeployStation`
+/// command. Returns the resolved metadata on success; the caller is
+/// responsible for actually consuming the kit + building the task chain.
+fn validate_deploy_inputs(
+    state: &GameState,
+    content: &GameContent,
+    ship_id: &ShipId,
+    kit_item_index: usize,
+) -> Option<DeployKitInfo> {
+    let ship = state.ships.get(ship_id)?;
+    let InventoryItem::Component { component_id, .. } = ship.inventory.get(kit_item_index)? else {
+        return None;
+    };
+    let kit_def = content
+        .component_defs
+        .iter()
+        .find(|c| c.id == component_id.0)?;
+    let frame_id = kit_def.deploys_frame.clone()?;
+    if !content.frames.contains_key(&frame_id) {
+        return None;
+    }
+    Some(DeployKitInfo {
+        frame_id,
+        kit_component_id: component_id.0.clone(),
+        assembly_ticks: assembly_ticks_for_kit(kit_def),
+    })
+}
+
+/// Decrement the kit count on the indexed inventory slot, removing the
+/// entry entirely at zero. Returns `false` if the slot does not match
+/// the expected Component shape.
+fn consume_kit_from_ship(ship: &mut crate::ShipState, kit_item_index: usize) -> bool {
+    let Some(InventoryItem::Component { count, .. }) = ship.inventory.get_mut(kit_item_index)
+    else {
+        return false;
+    };
+    if *count == 0 {
+        return false;
+    }
+    *count -= 1;
+    if *count == 0 {
+        ship.inventory.remove(kit_item_index);
+    }
+    true
+}
+
+/// Compute travel ticks from the ship's current position to the build
+/// site, reusing the existing spatial helpers so nav-beacon + propulsion
+/// modifiers flow through the ship's cached `speed_ticks_per_au`.
+/// Returns 0 when the ship is already within docking range.
+fn travel_ticks_to_build_site(
+    state: &GameState,
+    content: &GameContent,
+    ship: &crate::ShipState,
+    target_position: &crate::Position,
+) -> u64 {
+    if crate::is_co_located(
+        &ship.position,
+        target_position,
+        &state.body_cache,
+        content.constants.docking_range_au_um,
+    ) {
+        return 0;
+    }
+    let from_abs = crate::compute_entity_absolute(&ship.position, &state.body_cache);
+    let to_abs = crate::compute_entity_absolute(target_position, &state.body_cache);
+    let ticks_per_au = ship
+        .speed_ticks_per_au
+        .unwrap_or(content.constants.ticks_per_au);
+    crate::travel_ticks(
+        from_abs,
+        to_abs,
+        ticks_per_au,
+        content.constants.min_transit_ticks,
+    )
+}
+
+/// Handle a `DeployStation` command. Validates the kit + ship, removes
+/// the kit from cargo, and queues a `Transit` → `ConstructStation` chain
+/// on the ship so assembly begins once the ship reaches the target position.
+pub(crate) fn handle_deploy_station(
+    state: &mut GameState,
+    content: &GameContent,
+    ship_id: &ShipId,
+    kit_item_index: usize,
+    target_position: &crate::Position,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    let Some(kit_info) = validate_deploy_inputs(state, content, ship_id, kit_item_index) else {
+        return false;
+    };
+
+    let Some(ship_mut) = state.ships.get_mut(ship_id) else {
+        return false;
+    };
+    if !consume_kit_from_ship(ship_mut, kit_item_index) {
+        return false;
+    }
+
+    let travel_ticks = {
+        let ship_ref = state.ships.get(ship_id).expect("ship exists");
+        travel_ticks_to_build_site(state, content, ship_ref, target_position)
+    };
+
+    let construct_task = TaskKind::ConstructStation {
+        frame_id: kit_info.frame_id.clone(),
+        position: target_position.clone(),
+        assembly_ticks: kit_info.assembly_ticks,
+        kit_component_id: kit_info.kit_component_id,
+    };
+    let (final_task, total_duration) = if travel_ticks == 0 {
+        let duration = construct_task.duration(&content.constants);
+        (construct_task, duration)
+    } else {
+        let transit = TaskKind::Transit {
+            destination: target_position.clone(),
+            total_ticks: travel_ticks,
+            then: Box::new(construct_task),
+        };
+        let duration = transit.duration(&content.constants);
+        (transit, duration)
+    };
+
+    let Some(ship_mut) = state.ships.get_mut(ship_id) else {
+        return false;
+    };
+    ship_mut.task = Some(crate::TaskState {
+        kind: final_task.clone(),
+        started_tick: current_tick,
+        eta_tick: current_tick + total_duration,
+    });
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::TaskStarted {
+            ship_id: ship_id.clone(),
+            task_kind: final_task.label().to_string(),
+            target: final_task.target(),
+        },
+    ));
+    // When the ship is already on-site, fire StationConstructionStarted
+    // immediately. In the transit case, `resolve_transit` emits it once
+    // the transit step finishes.
+    if let TaskKind::ConstructStation {
+        frame_id: task_frame,
+        position,
+        assembly_ticks: ticks,
+        ..
+    } = &final_task
+    {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::StationConstructionStarted {
+                ship_id: ship_id.clone(),
+                frame_id: task_frame.clone(),
+                position: position.clone(),
+                assembly_ticks: *ticks,
+            },
+        ));
+    }
+    true
+}
+
 /// Uninstall a module from the station and return it to inventory.
 pub(crate) fn handle_uninstall_module(
     state: &mut GameState,

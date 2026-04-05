@@ -215,6 +215,15 @@ pub enum Event {
         hull_id: HullId,
         fitted_modules: Vec<FittedModule>,
     },
+    /// Emitted when a ship begins assembling a station on-site from a kit.
+    /// Fires on the tick the `ConstructStation` task actually starts (after
+    /// any preceding `Transit`).
+    StationConstructionStarted {
+        ship_id: ShipId,
+        frame_id: crate::FrameId,
+        position: crate::Position,
+        assembly_ticks: u64,
+    },
     ShipModuleFitted {
         ship_id: ShipId,
         slot_index: usize,
@@ -436,10 +445,21 @@ pub enum Event {
         payload: LaunchPayload,
         destination: Position,
     },
-    /// Emitted when a `StationKit` payload creates a new orbital station.
+    /// Emitted when a station is deployed either from a ground-launched
+    /// `StationKit` payload (P4 launch system) or from an on-site construction
+    /// ship (P5, VIO-592). Construction-ship deployments populate the
+    /// optional `ship_id`, `frame_id`, and `kit_component_id` fields;
+    /// launch-delivered deployments leave them as `None` for backward
+    /// compatibility with existing save data.
     StationDeployed {
         station_id: StationId,
         position: Position,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ship_id: Option<ShipId>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        frame_id: Option<crate::FrameId>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kit_component_id: Option<String>,
     },
     /// Emitted when `Command::SetStrategyConfig` replaces the live
     /// `GameState.strategy_config`. Carries no payload: consumers refetch

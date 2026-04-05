@@ -695,7 +695,12 @@ impl MetricsAccumulator {
         match ship.task.as_ref().map(|t| &t.kind) {
             None | Some(TaskKind::Idle) => self.fleet_idle += 1,
             Some(TaskKind::Mine { .. }) => self.fleet_mining += 1,
-            Some(TaskKind::Transit { .. }) => self.fleet_transiting += 1,
+            // Station construction counts as transiting-in-place for fleet
+            // aggregation. It's infrequent (large tier 3 operation) so a
+            // dedicated fleet counter is not yet justified.
+            Some(TaskKind::Transit { .. } | TaskKind::ConstructStation { .. }) => {
+                self.fleet_transiting += 1;
+            }
             Some(TaskKind::Survey { .. } | TaskKind::DeepScan { .. }) => {
                 self.fleet_surveying += 1;
             }
