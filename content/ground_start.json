@@ -1,0 +1,92 @@
+{
+  "meta": {
+    "tick": 0,
+    "seed": 42,
+    "schema_version": 1,
+    "content_version": "0.1.0"
+  },
+  "scan_sites": [],
+  "asteroids": {},
+  "ships": {},
+  "stations": {},
+  "ground_facilities": {
+    "ground_earth": {
+      "id": "ground_earth",
+      "name": "Earth Operations Center",
+      "position": {
+        "parent_body": "earth",
+        "radius_au_um": 0,
+        "angle_mdeg": 0
+      },
+      "inventory": [
+        {
+          "kind": "Module",
+          "item_id": "module_item_0001",
+          "module_def_id": "module_optical_telescope"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0002",
+          "module_def_id": "module_ground_workshop"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0003",
+          "module_def_id": "module_exploration_lab"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0004",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0005",
+          "module_def_id": "module_launch_pad_small"
+        },
+        {
+          "kind": "Component",
+          "component_id": "repair_kit",
+          "count": 3,
+          "quality": 1.0
+        },
+        {
+          "kind": "Material",
+          "element": "LH2",
+          "kg": 5000.0,
+          "quality": 1.0
+        }
+      ],
+      "cargo_capacity_m3": 5000.0,
+      "power_available_per_tick": 3000.0,
+      "modules": [],
+      "crew": {
+        "operator": 2,
+        "technician": 1,
+        "scientist": 1
+      },
+      "launch_transits": []
+    }
+  },
+  "balance": 50000000.0,
+  "research": {
+    "unlocked": [],
+    "data_pool": {},
+    "evidence": {},
+    "action_counts": {}
+  },
+  "counters": {
+    "next_event_id": 0,
+    "next_command_id": 0,
+    "next_asteroid_id": 0,
+    "next_lot_id": 0,
+    "next_module_instance_id": 6
+  },
+  "progression": {
+    "completed_milestones": [],
+    "phase": "Startup",
+    "grant_history": [],
+    "reputation": 0.0,
+    "trade_tier": "None"
+  }
+}
