@@ -379,6 +379,15 @@ pub struct ShipState {
     /// Ship leaders (reserved for Phase 2 leader system).
     #[serde(default)]
     pub leaders: Vec<LeaderId>,
+    /// Station this ship belongs to (VIO-486). Set at ship construction
+    /// by the building station's shipyard, or assigned by `AutopilotController`
+    /// to the nearest station on the first controller tick for ships that
+    /// predate the field. `None` means "unassigned" — ships with `None`
+    /// are auto-assigned on their first autopilot pass. Backward-compatible
+    /// via `#[serde(default)]`: old saves deserialize to `None` and are
+    /// auto-assigned transparently.
+    #[serde(default)]
+    pub home_station: Option<StationId>,
 }
 
 fn default_hull_id() -> HullId {
@@ -1151,6 +1160,62 @@ mod tests {
         assert_eq!(
             module.slot_index, None,
             "missing slot_index should default to None"
+        );
+    }
+
+    #[test]
+    fn ship_state_deserializes_without_home_station_field() {
+        // VIO-486: legacy save without `home_station` must deserialize
+        // with `None`. The engine's pre-tick pass will assign the nearest
+        // station on the first tick.
+        let json = r#"{
+            "id": "ship_legacy",
+            "position": {
+                "parent_body": "test_body",
+                "radius_au_um": 0,
+                "angle_mdeg": 0
+            },
+            "owner": "principal_autopilot",
+            "inventory": [],
+            "cargo_capacity_m3": 20.0,
+            "task": null
+        }"#;
+
+        let ship: ShipState = serde_json::from_str(json).expect("legacy ship save must load");
+        assert_eq!(
+            ship.home_station, None,
+            "missing home_station should default to None"
+        );
+    }
+
+    #[test]
+    fn ship_state_serde_roundtrip_with_home_station() {
+        let ship = ShipState {
+            id: ShipId("ship_test".to_string()),
+            position: crate::Position {
+                parent_body: BodyId("test_body".to_string()),
+                radius_au_um: crate::RadiusAuMicro(0),
+                angle_mdeg: crate::AngleMilliDeg(0),
+            },
+            owner: PrincipalId("principal_autopilot".to_string()),
+            inventory: vec![],
+            cargo_capacity_m3: 10.0,
+            task: None,
+            speed_ticks_per_au: None,
+            modifiers: crate::modifiers::ModifierSet::default(),
+            hull_id: HullId("hull_general_purpose".to_string()),
+            fitted_modules: vec![],
+            propellant_kg: 0.0,
+            propellant_capacity_kg: 0.0,
+            crew: Default::default(),
+            leaders: Vec::new(),
+            home_station: Some(StationId("station_alpha".to_string())),
+        };
+        let json = serde_json::to_string(&ship).expect("serialize");
+        let decoded: ShipState = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            decoded.home_station,
+            Some(StationId("station_alpha".to_string()))
         );
     }
 

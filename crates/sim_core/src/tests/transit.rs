@@ -72,6 +72,7 @@ fn transit_moves_ship_and_starts_next_task() {
                 propellant_capacity_kg: 0.0,
                 crew: Default::default(),
                 leaders: Vec::new(),
+                home_station: None,
             },
         )]
         .into_iter()
@@ -277,6 +278,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                 propellant_capacity_kg: 0.0,
                 crew: Default::default(),
                 leaders: Vec::new(),
+                home_station: None,
             },
         )]
         .into_iter()
@@ -427,6 +429,7 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         propellant_capacity_kg: 0.0,
         crew: Default::default(),
         leaders: Vec::new(),
+        home_station: None,
     };
     let ship_fast = ShipState {
         id: ShipId("ship_fast".to_string()),
@@ -443,6 +446,7 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         propellant_capacity_kg: 0.0,
         crew: Default::default(),
         leaders: Vec::new(),
+        home_station: None,
     };
     let ship_slow = ShipState {
         id: ShipId("ship_slow".to_string()),
@@ -459,6 +463,7 @@ fn ship_ticks_per_au_uses_per_ship_override() {
         propellant_capacity_kg: 0.0,
         crew: Default::default(),
         leaders: Vec::new(),
+        home_station: None,
     };
 
     let global = 2133;
@@ -725,4 +730,88 @@ fn transit_fuel_modifier_does_not_affect_colocated() {
         (after - before).abs() < f32::EPSILON,
         "co-located transit should cost no fuel even with modifier: before={before}, after={after}"
     );
+}
+
+// ----------------------------------------------------------------------
+// VIO-486: home_station auto-assignment
+// ----------------------------------------------------------------------
+
+#[test]
+fn tick_assigns_home_station_to_unassigned_ships() {
+    // A ship with home_station == None should be assigned to the nearest
+    // station by the engine's pre-tick pass.
+    let content = test_content();
+    let mut state = test_state(&content);
+    let ship_id = test_ship_id();
+    // Explicitly clear home_station (legacy save case).
+    state.ships.get_mut(&ship_id).unwrap().home_station = None;
+    assert_eq!(
+        state.ships.get(&ship_id).unwrap().home_station,
+        None,
+        "precondition: ship should start unassigned"
+    );
+
+    let mut rng = make_rng();
+    // Empty command batch; the pre-tick pass runs unconditionally.
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    // Base state has exactly one station — test_station_id().
+    let expected = test_station_id();
+    assert_eq!(
+        state.ships.get(&ship_id).unwrap().home_station,
+        Some(expected),
+        "unassigned ship should be auto-assigned to the only station"
+    );
+}
+
+#[test]
+fn tick_preserves_existing_home_station_assignment() {
+    // Ships that already have home_station set should NOT be reassigned,
+    // even if another station is closer.
+    let content = test_content();
+    let mut state = test_state(&content);
+    let ship_id = test_ship_id();
+    let custom = StationId("custom_home".to_string());
+    state.ships.get_mut(&ship_id).unwrap().home_station = Some(custom.clone());
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    assert_eq!(
+        state.ships.get(&ship_id).unwrap().home_station,
+        Some(custom),
+        "assigned ship should not be reassigned"
+    );
+}
+
+#[test]
+fn tick_auto_assigns_multiple_ships_deterministically() {
+    // Three ships, one station, all unassigned — all should converge on
+    // the same (only) station. Covers the "all ships unassigned" path.
+    let content = test_content();
+    let mut state = test_state(&content);
+    let original_ship = test_ship_id();
+    state.ships.get_mut(&original_ship).unwrap().home_station = None;
+
+    // Clone the original ship into two new ship entries with different ids.
+    let original = state.ships.get(&original_ship).unwrap().clone();
+    for name in &["ship_extra_a", "ship_extra_b"] {
+        let mut ship = original.clone();
+        ship.id = ShipId((*name).to_string());
+        ship.home_station = None;
+        state.ships.insert(ship.id.clone(), ship);
+    }
+
+    let mut rng = make_rng();
+    tick(&mut state, &[], &content, &mut rng, None);
+
+    let expected_station = test_station_id();
+    for ship in state.ships.values() {
+        assert_eq!(
+            ship.home_station,
+            Some(expected_station.clone()),
+            "ship {} should be auto-assigned",
+            ship.id
+        );
+    }
 }

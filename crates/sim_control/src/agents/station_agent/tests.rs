@@ -448,6 +448,7 @@ fn add_idle_ship(
         speed_ticks_per_au: None,
         crew: std::collections::BTreeMap::new(),
         leaders: vec![],
+        home_station: None,
     };
     state.ships.insert(ship_id.clone(), ship);
     agents.insert(ship_id.clone(), ShipAgent::new(ship_id));

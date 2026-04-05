@@ -916,6 +916,8 @@ fn build_initial_ship(
         propellant_capacity_kg: 0.0,
         crew: std::collections::BTreeMap::new(),
         leaders: Vec::new(),
+        // VIO-486: initial ship belongs to the starting Earth orbit station.
+        home_station: Some(StationId("station_earth_orbit".to_string())),
     };
     if content.hulls.contains_key(&hull_id) {
         sim_core::recompute_ship_stats(&mut ship, content);

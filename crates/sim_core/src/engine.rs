@@ -35,6 +35,12 @@ pub fn tick(
 ) -> Vec<crate::EventEnvelope> {
     let mut events = Vec::new();
 
+    // VIO-486: assign home_station to any ship that lacks one (legacy saves
+    // from before the field existed, or edge cases where construction missed
+    // the assignment). Picks the nearest station by body+radius to the ship's
+    // current position. Deterministic tiebreak by StationId.
+    assign_missing_home_stations(state);
+
     timed!(
         timings,
         apply_commands,
@@ -866,4 +872,74 @@ fn deduct_crew_salaries(
             }
         }
     }
+}
+
+/// VIO-486: Assign `home_station` to any ship missing one.
+///
+/// Called at the top of each `tick()`. Ships that were built before the
+/// `home_station` field existed (legacy saves) or constructed through a
+/// path that didn't set it will have `None` here; we pick the nearest
+/// station by absolute-position distance, with a deterministic tiebreak on
+/// `StationId` ordering.
+///
+/// Quiet no-op when all ships already have a `home_station` set, which
+/// is the steady-state case. The scan is O(ships × stations) but only
+/// runs on ticks where at least one ship lacks a home.
+fn assign_missing_home_stations(state: &mut crate::GameState) {
+    // Fast path: nothing to do if every ship already has a home.
+    if state.ships.values().all(|ship| ship.home_station.is_some()) {
+        return;
+    }
+    if state.stations.is_empty() {
+        return;
+    }
+
+    // Snapshot station positions once so we don't re-borrow state.stations
+    // while iterating ships mutably. BTreeMap iteration is already ordered
+    // by StationId, giving us the deterministic tiebreak for free.
+    let station_positions: Vec<(crate::StationId, crate::Position)> = state
+        .stations
+        .iter()
+        .map(|(id, s)| (id.clone(), s.position.clone()))
+        .collect();
+    let fallback_station_id = station_positions[0].0.clone();
+
+    for ship in state.ships.values_mut() {
+        if ship.home_station.is_some() {
+            continue;
+        }
+        // Try distance-based nearest lookup. Fall back to the first station
+        // in BTreeMap order when any position can't be resolved through the
+        // body cache (e.g. legacy node-based test fixtures with ad-hoc
+        // body IDs that aren't in the cache).
+        let nearest =
+            nearest_station_by_distance(&ship.position, &station_positions, &state.body_cache);
+        ship.home_station = Some(nearest.unwrap_or_else(|| fallback_station_id.clone()));
+    }
+}
+
+/// Helper for `assign_missing_home_stations`: return the `StationId` of
+/// the station whose position is closest to `ship_pos` in absolute
+/// coordinates. Returns `None` if any required body is missing from the
+/// cache. Deterministic tiebreak on `StationId`.
+fn nearest_station_by_distance(
+    ship_pos: &crate::Position,
+    station_positions: &[(crate::StationId, crate::Position)],
+    body_cache: &std::collections::HashMap<crate::BodyId, crate::BodyCache, ahash::RandomState>,
+) -> Option<crate::StationId> {
+    if !body_cache.contains_key(&ship_pos.parent_body) {
+        return None;
+    }
+    let ship_abs = crate::compute_entity_absolute(ship_pos, body_cache);
+    station_positions
+        .iter()
+        .filter_map(|(id, pos)| {
+            if !body_cache.contains_key(&pos.parent_body) {
+                return None;
+            }
+            let abs = crate::compute_entity_absolute(pos, body_cache);
+            Some((id, ship_abs.distance_squared(abs)))
+        })
+        .min_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(b.0)))
+        .map(|(id, _)| id.clone())
 }
