@@ -28,6 +28,8 @@ Replaced a 3-domain research model (DataKind: ScanData/MiningData/EngineeringDat
 
 **Rule:** When renaming serialized Rust enums that flow to JSON and TypeScript, treat the entire rename as one atomic changeset. Don't split across tickets — Rust's compiler won't let you do it incrementally anyway.
 
+> **Update (2026-04-05, P3):** This rule still applies to Rust enums that remain enums. But since VIO-544 (`DataKind`) and VIO-616 (`ResearchDomain`), both of these types are now content-driven `String` newtypes — adding a new data kind or research domain is a **pure content change** with no cross-layer cascade. The atomic-rename rule no longer applies to these specific types. See `docs/solutions/patterns/p3-tech-tree-expansion-patterns.md` Pattern 1 for the enum→newtype migration playbook.
+
 ### 2. Event Emission Pattern for New Call Sites
 
 When adding `generate_data()` for TransitData in `resolve_transit()`, the initial implementation discarded the return value and didn't emit `DataGenerated`. The pr-reviewer caught this — the FE relies on SSE events to update the Research Panel's data pool in real-time.

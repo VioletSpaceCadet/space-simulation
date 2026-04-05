@@ -63,6 +63,8 @@ Domain requirements needed to be scaled from 100-500 down to 5-50. Root causes:
 
 **Key metric:** Evidence accumulates at ~0.04 points/tick per domain in the full autopilot context (vs theoretical 4-5 points/tick if labs were fully fed). (auto memory [claude]: propellant balance observations noted similar data-rate constraints in Epic 4 verification)
 
+> **Update (2026-04-05, P3):** The preferred levers for tuning research pacing are now the `Constants` fields introduced in VIO-581/VIO-582: `research_speed_multiplier`, `research_domain_rates`, `research_tier_scaling`, and `research_lab_diminishing_returns`. These apply at the lab tick and compose multiplicatively with any `StatModifier` modifiers. Rebalancing evidence accumulation no longer requires touching per-tech domain requirements — adjust the global or per-domain multiplier in `constants.json` instead. See `docs/solutions/patterns/p3-tech-tree-expansion-patterns.md` for the pacing engine design.
+
 ## Prevention
 
 - **When adding a new StatId:** grep for all existing `resolve()` / `resolve_with()` calls using the stat you're coupling to. Verify no unintended cross-system effects.
