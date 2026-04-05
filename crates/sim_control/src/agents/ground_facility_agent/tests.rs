@@ -71,6 +71,33 @@ fn ground_content() -> sim_core::GameContent {
         },
     );
 
+    // Add rocket component defs.
+    content.component_defs.push(sim_core::ComponentDef {
+        id: "solid_fuel_grain".to_string(),
+        name: "Solid Fuel Grain".to_string(),
+        mass_kg: 150.0,
+        volume_m3: 0.3,
+    });
+    content.component_defs.push(sim_core::ComponentDef {
+        id: "guidance_unit".to_string(),
+        name: "Guidance Unit".to_string(),
+        mass_kg: 20.0,
+        volume_m3: 0.05,
+    });
+
+    // Add launch pad module def for launch tests.
+    content.module_defs.insert(
+        "module_launch_pad_small".to_string(),
+        ModuleDefBuilder::new("module_launch_pad_small")
+            .name("Small Launch Pad")
+            .behavior(ModuleBehaviorDef::LaunchPad(sim_core::LaunchPadDef {
+                max_payload_kg: 20000.0,
+                recovery_minutes: 5,
+                recovery_ticks: 5,
+            }))
+            .build(),
+    );
+
     content
 }
 
@@ -391,4 +418,114 @@ fn autopilot_managed_ground_facility_discovers_within_500_ticks() {
         !state.scan_sites.is_empty(),
         "scan_sites should contain discovered sites"
     );
+}
+
+#[test]
+fn component_purchase_buys_when_budget_allows() {
+    let mut content = ground_content();
+    content.pricing.items.insert(
+        "solid_fuel_grain".to_string(),
+        sim_core::PricingEntry {
+            base_price_per_unit: 50_000.0,
+            importable: true,
+            exportable: false,
+            category: "component".to_string(),
+        },
+    );
+    content.pricing.items.insert(
+        "guidance_unit".to_string(),
+        sim_core::PricingEntry {
+            base_price_per_unit: 200_000.0,
+            importable: true,
+            exportable: false,
+            category: "component".to_string(),
+        },
+    );
+    let state = ground_state(&content);
+    let mut controller = crate::AutopilotController::new();
+    let mut next_id = 100;
+
+    let commands = controller.generate_commands(&state, &content, &mut next_id);
+
+    let component_imports: Vec<_> = commands
+        .iter()
+        .filter(|c| {
+            matches!(
+                &c.command,
+                Command::Import { item_spec, .. }
+                    if matches!(item_spec, sim_core::TradeItemSpec::Component { .. })
+            )
+        })
+        .collect();
+    assert!(
+        !component_imports.is_empty(),
+        "should purchase rocket components"
+    );
+}
+
+#[test]
+fn component_purchase_skips_when_insufficient_budget() {
+    let mut content = ground_content();
+    content.pricing.items.insert(
+        "solid_fuel_grain".to_string(),
+        sim_core::PricingEntry {
+            base_price_per_unit: 50_000.0,
+            importable: true,
+            exportable: false,
+            category: "component".to_string(),
+        },
+    );
+    let mut state = ground_state(&content);
+    state.balance = 100.0; // too low for any purchase
+
+    let mut controller = crate::AutopilotController::new();
+    let mut next_id = 100;
+    let commands = controller.generate_commands(&state, &content, &mut next_id);
+
+    let component_imports = commands.iter().any(|c| {
+        matches!(
+            &c.command,
+            Command::Import { item_spec, .. }
+                if matches!(item_spec, sim_core::TradeItemSpec::Component { .. })
+        )
+    });
+    assert!(
+        !component_imports,
+        "should not purchase with insufficient budget"
+    );
+}
+
+#[test]
+fn launch_execution_skips_without_rocket_component() {
+    let content = ground_content();
+    let mut state = ground_state(&content);
+
+    // Add a pad but no rocket component.
+    let facility = state
+        .ground_facilities
+        .get_mut(&GroundFacilityId("ground_earth".to_string()))
+        .unwrap();
+    facility.core.modules.push(ModuleState {
+        id: sim_core::ModuleInstanceId("pad_001".to_string()),
+        def_id: "module_launch_pad_small".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::LaunchPad(sim_core::LaunchPadState::default()),
+        wear: WearState::default(),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
+        thermal: None,
+    });
+    sim_core::test_fixtures::rebuild_indices(&mut state, &content);
+
+    let mut controller = crate::AutopilotController::new();
+    let mut next_id = 100;
+    let commands = controller.generate_commands(&state, &content, &mut next_id);
+
+    let launch_cmds = commands
+        .iter()
+        .any(|c| matches!(&c.command, Command::Launch { .. }));
+    assert!(!launch_cmds, "should not launch without rocket component");
 }

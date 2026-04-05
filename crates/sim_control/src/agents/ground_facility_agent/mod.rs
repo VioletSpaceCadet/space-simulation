@@ -6,7 +6,7 @@ use sim_core::{CommandEnvelope, GameContent, GameState, GroundFacilityId, Princi
 
 use super::Agent;
 use super::DecisionRecord;
-use concerns::{ModuleInstall, SensorBudget, SensorPurchase};
+use concerns::{ComponentPurchase, LaunchExecution, ModuleInstall, SensorBudget, SensorPurchase};
 
 /// Context passed to each ground facility concern on every tick.
 #[allow(dead_code)]
@@ -30,7 +30,8 @@ pub(crate) trait GroundFacilityConcern: Send {
 
 /// Per-ground-facility agent that composes ordered concerns.
 ///
-/// Execution order: install modules → purchase sensors → manage sensor budget.
+/// Execution order: install modules → purchase sensors → manage sensor budget →
+/// purchase components → execute launches.
 ///
 /// Sensor data flows into the global research pool, so station labs
 /// automatically benefit from ground sensor output.
@@ -44,6 +45,8 @@ fn default_concerns() -> Vec<Box<dyn GroundFacilityConcern>> {
         Box::new(ModuleInstall),
         Box::new(SensorPurchase),
         Box::new(SensorBudget),
+        Box::new(ComponentPurchase),
+        Box::new(LaunchExecution),
     ]
 }
 
