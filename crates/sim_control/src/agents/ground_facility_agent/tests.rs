@@ -529,3 +529,273 @@ fn launch_execution_skips_without_rocket_component() {
         .any(|c| matches!(&c.command, Command::Launch { .. }));
     assert!(!launch_cmds, "should not launch without rocket component");
 }
+
+fn satellite_content() -> sim_core::GameContent {
+    let mut content = ground_content();
+
+    // Add satellite defs.
+    content.satellite_defs.insert(
+        "sat_comm_relay".to_string(),
+        sim_core::SatelliteDef {
+            id: "sat_comm_relay".to_string(),
+            name: "Comm Relay".to_string(),
+            satellite_type: "communication".to_string(),
+            mass_kg: 800.0,
+            wear_rate: 0.00008,
+            required_tech: Some(sim_core::TechId("tech_satellite_basics".to_string())),
+            behavior_config: serde_json::json!({ "comm_tier": "Basic" }),
+        },
+    );
+    content.satellite_defs.insert(
+        "sat_survey".to_string(),
+        sim_core::SatelliteDef {
+            id: "sat_survey".to_string(),
+            name: "Survey Satellite".to_string(),
+            satellite_type: "survey".to_string(),
+            mass_kg: 500.0,
+            wear_rate: 0.00015,
+            required_tech: Some(sim_core::TechId("tech_satellite_basics".to_string())),
+            behavior_config: serde_json::json!({ "discovery_multiplier": 2.0 }),
+        },
+    );
+
+    // Add component defs for satellite products (needed for compute_mass).
+    content.component_defs.push(sim_core::ComponentDef {
+        id: "sat_comm_relay".to_string(),
+        name: "Comm Relay".to_string(),
+        mass_kg: 800.0,
+        volume_m3: 2.0,
+    });
+    content.component_defs.push(sim_core::ComponentDef {
+        id: "sat_survey".to_string(),
+        name: "Survey Satellite".to_string(),
+        mass_kg: 500.0,
+        volume_m3: 1.5,
+    });
+
+    // Satellite config.
+    content.autopilot.satellite_priority =
+        vec!["sat_comm_relay".to_string(), "sat_survey".to_string()];
+    content.autopilot.satellite_launch_rocket = "rocket_sounding".to_string();
+    content.autopilot.satellite_tech = "tech_satellite_basics".to_string();
+    content.autopilot.satellite_replacement_wear = 0.7;
+
+    // Add rocket def for satellite launches.
+    content.rocket_defs.insert(
+        "rocket_sounding".to_string(),
+        sim_core::RocketDef {
+            id: "rocket_sounding".to_string(),
+            name: "Sounding Rocket".to_string(),
+            payload_capacity_kg: 1000.0,
+            base_launch_cost: 2_000_000.0,
+            fuel_kg: 500.0,
+            transit_minutes: 3,
+            required_tech: None,
+        },
+    );
+
+    // Pricing for satellite components.
+    content.pricing.items.insert(
+        "sat_comm_relay".to_string(),
+        sim_core::PricingEntry {
+            base_price_per_unit: 500_000.0,
+            importable: true,
+            exportable: false,
+            category: "component".to_string(),
+        },
+    );
+    content.pricing.items.insert(
+        "sat_survey".to_string(),
+        sim_core::PricingEntry {
+            base_price_per_unit: 300_000.0,
+            importable: true,
+            exportable: false,
+            category: "component".to_string(),
+        },
+    );
+
+    content
+}
+
+#[test]
+fn satellite_management_skips_without_tech() {
+    let content = satellite_content();
+    let state = ground_state(&content);
+    // tech_satellite_basics not unlocked.
+    let mut controller = crate::AutopilotController::new();
+    let mut next_id = 100;
+    let commands = controller.generate_commands(&state, &content, &mut next_id);
+
+    let sat_import = commands.iter().any(|c| {
+        matches!(&c.command, Command::Import { item_spec, .. }
+            if matches!(item_spec, TradeItemSpec::Component { component_id, .. }
+                if component_id.0.starts_with("sat_")))
+    });
+    assert!(!sat_import, "should not import satellite without tech");
+}
+
+#[test]
+fn satellite_management_imports_first_priority_component() {
+    let content = satellite_content();
+    let mut state = ground_state(&content);
+    // Unlock satellite tech.
+    state
+        .research
+        .unlocked
+        .insert(sim_core::TechId("tech_satellite_basics".to_string()));
+
+    let mut controller = crate::AutopilotController::new();
+    let mut next_id = 100;
+    let commands = controller.generate_commands(&state, &content, &mut next_id);
+
+    // Should import sat_comm_relay (first in priority).
+    let import_comm = commands.iter().any(|c| {
+        matches!(&c.command, Command::Import { item_spec, .. }
+            if matches!(item_spec, TradeItemSpec::Component { component_id, .. }
+                if component_id.0 == "sat_comm_relay"))
+    });
+    assert!(
+        import_comm,
+        "should import first priority satellite component (sat_comm_relay)"
+    );
+}
+
+#[test]
+fn satellite_management_launches_when_component_available() {
+    let content = satellite_content();
+    let mut state = ground_state(&content);
+    state
+        .research
+        .unlocked
+        .insert(sim_core::TechId("tech_satellite_basics".to_string()));
+
+    // Add satellite component + fuel + launch pad to facility.
+    let facility = state
+        .ground_facilities
+        .get_mut(&GroundFacilityId("ground_earth".to_string()))
+        .unwrap();
+    facility
+        .core
+        .inventory
+        .push(sim_core::InventoryItem::Component {
+            component_id: sim_core::ComponentId("sat_comm_relay".to_string()),
+            count: 1,
+            quality: 1.0,
+        });
+    facility
+        .core
+        .inventory
+        .push(sim_core::InventoryItem::Material {
+            element: "LH2".to_string(),
+            kg: 10000.0,
+            quality: 1.0,
+            thermal: None,
+        });
+    facility.core.modules.push(ModuleState {
+        id: sim_core::ModuleInstanceId("pad_001".to_string()),
+        def_id: "module_launch_pad_small".to_string(),
+        enabled: true,
+        kind_state: ModuleKindState::LaunchPad(sim_core::LaunchPadState::default()),
+        wear: WearState::default(),
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: Default::default(),
+        efficiency: 1.0,
+        prev_crew_satisfied: true,
+        thermal: None,
+    });
+    sim_core::test_fixtures::rebuild_indices(&mut state, &content);
+
+    let mut controller = crate::AutopilotController::new();
+    let mut next_id = 100;
+    let commands = controller.generate_commands(&state, &content, &mut next_id);
+
+    let launch_sat = commands.iter().any(|c| {
+        matches!(&c.command, Command::Launch { payload, .. }
+            if matches!(payload, sim_core::LaunchPayload::Satellite { satellite_def_id }
+                if satellite_def_id == "sat_comm_relay"))
+    });
+    assert!(
+        launch_sat,
+        "should launch satellite when component is available"
+    );
+}
+
+#[test]
+fn satellite_management_skips_when_satellite_already_active() {
+    let content = satellite_content();
+    let mut state = ground_state(&content);
+    state
+        .research
+        .unlocked
+        .insert(sim_core::TechId("tech_satellite_basics".to_string()));
+
+    // Add an active comm relay satellite.
+    state.satellites.insert(
+        sim_core::SatelliteId("sat_existing".to_string()),
+        sim_core::SatelliteState {
+            id: sim_core::SatelliteId("sat_existing".to_string()),
+            def_id: "sat_comm_relay".to_string(),
+            name: "Existing Relay".to_string(),
+            position: sim_core::test_fixtures::test_position(),
+            deployed_tick: 0,
+            wear: 0.1,
+            enabled: true,
+            satellite_type: "communication".to_string(),
+            payload_config: None,
+        },
+    );
+
+    let mut controller = crate::AutopilotController::new();
+    let mut next_id = 100;
+    let commands = controller.generate_commands(&state, &content, &mut next_id);
+
+    // Should skip comm relay (already active) and import survey instead.
+    let import_survey = commands.iter().any(|c| {
+        matches!(&c.command, Command::Import { item_spec, .. }
+            if matches!(item_spec, TradeItemSpec::Component { component_id, .. }
+                if component_id.0 == "sat_survey"))
+    });
+    assert!(
+        import_survey,
+        "should import next priority (sat_survey) when comm relay already active"
+    );
+}
+
+#[test]
+fn satellite_management_replaces_aging_satellite() {
+    let content = satellite_content();
+    let mut state = ground_state(&content);
+    state
+        .research
+        .unlocked
+        .insert(sim_core::TechId("tech_satellite_basics".to_string()));
+
+    // Add an aging comm relay (wear > replacement_wear threshold of 0.7).
+    state.satellites.insert(
+        sim_core::SatelliteId("sat_old".to_string()),
+        sim_core::SatelliteState {
+            id: sim_core::SatelliteId("sat_old".to_string()),
+            def_id: "sat_comm_relay".to_string(),
+            name: "Old Relay".to_string(),
+            position: sim_core::test_fixtures::test_position(),
+            deployed_tick: 0,
+            wear: 0.8, // above 0.7 threshold
+            enabled: true,
+            satellite_type: "communication".to_string(),
+            payload_config: None,
+        },
+    );
+
+    let mut controller = crate::AutopilotController::new();
+    let mut next_id = 100;
+    let commands = controller.generate_commands(&state, &content, &mut next_id);
+
+    // Should import a replacement comm relay.
+    let import_comm = commands.iter().any(|c| {
+        matches!(&c.command, Command::Import { item_spec, .. }
+            if matches!(item_spec, TradeItemSpec::Component { component_id, .. }
+                if component_id.0 == "sat_comm_relay"))
+    });
+    assert!(import_comm, "should import replacement for aging satellite");
+}
