@@ -498,6 +498,19 @@ fn apply_commands(
                     events,
                 );
             }
+            Command::SetStrategyConfig { config } => {
+                // Full replacement — not merge. The interpreter cache (if
+                // anyone's listening) observes the change on the next
+                // `AutopilotController::generate_commands` pass because the
+                // runtime owns its own dirty flag; the authoritative
+                // strategy config lives on `GameState`.
+                state.strategy_config = config.clone();
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    crate::Event::StrategyConfigChanged {},
+                ));
+            }
         }
     }
 
