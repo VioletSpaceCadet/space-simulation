@@ -189,7 +189,7 @@ fn compute_dimension_raw(
     tick: f64,
 ) -> f64 {
     match dimension_id {
-        "industrial_output" => compute_industrial(metrics, tick),
+        "industrial_output" => compute_industrial(metrics, state, tick),
         "research_progress" => compute_research(metrics, state, content),
         "economic_health" => compute_economic(metrics, state, tick),
         "fleet_operations" => compute_fleet(metrics, state),
@@ -200,14 +200,35 @@ fn compute_dimension_raw(
 }
 
 /// Industrial Output: material throughput per tick + assembler activity.
-fn compute_industrial(metrics: &MetricsSnapshot, tick: f64) -> f64 {
+///
+/// VIO-603: adds a multi-station diversification bonus — running N
+/// productive stations is rewarded over concentrating all output on one.
+/// A "productive station" is one with at least one Assembler or
+/// Processor module, regardless of whether it's currently active.
+fn compute_industrial(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> f64 {
     let throughput = f64::from(metrics.total_material_kg) / tick;
     let assembler_active = metrics
         .per_module_metrics
         .get("assembler")
         .map_or(0, |m| m.active);
-    // Throughput rate plus small assembler activity bonus (0.1 per active assembler)
-    throughput + f64::from(assembler_active) * 0.1
+    // Count productive stations — stations with at least one assembler
+    // or processor module. Starting station is always 1; each additional
+    // productive station contributes a capped diversification bonus.
+    let productive_stations = state
+        .stations
+        .values()
+        .filter(|s| {
+            s.core.modules.iter().any(|m| {
+                matches!(
+                    m.kind_state,
+                    crate::ModuleKindState::Assembler(_) | crate::ModuleKindState::Processor(_)
+                )
+            })
+        })
+        .count() as f64;
+    let diversification_bonus = (productive_stations - 1.0).max(0.0) * 0.5;
+    // Throughput rate plus small assembler activity bonus plus multi-station bonus
+    throughput + f64::from(assembler_active) * 0.1 + diversification_bonus
 }
 
 /// Research Progress: fraction of techs unlocked + scan data growth + science satellites.
@@ -317,6 +338,11 @@ fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
 }
 
 /// Expansion: bases (stations + ground facilities) + fleet + satellites.
+///
+/// VIO-603: adds an explicit multi-station bonus on top of `base_signal`
+/// so that deploying a second (or third) orbital station produces a
+/// visible score bump. Plateaus at 4 stations — we don't want to reward
+/// sprawl for its own sake.
 fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     // Both station and ground facility count as operational bases.
     let base_count = (state.stations.len() + state.ground_facilities.len()) as f64;
@@ -324,8 +350,12 @@ fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     let fleet_signal = (f64::from(metrics.fleet_total).sqrt() / 3.0).min(1.0);
     // Satellites contribute to expansion (orbital infrastructure).
     let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
-    // Blend: 40% bases, 30% fleet reach, 30% satellite infrastructure
-    base_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3
+    // Multi-station bonus: explicit reward for running N >= 2 orbital
+    // stations beyond the starting one. Plateaus at 4 stations.
+    let station_count = state.stations.len() as f64;
+    let multi_station_bonus = ((station_count - 1.0).max(0.0) / 3.0).min(1.0);
+    // Blend: 35% bases, 25% fleet, 25% satellites, 15% multi-station bonus
+    base_signal * 0.35 + fleet_signal * 0.25 + satellite_signal * 0.25 + multi_station_bonus * 0.15
 }
 
 /// Resolve the highest threshold name for a given composite score.
@@ -746,6 +776,205 @@ mod tests {
             "active satellites should increase expansion score: {} vs {}",
             expansion_yes,
             expansion_no
+        );
+    }
+
+    #[test]
+    fn multi_station_improves_expansion_score() {
+        // VIO-603: deploying a second orbital station should produce a
+        // visible expansion score bump beyond the base_signal contribution.
+        let content = scored_content();
+        let state_one_station = crate::test_fixtures::base_state(&content);
+        let metrics = make_metrics(100);
+        let score_one = compute_run_score(&metrics, &state_one_station, &content);
+
+        let mut state_two_stations = crate::test_fixtures::base_state(&content);
+        state_two_stations.stations.insert(
+            crate::StationId("station_mars_orbit".to_string()),
+            crate::StationState {
+                id: crate::StationId("station_mars_orbit".to_string()),
+                position: crate::test_fixtures::test_position(),
+                core: crate::FacilityCore {
+                    inventory: vec![],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    crew: Default::default(),
+                    thermal_links: Vec::new(),
+                    power: crate::PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: std::collections::HashMap::new(),
+                    power_budget_cache: crate::PowerBudgetCache::default(),
+                },
+                leaders: Vec::new(),
+                frame_id: None,
+            },
+        );
+        let score_two = compute_run_score(&metrics, &state_two_stations, &content);
+
+        let expansion_one = score_one.dimensions.get("expansion").unwrap().raw_value;
+        let expansion_two = score_two.dimensions.get("expansion").unwrap().raw_value;
+        assert!(
+            expansion_two > expansion_one,
+            "second station should increase expansion score: {} vs {}",
+            expansion_two,
+            expansion_one
+        );
+    }
+
+    #[test]
+    fn multi_productive_stations_improve_industrial_score() {
+        // VIO-603: running N productive stations (assembler/processor)
+        // should produce a diversification bonus over concentrating
+        // all industrial output on a single station.
+        let content = scored_content();
+
+        // Baseline: single station with a processor.
+        let mut state_one = crate::test_fixtures::base_state(&content);
+        {
+            let station = state_one
+                .stations
+                .get_mut(&crate::test_fixtures::test_station_id())
+                .unwrap();
+            station.core.modules.push(crate::ModuleState {
+                id: crate::ModuleInstanceId("mod_proc_001".to_string()),
+                def_id: "module_basic_smelter".to_string(),
+                enabled: true,
+                kind_state: crate::ModuleKindState::Processor(crate::ProcessorState {
+                    threshold_kg: 500.0,
+                    ticks_since_last_run: 0,
+                    stalled: false,
+                    selected_recipe: None,
+                }),
+                wear: crate::WearState::default(),
+                thermal: None,
+                power_stalled: false,
+                module_priority: 0,
+                assigned_crew: Default::default(),
+                efficiency: 1.0,
+                prev_crew_satisfied: true,
+                slot_index: None,
+            });
+        }
+        let metrics = make_metrics(100);
+        let score_one = compute_run_score(&metrics, &state_one, &content);
+
+        // Two productive stations: insert a second one with a processor.
+        let mut state_two = state_one.clone();
+        state_two.stations.insert(
+            crate::StationId("station_mars_orbit".to_string()),
+            crate::StationState {
+                id: crate::StationId("station_mars_orbit".to_string()),
+                position: crate::test_fixtures::test_position(),
+                core: crate::FacilityCore {
+                    inventory: vec![],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![crate::ModuleState {
+                        id: crate::ModuleInstanceId("mod_proc_002".to_string()),
+                        def_id: "module_basic_smelter".to_string(),
+                        enabled: true,
+                        kind_state: crate::ModuleKindState::Processor(crate::ProcessorState {
+                            threshold_kg: 500.0,
+                            ticks_since_last_run: 0,
+                            stalled: false,
+                            selected_recipe: None,
+                        }),
+                        wear: crate::WearState::default(),
+                        thermal: None,
+                        power_stalled: false,
+                        module_priority: 0,
+                        assigned_crew: Default::default(),
+                        efficiency: 1.0,
+                        prev_crew_satisfied: true,
+                        slot_index: None,
+                    }],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    crew: Default::default(),
+                    thermal_links: Vec::new(),
+                    power: crate::PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: std::collections::HashMap::new(),
+                    power_budget_cache: crate::PowerBudgetCache::default(),
+                },
+                leaders: Vec::new(),
+                frame_id: None,
+            },
+        );
+        let score_two = compute_run_score(&metrics, &state_two, &content);
+
+        let industrial_one = score_one
+            .dimensions
+            .get("industrial_output")
+            .unwrap()
+            .raw_value;
+        let industrial_two = score_two
+            .dimensions
+            .get("industrial_output")
+            .unwrap()
+            .raw_value;
+        assert!(
+            industrial_two > industrial_one,
+            "second productive station should increase industrial score: {} vs {}",
+            industrial_two,
+            industrial_one
+        );
+    }
+
+    #[test]
+    fn unproductive_second_station_no_industrial_bonus() {
+        // VIO-603: a station with no assembler/processor should NOT
+        // contribute to the industrial diversification bonus — only
+        // productive stations count.
+        let content = scored_content();
+        let state_one = crate::test_fixtures::base_state(&content);
+        let metrics = make_metrics(100);
+        let score_one = compute_run_score(&metrics, &state_one, &content);
+
+        let mut state_two = crate::test_fixtures::base_state(&content);
+        state_two.stations.insert(
+            crate::StationId("station_mars_orbit".to_string()),
+            crate::StationState {
+                id: crate::StationId("station_mars_orbit".to_string()),
+                position: crate::test_fixtures::test_position(),
+                core: crate::FacilityCore {
+                    inventory: vec![],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    crew: Default::default(),
+                    thermal_links: Vec::new(),
+                    power: crate::PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: std::collections::HashMap::new(),
+                    power_budget_cache: crate::PowerBudgetCache::default(),
+                },
+                leaders: Vec::new(),
+                frame_id: None,
+            },
+        );
+        let score_two = compute_run_score(&metrics, &state_two, &content);
+
+        let industrial_one = score_one
+            .dimensions
+            .get("industrial_output")
+            .unwrap()
+            .raw_value;
+        let industrial_two = score_two
+            .dimensions
+            .get("industrial_output")
+            .unwrap()
+            .raw_value;
+        assert!(
+            (industrial_one - industrial_two).abs() < f64::EPSILON,
+            "empty second station should not change industrial score: {} vs {}",
+            industrial_one,
+            industrial_two
         );
     }
 
