@@ -79,5 +79,28 @@
       }
     ],
     "tags": []
+  },
+  {
+    "id": "hull_construction_vessel",
+    "name": "Construction Vessel",
+    "mass_kg": 25000.0,
+    "cargo_capacity_m3": 120.0,
+    "base_speed_ticks_per_au": 4800,
+    "base_propellant_capacity_kg": 20000.0,
+    "slots": [
+      { "slot_type": "utility", "label": "Utility 1" },
+      { "slot_type": "utility", "label": "Utility 2" },
+      { "slot_type": "propulsion", "label": "Propulsion 1" }
+    ],
+    "bonuses": [
+      {
+        "stat": "cargo_capacity",
+        "op": "pct_multiplicative",
+        "value": 1.5,
+        "source": { "hull": "hull_construction_vessel" }
+      }
+    ],
+    "required_tech": "tech_station_construction",
+    "tags": ["construction", "heavy"]
   }
 ]
