@@ -1,5 +1,6 @@
 use crate::instrumentation::{timed, TickTimings};
 use crate::research::advance_research;
+use crate::satellite::tick_satellites;
 use crate::station::{tick_ground_facilities, tick_stations};
 use crate::tasks::resolve_task;
 use crate::{Command, CommandEnvelope, GameContent, GameState, ScanSite, ShipId, SiteId, TaskKind};
@@ -17,6 +18,7 @@ pub fn trade_unlock_tick(constants: &crate::Constants) -> u64 {
 /// 2. Resolve ship tasks whose eta has arrived.
 /// 3. Tick station modules (processors, assemblers, sensors, labs, maintenance, thermal, boiloff).
 ///    3.5. Tick ground facility modules (same pipeline via proxy-station pattern).
+///    3.6. Tick satellites (survey discovery, science data, zone effect caches).
 /// 4. Advance research on all eligible techs.
 ///    4.5. Evaluate milestones (content-driven progression).
 ///    4.6. Evaluate sim events (content-driven random events).
@@ -61,6 +63,11 @@ pub fn tick(
         timings,
         tick_ground_facilities,
         tick_ground_facilities(state, content, rng, &mut events)
+    );
+    timed!(
+        timings,
+        tick_satellites,
+        tick_satellites(state, content, rng, &mut events)
     );
     timed!(
         timings,

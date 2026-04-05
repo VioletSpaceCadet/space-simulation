@@ -13,6 +13,7 @@ pub mod milestone;
 pub mod modifiers;
 pub mod propulsion;
 mod research;
+pub(crate) mod satellite;
 pub mod scoring;
 pub mod sim_events;
 pub mod spatial;
