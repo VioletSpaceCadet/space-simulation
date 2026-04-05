@@ -49,6 +49,14 @@ impl GroundFacilityConcern for SensorPurchase {
                 continue;
             }
 
+            // Skip if the module's required_tech is not unlocked — otherwise
+            // we'd import it and fail to install every tick.
+            if let Some(ref required_tech) = def.required_tech {
+                if !ctx.state.research.unlocked.contains(required_tech) {
+                    continue;
+                }
+            }
+
             // Check budget
             let item_spec = TradeItemSpec::Module {
                 module_def_id: sensor_def_id.clone(),

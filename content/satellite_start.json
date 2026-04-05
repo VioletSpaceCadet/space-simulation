@@ -334,7 +334,9 @@
   "research": {
     "unlocked": [
       "tech_satellite_basics",
-      "tech_orbital_science"
+      "tech_orbital_science",
+      "tech_ground_observation",
+      "tech_radio_astronomy"
     ],
     "data_pool": {},
     "evidence": {},
