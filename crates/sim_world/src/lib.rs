@@ -708,6 +708,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let milestones: Vec<sim_core::MilestoneDef> = load_optional_json(dir, "milestones.json")?;
     let crew_roles = load_crew_roles(dir)?;
     let recipe_map = load_recipes(dir)?;
+    let rocket_defs: Vec<sim_core::RocketDef> = load_optional_json(dir, "rockets.json")?;
     let satellite_defs = load_satellite_defs(dir)?;
     let mut content = GameContent {
         content_version: techs_file.content_version,
@@ -729,6 +730,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         crew_roles,
         scoring,
         milestones,
+        rocket_defs,
         satellite_defs,
         density_map: AHashMap::default(),
     };

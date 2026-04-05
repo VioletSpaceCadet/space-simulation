@@ -413,6 +413,7 @@ pub fn base_content() -> GameContent {
         crew_roles: BTreeMap::new(),
         scoring: Default::default(),
         milestones: Vec::new(),
+        rocket_defs: Vec::new(),
         satellite_defs: std::collections::BTreeMap::new(),
         density_map: AHashMap::default(),
     };
@@ -664,6 +665,7 @@ pub fn minimal_content() -> GameContent {
         crew_roles: BTreeMap::new(),
         scoring: Default::default(),
         milestones: Vec::new(),
+        rocket_defs: Vec::new(),
         satellite_defs: std::collections::BTreeMap::new(),
         density_map: AHashMap::default(),
     };

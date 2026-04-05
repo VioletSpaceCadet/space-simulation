@@ -1,0 +1,38 @@
+[
+  {
+    "id": "rocket_sounding",
+    "name": "Sounding Rocket",
+    "payload_capacity_kg": 200.0,
+    "base_launch_cost": 2000000.0,
+    "fuel_kg": 500.0,
+    "transit_minutes": 30,
+    "required_tech": null
+  },
+  {
+    "id": "rocket_light",
+    "name": "Light Launcher",
+    "payload_capacity_kg": 1500.0,
+    "base_launch_cost": 15000000.0,
+    "fuel_kg": 8000.0,
+    "transit_minutes": 120,
+    "required_tech": "tech_basic_rocketry"
+  },
+  {
+    "id": "rocket_medium",
+    "name": "Medium Launcher",
+    "payload_capacity_kg": 16000.0,
+    "base_launch_cost": 67000000.0,
+    "fuel_kg": 400000.0,
+    "transit_minutes": 180,
+    "required_tech": "tech_medium_rocketry"
+  },
+  {
+    "id": "rocket_heavy",
+    "name": "Heavy Launcher",
+    "payload_capacity_kg": 64000.0,
+    "base_launch_cost": 150000000.0,
+    "fuel_kg": 1200000.0,
+    "transit_minutes": 240,
+    "required_tech": "tech_heavy_rocketry"
+  }
+]
