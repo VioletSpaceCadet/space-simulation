@@ -252,6 +252,7 @@
   {
     "id": "module_optical_telescope",
     "name": "Optical Telescope",
+    "required_tech": "tech_ground_observation",
     "mass_kg": 3000.0,
     "volume_m3": 8.0,
     "power_consumption_per_run": 5.0,
@@ -275,6 +276,7 @@
   {
     "id": "module_radio_telescope",
     "name": "Radio Telescope",
+    "required_tech": "tech_radio_astronomy",
     "mass_kg": 5000.0,
     "volume_m3": 15.0,
     "power_consumption_per_run": 12.0,
