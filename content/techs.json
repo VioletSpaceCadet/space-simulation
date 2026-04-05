@@ -218,6 +218,51 @@
           "value": 1.0
         }
       ]
+    },
+    {
+      "id": "tech_basic_rocketry",
+      "name": "Basic Rocketry",
+      "prereqs": [],
+      "domain_requirements": {
+        "Survey": 15.0,
+        "Manufacturing": 10.0
+      },
+      "accepted_data": [
+        "SurveyData",
+        "OpticalData",
+        "ManufacturingData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_medium_rocketry",
+      "name": "Medium Rocketry",
+      "prereqs": ["tech_basic_rocketry"],
+      "domain_requirements": {
+        "Survey": 30.0,
+        "Manufacturing": 25.0
+      },
+      "accepted_data": [
+        "SurveyData",
+        "RadioData",
+        "ManufacturingData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_heavy_rocketry",
+      "name": "Heavy Rocketry",
+      "prereqs": ["tech_medium_rocketry"],
+      "domain_requirements": {
+        "Survey": 50.0,
+        "Manufacturing": 45.0,
+        "Materials": 30.0
+      },
+      "accepted_data": [
+        "RadioData",
+        "ManufacturingData"
+      ],
+      "effects": []
     }
   ]
 }

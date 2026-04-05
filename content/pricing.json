@@ -296,6 +296,30 @@
       "exportable": false,
       "category": "component"
     },
+    "nozzle": {
+      "base_price_per_unit": 100000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "rocket_sounding": {
+      "base_price_per_unit": 500000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "rocket_light": {
+      "base_price_per_unit": 2000000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
+    "rocket_medium": {
+      "base_price_per_unit": 4500000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
     "module_ground_workshop": {
       "base_price_per_unit": 15000000.0,
       "importable": true,
