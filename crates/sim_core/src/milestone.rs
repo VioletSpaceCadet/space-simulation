@@ -27,6 +27,37 @@ fn resolve_counter(state: &GameState, counter: &str) -> Option<f64> {
                 .count();
             Some(count as f64)
         }
+        "satellites_deployed" => {
+            Some(state.satellites.values().filter(|s| s.enabled).count() as f64)
+        }
+        "comm_satellites" => Some(
+            state
+                .satellites
+                .values()
+                .filter(|s| s.enabled && s.satellite_type == "communication")
+                .count() as f64,
+        ),
+        "survey_satellites" => Some(
+            state
+                .satellites
+                .values()
+                .filter(|s| s.enabled && s.satellite_type == "survey")
+                .count() as f64,
+        ),
+        "science_satellites" => Some(
+            state
+                .satellites
+                .values()
+                .filter(|s| s.enabled && s.satellite_type == "science_platform")
+                .count() as f64,
+        ),
+        "nav_satellites" => Some(
+            state
+                .satellites
+                .values()
+                .filter(|s| s.enabled && s.satellite_type == "navigation")
+                .count() as f64,
+        ),
         _ => None,
     }
 }
@@ -404,5 +435,120 @@ mod tests {
         let mut events = Vec::new();
         let completed = evaluate_milestones(&mut state, &content, &mut events);
         assert!(completed.is_empty());
+    }
+
+    #[test]
+    fn satellite_counters_resolve() {
+        let content = base_content();
+        let mut state = base_state(&content);
+
+        // No satellites — all counters should be 0.
+        assert_eq!(resolve_counter(&state, "satellites_deployed"), Some(0.0));
+        assert_eq!(resolve_counter(&state, "comm_satellites"), Some(0.0));
+        assert_eq!(resolve_counter(&state, "survey_satellites"), Some(0.0));
+        assert_eq!(resolve_counter(&state, "science_satellites"), Some(0.0));
+
+        // Add satellites.
+        state.satellites.insert(
+            crate::SatelliteId("sat_1".into()),
+            crate::SatelliteState {
+                id: crate::SatelliteId("sat_1".into()),
+                def_id: "sat_comm_relay".into(),
+                name: "Comm 1".into(),
+                position: crate::test_fixtures::test_position(),
+                deployed_tick: 0,
+                wear: 0.0,
+                enabled: true,
+                satellite_type: "communication".into(),
+                payload_config: None,
+            },
+        );
+        state.satellites.insert(
+            crate::SatelliteId("sat_2".into()),
+            crate::SatelliteState {
+                id: crate::SatelliteId("sat_2".into()),
+                def_id: "sat_survey".into(),
+                name: "Survey 1".into(),
+                position: crate::test_fixtures::test_position(),
+                deployed_tick: 0,
+                wear: 0.0,
+                enabled: true,
+                satellite_type: "survey".into(),
+                payload_config: None,
+            },
+        );
+        state.satellites.insert(
+            crate::SatelliteId("sat_3".into()),
+            crate::SatelliteState {
+                id: crate::SatelliteId("sat_3".into()),
+                def_id: "sat_survey".into(),
+                name: "Survey 2".into(),
+                position: crate::test_fixtures::test_position(),
+                deployed_tick: 0,
+                wear: 0.0,
+                enabled: false, // disabled — should not count
+                satellite_type: "survey".into(),
+                payload_config: None,
+            },
+        );
+
+        assert_eq!(resolve_counter(&state, "satellites_deployed"), Some(2.0));
+        assert_eq!(resolve_counter(&state, "comm_satellites"), Some(1.0));
+        assert_eq!(resolve_counter(&state, "survey_satellites"), Some(1.0));
+        assert_eq!(resolve_counter(&state, "science_satellites"), Some(0.0));
+    }
+
+    #[test]
+    fn first_satellite_deployed_milestone_triggers() {
+        let mut content = base_content();
+        content.milestones = vec![MilestoneDef {
+            id: "first_satellite_deployed".into(),
+            name: "First Satellite".into(),
+            description: "Deploy a satellite".into(),
+            conditions: vec![MilestoneCondition::CounterAbove {
+                counter: "satellites_deployed".into(),
+                threshold: 1.0,
+            }],
+            rewards: MilestoneReward {
+                grant_amount: 15_000_000.0,
+                reputation: 0.0,
+                unlock_trade_tier: None,
+                unlock_zone_ids: vec![],
+                unlock_module_ids: vec![],
+            },
+            phase_advance: None,
+        }];
+
+        let mut state = base_state(&content);
+        let initial_balance = state.balance;
+
+        // No satellites — milestone should not trigger.
+        let mut events = Vec::new();
+        let completed = evaluate_milestones(&mut state, &content, &mut events);
+        assert!(completed.is_empty());
+
+        // Add a satellite.
+        state.satellites.insert(
+            crate::SatelliteId("sat_1".into()),
+            crate::SatelliteState {
+                id: crate::SatelliteId("sat_1".into()),
+                def_id: "sat_comm_relay".into(),
+                name: "Comm 1".into(),
+                position: crate::test_fixtures::test_position(),
+                deployed_tick: 0,
+                wear: 0.0,
+                enabled: true,
+                satellite_type: "communication".into(),
+                payload_config: None,
+            },
+        );
+
+        let mut events = Vec::new();
+        let completed = evaluate_milestones(&mut state, &content, &mut events);
+        assert_eq!(completed, vec!["first_satellite_deployed"]);
+        assert!(
+            (state.balance - initial_balance - 15_000_000.0).abs() < f64::EPSILON,
+            "grant should be applied"
+        );
     }
 }
