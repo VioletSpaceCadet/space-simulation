@@ -117,11 +117,11 @@ fn condition_met(
     cond: &MilestoneCondition,
     state: &GameState,
     content: &GameContent,
-    metrics: &MetricsSnapshot,
+    metrics: Option<&MetricsSnapshot>,
 ) -> bool {
     match cond {
         MilestoneCondition::MetricAbove { field, threshold } => metrics
-            .get_field_f64(field)
+            .and_then(|m| m.get_field_f64(field))
             .is_some_and(|val| val >= *threshold),
         MilestoneCondition::CounterAbove { counter, threshold } => {
             resolve_counter(state, content, counter).is_some_and(|val| val >= *threshold)
@@ -132,12 +132,30 @@ fn condition_met(
     }
 }
 
+/// Check whether any uncompleted milestone has a `MetricAbove` condition.
+/// If not, we can skip the expensive `compute_metrics` call entirely.
+fn needs_metrics(
+    milestones: &[MilestoneDef],
+    completed: &std::collections::BTreeSet<String>,
+) -> bool {
+    milestones.iter().any(|m| {
+        !completed.contains(&m.id)
+            && m.conditions
+                .iter()
+                .any(|c| matches!(c, MilestoneCondition::MetricAbove { .. }))
+    })
+}
+
 /// Evaluate all milestones against current state. Returns IDs of newly completed milestones.
 ///
 /// Milestones are evaluated in sorted order (by ID) for determinism.
 /// Multiple milestones can complete on the same tick, and chained milestones
 /// (condition: `MilestoneCompleted`) can trigger within the same evaluation
 /// pass because completions are applied immediately.
+///
+/// Optimization: `compute_metrics` is only called if at least one uncompleted
+/// milestone has a `MetricAbove` condition. Once all metric-based milestones
+/// complete, evaluation uses only counters and completion checks (O(1) each).
 pub fn evaluate_milestones(
     state: &mut GameState,
     content: &GameContent,
@@ -149,7 +167,14 @@ pub fn evaluate_milestones(
         return Vec::new();
     }
 
-    let metrics = crate::metrics::compute_metrics(state, content);
+    // Only compute metrics if at least one uncompleted milestone needs them.
+    // This avoids a full station/module/inventory walk on ticks where all
+    // remaining milestones use counters or completion checks only.
+    let metrics = if needs_metrics(&content.milestones, &state.progression.completed_milestones) {
+        Some(crate::metrics::compute_metrics(state, content))
+    } else {
+        None
+    };
 
     // Sort milestones by ID for deterministic evaluation order
     let mut sorted: Vec<&MilestoneDef> = content.milestones.iter().collect();
@@ -171,7 +196,7 @@ pub fn evaluate_milestones(
             let all_met = milestone
                 .conditions
                 .iter()
-                .all(|c| condition_met(c, state, content, &metrics));
+                .all(|c| condition_met(c, state, content, metrics.as_ref()));
 
             if all_met {
                 // Mark completed

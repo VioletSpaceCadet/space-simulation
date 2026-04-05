@@ -78,11 +78,16 @@ pub fn tick(
         advance_research,
         advance_research(state, content, &mut events)
     );
-    timed!(
-        timings,
-        evaluate_milestones,
-        crate::milestone::evaluate_milestones(state, content, &mut events)
-    );
+    // Milestones don't need per-tick evaluation. Check every 24 ticks
+    // (matching scoring interval) to avoid the per-tick overhead of
+    // iterating milestones, sorting, and potentially computing metrics.
+    if state.meta.tick.is_multiple_of(24) {
+        timed!(
+            timings,
+            evaluate_milestones,
+            crate::milestone::evaluate_milestones(state, content, &mut events)
+        );
+    }
     timed!(
         timings,
         evaluate_events,
