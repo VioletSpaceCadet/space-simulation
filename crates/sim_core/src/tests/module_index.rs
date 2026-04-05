@@ -40,6 +40,7 @@ fn module_id_index_after_install() {
         command: Command::InstallModule {
             facility_id: station_id.clone().into(),
             module_item_id: ModuleItemId("mod_item_test".to_string()),
+            slot_index: None,
         },
     };
 

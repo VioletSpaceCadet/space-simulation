@@ -29,6 +29,9 @@ impl GroundFacilityConcern for ModuleInstall {
                     Command::InstallModule {
                         facility_id: ctx.facility_id.clone().into(),
                         module_item_id: item_id.clone(),
+                        // Ground facilities are frameless; the handler
+                        // ignores slot_index on that path.
+                        slot_index: None,
                     },
                 ));
             }

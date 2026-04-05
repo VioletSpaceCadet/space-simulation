@@ -312,6 +312,7 @@ fn economy_full_loop() {
         Command::InstallModule {
             facility_id: station_id.clone().into(),
             module_item_id,
+            slot_index: None,
         },
     );
     tick(&mut state, &[cmd_install], &content, &mut rng, None);
