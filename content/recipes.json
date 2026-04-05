@@ -747,5 +747,19 @@
     "efficiency": 1.0,
     "required_tech": "tech_medium_rocketry",
     "tags": ["rocketry"]
+  },
+  {
+    "id": "recipe_station_kit",
+    "inputs": [
+      { "filter": { "Element": "Fe" }, "amount": { "Kg": 2000.0 } },
+      { "filter": { "Component": "hull_panel" }, "amount": { "Count": 4 } },
+      { "filter": { "Component": "structural_beam" }, "amount": { "Count": 6 } }
+    ],
+    "outputs": [
+      { "Component": { "component_id": "station_kit", "quality_formula": { "Fixed": 1.0 } } }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_basic_rocketry",
+    "tags": ["rocketry"]
   }
 ]

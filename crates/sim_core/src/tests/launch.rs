@@ -895,3 +895,54 @@ fn orbital_deploy_rejected_tech_gated() {
     );
     assert!(state.satellites.is_empty());
 }
+
+/// E2E: launch a station kit from ground, verify new orbital station.
+#[test]
+fn ground_to_orbit_station_kit_e2e() {
+    let content = launch_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Remove existing stations so StationKit creates the first one.
+    state.stations.clear();
+    assert!(state.stations.is_empty());
+
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::Launch {
+            facility_id: GroundFacilityId("ground_earth".to_string()),
+            rocket_def_id: "rocket_medium".to_string(),
+            payload: LaunchPayload::StationKit,
+            destination: test_position(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(&e.event, Event::PayloadLaunched { .. })),
+        "station kit should launch"
+    );
+
+    // Run ticks until transit completes.
+    let mut deployed = false;
+    for _ in 0..10 {
+        let events = tick(&mut state, &[], &content, &mut rng, None);
+        if events
+            .iter()
+            .any(|e| matches!(&e.event, Event::StationDeployed { .. }))
+        {
+            deployed = true;
+            break;
+        }
+    }
+
+    assert!(deployed, "station should deploy after transit");
+    assert_eq!(state.stations.len(), 1, "should have 1 new station");
+    let station = state.stations.values().next().unwrap();
+    assert!(station.core.cargo_capacity_m3 > 0.0);
+}

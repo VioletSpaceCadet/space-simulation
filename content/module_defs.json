@@ -718,7 +718,8 @@
           "recipe_nozzle",
           "recipe_sounding_rocket",
           "recipe_light_launcher",
-          "recipe_medium_launcher"
+          "recipe_medium_launcher",
+          "recipe_station_kit"
         ]
       }
     },

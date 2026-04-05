@@ -843,7 +843,11 @@ fn validate_satellite_payload(
 fn compute_payload_mass(payload: &crate::LaunchPayload, content: &GameContent) -> f32 {
     match payload {
         crate::LaunchPayload::Supplies(items) => crate::tasks::inventory_mass_kg(items),
-        crate::LaunchPayload::StationKit => 5000.0,
+        crate::LaunchPayload::StationKit => content
+            .component_defs
+            .iter()
+            .find(|d| d.id == "station_kit")
+            .map_or(5000.0, |d| d.mass_kg),
         crate::LaunchPayload::Satellite { satellite_def_id } => content
             .satellite_defs
             .get(satellite_def_id.as_str())
