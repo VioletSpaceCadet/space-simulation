@@ -224,6 +224,17 @@ pub enum Event {
         position: crate::Position,
         assembly_ticks: u64,
     },
+    /// Emitted when a module item arrives at a destination station via
+    /// inter-station transfer (VIO-595). The source station is included so
+    /// downstream consumers can show the full "from → to" route in the UI.
+    /// `from_station_id` is `None` for modules delivered from ground launch
+    /// or other non-station sources.
+    StationModuleDelivered {
+        station_id: StationId,
+        module_def_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from_station_id: Option<StationId>,
+    },
     ShipModuleFitted {
         ship_id: ShipId,
         slot_index: usize,
