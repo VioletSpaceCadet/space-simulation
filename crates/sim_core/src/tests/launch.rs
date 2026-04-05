@@ -251,8 +251,7 @@ fn transit_delivers_supplies_to_station() {
 
     // Run ticks until transit completes (transit_minutes=3, mpt=1 → 3 ticks).
     let mut delivered = false;
-    for tick_num in 1..10 {
-        state.meta.tick = tick_num;
+    for _ in 0..10 {
         let events = tick(&mut state, &[], &content, &mut rng, None);
         if events
             .iter()
@@ -307,8 +306,7 @@ fn station_kit_creates_new_station() {
 
     // Run ticks until transit completes (transit_minutes=3, mpt=1 → 3 ticks).
     let mut deployed = false;
-    for tick_num in 1..10 {
-        state.meta.tick = tick_num;
+    for _ in 0..10 {
         let events = tick(&mut state, &[], &content, &mut rng, None);
         if events
             .iter()
@@ -361,9 +359,8 @@ fn pad_recovers_after_countdown() {
     assert!(!pad.available);
     assert_eq!(pad.recovery_ticks_remaining, 4); // 5 - 1 (ticked on launch tick)
 
-    // Tick 4 more times to complete recovery.
-    for tick_num in 1..=4 {
-        state.meta.tick = tick_num;
+    // Tick until recovery completes.
+    for _ in 0..4 {
         tick(&mut state, &[], &content, &mut rng, None);
     }
 

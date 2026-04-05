@@ -64,6 +64,8 @@ pub fn tick(
         tick_ground_facilities,
         tick_ground_facilities(state, content, rng, &mut events)
     );
+    // Launch transit resolution + pad recovery. Not separately timed —
+    // O(facilities × transits), negligible vs station/ground ticking.
     resolve_launch_transits(state, content, rng, &mut events);
     tick_launch_pad_recovery(state, content);
     timed!(
@@ -506,31 +508,30 @@ fn resolve_launch_transits(
         facility.launch_transits = ongoing;
 
         for transit in completed {
-            // Emit delivery event.
-            events.push(crate::emit(
-                &mut state.counters,
-                current_tick,
-                crate::Event::PayloadDelivered {
-                    facility_id: facility_id.clone(),
-                    rocket_def_id: transit.rocket_def_id.clone(),
-                    payload: transit.payload.clone(),
-                    destination: transit.destination.clone(),
-                },
-            ));
-
+            let payload_for_event = transit.payload.clone();
             match transit.payload {
                 crate::LaunchPayload::Supplies(items) => {
-                    // Find the station closest to destination and deliver.
                     let target_station = find_nearest_station(state, &transit.destination, content);
-                    if let Some(station_id) = target_station {
-                        if let Some(station) = state.stations.get_mut(&station_id) {
-                            crate::trade::merge_into_inventory(&mut station.core.inventory, items);
-                            station.core.invalidate_volume_cache();
-                        }
-                    }
+                    let Some(station_id) = target_station else {
+                        continue;
+                    };
+                    let Some(station) = state.stations.get_mut(&station_id) else {
+                        continue;
+                    };
+                    crate::trade::merge_into_inventory(&mut station.core.inventory, items);
+                    station.core.invalidate_volume_cache();
+                    events.push(crate::emit(
+                        &mut state.counters,
+                        current_tick,
+                        crate::Event::PayloadDelivered {
+                            facility_id: facility_id.clone(),
+                            rocket_def_id: transit.rocket_def_id.clone(),
+                            payload: payload_for_event,
+                            destination: transit.destination.clone(),
+                        },
+                    ));
                 }
                 crate::LaunchPayload::StationKit => {
-                    // Create a new orbital station at the destination.
                     let uuid = crate::generate_uuid(rng);
                     let station_id = crate::StationId(format!("station_{uuid}"));
                     let station = crate::StationState {
@@ -543,6 +544,16 @@ fn resolve_launch_transits(
                         leaders: Vec::new(),
                     };
                     state.stations.insert(station_id.clone(), station);
+                    events.push(crate::emit(
+                        &mut state.counters,
+                        current_tick,
+                        crate::Event::PayloadDelivered {
+                            facility_id: facility_id.clone(),
+                            rocket_def_id: transit.rocket_def_id.clone(),
+                            payload: payload_for_event,
+                            destination: transit.destination.clone(),
+                        },
+                    ));
                     events.push(crate::emit(
                         &mut state.counters,
                         current_tick,
