@@ -64,7 +64,7 @@ fn tick_survey_satellite(
     let multiplier = def
         .behavior_config
         .get("discovery_multiplier")
-        .and_then(|v| v.as_f64())
+        .and_then(serde_json::Value::as_f64)
         .unwrap_or(2.0);
 
     let at_cap = state.scan_sites.len() >= content.constants.replenish_target_count as usize;
@@ -131,7 +131,7 @@ fn tick_science_satellite(
     let multiplier = def
         .behavior_config
         .get("data_multiplier")
-        .and_then(|v| v.as_f64())
+        .and_then(serde_json::Value::as_f64)
         .unwrap_or(4.0) as f32;
 
     // Science platforms generate orbital observation data.
