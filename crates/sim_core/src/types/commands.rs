@@ -130,4 +130,10 @@ pub enum Command {
         element: String,
         kg: f32,
     },
+    /// Deploy a satellite from an orbital station's inventory into the same zone.
+    DeploySatellite {
+        station_id: StationId,
+        /// Matches `SatelliteDef.id` and `ComponentId` of the satellite product.
+        satellite_def_id: String,
+    },
 }
