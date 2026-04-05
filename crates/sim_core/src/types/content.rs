@@ -383,6 +383,8 @@ pub struct SatelliteDef {
     #[serde(default)]
     pub required_tech: Option<crate::TechId>,
     /// Type-specific behavior configuration (opaque to the type system).
+    /// Uses `serde_json::Value` for content-driven extensibility — adding a new
+    /// satellite type with different config shape requires only a JSON entry change.
     #[serde(default)]
     pub behavior_config: serde_json::Value,
 }

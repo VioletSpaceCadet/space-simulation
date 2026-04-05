@@ -86,9 +86,12 @@ fn satellite_state_backward_compatible_missing_field() {
 
 #[test]
 fn game_state_backward_compatible_no_satellites() {
-    // GameState.satellites has #[serde(default)] so old saves without it should work.
-    // Verified implicitly by test_state() which constructs a GameState without satellites.
+    // Serialize a GameState, strip the "satellites" key, and verify deserialization
+    // still succeeds (serde(default) fills in an empty BTreeMap).
     let content = super::test_content();
     let state = super::test_state(&content);
-    assert!(state.satellites.is_empty());
+    let mut json_value: serde_json::Value = serde_json::to_value(&state).unwrap();
+    json_value.as_object_mut().unwrap().remove("satellites");
+    let restored: crate::GameState = serde_json::from_value(json_value).unwrap();
+    assert!(restored.satellites.is_empty());
 }

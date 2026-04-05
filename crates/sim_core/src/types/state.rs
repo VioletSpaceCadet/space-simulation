@@ -586,6 +586,9 @@ pub struct SatelliteState {
     /// Tick at which this satellite was deployed.
     pub deployed_tick: u64,
     /// Wear level 0.0 (pristine) to 1.0 (failed). Accumulates each tick.
+    /// f64 (not f32 like module WearState) because satellite wear rates are very
+    /// low (e.g. 0.00008/tick) and accumulate over 10,000+ tick lifespans where
+    /// f32 would lose meaningful precision.
     pub wear: f64,
     pub enabled: bool,
     /// Content-driven type string: "survey", "communication", "navigation", "`science_platform`".
