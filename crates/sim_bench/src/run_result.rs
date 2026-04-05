@@ -69,6 +69,8 @@ pub struct SummaryMetrics {
     pub overheat_warning_count: u32,
     pub overheat_critical_count: u32,
     pub heat_wear_multiplier_avg: f64,
+    pub satellites_active: u32,
+    pub satellites_failed: u32,
 }
 
 impl SummaryMetrics {
@@ -101,6 +103,8 @@ impl SummaryMetrics {
             overheat_warning_count: snapshot.overheat_warning_count,
             overheat_critical_count: snapshot.overheat_critical_count,
             heat_wear_multiplier_avg: f64::from(snapshot.heat_wear_multiplier_avg),
+            satellites_active: snapshot.satellites_active,
+            satellites_failed: snapshot.satellites_failed,
         }
     }
 }
@@ -226,6 +230,8 @@ mod tests {
             overheat_warning_count: 0,
             overheat_critical_count: 0,
             heat_wear_multiplier_avg: 0.0,
+            satellites_active: 0,
+            satellites_failed: 0,
         }
     }
 

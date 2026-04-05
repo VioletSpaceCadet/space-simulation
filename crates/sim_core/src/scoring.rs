@@ -190,7 +190,7 @@ fn compute_dimension_raw(
 ) -> f64 {
     match dimension_id {
         "industrial_output" => compute_industrial(metrics, tick),
-        "research_progress" => compute_research(metrics, content),
+        "research_progress" => compute_research(metrics, state, content),
         "economic_health" => compute_economic(metrics, state, tick),
         "fleet_operations" => compute_fleet(metrics, state),
         "efficiency" => compute_efficiency(metrics),
@@ -210,13 +210,20 @@ fn compute_industrial(metrics: &MetricsSnapshot, tick: f64) -> f64 {
     throughput + f64::from(assembler_active) * 0.1
 }
 
-/// Research Progress: fraction of techs unlocked + scan data growth.
-fn compute_research(metrics: &MetricsSnapshot, content: &GameContent) -> f64 {
+/// Research Progress: fraction of techs unlocked + scan data growth + science satellites.
+fn compute_research(metrics: &MetricsSnapshot, state: &GameState, content: &GameContent) -> f64 {
     let total_techs = content.techs.len().max(1) as f64;
     let tech_fraction = f64::from(metrics.techs_unlocked) / total_techs;
     let data_signal = (f64::from(metrics.total_scan_data) / 1000.0).min(1.0);
-    // Blend: 70% tech unlock fraction, 30% data accumulation signal
-    tech_fraction * 0.7 + data_signal * 0.3
+    // Science satellites contribute to research capability.
+    let science_count = state
+        .satellites
+        .values()
+        .filter(|s| s.enabled && s.satellite_type == "science_platform")
+        .count() as f64;
+    let science_signal = (science_count / 3.0).min(1.0);
+    // Blend: 60% tech unlocks, 25% data accumulation, 15% science infrastructure
+    tech_fraction * 0.6 + data_signal * 0.25 + science_signal * 0.15
 }
 
 /// Economic Health: balance trend + export revenue per tick.
@@ -229,18 +236,20 @@ fn compute_economic(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> 
     balance_ratio * 0.5 + revenue_signal * 0.5
 }
 
-/// Fleet Operations: utilization + fleet size.
+/// Fleet Operations: utilization + fleet size + satellite deployments.
 fn compute_fleet(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     let total = f64::from(metrics.fleet_total).max(1.0);
     let active = total - f64::from(metrics.fleet_idle);
     let utilization = active / total;
     let ships_constructed = state.ships.len().saturating_sub(1) as f64; // subtract starting ship
     let construction_signal = (ships_constructed / 5.0).min(1.0);
-    // Blend: 60% utilization, 40% fleet growth
-    utilization * 0.6 + construction_signal * 0.4
+    // Satellite deployments count as completed missions (sqrt diminishing returns).
+    let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
+    // Blend: 50% utilization, 30% fleet growth, 20% satellite deployments
+    utilization * 0.5 + construction_signal * 0.3 + satellite_signal * 0.2
 }
 
-/// Efficiency: inverted wear + power utilization + storage balance.
+/// Efficiency: inverted wear + power utilization + storage balance + satellite utilization.
 fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
     let wear_score = 1.0 - f64::from(metrics.avg_module_wear);
     let power_util = if metrics.power_generated_kw > 0.0 {
@@ -257,17 +266,26 @@ fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
     } else {
         1.0
     };
-    // Equal blend of three efficiency signals
-    (wear_score + power_util + storage_score) / 3.0
+    // Satellite utilization: active / total (1.0 if no satellites yet).
+    let total_sats = f64::from(metrics.satellites_active + metrics.satellites_failed);
+    let sat_util = if total_sats > 0.0 {
+        f64::from(metrics.satellites_active) / total_sats
+    } else {
+        1.0
+    };
+    // Blend: 25% each of four efficiency signals
+    (wear_score + power_util + storage_score + sat_util) / 4.0
 }
 
-/// Expansion: station count + fleet size (sqrt diminishing returns).
+/// Expansion: station count + fleet size + satellite count (sqrt diminishing returns).
 fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     let station_count = state.stations.len() as f64;
     let station_signal = (station_count / 3.0).min(1.0);
     let fleet_signal = (f64::from(metrics.fleet_total).sqrt() / 3.0).min(1.0);
-    // Blend: 50% stations, 50% fleet reach
-    station_signal * 0.5 + fleet_signal * 0.5
+    // Satellites contribute to expansion (orbital infrastructure).
+    let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
+    // Blend: 40% stations, 30% fleet reach, 30% satellite infrastructure
+    station_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3
 }
 
 /// Resolve the highest threshold name for a given composite score.
@@ -563,6 +581,8 @@ mod tests {
             overheat_warning_count: 0,
             overheat_critical_count: 0,
             heat_wear_multiplier_avg: 1.0,
+            satellites_active: 0,
+            satellites_failed: 0,
         }
     }
 

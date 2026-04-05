@@ -165,6 +165,10 @@ pub struct MetricsSnapshot {
     pub overheat_warning_count: u32,
     pub overheat_critical_count: u32,
     pub heat_wear_multiplier_avg: f32,
+
+    // Satellites
+    pub satellites_active: u32,
+    pub satellites_failed: u32,
 }
 
 impl MetricsSnapshot {
@@ -187,6 +191,9 @@ impl MetricsSnapshot {
                 "heat_wear_multiplier_avg",
                 F32(self.heat_wear_multiplier_avg),
             ),
+            // Satellites
+            ("satellites_active", U32(self.satellites_active)),
+            ("satellites_failed", U32(self.satellites_failed)),
         ]);
         fields
     }
@@ -325,6 +332,9 @@ impl MetricsSnapshot {
             ("overheat_warning_count", U32),
             ("overheat_critical_count", U32),
             ("heat_wear_multiplier_avg", F32),
+            // Satellites
+            ("satellites_active", U32),
+            ("satellites_failed", U32),
         ]
     }
 
@@ -787,6 +797,8 @@ impl MetricsAccumulator {
             overheat_warning_count: self.overheat_warning_count,
             overheat_critical_count: self.overheat_critical_count,
             heat_wear_multiplier_avg: avgs.heat_wear_multiplier_avg,
+            satellites_active: state.satellites.values().filter(|s| s.enabled).count() as u32,
+            satellites_failed: state.satellites.values().filter(|s| !s.enabled).count() as u32,
         }
     }
 }

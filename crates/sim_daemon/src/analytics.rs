@@ -387,6 +387,8 @@ mod tests {
             overheat_warning_count: 0,
             overheat_critical_count: 0,
             heat_wear_multiplier_avg: 0.0,
+            satellites_active: 0,
+            satellites_failed: 0,
         }
     }
 
