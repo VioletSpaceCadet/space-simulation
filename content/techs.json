@@ -4,6 +4,7 @@
     {
       "id": "tech_deep_scan_v1",
       "name": "Deep Scan v1",
+      "tier": 1,
       "prereqs": [],
       "domain_requirements": {
         "Survey": 20.0
@@ -113,6 +114,7 @@
     {
       "id": "tech_solar_efficiency",
       "name": "Solar Efficiency",
+      "tier": 1,
       "prereqs": [],
       "domain_requirements": {
         "Manufacturing": 10.0,
@@ -135,6 +137,7 @@
     {
       "id": "tech_electrolysis_efficiency",
       "name": "Electrolysis Efficiency",
+      "tier": 1,
       "prereqs": [],
       "domain_requirements": {
         "Materials": 15.0,
@@ -203,6 +206,7 @@
     {
       "id": "tech_battery_storage",
       "name": "Advanced Battery Storage",
+      "tier": 1,
       "prereqs": [],
       "domain_requirements": {
         "Manufacturing": 15.0
@@ -222,7 +226,8 @@
     {
       "id": "tech_basic_rocketry",
       "name": "Basic Rocketry",
-      "prereqs": ["tech_deep_scan_v1"],
+      "tier": 1,
+      "prereqs": ["tech_ground_observation"],
       "domain_requirements": {
         "Survey": 40.0,
         "Manufacturing": 30.0
@@ -267,6 +272,7 @@
     {
       "id": "tech_satellite_basics",
       "name": "Satellite Basics",
+      "tier": 1,
       "prereqs": ["tech_basic_rocketry"],
       "domain_requirements": {
         "Survey": 30.0,
@@ -288,6 +294,35 @@
       },
       "accepted_data": [
         "SurveyData",
+        "OpticalData",
+        "RadioData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_ground_observation",
+      "name": "Ground Observation",
+      "tier": 1,
+      "prereqs": [],
+      "domain_requirements": {
+        "Survey": 5.0
+      },
+      "accepted_data": [
+        "SurveyData",
+        "OpticalData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_radio_astronomy",
+      "name": "Radio Astronomy",
+      "tier": 1,
+      "prereqs": ["tech_ground_observation"],
+      "domain_requirements": {
+        "Survey": 10.0,
+        "Materials": 5.0
+      },
+      "accepted_data": [
         "OpticalData",
         "RadioData"
       ],
