@@ -1,7 +1,7 @@
 //! Satellite tick behavior — per-type evaluation and zone effects.
 //!
 //! Called as a top-level tick step after ground facilities and before research.
-//! Iterates satellites sorted by `SatelliteId` (BTreeMap order) for determinism.
+//! Iterates satellites sorted by `SatelliteId` (`BTreeMap` order) for determinism.
 
 use crate::{
     research::generate_data, DataKind, Event, EventEnvelope, GameContent, GameState, SatelliteId,
@@ -128,6 +128,7 @@ fn tick_science_satellite(
     let Some(def) = content.satellite_defs.get(def_id) else {
         return;
     };
+    #[allow(clippy::cast_possible_truncation)] // config value; truncation harmless
     let multiplier = def
         .behavior_config
         .get("data_multiplier")
