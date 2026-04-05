@@ -513,6 +513,9 @@ fn resolve_assembler_run(
                     propellant_capacity_kg: hull.base_propellant_capacity_kg,
                     crew: std::collections::BTreeMap::new(),
                     leaders: Vec::new(),
+                    // VIO-486: ships built by a shipyard belong to the
+                    // station that built them.
+                    home_station: Some(ctx.station_id.clone()),
                 };
                 crate::commands::recompute_ship_stats(&mut ship, content);
                 ship.propellant_kg = ship.propellant_capacity_kg;
@@ -1170,6 +1173,14 @@ mod assembler_component_tests {
             .iter()
             .any(|e| matches!(&e.event, Event::ShipConstructed { .. }));
         assert!(constructed, "expected ShipConstructed event");
+
+        // VIO-486: ships built by a shipyard assembler belong to the
+        // building station.
+        assert_eq!(
+            ship.home_station,
+            Some(station_id.clone()),
+            "shipyard-built ship should have home_station = building station"
+        );
 
         // Inputs should be consumed: Fe 200 - 100 = 100
         let station = state.stations.get(&station_id).unwrap();

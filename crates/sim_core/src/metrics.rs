@@ -1137,6 +1137,7 @@ mod tests {
             propellant_capacity_kg: 0.0,
             crew: Default::default(),
             leaders: Vec::new(),
+            home_station: None,
         }
     }
 

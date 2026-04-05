@@ -241,6 +241,7 @@ mod tests {
             speed_ticks_per_au: None,
             crew: BTreeMap::new(),
             leaders: vec![],
+            home_station: None,
         };
         state.ships.insert(test_ship_id(), ship);
         (state, content)
