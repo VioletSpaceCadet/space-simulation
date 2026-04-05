@@ -452,6 +452,23 @@ export const eventSchemas = {
     new_threshold: z.string(),
     composite_score: z.number(),
   }),
+
+  SatelliteDeployed: z.object({
+    satellite_id: z.string(),
+    position: positionSchema,
+    satellite_type: z.string(),
+  }),
+
+  SatelliteFailed: z.object({
+    satellite_id: z.string(),
+    satellite_type: z.string(),
+  }),
+
+  CommTierChanged: z.object({
+    zone_id: z.string(),
+    old_tier: z.string(),
+    new_tier: z.string(),
+  }),
 } as const;
 
 export type EventSchemas = typeof eventSchemas;

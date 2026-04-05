@@ -928,6 +928,9 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   PhaseAdvanced: noOp,
   GrantAwarded: noOp,
   OperatingCostDeducted: noOp,
+  SatelliteDeployed: noOp,
+  SatelliteFailed: noOp,
+  CommTierChanged: noOp,
 };
 
 export function applyEvents(

@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     AlertSeverity, AnomalyTag, AsteroidId, BehaviorType, ComponentId, CompositionVec, CrewRole,
     DataKind, ElementId, EventId, FittedModule, HullId, InventoryItem, ModuleDefId,
-    ModuleInstanceId, ModuleItemId, PowerState, RecipeId, ResearchDomain, ShipId, SiteId,
-    StationId, TechId, TradeItemSpec,
+    ModuleInstanceId, ModuleItemId, PowerState, RecipeId, ResearchDomain, SatelliteId, ShipId,
+    SiteId, StationId, TechId, TradeItemSpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -386,5 +386,22 @@ pub enum Event {
         facility_name: String,
         amount: f64,
         balance_after: f64,
+    },
+    /// Emitted when a satellite is deployed into orbit.
+    SatelliteDeployed {
+        satellite_id: SatelliteId,
+        position: crate::Position,
+        satellite_type: String,
+    },
+    /// Emitted when a satellite's wear reaches 1.0 and it ceases functioning.
+    SatelliteFailed {
+        satellite_id: SatelliteId,
+        satellite_type: String,
+    },
+    /// Emitted when a zone's communication tier changes (satellite deployed/failed).
+    CommTierChanged {
+        zone_id: String,
+        old_tier: String,
+        new_tier: String,
     },
 }
