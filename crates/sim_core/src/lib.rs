@@ -24,7 +24,7 @@ pub mod trade;
 mod types;
 pub mod wear;
 
-pub use commands::recompute_ship_stats;
+pub use commands::{recompute_ship_stats, recompute_station_stats};
 pub use engine::{tick, trade_unlock_tick};
 pub use id::generate_uuid;
 pub use instrumentation::{compute_step_stats, StepStats, TickTimings};

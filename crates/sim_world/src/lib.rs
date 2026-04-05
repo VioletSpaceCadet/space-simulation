@@ -932,7 +932,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
     let c = &content.constants;
     let station_id = StationId("station_earth_orbit".to_string());
 
-    let station = StationState {
+    let mut station = StationState {
         id: station_id.clone(),
         position: earth_orbit_pos.clone(),
         core: sim_core::FacilityCore {
@@ -963,6 +963,10 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         },
         leaders: Vec::new(),
     };
+    // SF-04: Apply frame bonuses through the modifier pipeline. This is a
+    // no-op when the station is frameless (test fixtures without frame
+    // content), so it is safe to call unconditionally.
+    sim_core::recompute_station_stats(&mut station, content);
     let (ship_id, ship) = build_initial_ship(content, c, &earth_orbit_pos);
     // Place scan sites in zone bodies using weighted picking + area-sampled positions.
     let zone_bodies: Vec<&sim_core::OrbitalBodyDef> = content
