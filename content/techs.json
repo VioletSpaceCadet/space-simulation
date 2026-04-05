@@ -26,6 +26,7 @@
     {
       "id": "tech_advanced_refining",
       "name": "Advanced Refining",
+      "tier": 2,
       "prereqs": [],
       "domain_requirements": {
         "Materials": 30.0,
@@ -48,6 +49,7 @@
     {
       "id": "tech_ship_construction",
       "name": "Ship Construction",
+      "tier": 2,
       "prereqs": [],
       "domain_requirements": {
         "Manufacturing": 40.0
@@ -87,6 +89,7 @@
     {
       "id": "tech_advanced_manufacturing",
       "name": "Advanced Manufacturing",
+      "tier": 2,
       "prereqs": [],
       "domain_requirements": {
         "Manufacturing": 50.0
@@ -160,6 +163,7 @@
     {
       "id": "tech_cryo_insulation",
       "name": "Cryo Insulation",
+      "tier": 2,
       "prereqs": [],
       "domain_requirements": {
         "Materials": 20.0,
@@ -242,6 +246,7 @@
     {
       "id": "tech_medium_rocketry",
       "name": "Medium Rocketry",
+      "tier": 2,
       "prereqs": ["tech_basic_rocketry"],
       "domain_requirements": {
         "Survey": 60.0,
@@ -287,6 +292,7 @@
     {
       "id": "tech_orbital_science",
       "name": "Orbital Science",
+      "tier": 2,
       "prereqs": ["tech_satellite_basics"],
       "domain_requirements": {
         "Survey": 50.0,
@@ -325,6 +331,68 @@
       "accepted_data": [
         "OpticalData",
         "RadioData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_navigation_systems",
+      "name": "Navigation Systems",
+      "tier": 2,
+      "prereqs": ["tech_satellite_basics"],
+      "domain_requirements": {
+        "Survey": 30.0,
+        "Engineering": 20.0
+      },
+      "accepted_data": [
+        "SurveyData",
+        "EngineeringData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_advanced_comm",
+      "name": "Advanced Communications",
+      "tier": 2,
+      "prereqs": ["tech_satellite_basics"],
+      "domain_requirements": {
+        "Engineering": 30.0,
+        "Materials": 20.0
+      },
+      "accepted_data": [
+        "EngineeringData",
+        "AssayData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_spectroscopy",
+      "name": "Spectroscopy",
+      "tier": 2,
+      "prereqs": ["tech_radio_astronomy"],
+      "domain_requirements": {
+        "Survey": 30.0,
+        "Materials": 25.0
+      },
+      "accepted_data": [
+        "OpticalData",
+        "RadioData",
+        "AssayData"
+      ],
+      "effects": []
+    },
+    {
+      "id": "tech_infrared_sensing",
+      "name": "Infrared Sensing",
+      "tier": 2,
+      "prereqs": ["tech_radio_astronomy"],
+      "domain_requirements": {
+        "Survey": 35.0,
+        "Engineering": 15.0
+      },
+      "accepted_data": [
+        "SurveyData",
+        "OpticalData",
+        "EngineeringData"
       ],
       "effects": []
     }
