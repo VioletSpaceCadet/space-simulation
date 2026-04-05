@@ -85,6 +85,7 @@ fn test_refinery_skips_when_below_threshold() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     station.core.inventory.push(InventoryItem::Ore {
         lot_id: LotId("lot_0001".to_string()),

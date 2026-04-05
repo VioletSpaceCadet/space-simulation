@@ -52,6 +52,7 @@ pub fn test_module(def_id: &str, kind_state: ModuleKindState) -> ModuleState {
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     }
 }
 
@@ -424,6 +425,7 @@ pub fn base_content() -> GameContent {
         milestones: Vec::new(),
         rocket_defs: std::collections::BTreeMap::new(),
         satellite_defs: std::collections::BTreeMap::new(),
+        frames: std::collections::BTreeMap::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -684,6 +686,7 @@ pub fn minimal_content() -> GameContent {
         milestones: Vec::new(),
         rocket_defs: std::collections::BTreeMap::new(),
         satellite_defs: std::collections::BTreeMap::new(),
+        frames: std::collections::BTreeMap::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -751,6 +754,7 @@ pub fn base_state(content: &GameContent) -> GameState {
                     power_budget_cache: crate::PowerBudgetCache::default(),
                 },
                 leaders: Vec::new(),
+                frame_id: None,
             },
         )]
         .into_iter()
@@ -877,6 +881,7 @@ fn smelter_module(temp_mk: u32) -> ModuleState {
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     }
 }
 
@@ -897,6 +902,7 @@ fn radiator_module() -> ModuleState {
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     }
 }
 

@@ -790,6 +790,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         alert_rules,
         events: sim_events,
         hulls,
+        frames: std::collections::BTreeMap::new(),
         fitting_templates,
         initial_station,
         autopilot,
@@ -898,6 +899,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             module_id_index: std::collections::HashMap::new(),
             power_budget_cache: sim_core::PowerBudgetCache::default(),
         },
+        frame_id: None,
         leaders: Vec::new(),
     };
     let (ship_id, ship) = build_initial_ship(content, c, &earth_orbit_pos);
@@ -1663,6 +1665,7 @@ mod tests {
                         power_budget_cache: sim_core::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()

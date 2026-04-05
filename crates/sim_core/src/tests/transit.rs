@@ -96,6 +96,7 @@ fn transit_moves_ship_and_starts_next_task() {
                     power_budget_cache: crate::PowerBudgetCache::default(),
                 },
                 leaders: Vec::new(),
+                frame_id: None,
             },
         )]
         .into_iter()
@@ -299,6 +300,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
                     power_budget_cache: crate::PowerBudgetCache::default(),
                 },
                 leaders: Vec::new(),
+                frame_id: None,
             },
         )]
         .into_iter()

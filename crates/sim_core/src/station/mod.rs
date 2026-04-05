@@ -300,6 +300,7 @@ pub(crate) fn tick_ground_facilities(
             id: proxy_station_id.clone(),
             position: gf.position.clone(),
             core: std::mem::take(&mut gf.core),
+            frame_id: None,
             leaders: Vec::new(),
         };
         state.stations.insert(proxy_station_id.clone(), proxy);
@@ -1155,6 +1156,7 @@ mod framework_tests {
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
                             thermal: None,
+                            slot_index: None,
                         }],
                         modifiers: crate::modifiers::ModifierSet::default(),
                         crew: Default::default(),
@@ -1166,6 +1168,7 @@ mod framework_tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()
@@ -1609,6 +1612,7 @@ mod framework_tests {
             prev_crew_satisfied: true,
             thermal: None,
             module_priority: 0,
+            slot_index: None,
         };
         let sensor_module = ModuleState {
             id: ModuleInstanceId("gf_sensor_001".to_string()),
@@ -1624,6 +1628,7 @@ mod framework_tests {
             prev_crew_satisfied: true,
             thermal: None,
             module_priority: 0,
+            slot_index: None,
         };
         let gf = crate::GroundFacilityState {
             id: gf_id.clone(),

@@ -49,6 +49,7 @@ fn state_with_solar_array(content: &GameContent) -> GameState {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     state
 }
@@ -108,6 +109,7 @@ fn power_budget_with_consumer() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -170,6 +172,7 @@ fn power_budget_deficit_when_insufficient() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -315,6 +318,7 @@ fn solar_tech_modifier_does_not_affect_battery() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Add SolarOutput modifier — should NOT affect battery capacity
@@ -366,6 +370,7 @@ fn power_consumption_reduced_by_tech_modifier() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Add -40% power consumption modifier
@@ -415,6 +420,7 @@ fn power_consumption_modifier_prevents_stall() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     station.core.modules.push(ModuleState {
         id: ModuleInstanceId("sensor_inst_0001".to_string()),
@@ -428,6 +434,7 @@ fn power_consumption_modifier_prevents_stall() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Add -40% power consumption modifier
@@ -514,6 +521,7 @@ fn power_stall_lowest_priority_first() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     };
 
     // Add refinery (priority 3, 10 kW) and sensor (priority 0, 8 kW)
@@ -536,6 +544,7 @@ fn power_stall_lowest_priority_first() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     station.core.modules.push(ModuleState {
         id: ModuleInstanceId("sensor_inst_0001".to_string()),
@@ -549,6 +558,7 @@ fn power_stall_lowest_priority_first() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -598,6 +608,7 @@ fn power_stall_no_stalling_without_solar_arrays() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -635,6 +646,7 @@ fn power_stall_clears_when_power_restored() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     station.core.modules.push(ModuleState {
         id: ModuleInstanceId("sensor_inst_0001".to_string()),
@@ -648,6 +660,7 @@ fn power_stall_clears_when_power_restored() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Phase 1: tick with deficit — sensor should be stalled
@@ -718,6 +731,7 @@ fn battery_charges_from_surplus() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -777,6 +791,7 @@ fn battery_discharges_to_cover_deficit() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     station.core.modules.push(ModuleState {
         id: ModuleInstanceId("hungry_inst_0001".to_string()),
@@ -795,6 +810,7 @@ fn battery_discharges_to_cover_deficit() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -866,6 +882,7 @@ fn battery_partial_discharge_then_stall() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     station.core.modules.push(ModuleState {
         id: ModuleInstanceId("hungry_inst_0001".to_string()),
@@ -884,6 +901,7 @@ fn battery_partial_discharge_then_stall() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -928,6 +946,7 @@ fn battery_charge_limited_by_capacity() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -964,6 +983,7 @@ fn battery_wear_reduces_effective_capacity() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -1005,6 +1025,7 @@ fn battery_not_stalled_by_power_system() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     let mut rng = make_rng();
@@ -1037,6 +1058,7 @@ fn battery_capacity_doubled_by_tech_modifier() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Add +100% battery capacity modifier (2x capacity → 200 kWh)
@@ -1097,6 +1119,7 @@ fn battery_discharge_rate_unchanged_by_capacity_modifier() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     station.core.modules.push(ModuleState {
         id: ModuleInstanceId("hungry_inst_0001".to_string()),
@@ -1115,6 +1138,7 @@ fn battery_discharge_rate_unchanged_by_capacity_modifier() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Add +100% battery capacity modifier

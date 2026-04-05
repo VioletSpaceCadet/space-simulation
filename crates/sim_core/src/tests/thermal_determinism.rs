@@ -45,6 +45,7 @@ fn hot_smelter_with_radiators_state(content: &crate::GameContent) -> crate::Game
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     });
     station.core.modules.push(crate::ModuleState {
         id: ModuleInstanceId("mod_radiator_002".to_string()),
@@ -62,6 +63,7 @@ fn hot_smelter_with_radiators_state(content: &crate::GameContent) -> crate::Game
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     });
 
     state

@@ -364,6 +364,7 @@ mod tests {
                 efficiency: 1.0,
                 prev_crew_satisfied: true,
                 thermal: None,
+                slot_index: None,
             });
 
         let mut autopilot = AutopilotController::new();
@@ -601,6 +602,7 @@ mod tests {
                 efficiency: 1.0,
                 prev_crew_satisfied: true,
                 thermal: None,
+                slot_index: None,
             });
 
         let mut autopilot = AutopilotController::new();
@@ -774,6 +776,7 @@ mod tests {
                 efficiency: 1.0,
                 prev_crew_satisfied: true,
                 thermal: None,
+                slot_index: None,
             });
 
         let mut autopilot = AutopilotController::new();
@@ -819,6 +822,7 @@ mod tests {
                 efficiency: 1.0,
                 prev_crew_satisfied: true,
                 thermal: None,
+                slot_index: None,
             });
 
         let mut autopilot = AutopilotController::new();
@@ -881,6 +885,7 @@ mod tests {
                 efficiency: 1.0,
                 prev_crew_satisfied: true,
                 thermal: None,
+                slot_index: None,
             });
 
         let mut autopilot = AutopilotController::new();
@@ -970,6 +975,7 @@ mod tests {
                 efficiency: 1.0,
                 prev_crew_satisfied: true,
                 thermal: None,
+                slot_index: None,
             });
 
         let mut autopilot = AutopilotController::new();
@@ -1058,6 +1064,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         });
 
         let mut autopilot = AutopilotController::new();
@@ -1295,6 +1302,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         });
 
         // Add 5000 kg Fe to station inventory
@@ -1754,6 +1762,7 @@ mod tests {
             assigned_crew: Default::default(),
             efficiency: 1.0,
             prev_crew_satisfied: true,
+            slot_index: None,
         });
         rebuild_station_indexes(&mut state, &content);
         // No H2O in inventory → needs_water = true
@@ -1966,6 +1975,7 @@ mod tests {
             assigned_crew: Default::default(),
             efficiency: 1.0,
             prev_crew_satisfied: true,
+            slot_index: None,
         });
         rebuild_station_indexes(&mut state, &content);
         // Add H2O above threshold (500 kg) → should NOT trigger volatile targeting
@@ -2068,6 +2078,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         });
     }
 
@@ -2091,6 +2102,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         });
     }
 
@@ -2230,6 +2242,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         });
         rebuild_station_indexes(&mut state, &content);
         // LH2 = 0 (below threshold)

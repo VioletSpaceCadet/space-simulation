@@ -83,6 +83,7 @@ pub enum ModifierSource {
     #[serde(rename = "fitted_module")]
     FittedModule(crate::ModuleDefId, usize),
     Hull(crate::HullId),
+    Frame(crate::FrameId),
     Tech(String),
     Thermal,
     Wear,
@@ -601,5 +602,14 @@ mod tests {
         );
         // Wear sorts last (alphabetically after Thermal and Environment)
         assert!((result_a - 50.0).abs() < TOL);
+    }
+
+    /// SF-01: `ModifierSource::Frame` serializes and deserializes correctly.
+    #[test]
+    fn modifier_source_frame_serde_roundtrip() {
+        let source = ModifierSource::Frame(crate::FrameId("frame_research_station".to_string()));
+        let json = serde_json::to_string(&source).expect("serialize");
+        let decoded: ModifierSource = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(source, decoded);
     }
 }

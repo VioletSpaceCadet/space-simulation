@@ -881,6 +881,7 @@ mod tests {
             assigned_crew: Default::default(),
             efficiency: 1.0,
             prev_crew_satisfied: true,
+            slot_index: None,
         });
         state.ground_facilities.insert(facility_id, facility);
 

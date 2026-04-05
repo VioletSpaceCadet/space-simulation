@@ -197,6 +197,7 @@ fn recruit_crew_skips_when_salary_would_bankrupt() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     station.rebuild_module_index(&content);
 
@@ -699,6 +700,7 @@ fn manage_modules_sheds_load_during_power_deficit() {
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     });
     station.core.modules.push(sim_core::ModuleState {
         id: sim_core::ModuleInstanceId("mod_most_critical".to_string()),
@@ -718,6 +720,7 @@ fn manage_modules_sheds_load_during_power_deficit() {
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     });
 
     // Set power state with deficit: 30kW gen, 50kW consumed = 20kW deficit

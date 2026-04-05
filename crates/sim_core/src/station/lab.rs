@@ -264,6 +264,7 @@ mod tests {
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
                             thermal: None,
+                            slot_index: None,
                         }],
                         modifiers: crate::modifiers::ModifierSet::default(),
                         crew: Default::default(),
@@ -275,6 +276,7 @@ mod tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()
@@ -593,6 +595,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         });
         station.core.module_type_index = crate::ModuleTypeIndex::default();
 
@@ -647,6 +650,7 @@ mod tests {
                     efficiency: 1.0,
                     prev_crew_satisfied: true,
                     thermal: None,
+                    slot_index: None,
                 }],
                 modifiers: crate::modifiers::ModifierSet::default(),
                 crew: Default::default(),

@@ -658,6 +658,7 @@ mod tests {
                                 thermal_group: Some("smelting".to_string()),
                                 ..Default::default()
                             }),
+                            slot_index: None,
                         }],
                         modifiers: crate::modifiers::ModifierSet::default(),
                         crew: Default::default(),
@@ -669,6 +670,7 @@ mod tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()
@@ -865,6 +867,7 @@ mod tests {
                 thermal_group: Some("reactor".to_string()),
                 ..Default::default()
             }),
+            slot_index: None,
         });
 
         tick_thermal(&mut state, &station_id, &content, &mut Vec::new());
@@ -926,6 +929,7 @@ mod tests {
                 thermal_group: Some("smelting".to_string()),
                 ..Default::default()
             }),
+            slot_index: None,
         });
     }
 
