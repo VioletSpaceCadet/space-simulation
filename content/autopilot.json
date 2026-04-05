@@ -37,5 +37,9 @@
   "power_deficit_threshold_kw": 0.01,
   "crew_hire_projection_minutes": 43200,
   "ground_sensor_modules": ["module_optical_telescope", "module_radio_telescope"],
-  "ground_opex_max_fraction": 0.001
+  "ground_opex_max_fraction": 0.001,
+  "satellite_priority": ["sat_comm_relay", "sat_survey", "sat_nav_beacon", "sat_science_platform"],
+  "satellite_launch_rocket": "rocket_light",
+  "satellite_replacement_wear": 0.7,
+  "satellite_tech": "tech_satellite_basics"
 }

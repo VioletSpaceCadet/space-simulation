@@ -134,6 +134,22 @@ pub struct AutopilotConfig {
     /// When total opex exceeds this, the agent disables expensive sensors first.
     #[serde(default = "default_ground_opex_max_fraction")]
     pub ground_opex_max_fraction: f64,
+
+    // -- Satellite management parameters --
+    /// Satellite deployment priority order. Autopilot deploys in this order.
+    /// Each entry is a `SatelliteDef.id` (e.g. `"sat_comm_relay"`).
+    #[serde(default)]
+    pub satellite_priority: Vec<String>,
+    /// Preferred rocket for satellite launches (must fit satellite mass).
+    #[serde(default)]
+    pub satellite_launch_rocket: String,
+    /// Wear threshold at which the autopilot queues a replacement satellite.
+    /// Default 0.7 = start manufacturing replacement when 70% worn.
+    #[serde(default = "default_satellite_replacement_wear")]
+    pub satellite_replacement_wear: f64,
+    /// Tech required before the autopilot attempts satellite operations.
+    #[serde(default)]
+    pub satellite_tech: String,
 }
 
 impl Default for AutopilotConfig {
@@ -198,6 +214,15 @@ impl Default for AutopilotConfig {
                 "module_radio_telescope".to_string(),
             ],
             ground_opex_max_fraction: default_ground_opex_max_fraction(),
+            satellite_priority: vec![
+                "sat_comm_relay".to_string(),
+                "sat_survey".to_string(),
+                "sat_nav_beacon".to_string(),
+                "sat_science_platform".to_string(),
+            ],
+            satellite_launch_rocket: "rocket_light".to_string(),
+            satellite_replacement_wear: default_satellite_replacement_wear(),
+            satellite_tech: "tech_satellite_basics".to_string(),
         }
     }
 }
@@ -367,6 +392,10 @@ pub struct InitialComponent {
 
 fn default_ground_opex_max_fraction() -> f64 {
     0.001
+}
+
+fn default_satellite_replacement_wear() -> f64 {
+    0.7
 }
 
 fn default_quality() -> f32 {
