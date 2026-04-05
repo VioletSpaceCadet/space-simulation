@@ -318,6 +318,22 @@ impl StrategyConfig {
 }
 
 // ---------------------------------------------------------------------------
+// ConcernPriorities
+// ---------------------------------------------------------------------------
+
+/// Output of the strategy rule interpreter — final per-concern urgency scores
+/// in \[0.0, 1.0\] that guide station and ship agent decisions. Computed by
+/// `sim_control::AutopilotController::evaluate_strategy` from
+/// `StrategyConfig` + `GameState` using `config_weight * state_urgency`
+/// multiplied by the mode multipliers, plus hysteresis and temporal bias.
+///
+/// Shape is identical to `PriorityWeights` — the type alias keeps the
+/// optimizer interface (`to_vec` / `from_vec`) and semantics consistent
+/// across the configuration-side (user weights) and the output side
+/// (interpreter-computed scores).
+pub type ConcernPriorities = PriorityWeights;
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

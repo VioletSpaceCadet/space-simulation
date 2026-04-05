@@ -106,7 +106,7 @@ pub use scoring::{
 };
 pub use types::{boiloff_rate_per_tick, derive_module_tick_values, Constants};
 // -- types: strategy --
-pub use types::{PriorityWeights, StrategyConfig, StrategyMode};
+pub use types::{ConcernPriorities, PriorityWeights, StrategyConfig, StrategyMode};
 pub use wear::wear_efficiency;
 
 pub(crate) fn emit(counters: &mut Counters, tick: u64, event: Event) -> EventEnvelope {
