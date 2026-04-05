@@ -6,7 +6,7 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 
 | Type | Purpose |
 |---|---|
-| `GameState` | Full mutable simulation state (meta, scan_sites, asteroids, ships, stations, ground_facilities, research, counters) |
+| `GameState` | Full mutable simulation state (meta, scan_sites, asteroids, ships, stations, ground_facilities, satellites, research, counters) |
 | `ScanSite` | Unscanned potential asteroid location (consumed on survey) |
 | `AsteroidState` | Created on discovery; holds `true_composition` (hidden), `knowledge`, `mass_kg`, `anomaly_tags` |
 | `ResearchState` | `unlocked`, `data_pool`, `evidence` — no active allocations |
@@ -14,6 +14,8 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `StationState` | `id`, `position`, `core: FacilityCore`, `leaders` |
 | `FacilityCore` | Shared module-hosting substrate: `inventory`, `cargo_capacity_m3`, `power_available_per_tick`, `modules`, `modifiers`, `crew`, `thermal_links`, `power`, cached indices. Composed by both `StationState` and `GroundFacilityState`. |
 | `GroundFacilityState` | Earth-based operations center: `id`, `name`, `position`, `core: FacilityCore`, `launch_transits`. Cannot dock ships. |
+| `SatelliteState` | Deployed satellite: `id`, `def_id`, `name`, `position`, `deployed_tick`, `wear` (f64 0.0–1.0), `enabled`, `satellite_type` (content-driven string), `payload_config: Option<String>` |
+| `SatelliteDef` | Content definition: `id`, `name`, `satellite_type`, `mass_kg`, `wear_rate`, `required_tech`, `behavior_config` (type-specific JSON). Loaded from `satellite_defs.json`. |
 | `LaunchTransitState` | In-flight launch: `rocket_def_id`, `payload: LaunchPayload`, `destination`, `arrival_tick` |
 | `LaunchPayload` | Enum: `Supplies(Vec<InventoryItem>)`, `StationKit` |
 | `InventoryItem` | Enum: `Ore { lot_id, asteroid_id, kg, composition }`, `Material { element, kg, quality }`, `Slag { kg, composition }`, `Component { component_id, count, quality }`, `Module { item_id, module_def_id }` |
@@ -98,6 +100,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 | `pricing.json` | Import/export pricing: surcharges per kg, per-item base prices, importable/exportable flags |
 | `scoring.json` | Run scoring config: 6 dimensions (id, name, weight, ceiling), 5 named thresholds (Startup→Space Magnate), computation_interval_ticks (default 24), scale_factor (default 2500). See Scoring section below. |
 | `milestones.json` | Progression milestones: 8 milestones with conditions, rewards (grants, trade tier, zones), phase advancement. See Milestones section below. |
+| `satellite_defs.json` | 4 satellite types: `sat_survey` (survey, wear_rate 0.00015), `sat_comm_relay` (communication, wear_rate 0.00008), `sat_nav_beacon` (navigation, wear_rate 0.0001), `sat_science_platform` (science_platform, wear_rate 0.00012). Each has `behavior_config` with type-specific params. |
 | `dev_advanced_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
 
 ## Inventory & Refinery Design

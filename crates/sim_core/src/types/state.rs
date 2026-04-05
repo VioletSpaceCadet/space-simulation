@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 use crate::{
     AnomalyTag, AsteroidId, BodyId, ComponentId, CompositionVec, Constants, CrewRole, DataKind,
     DomainProgress, GameContent, HullId, InventoryItem, LeaderId, ModuleDefId, ModuleInstanceId,
-    OverheatZone, Phase, PrincipalId, RecipeId, ShipId, SiteId, StationId, TechId, ThermalGroupId,
-    DEFAULT_AMBIENT_TEMP_MK,
+    OverheatZone, Phase, PrincipalId, RecipeId, SatelliteId, ShipId, SiteId, StationId, TechId,
+    ThermalGroupId, DEFAULT_AMBIENT_TEMP_MK,
 };
 
 // ---------------------------------------------------------------------------
@@ -30,6 +30,9 @@ pub struct GameState {
     /// Earth-based (or planetary surface) operations centers.
     #[serde(default)]
     pub ground_facilities: std::collections::BTreeMap<crate::GroundFacilityId, GroundFacilityState>,
+    /// Deployed satellites (survey, comm relay, nav beacon, science platform).
+    #[serde(default)]
+    pub satellites: std::collections::BTreeMap<SatelliteId, SatelliteState>,
     pub research: ResearchState,
     #[serde(default)]
     pub balance: f64,
@@ -565,6 +568,34 @@ pub enum LaunchPayload {
     Supplies(Vec<InventoryItem>),
     /// Deploy a new orbital station.
     StationKit,
+}
+
+// ---------------------------------------------------------------------------
+// Satellites
+// ---------------------------------------------------------------------------
+
+/// A deployed satellite in orbit. Content-driven: `satellite_type` is a string
+/// matching a `SatelliteDef.satellite_type` (not an enum).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SatelliteState {
+    pub id: SatelliteId,
+    /// References `SatelliteDef.id` in content.
+    pub def_id: String,
+    pub name: String,
+    pub position: crate::Position,
+    /// Tick at which this satellite was deployed.
+    pub deployed_tick: u64,
+    /// Wear level 0.0 (pristine) to 1.0 (failed). Accumulates each tick.
+    /// f64 (not f32 like module `WearState`) because satellite wear rates are very
+    /// low (e.g. 0.00008/tick) and accumulate over 10,000+ tick lifespans where
+    /// f32 would lose meaningful precision.
+    pub wear: f64,
+    pub enabled: bool,
+    /// Content-driven type string: "survey", "communication", "navigation", "`science_platform`".
+    pub satellite_type: String,
+    /// Optional type-specific configuration (e.g. target sensor type for science platforms).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payload_config: Option<String>,
 }
 
 impl FacilityCore {

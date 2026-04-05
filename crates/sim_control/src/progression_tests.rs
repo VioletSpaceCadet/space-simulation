@@ -1009,6 +1009,7 @@ fn manufacturing_pipeline_ore_to_cast_part() {
         .into_iter()
         .collect(),
         ground_facilities: std::collections::BTreeMap::new(),
+        satellites: std::collections::BTreeMap::new(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
             data_pool: sim_core::AHashMap::default(),

@@ -101,6 +101,7 @@ fn transit_moves_ship_and_starts_next_task() {
         .into_iter()
         .collect(),
         ground_facilities: std::collections::BTreeMap::new(),
+        satellites: std::collections::BTreeMap::new(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
             data_pool: AHashMap::default(),
@@ -302,6 +303,7 @@ fn transit_generates_transit_data_with_diminishing_returns() {
         .into_iter()
         .collect(),
         ground_facilities: std::collections::BTreeMap::new(),
+        satellites: std::collections::BTreeMap::new(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
             data_pool: AHashMap::default(),

@@ -408,6 +408,7 @@ pub fn base_content() -> GameContent {
         crew_roles: BTreeMap::new(),
         scoring: Default::default(),
         milestones: Vec::new(),
+        satellite_defs: std::collections::BTreeMap::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -658,6 +659,7 @@ pub fn minimal_content() -> GameContent {
         crew_roles: BTreeMap::new(),
         scoring: Default::default(),
         milestones: Vec::new(),
+        satellite_defs: std::collections::BTreeMap::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -730,6 +732,7 @@ pub fn base_state(content: &GameContent) -> GameState {
         .into_iter()
         .collect(),
         ground_facilities: std::collections::BTreeMap::new(),
+        satellites: std::collections::BTreeMap::new(),
         research: ResearchState {
             unlocked: std::collections::HashSet::new(),
             data_pool: AHashMap::default(),

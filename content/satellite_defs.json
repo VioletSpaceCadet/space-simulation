@@ -1,0 +1,46 @@
+[
+  {
+    "id": "sat_survey",
+    "name": "Survey Satellite",
+    "satellite_type": "survey",
+    "mass_kg": 500.0,
+    "wear_rate": 0.00015,
+    "required_tech": "tech_satellite_basics",
+    "behavior_config": {
+      "discovery_multiplier": 2.0
+    }
+  },
+  {
+    "id": "sat_comm_relay",
+    "name": "Communication Relay",
+    "satellite_type": "communication",
+    "mass_kg": 800.0,
+    "wear_rate": 0.00008,
+    "required_tech": "tech_satellite_basics",
+    "behavior_config": {
+      "comm_tier": "Basic"
+    }
+  },
+  {
+    "id": "sat_nav_beacon",
+    "name": "Navigation Beacon",
+    "satellite_type": "navigation",
+    "mass_kg": 600.0,
+    "wear_rate": 0.0001,
+    "required_tech": "tech_satellite_basics",
+    "behavior_config": {
+      "transit_reduction_pct": 15.0
+    }
+  },
+  {
+    "id": "sat_science_platform",
+    "name": "Science Platform",
+    "satellite_type": "science_platform",
+    "mass_kg": 1200.0,
+    "wear_rate": 0.00012,
+    "required_tech": "tech_orbital_science",
+    "behavior_config": {
+      "data_multiplier": 4.0
+    }
+  }
+]

@@ -43,6 +43,7 @@ mod trade_integration;
 mod transfer_molten;
 
 mod research_lifecycle;
+mod satellite;
 
 // --- Shared test helpers ------------------------------------------------
 

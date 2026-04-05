@@ -112,6 +112,7 @@ numeric_id!(EventId);
 string_id!(PrincipalId);
 string_id!(LotId);
 string_id!(GroundFacilityId);
+string_id!(SatelliteId);
 
 /// A reference to either a station or a ground facility. Used by commands
 /// that apply to both entity types (`Import`, `Export`, `InstallModule`, etc.).

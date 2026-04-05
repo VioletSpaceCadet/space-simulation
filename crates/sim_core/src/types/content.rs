@@ -284,6 +284,9 @@ pub struct GameContent {
     /// Milestone definitions loaded from `content/milestones.json`.
     #[serde(default)]
     pub milestones: Vec<super::progression::MilestoneDef>,
+    /// Satellite definitions loaded from `content/satellite_defs.json`.
+    #[serde(default)]
+    pub satellite_defs: BTreeMap<String, SatelliteDef>,
     /// Pre-computed element id -> density (kg/m3) lookup. Populated by `init_caches()`.
     #[serde(skip)]
     pub density_map: AHashMap<String, f32>,
@@ -358,6 +361,32 @@ pub struct ComponentDef {
     pub name: String,
     pub mass_kg: f32,
     pub volume_m3: f32,
+}
+
+// ---------------------------------------------------------------------------
+// Satellite definitions
+// ---------------------------------------------------------------------------
+
+/// Content-driven satellite definition loaded from `satellite_defs.json`.
+/// `satellite_type` is a string for dispatch (not an enum) — adding a new
+/// satellite type = adding a JSON entry, not a code change.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SatelliteDef {
+    pub id: String,
+    pub name: String,
+    /// Content-driven type: "survey", "communication", "navigation", "`science_platform`".
+    pub satellite_type: String,
+    pub mass_kg: f32,
+    /// Wear added per tick (e.g. 0.0001 = ~10,000 tick lifespan).
+    pub wear_rate: f64,
+    /// Tech required to manufacture/deploy this satellite.
+    #[serde(default)]
+    pub required_tech: Option<crate::TechId>,
+    /// Type-specific behavior configuration (opaque to the type system).
+    /// Uses `serde_json::Value` for content-driven extensibility — adding a new
+    /// satellite type with different config shape requires only a JSON entry change.
+    #[serde(default)]
+    pub behavior_config: serde_json::Value,
 }
 
 // ---------------------------------------------------------------------------
