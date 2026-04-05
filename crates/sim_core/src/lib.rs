@@ -77,8 +77,8 @@ pub use types::{
     AlertRuleDef, AlertRuleType, AsteroidTemplateDef, AutopilotConfig, BodyType, BoiloffCurveDef,
     ComponentDef, CrewRoleDef, DeepScanTargetConfig, ElementDef, ExportComponentConfig,
     ExportElementConfig, GameContent, HullDef, InitialComponent, InitialMaterial,
-    InitialStationDef, NodeDef, OrbitalBodyDef, SatelliteDef, SlotDef, SolarSystemDef, TechDef,
-    TechEffect, ThermalDef, ZoneDef,
+    InitialStationDef, NodeDef, OrbitalBodyDef, RocketDef, SatelliteDef, SlotDef, SolarSystemDef,
+    TechDef, TechEffect, ThermalDef, ZoneDef,
 };
 // -- types: module & recipe definitions --
 pub use types::{

@@ -15,6 +15,7 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `FacilityCore` | Shared module-hosting substrate: `inventory`, `cargo_capacity_m3`, `power_available_per_tick`, `modules`, `modifiers`, `crew`, `thermal_links`, `power`, cached indices. Composed by both `StationState` and `GroundFacilityState`. |
 | `GroundFacilityState` | Earth-based operations center: `id`, `name`, `position`, `core: FacilityCore`, `launch_transits`. Cannot dock ships. |
 | `SatelliteState` | Deployed satellite: `id`, `def_id`, `name`, `position`, `deployed_tick`, `wear` (f64 0.0–1.0), `enabled`, `satellite_type` (content-driven string), `payload_config: Option<String>` |
+| `RocketDef` | Launch vehicle definition: `id`, `name`, `payload_capacity_kg`, `base_launch_cost`, `fuel_kg`, `transit_minutes`, `required_tech`. Loaded from `rockets.json`. |
 | `SatelliteDef` | Content definition: `id`, `name`, `satellite_type`, `mass_kg`, `wear_rate`, `required_tech`, `behavior_config` (type-specific JSON). Loaded from `satellite_defs.json`. |
 | `LaunchTransitState` | In-flight launch: `rocket_def_id`, `payload: LaunchPayload`, `destination`, `arrival_tick` |
 | `LaunchPayload` | Enum: `Supplies(Vec<InventoryItem>)`, `StationKit` |

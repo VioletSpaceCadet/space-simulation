@@ -299,6 +299,9 @@ pub struct GameContent {
     /// Milestone definitions loaded from `content/milestones.json`.
     #[serde(default)]
     pub milestones: Vec<super::progression::MilestoneDef>,
+    /// Rocket definitions loaded from `content/rockets.json`.
+    #[serde(default)]
+    pub rocket_defs: BTreeMap<String, RocketDef>,
     /// Satellite definitions loaded from `content/satellite_defs.json`.
     #[serde(default)]
     pub satellite_defs: BTreeMap<String, SatelliteDef>,
@@ -380,6 +383,30 @@ pub struct ComponentDef {
     pub name: String,
     pub mass_kg: f32,
     pub volume_m3: f32,
+}
+
+// ---------------------------------------------------------------------------
+// Rocket definitions
+// ---------------------------------------------------------------------------
+
+/// Content-driven rocket definition loaded from `rockets.json`.
+/// Represents a launch vehicle type that can deliver payloads from
+/// ground facilities to orbit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RocketDef {
+    pub id: String,
+    pub name: String,
+    /// Maximum payload mass (kg) this rocket can deliver to orbit.
+    pub payload_capacity_kg: f32,
+    /// Base cost ($) per launch (vehicle cost, not fuel).
+    pub base_launch_cost: f64,
+    /// Fuel consumed (kg) per launch from ground facility inventory.
+    pub fuel_kg: f32,
+    /// Transit time (game-minutes) from launch to orbital delivery.
+    pub transit_minutes: u64,
+    /// Tech required to manufacture/launch this rocket.
+    #[serde(default)]
+    pub required_tech: Option<crate::TechId>,
 }
 
 // ---------------------------------------------------------------------------
