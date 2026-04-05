@@ -760,6 +760,6 @@
     ],
     "efficiency": 1.0,
     "required_tech": "tech_basic_rocketry",
-    "tags": ["station"]
+    "tags": ["rocketry"]
   }
 ]
