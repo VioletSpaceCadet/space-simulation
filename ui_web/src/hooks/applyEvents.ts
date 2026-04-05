@@ -867,6 +867,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   ModuleInstalled: handleModuleInstalled,
   ModuleNoCompatibleSlot: noOp,
   ModuleUninstalled: handleModuleUninstalled,
+  StationConstructionStarted: noOp,
   ModuleToggled: handleModuleToggled,
   ModuleThresholdSet: handleModuleThresholdSet,
   RefineryRan: handleRefineryRan,

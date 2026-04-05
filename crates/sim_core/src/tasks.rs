@@ -32,8 +32,79 @@ pub(crate) fn resolve_task(
         TaskKind::Deposit { ref station, .. } => {
             resolve_deposit(state, ship_id, station, content, events);
         }
+        TaskKind::ConstructStation {
+            ref frame_id,
+            ref position,
+            ref kit_component_id,
+            ..
+        } => {
+            resolve_construct_station(
+                state,
+                ship_id,
+                frame_id,
+                position,
+                kit_component_id,
+                content,
+                events,
+            );
+        }
         TaskKind::Idle | TaskKind::Refuel { .. } => {}
     }
+}
+
+/// Finalize a `ConstructStation` task: create a fresh, empty `StationState`
+/// at the build position with the kit's frame, apply frame bonuses via the
+/// modifier pipeline, and idle the ship. The kit was already consumed by
+/// the `DeployStation` command handler before the Transit started.
+pub(crate) fn resolve_construct_station(
+    state: &mut GameState,
+    ship_id: &ShipId,
+    frame_id: &crate::FrameId,
+    position: &crate::Position,
+    kit_component_id: &str,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    // Allocate a deterministic station id off the existing deploy counter.
+    // This matches the P4 launch-delivered station naming convention
+    // (station_{counter}) so save files and scoring treat them uniformly.
+    state.counters.stations_deployed += 1;
+    let station_id = crate::StationId(format!(
+        "station_deployed_{:04}",
+        state.counters.stations_deployed
+    ));
+
+    let mut station = crate::StationState {
+        id: station_id.clone(),
+        position: position.clone(),
+        core: crate::FacilityCore {
+            cargo_capacity_m3: content
+                .frames
+                .get(frame_id)
+                .map_or(500.0, |f| f.base_cargo_capacity_m3),
+            ..Default::default()
+        },
+        frame_id: Some(frame_id.clone()),
+        leaders: Vec::new(),
+    };
+    crate::recompute_station_stats(&mut station, content);
+    state.stations.insert(station_id.clone(), station);
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::StationDeployed {
+            station_id,
+            position: position.clone(),
+            ship_id: Some(ship_id.clone()),
+            frame_id: Some(frame_id.clone()),
+            kit_component_id: Some(kit_component_id.to_string()),
+        },
+    ));
+
+    set_ship_idle(state, ship_id, current_tick);
 }
 
 /// True if any unlocked tech grants the `EnableDeepScan` effect.
@@ -246,6 +317,28 @@ pub(crate) fn resolve_transit(
             target,
         },
     ));
+
+    // VIO-592: if the follow-on task is a station construction, fire the
+    // dedicated StationConstructionStarted event so downstream consumers
+    // can surface it in the timeline without parsing TaskStarted labels.
+    if let TaskKind::ConstructStation {
+        frame_id,
+        position,
+        assembly_ticks,
+        ..
+    } = then
+    {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::StationConstructionStarted {
+                ship_id: ship_id.clone(),
+                frame_id: frame_id.clone(),
+                position: position.clone(),
+                assembly_ticks: *assembly_ticks,
+            },
+        ));
+    }
 }
 
 pub(crate) fn resolve_survey(
