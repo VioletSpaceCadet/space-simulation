@@ -587,6 +587,7 @@ fn resolve_transit_payload(
                     cargo_capacity_m3: 500.0,
                     ..Default::default()
                 },
+                frame_id: None,
                 leaders: Vec::new(),
             };
             state.stations.insert(station_id.clone(), station);

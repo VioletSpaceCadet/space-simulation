@@ -9,9 +9,9 @@ use std::collections::BTreeMap;
 
 use crate::{
     AnomalyTag, AsteroidId, BodyId, ComponentId, CompositionVec, Constants, CrewRole, DataKind,
-    DomainProgress, GameContent, HullId, InventoryItem, LeaderId, ModuleDefId, ModuleInstanceId,
-    OverheatZone, Phase, PrincipalId, RecipeId, SatelliteId, ShipId, SiteId, StationId, TechId,
-    ThermalGroupId, DEFAULT_AMBIENT_TEMP_MK,
+    DomainProgress, FrameId, GameContent, HullId, InventoryItem, LeaderId, ModuleDefId,
+    ModuleInstanceId, OverheatZone, Phase, PrincipalId, RecipeId, SatelliteId, ShipId, SiteId,
+    StationId, TechId, ThermalGroupId, DEFAULT_AMBIENT_TEMP_MK,
 };
 
 // ---------------------------------------------------------------------------
@@ -102,6 +102,10 @@ pub struct ModuleState {
     /// Per-module thermal state. None for non-thermal modules.
     #[serde(default)]
     pub thermal: Option<ThermalState>,
+    /// Index into the station frame's `slots` vec. `None` for frameless
+    /// (legacy) stations and for modules fitted on ships.
+    #[serde(default)]
+    pub slot_index: Option<usize>,
     /// Set each tick by power budget computation. Stalled modules skip their tick.
     #[serde(skip, default)]
     pub power_stalled: bool,
@@ -556,6 +560,11 @@ pub struct StationState {
     /// Shared module-hosting fields.
     #[serde(flatten)]
     pub core: FacilityCore,
+    /// Station frame. Determines slot layout and contributes frame bonuses
+    /// via the modifier pipeline. `None` = legacy frameless station
+    /// (unlimited slots, no frame bonuses).
+    #[serde(default)]
+    pub frame_id: Option<FrameId>,
     /// Station leaders (reserved for Phase 2 leader system).
     #[serde(default)]
     pub leaders: Vec<LeaderId>,
@@ -978,6 +987,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         });
         station.core.modules.push(ModuleState {
             id: ModuleInstanceId("mod_beta".to_string()),
@@ -991,6 +1001,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         });
 
         station.rebuild_module_index(&content);
@@ -1040,6 +1051,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         };
         let def = crate::test_fixtures::ModuleDefBuilder::new("test")
             .crew("operator", 2)
@@ -1066,5 +1078,109 @@ mod tests {
             (eff - 0.0).abs() < f32::EPSILON,
             "power stalled = 0 efficiency"
         );
+    }
+
+    // ----------------------------------------------------------------------
+    // SF-01: frame_id + slot_index serde backward compat
+    // ----------------------------------------------------------------------
+
+    #[test]
+    fn station_state_deserializes_without_frame_id_field() {
+        // Old save JSON has no `frame_id` — must deserialize with `None`.
+        let json = r#"{
+            "id": "station_earth_orbit",
+            "position": {
+                "parent_body": "test_body",
+                "radius_au_um": 0,
+                "angle_mdeg": 0
+            },
+            "inventory": [],
+            "cargo_capacity_m3": 10000.0,
+            "power_available_per_tick": 100.0,
+            "modules": [],
+            "modifiers": {"modifiers": []},
+            "crew": {},
+            "thermal_links": [],
+            "leaders": []
+        }"#;
+
+        let station: StationState = serde_json::from_str(json).expect("legacy save must load");
+        assert_eq!(
+            station.frame_id, None,
+            "missing frame_id should default to None"
+        );
+    }
+
+    #[test]
+    fn module_state_deserializes_without_slot_index_field() {
+        // Old save JSON has no `slot_index` — must deserialize with `None`.
+        let json = r#"{
+            "id": "inst_legacy",
+            "def_id": "module_legacy",
+            "enabled": true,
+            "kind_state": "Storage",
+            "wear": {"wear": 0.0}
+        }"#;
+
+        let module: ModuleState =
+            serde_json::from_str(json).expect("legacy module state must load");
+        assert_eq!(
+            module.slot_index, None,
+            "missing slot_index should default to None"
+        );
+    }
+
+    #[test]
+    fn station_state_serde_roundtrip_with_frame_id() {
+        // Build a station, assign a frame, serialize, deserialize, verify.
+        let station = StationState {
+            id: StationId("s_roundtrip".to_string()),
+            position: crate::Position {
+                parent_body: BodyId("test_body".to_string()),
+                radius_au_um: crate::RadiusAuMicro(0),
+                angle_mdeg: crate::AngleMilliDeg(0),
+            },
+            core: FacilityCore {
+                inventory: vec![],
+                cargo_capacity_m3: 500.0,
+                power_available_per_tick: 0.0,
+                modules: vec![],
+                modifiers: crate::modifiers::ModifierSet::default(),
+                crew: Default::default(),
+                thermal_links: Vec::new(),
+                power: crate::PowerState::default(),
+                cached_inventory_volume_m3: None,
+                module_type_index: crate::ModuleTypeIndex::default(),
+                module_id_index: std::collections::HashMap::new(),
+                power_budget_cache: crate::PowerBudgetCache::default(),
+            },
+            frame_id: Some(FrameId("frame_outpost".to_string())),
+            leaders: Vec::new(),
+        };
+
+        let json = serde_json::to_string(&station).expect("serialize");
+        let decoded: StationState = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(decoded.frame_id, Some(FrameId("frame_outpost".to_string())));
+    }
+
+    #[test]
+    fn module_state_serde_roundtrip_with_slot_index() {
+        let module = ModuleState {
+            id: ModuleInstanceId("m_roundtrip".to_string()),
+            def_id: "m_def".to_string(),
+            enabled: true,
+            kind_state: ModuleKindState::Storage,
+            wear: WearState::default(),
+            thermal: None,
+            slot_index: Some(3),
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
+        };
+        let json = serde_json::to_string(&module).expect("serialize");
+        let decoded: ModuleState = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(decoded.slot_index, Some(3));
     }
 }

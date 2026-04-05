@@ -102,6 +102,7 @@ fn launch_state(content: &GameContent) -> GameState {
                     efficiency: 1.0,
                     prev_crew_satisfied: true,
                     thermal: None,
+                    slot_index: None,
                 }],
                 inventory: vec![InventoryItem::Material {
                     element: "LH2".to_string(),
@@ -711,6 +712,7 @@ fn orbital_deploy_satellite_from_station() {
                 ..Default::default()
             },
             leaders: Vec::new(),
+            frame_id: None,
         },
     );
     crate::test_fixtures::rebuild_indices(&mut state, &content);
@@ -775,6 +777,7 @@ fn orbital_deploy_rejected_no_component() {
                 ..Default::default()
             },
             leaders: Vec::new(),
+            frame_id: None,
         },
     );
     crate::test_fixtures::rebuild_indices(&mut state, &content);
@@ -822,6 +825,7 @@ fn orbital_deploy_rejected_unknown_def() {
                 ..Default::default()
             },
             leaders: Vec::new(),
+            frame_id: None,
         },
     );
     crate::test_fixtures::rebuild_indices(&mut state, &content);
@@ -870,6 +874,7 @@ fn orbital_deploy_rejected_tech_gated() {
                 ..Default::default()
             },
             leaders: Vec::new(),
+            frame_id: None,
         },
     );
     crate::test_fixtures::rebuild_indices(&mut state, &content);

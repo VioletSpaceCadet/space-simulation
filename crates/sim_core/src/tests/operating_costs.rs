@@ -46,6 +46,7 @@ fn make_module(def_id: &str, enabled: bool) -> ModuleState {
         prev_crew_satisfied: true,
         thermal: None,
         module_priority: 0,
+        slot_index: None,
     }
 }
 

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AlertSeverity, AnomalyTag, AssemblerState, BatteryState, BehaviorType, BodyId, ComponentId,
-    Constants, CrewRole, DataKind, ElementId, FittedModule, HullId, ItemKind, LabState,
+    Constants, CrewRole, DataKind, ElementId, FittedModule, FrameId, HullId, ItemKind, LabState,
     MaintenanceState, ModuleKindState, NodeId, Phase, PricingTable, ProcessorState, RadiatorState,
     RecipeId, ResearchDomain, SensorArrayState, SlotType, SolarArrayState, TechId, ThermalGroupId,
 };
@@ -306,6 +306,10 @@ pub struct GameContent {
     /// Hull definitions loaded from `content/hull_defs.json`. Empty if file is missing.
     #[serde(default)]
     pub hulls: BTreeMap<HullId, HullDef>,
+    /// Station frame definitions loaded from `content/frame_defs.json`.
+    /// Empty if file is missing.
+    #[serde(default)]
+    pub frames: BTreeMap<FrameId, FrameDef>,
     /// Default fitting loadouts per hull from `content/fitting_templates.json`.
     #[serde(default)]
     pub fitting_templates: BTreeMap<HullId, Vec<FittedModule>>,
@@ -736,6 +740,28 @@ pub struct HullDef {
 pub struct SlotDef {
     pub slot_type: SlotType,
     pub label: String,
+}
+
+// ---------------------------------------------------------------------------
+// Frame types (station frames — mirror of ship hulls)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrameDef {
+    pub id: FrameId,
+    pub name: String,
+    pub base_cargo_capacity_m3: f32,
+    /// Reserved for future power-capacity wiring. Power stays solar-array
+    /// driven in Phase 1; this field is stored but not yet read by the
+    /// power resolver.
+    pub base_power_capacity_kw: f32,
+    pub slots: Vec<SlotDef>,
+    #[serde(default)]
+    pub bonuses: Vec<crate::modifiers::Modifier>,
+    #[serde(default)]
+    pub required_tech: Option<TechId>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1215,5 +1241,66 @@ pub fn derive_module_tick_values(
             }
             _ => {}
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SF-01: FrameDef serde tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod frame_def_tests {
+    use super::*;
+    use crate::modifiers::{Modifier, ModifierOp, ModifierSource, StatId};
+
+    #[test]
+    fn frame_def_serde_roundtrip_with_bonuses() {
+        let frame = FrameDef {
+            id: FrameId("frame_research_station".to_string()),
+            name: "Research Station".to_string(),
+            base_cargo_capacity_m3: 1000.0,
+            base_power_capacity_kw: 80.0,
+            slots: vec![
+                SlotDef {
+                    slot_type: SlotType("utility".to_string()),
+                    label: "Utility 1".to_string(),
+                },
+                SlotDef {
+                    slot_type: SlotType("research".to_string()),
+                    label: "Research 1".to_string(),
+                },
+            ],
+            bonuses: vec![Modifier {
+                stat: StatId::ResearchSpeed,
+                op: ModifierOp::PctAdditive,
+                value: 0.15,
+                source: ModifierSource::Frame(FrameId("frame_research_station".to_string())),
+                condition: None,
+            }],
+            required_tech: Some(TechId("tech_research_station".to_string())),
+            tags: vec!["research".to_string()],
+        };
+        let json = serde_json::to_string(&frame).expect("serialize");
+        let decoded: FrameDef = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(decoded.id.0, "frame_research_station");
+        assert_eq!(decoded.slots.len(), 2);
+        assert_eq!(decoded.bonuses.len(), 1);
+        assert_eq!(decoded.bonuses[0].value, 0.15);
+    }
+
+    #[test]
+    fn frame_def_deserializes_without_optional_fields() {
+        // Minimal JSON — bonuses/required_tech/tags use serde(default).
+        let json = r#"{
+            "id": "frame_outpost",
+            "name": "Outpost",
+            "base_cargo_capacity_m3": 500.0,
+            "base_power_capacity_kw": 30.0,
+            "slots": []
+        }"#;
+        let frame: FrameDef = serde_json::from_str(json).expect("deserialize");
+        assert!(frame.bonuses.is_empty());
+        assert!(frame.required_tech.is_none());
+        assert!(frame.tags.is_empty());
     }
 }

@@ -520,6 +520,7 @@ fn sensor_data_generation_rate_at_mpt_60() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Run 10 ticks (no autopilot needed)
@@ -966,6 +967,7 @@ fn manufacturing_pipeline_ore_to_cast_part() {
                             )]),
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
+                            slot_index: None,
                         },
                         // Crucible for molten storage
                         ModuleState {
@@ -986,6 +988,7 @@ fn manufacturing_pipeline_ore_to_cast_part() {
                             assigned_crew: Default::default(),
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
+                            slot_index: None,
                         },
                         // Casting mold at operating temperature
                         ModuleState {
@@ -1012,6 +1015,7 @@ fn manufacturing_pipeline_ore_to_cast_part() {
                             )]),
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
+                            slot_index: None,
                         },
                     ],
                     crew: std::collections::BTreeMap::from([(CrewRole("operator".to_string()), 2)]),
@@ -1039,6 +1043,7 @@ fn manufacturing_pipeline_ore_to_cast_part() {
                     power_budget_cache: Default::default(),
                 },
                 leaders: Vec::new(),
+                frame_id: None,
             },
         )]
         .into_iter()

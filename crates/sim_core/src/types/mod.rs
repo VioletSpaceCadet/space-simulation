@@ -147,6 +147,7 @@ string_id!(ModuleInstanceId);
 string_id!(ComponentId);
 string_id!(RecipeId);
 string_id!(HullId);
+string_id!(FrameId);
 string_id!(SlotType);
 string_id!(ModuleDefId);
 string_id!(CrewRole);

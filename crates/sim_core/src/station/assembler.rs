@@ -667,6 +667,7 @@ mod assembler_component_tests {
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
                             thermal: None,
+                            slot_index: None,
                         }],
                         modifiers: crate::modifiers::ModifierSet::default(),
                         crew: Default::default(),
@@ -678,6 +679,7 @@ mod assembler_component_tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()
@@ -1076,6 +1078,7 @@ mod assembler_component_tests {
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
                             thermal: None,
+                            slot_index: None,
                         }],
                         modifiers: crate::modifiers::ModifierSet::default(),
                         crew: Default::default(),
@@ -1087,6 +1090,7 @@ mod assembler_component_tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()

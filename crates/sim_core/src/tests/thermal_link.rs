@@ -57,6 +57,7 @@ fn link_state(content: &GameContent) -> GameState {
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     });
 
     // Add receiver module (has molten_in port)
@@ -77,6 +78,7 @@ fn link_state(content: &GameContent) -> GameState {
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     });
 
     station.rebuild_module_index(&content);

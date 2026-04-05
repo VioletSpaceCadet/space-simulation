@@ -1111,6 +1111,7 @@ mod tests {
                 power_budget_cache: crate::PowerBudgetCache::default(),
             },
             leaders: Vec::new(),
+            frame_id: None,
         }
     }
 
@@ -1368,6 +1369,7 @@ mod tests {
                 efficiency: 1.0,
                 prev_crew_satisfied: true,
                 thermal: None,
+                slot_index: None,
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -1543,6 +1545,7 @@ mod tests {
                 efficiency: 1.0,
                 prev_crew_satisfied: true,
                 thermal: None,
+                slot_index: None,
             }],
         );
         state.stations.insert(station.id.clone(), station);
@@ -1655,6 +1658,7 @@ mod tests {
                     efficiency: 1.0,
                     prev_crew_satisfied: true,
                     thermal: None,
+                    slot_index: None,
                 },
                 ModuleState {
                     id: ModuleInstanceId("mod_0002".to_string()),
@@ -1673,6 +1677,7 @@ mod tests {
                     efficiency: 1.0,
                     prev_crew_satisfied: true,
                     thermal: None,
+                    slot_index: None,
                 },
             ],
         );
@@ -1730,6 +1735,7 @@ mod tests {
             efficiency: 1.0,
             prev_crew_satisfied: true,
             thermal: None,
+            slot_index: None,
         });
         state.stations.insert(station.id.clone(), station);
 
@@ -1801,6 +1807,7 @@ mod tests {
                         overheat_zone: crate::OverheatZone::Nominal,
                         overheat_disabled: false,
                     }),
+                    slot_index: None,
                 },
                 // Module at 2_400_000 mK (warning)
                 ModuleState {
@@ -1825,6 +1832,7 @@ mod tests {
                         overheat_zone: crate::OverheatZone::Warning,
                         overheat_disabled: false,
                     }),
+                    slot_index: None,
                 },
                 // Module at 2_800_000 mK (critical)
                 ModuleState {
@@ -1849,6 +1857,7 @@ mod tests {
                         overheat_zone: crate::OverheatZone::Critical,
                         overheat_disabled: true,
                     }),
+                    slot_index: None,
                 },
             ],
         );
@@ -1909,6 +1918,7 @@ mod tests {
                 efficiency: 1.0,
                 prev_crew_satisfied: true,
                 thermal: None,
+                slot_index: None,
             }],
         );
         state.stations.insert(station.id.clone(), station);

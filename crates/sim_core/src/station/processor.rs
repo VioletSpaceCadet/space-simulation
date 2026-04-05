@@ -1115,6 +1115,7 @@ mod tests {
                                 thermal_group: Some("smelting".to_string()),
                                 ..Default::default()
                             }),
+                            slot_index: None,
                         }],
                         modifiers: crate::modifiers::ModifierSet::default(),
                         crew: Default::default(),
@@ -1126,6 +1127,7 @@ mod tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()
@@ -1494,6 +1496,7 @@ mod tests {
                                 assigned_crew: Default::default(),
                                 efficiency: 1.0,
                                 prev_crew_satisfied: true,
+                                slot_index: None,
                             },
                             // High-priority processor
                             ModuleState {
@@ -1513,6 +1516,7 @@ mod tests {
                                 assigned_crew: Default::default(),
                                 efficiency: 1.0,
                                 prev_crew_satisfied: true,
+                                slot_index: None,
                             },
                         ],
                         modifiers: crate::modifiers::ModifierSet::default(),
@@ -1525,6 +1529,7 @@ mod tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()
@@ -1646,6 +1651,7 @@ mod tests {
                             assigned_crew: Default::default(),
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
+                            slot_index: None,
                         }],
                         modifiers: crate::modifiers::ModifierSet::default(),
                         crew: Default::default(),
@@ -1657,6 +1663,7 @@ mod tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()
@@ -1820,6 +1827,7 @@ mod tests {
                             assigned_crew: Default::default(),
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
+                            slot_index: None,
                         }],
                         modifiers: crate::modifiers::ModifierSet::default(),
                         crew: Default::default(),
@@ -1831,6 +1839,7 @@ mod tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()
@@ -1986,6 +1995,7 @@ mod tests {
                             assigned_crew: Default::default(),
                             efficiency: 1.0,
                             prev_crew_satisfied: true,
+                            slot_index: None,
                         }],
                         modifiers: crate::modifiers::ModifierSet::default(),
                         crew: Default::default(),
@@ -1997,6 +2007,7 @@ mod tests {
                         power_budget_cache: crate::PowerBudgetCache::default(),
                     },
                     leaders: Vec::new(),
+                    frame_id: None,
                 },
             )]
             .into_iter()

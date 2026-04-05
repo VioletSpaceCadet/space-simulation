@@ -177,6 +177,7 @@ fn autopilot_skips_purchase_when_already_installed() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     facility.core.module_type_index = ModuleTypeIndex::default();
     sim_core::test_fixtures::rebuild_indices(&mut state, &content);
@@ -246,6 +247,7 @@ fn sensor_budget_disables_when_over_opex_limit() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     facility.core.modules.push(ModuleState {
         id: sim_core::ModuleInstanceId("radio_001".to_string()),
@@ -261,6 +263,7 @@ fn sensor_budget_disables_when_over_opex_limit() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     facility.core.module_type_index = ModuleTypeIndex::default();
     sim_core::test_fixtures::rebuild_indices(&mut state, &content);
@@ -305,6 +308,7 @@ fn sensor_budget_reenables_when_budget_allows() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     facility.core.module_type_index = ModuleTypeIndex::default();
     sim_core::test_fixtures::rebuild_indices(&mut state, &content);
@@ -514,6 +518,7 @@ fn launch_execution_skips_without_rocket_component() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     sim_core::test_fixtures::rebuild_indices(&mut state, &content);
 
@@ -700,6 +705,7 @@ fn satellite_management_launches_when_component_available() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
     sim_core::test_fixtures::rebuild_indices(&mut state, &content);
 

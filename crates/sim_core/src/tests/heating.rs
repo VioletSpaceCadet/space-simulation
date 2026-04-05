@@ -86,6 +86,7 @@ fn state_with_heating(content: &GameContent) -> GameState {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Ice ore with 50% H2O, 10% Fe, 40% Si
@@ -211,6 +212,7 @@ fn test_heating_ore_with_no_h2o_produces_only_slag() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Ore with 0% H2O — should produce no water

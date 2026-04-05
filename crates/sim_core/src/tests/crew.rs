@@ -82,6 +82,7 @@ fn crew_state(content: &GameContent, crew_count: u32) -> GameState {
         },
         efficiency: if crew_count > 0 { 1.0 } else { 0.0 },
         prev_crew_satisfied: true,
+        slot_index: None,
     });
     station
         .core
@@ -175,6 +176,7 @@ fn empty_crew_requirement_always_satisfied() {
         assigned_crew: BTreeMap::new(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     });
     // base_content modules have empty crew_requirement — always satisfied
     assert!(is_crew_satisfied(&BTreeMap::new(), &BTreeMap::new()));

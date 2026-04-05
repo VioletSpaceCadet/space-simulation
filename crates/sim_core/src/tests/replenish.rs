@@ -151,6 +151,7 @@ fn replenish_test_content() -> GameContent {
         milestones: Vec::new(),
         rocket_defs: std::collections::BTreeMap::new(),
         satellite_defs: std::collections::BTreeMap::new(),
+        frames: std::collections::BTreeMap::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();
@@ -189,6 +190,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
                     power_budget_cache: crate::PowerBudgetCache::default(),
                 },
                 leaders: Vec::new(),
+                frame_id: None,
             },
         )]
         .into_iter()

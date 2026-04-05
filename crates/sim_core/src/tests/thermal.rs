@@ -19,6 +19,7 @@ fn thermal_state_none_round_trip() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     };
 
     let json = serde_json::to_string(&module).unwrap();
@@ -50,6 +51,7 @@ fn thermal_state_some_round_trip() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: Some(thermal.clone()),
+        slot_index: None,
     };
 
     let json = serde_json::to_string(&module).unwrap();

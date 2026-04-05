@@ -43,9 +43,9 @@ pub use spatial::{
 pub use tasks::{inventory_mass_kg, inventory_volume_m3, mine_duration};
 // -- types: ID newtypes --
 pub use types::{
-    AsteroidId, BodyId, CommandId, ComponentId, CrewRole, EventId, FacilityId, GroundFacilityId,
-    HullId, LeaderId, LotId, ModuleDefId, ModuleInstanceId, ModuleItemId, NodeId, PrincipalId,
-    RecipeId, SatelliteId, ShipId, SiteId, SlotType, StationId, TechId,
+    AsteroidId, BodyId, CommandId, ComponentId, CrewRole, EventId, FacilityId, FrameId,
+    GroundFacilityId, HullId, LeaderId, LotId, ModuleDefId, ModuleInstanceId, ModuleItemId, NodeId,
+    PrincipalId, RecipeId, SatelliteId, ShipId, SiteId, SlotType, StationId, TechId,
 };
 // -- types: type aliases & constants --
 pub use types::{
@@ -79,7 +79,7 @@ pub use types::{MaterialThermalProps, ThermalState};
 pub use types::{
     AlertRuleDef, AlertRuleType, AsteroidTemplateDef, AutopilotConfig, BodyType, BoiloffCurveDef,
     ComponentDef, CrewRoleDef, DeepScanTargetConfig, ElementDef, ExportComponentConfig,
-    ExportElementConfig, GameContent, HullDef, InitialComponent, InitialMaterial,
+    ExportElementConfig, FrameDef, GameContent, HullDef, InitialComponent, InitialMaterial,
     InitialStationDef, NodeDef, OrbitalBodyDef, RocketDef, SatelliteDef, SlotDef, SolarSystemDef,
     TechDef, TechEffect, ThermalDef, ZoneDef,
 };

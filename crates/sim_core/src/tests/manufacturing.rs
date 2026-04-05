@@ -203,6 +203,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Structural assembler (priority 5) — consumes 3x fe_plate → structural_beam
@@ -224,6 +225,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Basic assembler (priority 3) — consumes 1x fe_plate + 1x repair_kit
@@ -245,6 +247,7 @@ fn state_with_competing_assemblers(content: &GameContent) -> GameState {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Give Fe for plates (plate press: 500kg Fe → 1 fe_plate every 2 ticks).
@@ -483,6 +486,7 @@ fn state_with_smelter_and_crucible(content: &GameContent) -> GameState {
         assigned_crew: Default::default(),
         efficiency: 1.0,
         prev_crew_satisfied: true,
+        slot_index: None,
     });
 
     // Create thermal link: smelter.molten_out → crucible.molten_in

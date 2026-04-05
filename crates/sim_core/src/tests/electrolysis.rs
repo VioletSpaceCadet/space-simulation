@@ -119,6 +119,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Electrolysis unit
@@ -139,6 +140,7 @@ fn state_with_electrolysis(content: &GameContent) -> GameState {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // H2O Material in station inventory
@@ -511,6 +513,7 @@ fn test_full_chain_ore_to_propellant() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Heating unit (ore → H2O)
@@ -531,6 +534,7 @@ fn test_full_chain_ore_to_propellant() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Electrolysis unit (H2O → LH2 + LOX)
@@ -551,6 +555,7 @@ fn test_full_chain_ore_to_propellant() {
         efficiency: 1.0,
         prev_crew_satisfied: true,
         thermal: None,
+        slot_index: None,
     });
 
     // Ice-rich ore with 50% H2O
