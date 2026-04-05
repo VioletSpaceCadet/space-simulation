@@ -923,4 +923,60 @@ mod tests {
             "ground facility components should count in assembler_runs"
         );
     }
+
+    /// Pins the engine-level interval gating behavior:
+    /// `engine::tick` must only call `evaluate_milestones` every N ticks
+    /// where N == `content.scoring.computation_interval_ticks`.
+    ///
+    /// Without this test, the gate could be silently removed or changed
+    /// (e.g. to a different constant) and no other test would catch it —
+    /// the unit tests in this module call `evaluate_milestones` directly.
+    #[test]
+    fn engine_tick_gates_milestone_evaluation_to_scoring_interval() {
+        use rand::SeedableRng;
+
+        let mut content = base_content();
+        // Set a small interval so we don't have to tick hundreds of times.
+        content.scoring.computation_interval_ticks = 5;
+        // A milestone that's already satisfied at tick 0 (tick >= 0).
+        // If evaluated, it fires on the very first call.
+        content.milestones = vec![test_milestone(
+            "ticks_any",
+            vec![MilestoneCondition::MetricAbove {
+                field: "tick".to_string(),
+                threshold: 0.0,
+            }],
+        )];
+
+        let mut state = base_state(&content);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(0);
+
+        // Tick 0: gate fires (0 % 5 == 0) — milestone completes immediately.
+        let _ = crate::tick(&mut state, &[], &content, &mut rng, None);
+        assert!(
+            state.progression.is_milestone_completed("ticks_any"),
+            "milestone should fire on tick=0 when gate aligns (0 % 5 == 0)"
+        );
+
+        // Reset and test the non-aligned case: start state at tick=1 so the
+        // gate is skipped for 4 consecutive ticks before it fires at tick=5.
+        let mut state = base_state(&content);
+        state.meta.tick = 1;
+        // Ticks 1..5 skip evaluation (1,2,3,4 all fail `% 5 == 0`).
+        for _ in 0..4 {
+            let _ = crate::tick(&mut state, &[], &content, &mut rng, None);
+            assert!(
+                !state.progression.is_milestone_completed("ticks_any"),
+                "milestone should NOT fire between gate intervals (tick={})",
+                state.meta.tick
+            );
+        }
+        // Next tick moves tick from 4→5, gate fires at tick=5.
+        let _ = crate::tick(&mut state, &[], &content, &mut rng, None);
+        assert!(
+            state.progression.is_milestone_completed("ticks_any"),
+            "milestone should fire when gate re-aligns at tick={}",
+            state.meta.tick
+        );
+    }
 }
