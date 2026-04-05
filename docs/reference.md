@@ -35,10 +35,11 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `PricingEntry` | `base_price_per_unit`, `importable`, `exportable` |
 | `TradeItemSpec` | Enum: `Material { element, kg }`, `Component { component_id, count }`, `Module { module_def_id }` |
 | `OutputSpec` | Enum: `Material { ... }`, `Slag { ... }`, `Component { ... }`, `Ship { cargo_capacity_m3 }` |
-| `TechEffect` | `EnableDeepScan`, `DeepScanCompositionNoise { sigma }`, `EnableShipConstruction`, or `StatModifier { stat, op, value }` — numeric bonuses from research |
-| `ResearchDomain` | Enum: `Survey`, `Materials`, `Manufacturing`, `Propulsion` — categorises techs and lab output |
-| `DomainProgress` | Per-tech domain point tracking: `points: HashMap<ResearchDomain, f64>` |
-| `DataKind` | Content-driven string newtype (like `AnomalyTag`). Well-known values: `SurveyData`, `AssayData`, `ManufacturingData`, `TransitData`. New data kinds added via content JSON. |
+| `TechEffect` | `EnableDeepScan`, `DeepScanCompositionNoise { sigma }`, `EnableShipConstruction`, or `StatModifier { stat, op, value }` — numeric bonuses from research. Prefer `StatModifier` with an existing `StatId` (e.g. `ResearchSpeed`) over new variants. |
+| `TechDef` | Tech definition: `id`, `name`, `tier: u32` (serde default 1), `prereqs`, `domain_requirements`, `accepted_data`, `effects`. Tier groups techs for P3 progression and per-tier pacing scaling. |
+| `ResearchDomain` | Content-driven string newtype (like `DataKind`, `AnomalyTag`). Well-known values: `Survey`, `Materials`, `Manufacturing`, `Propulsion`, `Engineering`. New domains added via content JSON with no Rust changes. |
+| `DomainProgress` | Per-tech domain point tracking: `points: HashMap<ResearchDomain, f32>` |
+| `DataKind` | Content-driven string newtype (like `AnomalyTag`). Well-known values: `SurveyData`, `AssayData`, `ManufacturingData`, `TransitData`, `OpticalData`, `RadioData`, `EngineeringData`. New data kinds added via content JSON. |
 | `LabDef` | Lab module behavior definition: `data_kind`, `domain`, `throughput_per_tick` |
 | `LabState` | Lab runtime state (embedded in `ModuleState::kind_state`): `assigned_tech: Option<TechId>` |
 | `ThermalDef` | Module thermal properties: `heat_capacity_j_per_k`, `passive_cooling_coefficient`, `max_temp_mk`, `operating_min_mk`, `operating_max_mk`, `thermal_group`, `idle_heat_generation_w` |
@@ -55,25 +56,29 @@ Note: `FacilitiesState` has been removed. Research state is fully contained in `
 
 **Lab-based domain model:** Labs are station modules (`ModuleBehaviorDef::Lab`) that consume raw data from the sim-wide `ResearchState.data_pool` each tick and produce domain-specific research points toward an assigned tech.
 
-**Research Domains (4):**
+**Research Domains (5):** Content-driven strings loaded from `module_defs.json` lab entries and `techs.json` domain requirements. Adding a new domain is a content-only change.
 
 | Domain | Fantasy | Gameplay Loop |
 |--------|---------|---------------|
-| Survey | Finding and characterizing the environment | Scanning, sensor arrays |
+| Survey | Finding and characterizing the environment | Scanning, sensor arrays, telescopes |
 | Materials | Physical/chemical science | Processing ore, refining |
 | Manufacturing | Building systems at scale | Assembly, module operations |
 | Propulsion | Moving mass through space | Ship transits (late-game) |
+| Engineering | Rocketry, precision systems | Assembler runs (alongside ManufacturingData) |
 
-**Data Kinds (4):**
+**Data Kinds (7):** Content-driven strings. Adding a new data kind is a content-only change.
 
 | DataKind | Source Activities |
 |----------|------------------|
-| SurveyData | Survey tasks, deep scans, sensor arrays |
+| SurveyData | Survey tasks, deep scans, orbital sensor arrays |
 | AssayData | Mining task completion |
 | ManufacturingData | Assembler runs |
 | TransitData | Ship transit completion |
+| OpticalData | Optical telescope scans (gated by `tech_ground_observation`) |
+| RadioData | Radio telescope scans (gated by `tech_radio_astronomy`) |
+| EngineeringData | Assembler runs (dual-produced with ManufacturingData) |
 
-**`ResearchState` fields:** `unlocked: HashSet<TechId>`, `data_pool: HashMap<DataKind, f64>`, `evidence: HashMap<TechId, DomainProgress>`, `action_counts: HashMap<String, u32>`.
+**`ResearchState` fields:** `unlocked: HashSet<TechId>`, `data_pool: AHashMap<DataKind, f32>`, `evidence: AHashMap<TechId, DomainProgress>`, `action_counts: AHashMap<String, u64>`.
 
 **Raw data generation:** Tasks generate raw data via `generate_data(research, kind, action_key, constants)` with diminishing returns (yield = `base_yield × (1 / (1 + 0.1 × count))`). Data is sim-wide — not stored in ship or station inventory.
 
@@ -86,6 +91,10 @@ Note: `FacilitiesState` has been removed. Research state is fully contained in `
 | `data_generation_peak` | Peak raw data yield per ship task |
 | `data_generation_floor` | Minimum raw data yield per ship task |
 | `data_generation_decay_rate` | Exponential decay rate for data yield over repeated tasks |
+| `research_speed_multiplier` | Global multiplier on all research point production (default 1.0) |
+| `research_domain_rates` | `HashMap<String, f64>` — per-domain rate multiplier keyed by domain name (default empty, missing keys = 1.0) |
+| `research_tier_scaling` | `Vec<f64>` — per-tier multiplier indexed by tier-1 (default empty, missing indices = 1.0) |
+| `research_lab_diminishing_returns` | Lab DR factor: Nth lab of same domain produces `base × factor^(N-1)`. Counts enabled labs across all stations AND ground facilities. Default 1.0 = no DR. |
 
 ## Content Files
 
@@ -94,7 +103,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 | File | Key fields |
 |---|---|
 | `constants.json` | Scan durations, travel ticks, mining rate, cargo capacities, deposit ticks, research compute |
-| `techs.json` | Tech tree (`tech_deep_scan_v1` is the only current tech) |
+| `techs.json` | Tech tree: ~26 techs across 3 tiers (tier 1 = ground phase, tier 2 = early orbital, tier 3 = industrial). Each `TechDef` has `tier`, `prereqs`, `domain_requirements`, `accepted_data`, `effects`. |
 | `solar_system.json` | 4 nodes (Earth Orbit → Inner Belt → Mid Belt → Outer Belt), linear chain |
 | `asteroid_templates.json` | 2 templates: `tmpl_iron_rich` (IronRich, Fe-heavy) and `tmpl_silicate` (Si-heavy) |
 | `elements.json` | 5 elements: `ore` (3000), `slag` (2500), `Fe` (7874), `Si` (2329), `He` (125) kg/m³ |
