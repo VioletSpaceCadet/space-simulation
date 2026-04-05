@@ -1253,6 +1253,51 @@ pub(crate) fn handle_unassign_crew(
     true
 }
 
+/// Apply frame bonuses to a station via the modifier pipeline, mirroring
+/// [`recompute_ship_stats`] for ships.
+///
+/// - Clears any existing `ModifierSource::Frame(_)` entries from
+///   `station.core.modifiers` so the set matches the current frame exactly.
+/// - If the station has a frame, copies the frame's `bonuses` into the
+///   modifier set tagged with `ModifierSource::Frame(frame_id)` and recomputes
+///   cached base stats (currently just `cargo_capacity_m3`).
+/// - Frameless stations (`frame_id == None`) are left alone — no frame
+///   modifiers, no stat recompute. Their `cargo_capacity_m3` remains whatever
+///   the caller set directly.
+///
+/// **Power note:** `base_power_capacity_kw` on `FrameDef` is reserved for
+/// future use. Phase 1 power resolution stays solar-array driven and is not
+/// wired through frames here.
+pub fn recompute_station_stats(station: &mut crate::StationState, content: &GameContent) {
+    use crate::modifiers::{ModifierSource, StatId};
+
+    // Always clear old frame modifiers so the set stays in sync with the
+    // current frame, even when the station has been de-framed.
+    station
+        .core
+        .modifiers
+        .remove_where(|s| matches!(s, ModifierSource::Frame(_)));
+
+    let Some(frame_id) = station.frame_id.clone() else {
+        return;
+    };
+    let Some(frame) = content.frames.get(&frame_id) else {
+        return;
+    };
+
+    for bonus in &frame.bonuses {
+        let mut modifier = bonus.clone();
+        modifier.source = ModifierSource::Frame(frame_id.clone());
+        station.core.modifiers.add(modifier);
+    }
+
+    // Recompute cached cargo capacity from the frame base plus modifiers.
+    station.core.cargo_capacity_m3 = station
+        .core
+        .modifiers
+        .resolve_f32(StatId::CargoCapacity, frame.base_cargo_capacity_m3);
+}
+
 /// Recompute ship cached stats (cargo, speed, propellant capacity) from hull + fitted modules.
 pub fn recompute_ship_stats(ship: &mut crate::ShipState, content: &GameContent) {
     use crate::modifiers::{ModifierSource, StatId};
@@ -1932,6 +1977,129 @@ mod tests {
             module_def_id: "module_cargo_expander".to_string(),
         });
         state
+    }
+
+    // ------------------------------------------------------------------
+    // SF-04: recompute_station_stats — frame bonus application
+    // ------------------------------------------------------------------
+
+    fn content_with_frame() -> GameContent {
+        let mut content = base_content();
+        use crate::modifiers::{Modifier, ModifierOp, ModifierSource, StatId};
+        let frame_id = crate::FrameId("frame_test_research".to_string());
+        content.frames.insert(
+            frame_id.clone(),
+            crate::FrameDef {
+                id: frame_id.clone(),
+                name: "Test Research".to_string(),
+                base_cargo_capacity_m3: 1000.0,
+                base_power_capacity_kw: 80.0,
+                slots: vec![],
+                bonuses: vec![Modifier {
+                    stat: StatId::ResearchSpeed,
+                    op: ModifierOp::PctAdditive,
+                    value: 0.15,
+                    source: ModifierSource::Frame(frame_id.clone()),
+                    condition: None,
+                }],
+                required_tech: None,
+                tags: vec![],
+            },
+        );
+        content
+    }
+
+    #[test]
+    fn recompute_station_stats_frameless_leaves_modifiers_untouched() {
+        let content = base_content();
+        let mut state = base_state(&content);
+        let station = state.stations.values_mut().next().unwrap();
+        station.frame_id = None;
+        // Prime the modifier set with a non-frame modifier to prove it is
+        // not swept away by the recompute.
+        use crate::modifiers::{Modifier, ModifierOp, ModifierSource, StatId};
+        station.core.modifiers.add(Modifier {
+            stat: StatId::ResearchSpeed,
+            op: ModifierOp::Flat,
+            value: 1.0,
+            source: ModifierSource::Tech("tech_research".to_string()),
+            condition: None,
+        });
+        let before = station.core.modifiers.len();
+        recompute_station_stats(station, &content);
+        assert_eq!(station.core.modifiers.len(), before);
+    }
+
+    #[test]
+    fn recompute_station_stats_applies_frame_bonus_and_cargo() {
+        let content = content_with_frame();
+        let mut state = base_state(&content);
+        let station = state.stations.values_mut().next().unwrap();
+        station.frame_id = Some(crate::FrameId("frame_test_research".to_string()));
+
+        recompute_station_stats(station, &content);
+
+        // Frame adds +15% ResearchSpeed tagged with ModifierSource::Frame
+        use crate::modifiers::{ModifierSource, StatId};
+        let resolved = station.core.modifiers.resolve(StatId::ResearchSpeed, 100.0);
+        assert!(
+            (resolved - 115.0).abs() < 1e-6,
+            "expected ResearchSpeed = 115, got {resolved}"
+        );
+        let has_frame_modifier = station
+            .core
+            .modifiers
+            .iter()
+            .any(|m| matches!(m.source, ModifierSource::Frame(_)));
+        assert!(
+            has_frame_modifier,
+            "frame bonus should be tagged with ModifierSource::Frame"
+        );
+
+        // Cached cargo capacity should match the frame base (no CargoCapacity
+        // modifier on this frame, so resolve returns the base).
+        assert!((station.core.cargo_capacity_m3 - 1000.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn recompute_station_stats_is_idempotent() {
+        let content = content_with_frame();
+        let mut state = base_state(&content);
+        let station = state.stations.values_mut().next().unwrap();
+        station.frame_id = Some(crate::FrameId("frame_test_research".to_string()));
+
+        recompute_station_stats(station, &content);
+        let after_first = station.core.modifiers.len();
+        recompute_station_stats(station, &content);
+        let after_second = station.core.modifiers.len();
+        assert_eq!(
+            after_first, after_second,
+            "calling recompute twice should not stack modifiers"
+        );
+    }
+
+    #[test]
+    fn recompute_station_stats_clears_stale_frame_modifiers_when_unframed() {
+        let content = content_with_frame();
+        let mut state = base_state(&content);
+        let station = state.stations.values_mut().next().unwrap();
+        station.frame_id = Some(crate::FrameId("frame_test_research".to_string()));
+        recompute_station_stats(station, &content);
+        assert!(!station.core.modifiers.is_empty());
+
+        // De-frame the station and recompute — all frame modifiers should go.
+        station.frame_id = None;
+        recompute_station_stats(station, &content);
+        use crate::modifiers::ModifierSource;
+        let lingering_frame = station
+            .core
+            .modifiers
+            .iter()
+            .any(|m| matches!(m.source, ModifierSource::Frame(_)));
+        assert!(
+            !lingering_frame,
+            "de-framed station should have no Frame-sourced modifiers"
+        );
     }
 
     #[test]
