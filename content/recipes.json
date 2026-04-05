@@ -589,5 +589,57 @@
     "tags": [
       "casting"
     ]
+  },
+  {
+    "id": "recipe_survey_satellite",
+    "inputs": [
+      { "filter": { "Component": "solar_cell" }, "amount": { "Count": 2 } },
+      { "filter": { "Component": "camera_module" }, "amount": { "Count": 1 } },
+      { "filter": { "Component": "guidance_board" }, "amount": { "Count": 1 } }
+    ],
+    "outputs": [
+      { "Component": { "component_id": "survey_satellite", "quality_formula": { "Fixed": 1.0 } } }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_satellite_basics"
+  },
+  {
+    "id": "recipe_comm_relay",
+    "inputs": [
+      { "filter": { "Component": "antenna_array" }, "amount": { "Count": 1 } },
+      { "filter": { "Component": "solar_cell" }, "amount": { "Count": 2 } },
+      { "filter": { "Component": "transponder" }, "amount": { "Count": 1 } }
+    ],
+    "outputs": [
+      { "Component": { "component_id": "comm_relay", "quality_formula": { "Fixed": 1.0 } } }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_satellite_basics"
+  },
+  {
+    "id": "recipe_nav_beacon",
+    "inputs": [
+      { "filter": { "Component": "atomic_clock" }, "amount": { "Count": 1 } },
+      { "filter": { "Component": "solar_cell" }, "amount": { "Count": 2 } },
+      { "filter": { "Component": "signal_processor" }, "amount": { "Count": 1 } }
+    ],
+    "outputs": [
+      { "Component": { "component_id": "nav_beacon", "quality_formula": { "Fixed": 1.0 } } }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_satellite_basics"
+  },
+  {
+    "id": "recipe_science_platform",
+    "inputs": [
+      { "filter": { "Component": "sensor_payload" }, "amount": { "Count": 1 } },
+      { "filter": { "Component": "solar_cell" }, "amount": { "Count": 4 } },
+      { "filter": { "Component": "attitude_controller" }, "amount": { "Count": 1 } }
+    ],
+    "outputs": [
+      { "Component": { "component_id": "science_platform", "quality_formula": { "Fixed": 1.0 } } }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_orbital_science"
   }
 ]
