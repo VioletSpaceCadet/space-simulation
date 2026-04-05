@@ -704,7 +704,11 @@ impl MetricsAccumulator {
             Some(TaskKind::Survey { .. } | TaskKind::DeepScan { .. }) => {
                 self.fleet_surveying += 1;
             }
-            Some(TaskKind::Deposit { .. }) => self.fleet_depositing += 1,
+            // Pickup is the loading end of an inter-station transfer —
+            // count it alongside Deposit as loading/unloading activity.
+            Some(TaskKind::Deposit { .. } | TaskKind::Pickup { .. }) => {
+                self.fleet_depositing += 1;
+            }
             Some(TaskKind::Refuel { .. }) => self.fleet_refueling += 1,
         }
     }

@@ -481,6 +481,239 @@ pub(crate) fn handle_deploy_station(
     true
 }
 
+/// VIO-595: Handle a `TransferItems` command. Validates the ship and
+/// both stations, pre-deducts fuel for BOTH transit legs (ship→src and
+/// src→dst), and assigns a chained task
+/// `Transit(src) → Pickup → Transit(dst) → Deposit` to the ship.
+/// Returns `true` on successful assignment. Ignores `Crew` item specs
+/// (use Import/Export trade commands for crew).
+///
+/// Why pre-deduct both legs: `resolve_transit` does not deduct fuel on
+/// chained hand-off (only the initial `apply_ship_assignments` call
+/// does). A transfer has two transit legs, so both are charged upfront
+/// to avoid free fuel for the return leg. If either leg is unaffordable
+/// the entire command is rejected — the ship's fuel is not mutated.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn handle_transfer_items(
+    state: &mut GameState,
+    content: &GameContent,
+    ship_id: &ShipId,
+    from_station: &crate::StationId,
+    to_station: &crate::StationId,
+    items: &[crate::TradeItemSpec],
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    // Filter out Crew specs — unsupported by this command.
+    let filtered_items: Vec<crate::TradeItemSpec> = items
+        .iter()
+        .filter(|spec| !matches!(spec, crate::TradeItemSpec::Crew { .. }))
+        .cloned()
+        .collect();
+    if filtered_items.is_empty() || from_station == to_station {
+        return false;
+    }
+
+    let Some(src_position) = state.stations.get(from_station).map(|s| s.position.clone()) else {
+        return false;
+    };
+    let Some(dst_position) = state.stations.get(to_station).map(|s| s.position.clone()) else {
+        return false;
+    };
+    let Some(ship) = state.ships.get(ship_id) else {
+        return false;
+    };
+
+    // Pre-compute both travel legs and their fuel costs.
+    let src_travel = travel_ticks_to_build_site(state, content, ship, &src_position);
+    let dst_travel = travel_ticks_between(state, content, ship, &src_position, &dst_position);
+    let total_fuel = compute_transfer_fuel(
+        state,
+        content,
+        ship,
+        &src_position,
+        &dst_position,
+        src_travel,
+        dst_travel,
+    );
+
+    if content.constants.fuel_cost_per_au > 0.0
+        && total_fuel > 0.0
+        && ship.propellant_kg < total_fuel
+    {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::InsufficientPropellant {
+                ship_id: ship_id.clone(),
+                destination: dst_position,
+            },
+        ));
+        return false;
+    }
+
+    let final_task = build_transfer_task_chain(
+        from_station,
+        to_station,
+        filtered_items,
+        src_position,
+        dst_position.clone(),
+        src_travel,
+        dst_travel,
+    );
+    let duration = final_task.duration(&content.constants);
+    let label = final_task.label().to_string();
+    let target = final_task.target();
+
+    let Some(ship_mut) = state.ships.get_mut(ship_id) else {
+        return false;
+    };
+    if content.constants.fuel_cost_per_au > 0.0 && total_fuel > 0.0 {
+        ship_mut.propellant_kg -= total_fuel;
+        state.propellant_consumed_total += f64::from(total_fuel);
+    }
+    if let Some(ship_mut) = state.ships.get_mut(ship_id) {
+        ship_mut.task = Some(crate::TaskState {
+            kind: final_task,
+            started_tick: current_tick,
+            eta_tick: current_tick + duration,
+        });
+    }
+
+    if content.constants.fuel_cost_per_au > 0.0 && total_fuel > 0.0 {
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            crate::Event::PropellantConsumed {
+                ship_id: ship_id.clone(),
+                kg_consumed: total_fuel,
+                destination: dst_position,
+            },
+        ));
+    }
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::TaskStarted {
+            ship_id: ship_id.clone(),
+            task_kind: label,
+            target,
+        },
+    ));
+    true
+}
+
+/// Compute total fuel required for a two-leg transfer (ship→src +
+/// src→dst). Returns 0 for zero-length legs. Applies the global
+/// `FuelEfficiency` modifier to match `deduct_transit_fuel`.
+fn compute_transfer_fuel(
+    state: &GameState,
+    content: &GameContent,
+    ship: &crate::ShipState,
+    src_position: &crate::Position,
+    dst_position: &crate::Position,
+    src_travel: u64,
+    dst_travel: u64,
+) -> f32 {
+    let fuel_efficiency = state
+        .modifiers
+        .resolve_f32(crate::modifiers::StatId::FuelEfficiency, 1.0);
+    let leg1 = if src_travel == 0 {
+        0.0
+    } else {
+        crate::propulsion::compute_transit_fuel(
+            ship,
+            &ship.position,
+            src_position,
+            content,
+            &state.body_cache,
+        ) * fuel_efficiency
+    };
+    let leg2 = if dst_travel == 0 {
+        0.0
+    } else {
+        crate::propulsion::compute_transit_fuel(
+            ship,
+            src_position,
+            dst_position,
+            content,
+            &state.body_cache,
+        ) * fuel_efficiency
+    };
+    leg1 + leg2
+}
+
+/// Build the chained `Transit(src) → Pickup → Transit(dst) → Deposit`
+/// task tree. Transit legs collapse to their successor when the ship
+/// is already co-located with the respective endpoint (travel == 0).
+fn build_transfer_task_chain(
+    from_station: &crate::StationId,
+    to_station: &crate::StationId,
+    items: Vec<crate::TradeItemSpec>,
+    src_position: crate::Position,
+    dst_position: crate::Position,
+    src_travel: u64,
+    dst_travel: u64,
+) -> TaskKind {
+    let deposit = TaskKind::Deposit {
+        station: to_station.clone(),
+        blocked: false,
+    };
+    let transit_to_dst = if dst_travel == 0 {
+        deposit
+    } else {
+        TaskKind::Transit {
+            destination: dst_position,
+            total_ticks: dst_travel,
+            then: Box::new(deposit),
+        }
+    };
+    let pickup = TaskKind::Pickup {
+        from_station: from_station.clone(),
+        items,
+        then: Box::new(transit_to_dst),
+    };
+    if src_travel == 0 {
+        pickup
+    } else {
+        TaskKind::Transit {
+            destination: src_position,
+            total_ticks: src_travel,
+            then: Box::new(pickup),
+        }
+    }
+}
+
+/// Travel ticks between two positions using the ship's speed. Returns 0
+/// if the positions are already co-located within docking range.
+fn travel_ticks_between(
+    state: &GameState,
+    content: &GameContent,
+    ship: &crate::ShipState,
+    from_position: &crate::Position,
+    to_position: &crate::Position,
+) -> u64 {
+    if crate::is_co_located(
+        from_position,
+        to_position,
+        &state.body_cache,
+        content.constants.docking_range_au_um,
+    ) {
+        return 0;
+    }
+    let from_abs = crate::compute_entity_absolute(from_position, &state.body_cache);
+    let to_abs = crate::compute_entity_absolute(to_position, &state.body_cache);
+    let ticks_per_au = ship
+        .speed_ticks_per_au
+        .unwrap_or(content.constants.ticks_per_au);
+    crate::travel_ticks(
+        from_abs,
+        to_abs,
+        ticks_per_au,
+        content.constants.min_transit_ticks,
+    )
+}
+
 /// Uninstall a module from the station and return it to inventory.
 pub(crate) fn handle_uninstall_module(
     state: &mut GameState,

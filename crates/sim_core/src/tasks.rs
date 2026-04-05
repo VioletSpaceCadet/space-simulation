@@ -32,6 +32,13 @@ pub(crate) fn resolve_task(
         TaskKind::Deposit { ref station, .. } => {
             resolve_deposit(state, ship_id, station, content, events);
         }
+        TaskKind::Pickup {
+            ref from_station,
+            ref items,
+            ref then,
+        } => {
+            resolve_pickup(state, ship_id, from_station, items, then, content, events);
+        }
         TaskKind::ConstructStation {
             ref frame_id,
             ref position,
@@ -720,6 +727,282 @@ pub(crate) fn resolve_deposit(
             target: Some(station_id.0.clone()),
         },
     ));
+}
+
+/// VIO-595: load inventory items from a station into the ship, then
+/// start the chained `then` task (typically `Transit { then: Deposit }`
+/// to complete an inter-station transfer). Best-effort: picks up what
+/// the station has up to the ship's remaining cargo capacity. Items
+/// that are not available or do not fit are silently dropped from the
+/// request — the ship proceeds with whatever it managed to load.
+pub(crate) fn resolve_pickup(
+    state: &mut GameState,
+    ship_id: &ShipId,
+    from_station: &StationId,
+    items: &[crate::TradeItemSpec],
+    then: &TaskKind,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    // Compute remaining ship capacity before any pickups.
+    let mut remaining_capacity = {
+        let Some(ship) = state.ships.get(ship_id) else {
+            return;
+        };
+        let used = inventory_volume_m3(&ship.inventory, content);
+        (ship.cargo_capacity_m3 - used).max(0.0)
+    };
+
+    // Pull matching items out of the station inventory, one TradeItemSpec
+    // at a time. Track what we successfully transferred for the event.
+    let mut picked_up: Vec<InventoryItem> = Vec::new();
+
+    for spec in items {
+        let Some(station) = state.stations.get_mut(from_station) else {
+            break; // Station disappeared — abort further pickups.
+        };
+        let taken = take_items_for_spec(station, spec, remaining_capacity, content);
+        for item in taken {
+            remaining_capacity = (remaining_capacity - item_volume_m3(&item, content)).max(0.0);
+            picked_up.push(item);
+        }
+    }
+
+    // Move the loaded items into the ship inventory.
+    if !picked_up.is_empty() {
+        if let Some(station) = state.stations.get_mut(from_station) {
+            station.invalidate_volume_cache();
+        }
+        if let Some(ship) = state.ships.get_mut(ship_id) {
+            ship.inventory.extend(picked_up.clone());
+        }
+    }
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::ItemsPickedUp {
+            ship_id: ship_id.clone(),
+            station_id: from_station.clone(),
+            items: picked_up,
+        },
+    ));
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::TaskCompleted {
+            ship_id: ship_id.clone(),
+            task_kind: "Pickup".to_string(),
+            target: Some(from_station.0.clone()),
+        },
+    ));
+
+    // Chain into the follow-on task (mirrors resolve_transit's handoff).
+    let duration = then.duration(&content.constants);
+    let label = then.label().to_string();
+    let target = then.target();
+    if let Some(ship) = state.ships.get_mut(ship_id) {
+        ship.task = Some(TaskState {
+            kind: then.clone(),
+            started_tick: current_tick,
+            eta_tick: current_tick + duration,
+        });
+    }
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::TaskStarted {
+            ship_id: ship_id.clone(),
+            task_kind: label,
+            target,
+        },
+    ));
+}
+
+/// Remove items from `station.core.inventory` that match `spec`, up to
+/// the available remaining ship capacity. Returns the extracted items.
+/// Best-effort on both sides: partial materials are split, partial
+/// component stacks are split, missing items are skipped. Volume check
+/// is strict — items whose `item_volume_m3` exceeds remaining capacity
+/// are not partially loaded (components/modules are atomic).
+fn take_items_for_spec(
+    station: &mut crate::StationState,
+    spec: &crate::TradeItemSpec,
+    remaining_capacity: f32,
+    content: &GameContent,
+) -> Vec<InventoryItem> {
+    match spec {
+        crate::TradeItemSpec::Material {
+            element,
+            kg: requested_kg,
+        } => take_material(
+            &mut station.core.inventory,
+            element,
+            *requested_kg,
+            remaining_capacity,
+            content,
+        ),
+        crate::TradeItemSpec::Component {
+            component_id,
+            count,
+        } => take_components(
+            &mut station.core.inventory,
+            component_id,
+            *count,
+            remaining_capacity,
+            content,
+        ),
+        crate::TradeItemSpec::Module { module_def_id } => take_module(
+            &mut station.core.inventory,
+            module_def_id,
+            remaining_capacity,
+            content,
+        ),
+        crate::TradeItemSpec::Crew { .. } => Vec::new(), // Crew transfer not supported.
+    }
+}
+
+fn take_material(
+    inventory: &mut Vec<InventoryItem>,
+    element: &str,
+    requested_kg: f32,
+    remaining_capacity: f32,
+    content: &GameContent,
+) -> Vec<InventoryItem> {
+    // Material volume is density-based: volume = kg / density.
+    let density = element_density(content, element);
+    if density <= 0.0 {
+        return Vec::new();
+    }
+    let max_kg_by_capacity = (remaining_capacity * density).max(0.0);
+    let mut to_take = requested_kg.min(max_kg_by_capacity);
+    if to_take <= 0.0 {
+        return Vec::new();
+    }
+
+    let mut taken: Vec<InventoryItem> = Vec::new();
+    // Iterate in place; split materials as needed.
+    let mut index = 0;
+    while index < inventory.len() && to_take > 0.0 {
+        let matches_element = matches!(
+            &inventory[index],
+            InventoryItem::Material { element: e, .. } if e == element
+        );
+        if !matches_element {
+            index += 1;
+            continue;
+        }
+        let InventoryItem::Material {
+            element: e,
+            kg,
+            quality,
+            thermal,
+        } = &mut inventory[index]
+        else {
+            unreachable!();
+        };
+        if *kg <= to_take {
+            to_take -= *kg;
+            taken.push(inventory.remove(index));
+        } else {
+            // Split: extract `to_take` kg into a new InventoryItem.
+            *kg -= to_take;
+            taken.push(InventoryItem::Material {
+                element: e.clone(),
+                kg: to_take,
+                quality: *quality,
+                thermal: thermal.clone(),
+            });
+            to_take = 0.0;
+        }
+    }
+    taken
+}
+
+fn take_components(
+    inventory: &mut Vec<InventoryItem>,
+    component_id: &crate::ComponentId,
+    requested_count: u32,
+    remaining_capacity: f32,
+    _content: &GameContent,
+) -> Vec<InventoryItem> {
+    // Per-unit volume matches `item_volume_m3`: hardcoded 1.0 m^3 per
+    // component (engine-wide convention for components in cargo holds).
+    // Using `ComponentDef.volume_m3` here would create an asymmetry with
+    // the rest of the cargo system and allow overloading by a factor of
+    // 1/def.volume_m3. When item_volume_m3 is fixed to honor def values,
+    // this helper should follow suit (single source of truth).
+    const PER_UNIT_VOLUME_M3: f32 = 1.0;
+    // Safe: non-negative (remaining_capacity >= 0) and clamped below
+    // u16::MAX well below u32::MAX before cast.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let max_count_by_capacity = (remaining_capacity / PER_UNIT_VOLUME_M3)
+        .floor()
+        .clamp(0.0, f32::from(u16::MAX)) as u32;
+    let mut to_take = requested_count.min(max_count_by_capacity);
+    if to_take == 0 {
+        return Vec::new();
+    }
+
+    let mut taken: Vec<InventoryItem> = Vec::new();
+    let mut index = 0;
+    while index < inventory.len() && to_take > 0 {
+        let matches_id = matches!(
+            &inventory[index],
+            InventoryItem::Component { component_id: cid, .. } if cid == component_id
+        );
+        if !matches_id {
+            index += 1;
+            continue;
+        }
+        let InventoryItem::Component {
+            component_id: cid,
+            count,
+            quality,
+        } = &mut inventory[index]
+        else {
+            unreachable!();
+        };
+        if *count <= to_take {
+            to_take -= *count;
+            taken.push(inventory.remove(index));
+        } else {
+            *count -= to_take;
+            taken.push(InventoryItem::Component {
+                component_id: cid.clone(),
+                count: to_take,
+                quality: *quality,
+            });
+            to_take = 0;
+        }
+    }
+    taken
+}
+
+fn take_module(
+    inventory: &mut Vec<InventoryItem>,
+    module_def_id: &str,
+    remaining_capacity: f32,
+    content: &GameContent,
+) -> Vec<InventoryItem> {
+    // Find the module def to look up its volume (module_defs is keyed by id).
+    let Some(def) = content.module_defs.get(module_def_id) else {
+        return Vec::new();
+    };
+    if def.volume_m3 > remaining_capacity {
+        return Vec::new();
+    }
+    // Take the first matching module item.
+    let position = inventory.iter().position(|item| {
+        matches!(item, InventoryItem::Module { module_def_id: mdid, .. } if mdid == module_def_id)
+    });
+    match position {
+        Some(pos) => vec![inventory.remove(pos)],
+        None => Vec::new(),
+    }
 }
 
 pub(crate) fn resolve_deep_scan(
