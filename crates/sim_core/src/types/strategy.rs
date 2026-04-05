@@ -204,10 +204,19 @@ fn sanitize_unit(value: f32) -> f32 {
 /// `GameContent.default_strategy`) and can be replaced at runtime via
 /// `Command::SetStrategyConfig` (VIO-483).
 ///
-/// The nine operational threshold fields mirror `Constants.autopilot_*` values
-/// with identical defaults — VIO-605 will consolidate both schemas and switch
-/// consumers to read from `StrategyConfig` exclusively. For VIO-479 the fields
-/// are defined but no consumers read them yet, so behavior is unchanged.
+/// **Version history:**
+/// * `strategy-v1` (VIO-479) — mode, priorities, fleet target, 9 thresholds
+///   mirroring `Constants.autopilot_*`.
+/// * `strategy-v2` (VIO-605) — superset of the P0 `AutopilotConfig` behavioral
+///   parameters. Adds `refuel_max_pct`, `shipyard_component_count`,
+///   `power_deficit_threshold_kw`, and `crew_hire_projection_minutes` so
+///   `sim_bench` and the optimizer can tune the full surface.
+///
+/// The behavioral fields mirror `Constants.autopilot_*` / `AutopilotConfig`
+/// with identical defaults — no consumers read from `StrategyConfig` yet, so
+/// behavior is unchanged. Consumer switching is tracked separately and lands
+/// alongside VIO-480/481 when the rule interpreter and station agents are
+/// wired up.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct StrategyConfig {
@@ -225,7 +234,7 @@ pub struct StrategyConfig {
     /// this number.
     pub fleet_size_target: u32,
 
-    // -- 9 operational thresholds (defaults match Constants.autopilot_*) --
+    // -- Operational thresholds (defaults match Constants.autopilot_* / AutopilotConfig) --
     /// H2O inventory (kg) below which the autopilot prioritizes volatile-rich
     /// mining. Default 500.0. Mirrors `Constants.autopilot_volatile_threshold_kg`.
     pub volatile_threshold_kg: f32,
@@ -254,12 +263,29 @@ pub struct StrategyConfig {
     /// Propellant fraction below which ships opportunistically refuel at a
     /// station. Default 0.8. Mirrors `Constants.autopilot_refuel_threshold_pct`.
     pub refuel_threshold_pct: f32,
+
+    // -- strategy-v2 additions (VIO-605): remaining P0 AutopilotConfig behavioral params --
+    /// Propellant fraction at or above which refueling is considered complete.
+    /// Default 0.99. Mirrors `AutopilotConfig::refuel_max_pct` /
+    /// `Constants.autopilot_refuel_max_pct`.
+    pub refuel_max_pct: f32,
+    /// Default component import count for shipyard recipes when no recipe
+    /// match is found. Default 4. Mirrors `AutopilotConfig::shipyard_component_count` /
+    /// `Constants.autopilot_shipyard_component_count`.
+    pub shipyard_component_count: u32,
+    /// Power deficit (kW) below which module shedding is not triggered.
+    /// Default 0.01. Mirrors `AutopilotConfig::power_deficit_threshold_kw`.
+    pub power_deficit_threshold_kw: f32,
+    /// Forward-looking salary projection window (game-minutes) for crew
+    /// hiring decisions. Default `30 * 24 * 60 = 43_200` (30 days).
+    /// Mirrors `AutopilotConfig::crew_hire_projection_minutes`.
+    pub crew_hire_projection_minutes: u64,
 }
 
 impl Default for StrategyConfig {
     fn default() -> Self {
         Self {
-            version: "strategy-v1".to_string(),
+            version: "strategy-v2".to_string(),
             mode: StrategyMode::Balanced,
             priorities: PriorityWeights::default(),
             fleet_size_target: 3,
@@ -272,6 +298,10 @@ impl Default for StrategyConfig {
             export_min_revenue: 1_000.0,
             budget_cap_fraction: 0.05,
             refuel_threshold_pct: 0.8,
+            refuel_max_pct: 0.99,
+            shipyard_component_count: 4,
+            power_deficit_threshold_kw: 0.01,
+            crew_hire_projection_minutes: 30 * 24 * 60,
         }
     }
 }
@@ -379,8 +409,7 @@ mod tests {
     #[test]
     fn strategy_config_default_matches_constants_thresholds() {
         let config = StrategyConfig::default();
-        // These must match Constants.autopilot_* defaults exactly so that when
-        // VIO-605 flips consumers over there is no behavior change.
+        // strategy-v1 threshold fields — must match Constants.autopilot_* defaults.
         assert!((config.volatile_threshold_kg - 500.0).abs() < 1e-6);
         assert!((config.lh2_threshold_kg - 5000.0).abs() < 1e-6);
         assert!((config.lh2_abundant_multiplier - 2.0).abs() < 1e-6);
@@ -390,6 +419,37 @@ mod tests {
         assert!((config.export_min_revenue - 1_000.0).abs() < 1e-9);
         assert!((config.budget_cap_fraction - 0.05).abs() < 1e-9);
         assert!((config.refuel_threshold_pct - 0.8).abs() < 1e-6);
+        // strategy-v2 additions (VIO-605) — must match AutopilotConfig defaults
+        // so consumer switching in a follow-up ticket is a no-op.
+        assert!((config.refuel_max_pct - 0.99).abs() < 1e-6);
+        assert_eq!(config.shipyard_component_count, 4);
+        assert!((config.power_deficit_threshold_kw - 0.01).abs() < 1e-6);
+        assert_eq!(config.crew_hire_projection_minutes, 30 * 24 * 60);
+    }
+
+    #[test]
+    fn strategy_config_default_version_is_v2() {
+        assert_eq!(StrategyConfig::default().version, "strategy-v2");
+    }
+
+    #[test]
+    fn strategy_v1_json_deserializes_as_v2_with_defaults() {
+        // Backward-compat: an old strategy-v1 JSON (no v2 fields) must still
+        // parse. Missing v2 fields fall back to `StrategyConfig::default()`
+        // so existing saves continue to work.
+        let v1_json = r#"{
+            "version": "strategy-v1",
+            "mode": "Balanced",
+            "fleet_size_target": 3
+        }"#;
+        let parsed: StrategyConfig = serde_json::from_str(v1_json).unwrap();
+        assert_eq!(parsed.version, "strategy-v1");
+        assert_eq!(parsed.fleet_size_target, 3);
+        // v2 fields take defaults.
+        assert!((parsed.refuel_max_pct - 0.99).abs() < 1e-6);
+        assert_eq!(parsed.shipyard_component_count, 4);
+        assert!((parsed.power_deficit_threshold_kw - 0.01).abs() < 1e-6);
+        assert_eq!(parsed.crew_hire_projection_minutes, 30 * 24 * 60);
     }
 
     #[test]
