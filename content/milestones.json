@@ -164,5 +164,105 @@
       "grant_amount": 20000000,
       "reputation": 25
     }
+  },
+  {
+    "id": "first_observation",
+    "name": "First Observation",
+    "description": "Your sensors have produced the first raw scientific data. The universe is watching.",
+    "conditions": [
+      { "type": "counter_above", "counter": "total_raw_data", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 2000000,
+      "reputation": 10
+    }
+  },
+  {
+    "id": "first_asteroid_classified",
+    "name": "First Asteroid Classified",
+    "description": "Determine the composition of an asteroid through spectroscopic analysis.",
+    "conditions": [
+      { "type": "milestone_completed", "milestone_id": "first_observation" },
+      { "type": "counter_above", "counter": "asteroids_classified", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 5000000,
+      "reputation": 15
+    }
+  },
+  {
+    "id": "first_manufactured_component",
+    "name": "First Manufactured Component",
+    "description": "Your workshop has assembled its first component. Manufacturing capability established.",
+    "conditions": [
+      { "type": "counter_above", "counter": "assembler_runs", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 8000000,
+      "reputation": 15
+    }
+  },
+  {
+    "id": "first_rocket_assembled",
+    "name": "First Rocket Assembled",
+    "description": "A complete launch vehicle has been manufactured. The sky is no longer the limit.",
+    "conditions": [
+      { "type": "counter_above", "counter": "rockets_in_inventory", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 10000000,
+      "reputation": 20
+    }
+  },
+  {
+    "id": "first_launch",
+    "name": "First Launch",
+    "description": "Successfully launch a payload to orbit. Ground-to-orbit capability achieved.",
+    "conditions": [
+      { "type": "counter_above", "counter": "total_launches", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 25000000,
+      "reputation": 30
+    },
+    "phase_advance": "Orbital"
+  },
+  {
+    "id": "first_reusable_landing",
+    "name": "First Reusable Landing",
+    "description": "Recover a booster for reuse, dramatically reducing launch costs.",
+    "conditions": [
+      { "type": "counter_above", "counter": "reusable_landings", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 20000000,
+      "reputation": 25
+    }
+  },
+  {
+    "id": "first_orbital_station",
+    "name": "First Orbital Station",
+    "description": "Deploy a station kit to establish your first orbital outpost.",
+    "conditions": [
+      { "type": "milestone_completed", "milestone_id": "first_launch" },
+      { "type": "counter_above", "counter": "orbital_stations", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 50000000,
+      "reputation": 40
+    }
+  },
+  {
+    "id": "launch_cost_milestone",
+    "name": "Launch Cost Efficiency",
+    "description": "Achieve efficient per-kilogram launch costs through scale and reusability.",
+    "conditions": [
+      { "type": "counter_above", "counter": "total_launches", "threshold": 10 },
+      { "type": "counter_above", "counter": "reusable_landings", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 30000000,
+      "reputation": 35
+    }
   }
 ]
