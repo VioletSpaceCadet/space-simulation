@@ -453,7 +453,7 @@ pub(crate) fn handle_export(
         < crate::CommTier::Basic
     {
         return false;
-    };
+    }
 
     // Look up pricing and compute revenue
     let Some(revenue) = trade::compute_export_revenue(item_spec, &content.pricing, content) else {
