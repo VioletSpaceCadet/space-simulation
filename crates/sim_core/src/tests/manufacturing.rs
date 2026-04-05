@@ -46,24 +46,28 @@ fn competing_demand_content() -> GameContent {
             name: "Iron Plate".to_string(),
             mass_kg: 25.0,
             volume_m3: 0.05,
+            deploys_frame: None,
         },
         ComponentDef {
             id: "structural_beam".to_string(),
             name: "Structural Beam".to_string(),
             mass_kg: 100.0,
             volume_m3: 0.3,
+            deploys_frame: None,
         },
         ComponentDef {
             id: "repair_kit".to_string(),
             name: "Repair Kit".to_string(),
             mass_kg: 50.0,
             volume_m3: 0.1,
+            deploys_frame: None,
         },
         ComponentDef {
             id: "advanced_repair_kit".to_string(),
             name: "Advanced Repair Kit".to_string(),
             mass_kg: 75.0,
             volume_m3: 0.15,
+            deploys_frame: None,
         },
     ];
 

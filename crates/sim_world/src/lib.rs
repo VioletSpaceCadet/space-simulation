@@ -2115,6 +2115,59 @@ mod tests {
     }
 
     #[test]
+    fn test_station_kits_declare_deploys_frame() {
+        // VIO-591: the three construction kits must declare which frame
+        // they deploy so DeployStation (VIO-592) can map kit -> frame.
+        let content = load_content("../../content").unwrap();
+        let expected = [
+            ("outpost_kit", "frame_outpost"),
+            ("industrial_hub_kit", "frame_industrial_hub"),
+            ("research_station_kit", "frame_research_station"),
+        ];
+        for (kit_id, expected_frame) in expected {
+            let kit = content
+                .component_defs
+                .iter()
+                .find(|c| c.id == kit_id)
+                .unwrap_or_else(|| panic!("component '{kit_id}' missing from catalog"));
+            let actual = kit
+                .deploys_frame
+                .as_ref()
+                .unwrap_or_else(|| panic!("component '{kit_id}' must declare deploys_frame"));
+            assert_eq!(
+                actual.0, expected_frame,
+                "component '{kit_id}' deploys_frame mismatch"
+            );
+            // The frame must actually exist in the catalog.
+            assert!(
+                content
+                    .frames
+                    .contains_key(&sim_core::FrameId(expected_frame.to_string())),
+                "kit '{kit_id}' references unknown frame '{expected_frame}'"
+            );
+        }
+    }
+
+    #[test]
+    fn test_non_kit_components_have_none_deploys_frame() {
+        // Regular components (plates, thrusters, repair kits) should leave
+        // deploys_frame as None after loading.
+        let content = load_content("../../content").unwrap();
+        let regulars = ["repair_kit", "thruster", "fe_plate", "hull_panel"];
+        for id in regulars {
+            let def = content
+                .component_defs
+                .iter()
+                .find(|c| c.id == id)
+                .unwrap_or_else(|| panic!("component '{id}' missing from catalog"));
+            assert!(
+                def.deploys_frame.is_none(),
+                "component '{id}' should not declare deploys_frame"
+            );
+        }
+    }
+
+    #[test]
     #[should_panic(expected = "references unknown module")]
     fn test_fitting_template_bad_module_panics() {
         let mut content = base_content();

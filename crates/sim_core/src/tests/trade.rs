@@ -75,12 +75,14 @@ fn trade_content() -> GameContent {
             name: "Repair Kit".to_string(),
             mass_kg: 50.0,
             volume_m3: 0.1,
+            deploys_frame: None,
         },
         ComponentDef {
             id: "thruster".to_string(),
             name: "Thruster".to_string(),
             mass_kg: 200.0,
             volume_m3: 0.5,
+            deploys_frame: None,
         },
     ];
     content.module_defs = [(
