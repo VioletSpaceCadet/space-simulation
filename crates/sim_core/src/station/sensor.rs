@@ -386,6 +386,7 @@ mod tests {
                 angle_span_mdeg: 360_000,
                 resource_class: crate::spatial::ResourceClass::Mixed,
                 scan_site_weight: 1,
+                implicit_comm_tier: None,
             }),
         });
         let mut state = sensor_state(&content);

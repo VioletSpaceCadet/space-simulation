@@ -529,6 +529,10 @@ pub struct ZoneDef {
     pub angle_span_mdeg: u32,
     pub resource_class: crate::spatial::ResourceClass,
     pub scan_site_weight: u32,
+    /// Implicit comm tier for this zone (e.g. `Advanced` for near-Earth zones).
+    /// Zones without this field default to `CommTier::None`.
+    #[serde(default)]
+    pub implicit_comm_tier: Option<crate::CommTier>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

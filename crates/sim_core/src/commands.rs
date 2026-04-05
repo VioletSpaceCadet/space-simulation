@@ -351,6 +351,11 @@ pub(crate) fn handle_import(
     if !state.stations.contains_key(station_id) {
         return false;
     }
+    // Zone must have comm relay coverage for trade.
+    let zone_id = &state.stations[station_id].position.parent_body.0;
+    if crate::satellite::zone_comm_tier(zone_id, state, content) < crate::CommTier::Basic {
+        return false;
+    }
 
     // Look up pricing and compute cost
     let Some(cost) = trade::compute_import_cost(item_spec, &content.pricing, content) else {
@@ -443,6 +448,12 @@ pub(crate) fn handle_export(
     let Some(station) = state.stations.get(station_id) else {
         return false;
     };
+    // Zone must have comm relay coverage for trade.
+    if crate::satellite::zone_comm_tier(&station.position.parent_body.0, state, content)
+        < crate::CommTier::Basic
+    {
+        return false;
+    }
 
     // Look up pricing and compute revenue
     let Some(revenue) = trade::compute_export_revenue(item_spec, &content.pricing, content) else {

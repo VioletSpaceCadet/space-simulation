@@ -33,6 +33,7 @@ pub use metrics::{
     write_metrics_csv, write_metrics_header, MetricType, MetricValue, MetricsFileWriter,
     MetricsSnapshot, ModuleStatusMetrics, OreElementStats, METRICS_VERSION,
 };
+pub use satellite::zone_comm_tier;
 pub use spatial::{
     build_body_cache, compute_entity_absolute, integer_sqrt, is_co_located, pick_template_biased,
     pick_zone_weighted, polar_to_cart, random_angle_in_span, random_position_in_zone,
@@ -54,8 +55,8 @@ pub use types::{
 };
 // -- types: core enums --
 pub use types::{
-    AlertSeverity, AnomalyTag, BehaviorType, DataKind, DomainProgress, ItemKind, OverheatZone,
-    Phase, ResearchDomain,
+    AlertSeverity, AnomalyTag, BehaviorType, CommTier, DataKind, DomainProgress, ItemKind,
+    OverheatZone, Phase, ResearchDomain,
 };
 // -- types: game state --
 pub use types::{
