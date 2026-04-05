@@ -71,6 +71,12 @@ fn launch_state(content: &GameContent) -> GameState {
                     prev_crew_satisfied: true,
                     thermal: None,
                 }],
+                inventory: vec![InventoryItem::Material {
+                    element: "LH2".to_string(),
+                    kg: 500_000.0, // enough for any test rocket
+                    quality: 1.0,
+                    thermal: None,
+                }],
                 cargo_capacity_m3: 10000.0,
                 ..Default::default()
             },
@@ -114,9 +120,11 @@ fn launch_deducts_cost_and_creates_transit() {
         state.balance < initial_balance,
         "balance should decrease after launch"
     );
+    // base ($2M) + fuel (500kg * $0.50/kg = $250) = $2,000,250
+    let expected_cost = 2_000_000.0 + 500.0 * 0.50;
     assert!(
-        (initial_balance - state.balance - 2_000_000.0).abs() < 1.0,
-        "should deduct rocket cost"
+        (initial_balance - state.balance - expected_cost).abs() < 1.0,
+        "should deduct base + fuel cost (expected {expected_cost})"
     );
 
     // Transit created.
@@ -220,6 +228,100 @@ fn overweight_payload_rejected() {
         .iter()
         .any(|e| matches!(&e.event, Event::PayloadLaunched { .. }));
     assert!(!launched, "should not launch overweight payload");
+}
+
+#[test]
+fn launch_fails_without_fuel() {
+    let content = launch_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Remove all fuel from facility.
+    let facility = state
+        .ground_facilities
+        .get_mut(&GroundFacilityId("ground_earth".to_string()))
+        .unwrap();
+    facility.core.inventory.clear();
+    facility.core.invalidate_volume_cache();
+
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::Launch {
+            facility_id: GroundFacilityId("ground_earth".to_string()),
+            rocket_def_id: "rocket_sounding".to_string(),
+            payload: LaunchPayload::Supplies(vec![]),
+            destination: test_position(),
+        },
+    };
+
+    let initial_balance = state.balance;
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+
+    assert!(
+        (state.balance - initial_balance).abs() < 1.0,
+        "balance should not change without fuel"
+    );
+    let launched = events
+        .iter()
+        .any(|e| matches!(&e.event, Event::PayloadLaunched { .. }));
+    assert!(!launched, "should not launch without fuel");
+}
+
+#[test]
+fn launch_consumes_fuel_from_inventory() {
+    let content = launch_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    let fuel_before: f32 = state
+        .ground_facilities
+        .get(&GroundFacilityId("ground_earth".to_string()))
+        .unwrap()
+        .core
+        .inventory
+        .iter()
+        .filter_map(|item| match item {
+            InventoryItem::Material { element, kg, .. } if element == "LH2" => Some(*kg),
+            _ => None,
+        })
+        .sum();
+
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::Launch {
+            facility_id: GroundFacilityId("ground_earth".to_string()),
+            rocket_def_id: "rocket_sounding".to_string(),
+            payload: LaunchPayload::Supplies(vec![]),
+            destination: test_position(),
+        },
+    };
+
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+
+    let fuel_after: f32 = state
+        .ground_facilities
+        .get(&GroundFacilityId("ground_earth".to_string()))
+        .unwrap()
+        .core
+        .inventory
+        .iter()
+        .filter_map(|item| match item {
+            InventoryItem::Material { element, kg, .. } if element == "LH2" => Some(*kg),
+            _ => None,
+        })
+        .sum();
+
+    // Sounding rocket consumes 500 kg fuel.
+    assert!(
+        (fuel_before - fuel_after - 500.0).abs() < 1.0,
+        "should consume 500 kg LH2 (before={fuel_before}, after={fuel_after})"
+    );
 }
 
 #[test]

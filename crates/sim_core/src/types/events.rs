@@ -410,7 +410,12 @@ pub enum Event {
         rocket_def_id: String,
         payload: LaunchPayload,
         destination: Position,
+        /// Total cost (base + fuel).
         cost: f64,
+        /// Fuel cost component.
+        fuel_cost: f64,
+        /// Fuel consumed (kg).
+        fuel_consumed_kg: f32,
         arrival_tick: u64,
     },
     /// Emitted when a launched payload arrives at its destination.

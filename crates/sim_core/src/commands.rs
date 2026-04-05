@@ -732,9 +732,29 @@ pub(crate) fn handle_ground_set_module_enabled(
     true
 }
 
+/// Consume fuel from a ground facility's inventory.
+fn consume_fuel(core: &mut crate::FacilityCore, fuel_element: &str, fuel_kg: f32) {
+    let mut remaining = fuel_kg;
+    for item in &mut core.inventory {
+        if remaining <= 0.0 {
+            break;
+        }
+        if let InventoryItem::Material { element, kg, .. } = item {
+            if element == fuel_element {
+                let consumed = kg.min(remaining);
+                *kg -= consumed;
+                remaining -= consumed;
+            }
+        }
+    }
+    core.inventory
+        .retain(|item| !matches!(item, InventoryItem::Material { kg, .. } if *kg <= 0.0));
+    core.invalidate_volume_cache();
+}
+
 /// Launch a rocket from a ground facility. Validates pad availability,
-/// payload weight, and balance. Deducts cost, marks pad as recovering,
-/// and creates a `LaunchTransitState`.
+/// payload weight, fuel, and balance. Deducts cost and fuel, marks pad
+/// as recovering, and creates a `LaunchTransitState`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_launch(
     state: &mut GameState,
@@ -791,19 +811,40 @@ pub(crate) fn handle_launch(
     // Compute payload mass and check capacity.
     let payload_mass_kg: f32 = match payload {
         crate::LaunchPayload::Supplies(items) => crate::tasks::inventory_mass_kg(items),
-        crate::LaunchPayload::StationKit => 5000.0, // Station kit base mass
+        crate::LaunchPayload::StationKit => 5000.0,
     };
     if payload_mass_kg > rocket_def.payload_capacity_kg {
         return false;
     }
 
-    // Check balance.
-    if state.balance < rocket_def.base_launch_cost {
+    // Check fuel availability in facility inventory.
+    let fuel_element = &content.constants.launch_fuel_element;
+    let available_fuel: f32 = facility
+        .core
+        .inventory
+        .iter()
+        .filter_map(|item| match item {
+            InventoryItem::Material { element, kg, .. } if element == fuel_element => Some(*kg),
+            _ => None,
+        })
+        .sum();
+    if available_fuel < rocket_def.fuel_kg {
         return false;
     }
 
-    // Deduct cost.
-    state.balance -= rocket_def.base_launch_cost;
+    // Compute total cost: base + fuel.
+    let fuel_cost = f64::from(rocket_def.fuel_kg) * content.constants.launch_fuel_cost_per_kg;
+    let total_cost = rocket_def.base_launch_cost + fuel_cost;
+    if state.balance < total_cost {
+        return false;
+    }
+
+    // Commit: deduct cost and consume fuel.
+    state.balance -= total_cost;
+    let Some(facility) = state.ground_facilities.get_mut(facility_id) else {
+        return false;
+    };
+    consume_fuel(&mut facility.core, fuel_element, rocket_def.fuel_kg);
 
     // Mark pad as recovering and create launch transit.
     let transit_ticks = content
@@ -836,7 +877,9 @@ pub(crate) fn handle_launch(
             rocket_def_id: rocket_def_id.to_string(),
             payload: payload.clone(),
             destination: destination.clone(),
-            cost: rocket_def.base_launch_cost,
+            cost: total_cost,
+            fuel_cost,
+            fuel_consumed_kg: rocket_def.fuel_kg,
             arrival_tick,
         },
     ));

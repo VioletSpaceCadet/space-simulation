@@ -403,6 +403,9 @@ pub fn base_content() -> GameContent {
             bottleneck_storage_threshold_pct: 0.95,
             bottleneck_slag_ratio_threshold: 0.5,
             bottleneck_wear_threshold: 0.8,
+            // Launch system
+            launch_fuel_cost_per_kg: 0.50,
+            launch_fuel_element: "LH2".to_string(),
         },
         alert_rules: Vec::new(),
         events: Vec::new(),
@@ -639,6 +642,9 @@ pub fn minimal_content() -> GameContent {
             bottleneck_storage_threshold_pct: 0.95,
             bottleneck_slag_ratio_threshold: 0.5,
             bottleneck_wear_threshold: 0.8,
+            // Launch system
+            launch_fuel_cost_per_kg: 0.50,
+            launch_fuel_element: "LH2".to_string(),
         },
         alert_rules: Vec::new(),
         events: Vec::new(),
