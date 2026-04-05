@@ -60,8 +60,10 @@ fn unfilled_slots_needing_delivery(
         .filter_map(|m| m.slot_index)
         .collect();
 
-    // Module def IDs currently in local inventory (ready for local install).
-    let local_module_defs: Vec<&str> = station
+    // Local inventory modules available for install, tracked as consumable
+    // counts so that N modules can only fill N slots (reviewer fix: was
+    // non-consuming, causing 1 module to mask all unfilled slots of its type).
+    let mut local_module_items: Vec<&str> = station
         .core
         .inventory
         .iter()
@@ -76,14 +78,17 @@ fn unfilled_slots_needing_delivery(
         if occupied.contains(&idx) {
             continue;
         }
-        // Check if any local inventory module can fill this slot.
-        let has_local_match = local_module_defs.iter().any(|def_id| {
+        // Check if any unconsumed local inventory module can fill this slot.
+        let local_match_pos = local_module_items.iter().position(|def_id| {
             content
                 .module_defs
                 .get(*def_id)
                 .is_some_and(|d| d.compatible_slots.contains(&slot.slot_type))
         });
-        if !has_local_match {
+        if let Some(pos) = local_match_pos {
+            // Consume this local module so it can't fill another slot.
+            local_module_items.swap_remove(pos);
+        } else {
             result.push((slot.slot_type.clone(), idx));
         }
     }
@@ -91,23 +96,27 @@ fn unfilled_slots_needing_delivery(
 }
 
 /// Find a module in a source station's inventory that is compatible with the
-/// given slot type. Returns the `module_def_id` if found.
+/// given slot type. Returns `(item_id, module_def_id)` if found. Claims are
+/// tracked by `item_id` so duplicate modules of the same type are independent.
 fn find_spare_module<'a>(
     station: &'a sim_core::StationState,
     slot_type: &SlotType,
     content: &GameContent,
-    already_claimed: &[String],
-) -> Option<&'a str> {
+    already_claimed: &[sim_core::ModuleItemId],
+) -> Option<(&'a sim_core::ModuleItemId, &'a str)> {
     station
         .core
         .inventory
         .iter()
         .filter_map(|item| match item {
-            InventoryItem::Module { module_def_id, .. } => Some(module_def_id.as_str()),
+            InventoryItem::Module {
+                item_id,
+                module_def_id,
+            } => Some((item_id, module_def_id.as_str())),
             _ => None,
         })
-        .find(|def_id| {
-            !already_claimed.iter().any(|c| c == *def_id)
+        .find(|(item_id, def_id)| {
+            !already_claimed.contains(item_id)
                 && content
                     .module_defs
                     .get(*def_id)
@@ -145,8 +154,9 @@ pub(crate) fn assign_module_deliveries(
     // Build delivery requests: for each target station with unfilled slots,
     // search other stations for compatible spare modules.
     let mut requests: Vec<DeliveryRequest> = Vec::new();
-    // Track claimed modules so two requests don't claim the same inventory item.
-    let mut claimed_modules: Vec<(StationId, String)> = Vec::new();
+    // Track claimed modules by item_id so duplicate modules of the same type
+    // are independently claimable (reviewer fix: was keyed by def_id).
+    let mut claimed_modules: Vec<(StationId, sim_core::ModuleItemId)> = Vec::new();
 
     // Iterate target stations in deterministic order.
     let station_ids: Vec<StationId> = state.stations.keys().cloned().collect();
@@ -164,19 +174,19 @@ pub(crate) fn assign_module_deliveries(
                     continue;
                 }
                 let source = &state.stations[source_id];
-                let already_claimed: Vec<String> = claimed_modules
+                let already_claimed: Vec<sim_core::ModuleItemId> = claimed_modules
                     .iter()
                     .filter(|(sid, _)| sid == source_id)
-                    .map(|(_, def_id)| def_id.clone())
+                    .map(|(_, item_id)| item_id.clone())
                     .collect();
-                if let Some(def_id) =
+                if let Some((item_id, def_id)) =
                     find_spare_module(source, slot_type, content, &already_claimed)
                 {
                     let priority = content
                         .module_defs
                         .get(def_id)
                         .map_or(4, |d| delivery_priority(&d.behavior));
-                    claimed_modules.push((source_id.clone(), def_id.to_string()));
+                    claimed_modules.push((source_id.clone(), item_id.clone()));
                     requests.push(DeliveryRequest {
                         source_station: source_id.clone(),
                         target_station: target_id.clone(),
@@ -484,7 +494,7 @@ mod tests {
     }
 
     #[test]
-    fn delivery_prioritizes_power_over_research() {
+    fn delivery_prioritizes_power_over_research_under_scarcity() {
         let content = delivery_content();
         let mut state = delivery_state(&content);
         // Add both a solar panel AND a lab to source inventory.
@@ -494,53 +504,27 @@ mod tests {
             module_def_id: "module_lab".to_string(),
         });
 
-        // Two idle ships so both can be assigned.
-        let ship2_id = ShipId("ship_hauler_2".to_string());
-        state.ships.insert(
-            ship2_id.clone(),
-            ShipState {
-                id: ship2_id.clone(),
-                owner: owner(),
-                position: test_position(),
-                inventory: vec![],
-                task: None,
-                hull_id: HullId("hull_general_purpose".to_string()),
-                fitted_modules: vec![],
-                modifiers: Default::default(),
-                propellant_kg: 0.0,
-                propellant_capacity_kg: 0.0,
-                cargo_capacity_m3: 100.0,
-                speed_ticks_per_au: None,
-                crew: BTreeMap::new(),
-                leaders: vec![],
-                home_station: None,
-            },
-        );
-
+        // Only ONE idle ship — must pick the higher-priority module (power).
         let mut ship_agents = BTreeMap::new();
         ship_agents.insert(ship_id(), ShipAgent::new(ship_id()));
-        ship_agents.insert(ship2_id.clone(), ShipAgent::new(ship2_id.clone()));
 
         assign_module_deliveries(&mut ship_agents, &state, &content, &owner(), None);
 
-        // Both ships should be assigned. Collect their module_def_ids.
-        let mut delivered_modules: Vec<String> = ship_agents
-            .values()
-            .filter_map(|a| match &a.objective {
-                Some(ShipObjective::Transfer { items, .. }) => {
-                    items.first().and_then(|item| match item {
-                        TradeItemSpec::Module { module_def_id } => Some(module_def_id.clone()),
-                        _ => None,
-                    })
-                }
-                _ => None,
-            })
-            .collect();
-        delivered_modules.sort();
-
-        assert_eq!(delivered_modules.len(), 2);
-        assert!(delivered_modules.contains(&"module_lab".to_string()));
-        assert!(delivered_modules.contains(&"module_solar_panel".to_string()));
+        // The single ship should be assigned the solar panel (priority 0)
+        // over the lab (priority 3).
+        let agent = &ship_agents[&ship_id()];
+        match &agent.objective {
+            Some(ShipObjective::Transfer { items, .. }) => {
+                assert!(
+                    matches!(
+                        &items[0],
+                        TradeItemSpec::Module { module_def_id } if module_def_id == "module_solar_panel"
+                    ),
+                    "power module should be delivered first under scarcity"
+                );
+            }
+            other => panic!("expected Transfer objective, got {other:?}"),
+        }
     }
 
     #[test]
@@ -585,5 +569,95 @@ mod tests {
             &ship_agents[&ship_id()].objective,
             Some(ShipObjective::Mine { .. })
         ));
+    }
+
+    #[test]
+    fn delivery_claims_duplicate_modules_independently() {
+        let mut content = delivery_content();
+        // Frame with 2 utility slots.
+        content
+            .frames
+            .get_mut(&FrameId("frame_outpost".to_string()))
+            .unwrap()
+            .slots = vec![
+            SlotDef {
+                slot_type: sim_core::SlotType("utility".to_string()),
+                label: "Utility 1".to_string(),
+            },
+            SlotDef {
+                slot_type: sim_core::SlotType("utility".to_string()),
+                label: "Utility 2".to_string(),
+            },
+        ];
+        let mut state = delivery_state(&content);
+        // Source station has 2 solar panels (same def, different item_ids).
+        let source = state.stations.get_mut(&source_station_id()).unwrap();
+        source.core.inventory.push(InventoryItem::Module {
+            item_id: sim_core::ModuleItemId("item_solar_2".to_string()),
+            module_def_id: "module_solar_panel".to_string(),
+        });
+
+        // Two idle ships.
+        let ship2_id = ShipId("ship_hauler_2".to_string());
+        state.ships.insert(
+            ship2_id.clone(),
+            ShipState {
+                id: ship2_id.clone(),
+                owner: owner(),
+                position: test_position(),
+                inventory: vec![],
+                task: None,
+                hull_id: HullId("hull_general_purpose".to_string()),
+                fitted_modules: vec![],
+                modifiers: Default::default(),
+                propellant_kg: 0.0,
+                propellant_capacity_kg: 0.0,
+                cargo_capacity_m3: 100.0,
+                speed_ticks_per_au: None,
+                crew: BTreeMap::new(),
+                leaders: vec![],
+                home_station: None,
+            },
+        );
+
+        let mut ship_agents = BTreeMap::new();
+        ship_agents.insert(ship_id(), ShipAgent::new(ship_id()));
+        ship_agents.insert(ship2_id.clone(), ShipAgent::new(ship2_id.clone()));
+
+        assign_module_deliveries(&mut ship_agents, &state, &content, &owner(), None);
+
+        // Both ships should get Transfer objectives — one per solar panel.
+        let assigned_count = ship_agents
+            .values()
+            .filter(|a| matches!(&a.objective, Some(ShipObjective::Transfer { .. })))
+            .count();
+        assert_eq!(
+            assigned_count, 2,
+            "both duplicate solar panels should be independently claimable"
+        );
+    }
+
+    #[test]
+    fn unfilled_slots_consumes_local_modules() {
+        let content = delivery_content();
+        let mut state = delivery_state(&content);
+        // Target has 1 local solar panel but frame has 2 utility + 1 research slots.
+        let target = state.stations.get_mut(&target_station_id()).unwrap();
+        target.core.inventory.push(InventoryItem::Module {
+            item_id: sim_core::ModuleItemId("item_solar_local".to_string()),
+            module_def_id: "module_solar_panel".to_string(),
+        });
+        // Give the frame an extra utility slot (total: 2 utility + 1 research).
+        let frame = content
+            .frames
+            .get(&FrameId("frame_outpost".to_string()))
+            .unwrap();
+        assert_eq!(frame.slots.len(), 2, "fixture has 1 utility + 1 research");
+
+        // With 1 local solar panel and 1 utility slot, that slot is fillable locally.
+        // The research slot has no local match → needs delivery.
+        let unfilled = unfilled_slots_needing_delivery(target, &content);
+        assert_eq!(unfilled.len(), 1, "only research slot needs delivery");
+        assert_eq!(unfilled[0].0 .0, "research");
     }
 }
