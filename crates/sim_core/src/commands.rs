@@ -669,22 +669,23 @@ pub(crate) fn handle_ground_install_module(
     let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
         return false;
     };
+    // Ground facility modules auto-enable and auto-assign crew on install.
+    let crew_satisfied = def
+        .crew_requirement
+        .iter()
+        .all(|(role, &needed)| gf.core.crew.get(role).copied().unwrap_or(0) >= needed);
     gf.core.modules.push(crate::ModuleState {
         id: module_id.clone(),
         def_id: module_def_id.clone(),
-        enabled: false,
+        enabled: true,
         kind_state,
         wear: crate::WearState::default(),
         thermal,
         power_stalled: false,
         module_priority: 0,
-        assigned_crew: std::collections::BTreeMap::new(),
-        efficiency: if def.crew_requirement.is_empty() {
-            1.0
-        } else {
-            0.0
-        },
-        prev_crew_satisfied: def.crew_requirement.is_empty(),
+        assigned_crew: def.crew_requirement.clone(),
+        efficiency: if crew_satisfied { 1.0 } else { 0.0 },
+        prev_crew_satisfied: crew_satisfied,
     });
     gf.core.rebuild_module_index(content);
     gf.core.invalidate_power_cache();
