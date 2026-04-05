@@ -213,13 +213,28 @@ fn apply_strategy_overrides(
         unreachable!("StrategyConfig serializes to JSON object")
     };
 
-    for &(stripped_key, value, original_key) in overrides {
+    // Apply longer (more specific) paths last so a scenario mixing
+    // `strategy.priorities` with a sibling top-level key ends with the
+    // nested override winning regardless of HashMap iteration order.
+    let mut sorted_overrides: Vec<&(&str, &serde_json::Value, &str)> = overrides.iter().collect();
+    sorted_overrides.sort_by_key(|o| o.0.matches('.').count());
+
+    for &&(stripped_key, value, original_key) in &sorted_overrides {
         set_nested_path(&mut map, stripped_key, value.clone())
             .with_context(|| format!("invalid strategy override key '{original_key}'"))?;
     }
 
-    *strategy = serde_json::from_value(serde_json::Value::Object(map))
-        .context("failed to deserialize StrategyConfig after applying overrides")?;
+    // Preserve the applied-key list so a deserialize failure can still name
+    // which override corrupted the shape. For example, `strategy.priorities
+    // = 0.5` passes set_nested_path (valid top-level key) but breaks the
+    // `PriorityWeights` struct shape when we deserialize back.
+    let applied_keys: Vec<&str> = sorted_overrides.iter().map(|o| o.2).collect();
+    *strategy = serde_json::from_value(serde_json::Value::Object(map)).with_context(|| {
+        format!(
+            "failed to deserialize StrategyConfig after applying overrides [{}]",
+            applied_keys.join(", ")
+        )
+    })?;
     Ok(())
 }
 
@@ -714,7 +729,7 @@ mod tests {
 
     #[test]
     fn test_autopilot_overrides() {
-        let mut content = sim_world::load_content("../../content").unwrap();
+        let mut content = test_content();
         let original_pct = content.autopilot.slag_jettison_pct;
         let overrides = HashMap::from([(
             "autopilot.slag_jettison_pct".to_string(),
@@ -733,7 +748,7 @@ mod tests {
 
     #[test]
     fn test_autopilot_override_unknown_key_errors() {
-        let mut content = sim_world::load_content("../../content").unwrap();
+        let mut content = test_content();
         let overrides = HashMap::from([(
             "autopilot.nonexistent_field".to_string(),
             serde_json::json!(42),
@@ -749,7 +764,7 @@ mod tests {
 
     #[test]
     fn test_strategy_override_top_level_fields() {
-        let mut content = sim_world::load_content("../../content").unwrap();
+        let mut content = test_content();
         let overrides = HashMap::from([
             ("strategy.mode".to_string(), serde_json::json!("Expand")),
             (
@@ -772,7 +787,7 @@ mod tests {
 
     #[test]
     fn test_strategy_override_nested_priorities() {
-        let mut content = sim_world::load_content("../../content").unwrap();
+        let mut content = test_content();
         let original = content.default_strategy.priorities.research;
         let overrides = HashMap::from([
             (
@@ -796,7 +811,7 @@ mod tests {
 
     #[test]
     fn test_strategy_override_unknown_top_level_errors() {
-        let mut content = sim_world::load_content("../../content").unwrap();
+        let mut content = test_content();
         let overrides = HashMap::from([(
             "strategy.nonexistent_field".to_string(),
             serde_json::json!(42),
@@ -812,7 +827,7 @@ mod tests {
 
     #[test]
     fn test_strategy_override_unknown_nested_key_errors() {
-        let mut content = sim_world::load_content("../../content").unwrap();
+        let mut content = test_content();
         let overrides = HashMap::from([(
             "strategy.priorities.bogus_concern".to_string(),
             serde_json::json!(0.5),
@@ -828,7 +843,7 @@ mod tests {
 
     #[test]
     fn test_strategy_override_type_mismatch_errors() {
-        let mut content = sim_world::load_content("../../content").unwrap();
+        let mut content = test_content();
         let overrides = HashMap::from([(
             "strategy.fleet_size_target".to_string(),
             serde_json::json!("not_a_number"),
@@ -839,7 +854,7 @@ mod tests {
 
     #[test]
     fn test_strategy_override_invalid_mode_errors() {
-        let mut content = sim_world::load_content("../../content").unwrap();
+        let mut content = test_content();
         let overrides = HashMap::from([(
             "strategy.mode".to_string(),
             serde_json::json!("NotARealMode"),
@@ -850,7 +865,7 @@ mod tests {
 
     #[test]
     fn test_strategy_override_mixed_with_other_groups() {
-        let mut content = sim_world::load_content("../../content").unwrap();
+        let mut content = test_content();
         let overrides = HashMap::from([
             (
                 "station_cargo_capacity_m3".to_string(),
@@ -877,5 +892,79 @@ mod tests {
         );
         assert!((content.default_strategy.priorities.research - 1.0).abs() < f32::EPSILON);
         assert!((content.autopilot.slag_jettison_pct - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_strategy_override_object_to_scalar_fails_with_key_context() {
+        // Fat-fingering `strategy.priorities = 0.5` (instead of
+        // `strategy.priorities.mining = 0.5`) must fail with a message that
+        // still names the offending key — otherwise the user sees a generic
+        // "failed to deserialize StrategyConfig" with no diagnostic value.
+        let mut content = test_content();
+        let overrides =
+            HashMap::from([("strategy.priorities".to_string(), serde_json::json!(0.5))]);
+        let err = apply_overrides(&mut content, &overrides).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("strategy.priorities"),
+            "error should name the bad override key: {msg}",
+        );
+    }
+
+    #[test]
+    fn test_strategy_override_deeply_nested_beyond_valid_path_errors() {
+        // `strategy.priorities.mining` is valid; descending further into a
+        // scalar (`strategy.priorities.mining.subfield`) must bail.
+        let mut content = test_content();
+        let overrides = HashMap::from([(
+            "strategy.priorities.mining.subfield".to_string(),
+            serde_json::json!(0.5),
+        )]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+        let err = format!("{:#}", result.unwrap_err());
+        assert!(
+            err.contains("mining") || err.contains("not an object"),
+            "error should explain the descent-into-scalar failure: {err}",
+        );
+    }
+
+    #[test]
+    fn test_strategy_override_empty_prefix_errors() {
+        // Just `strategy.` with an empty path segment must fail — not silently
+        // succeed or walk into the root.
+        let mut content = test_content();
+        let overrides = HashMap::from([("strategy.".to_string(), serde_json::json!(42))]);
+        let result = apply_overrides(&mut content, &overrides);
+        assert!(result.is_err());
+        let err = format!("{:#}", result.unwrap_err());
+        assert!(
+            err.contains("empty") || err.contains("strategy."),
+            "error should explain the empty-segment failure: {err}",
+        );
+    }
+
+    #[test]
+    fn test_strategy_override_specific_wins_over_general_regardless_of_map_order() {
+        // Scenario authors may combine a top-level field override with a
+        // sibling nested one. Both apply correctly regardless of HashMap
+        // iteration order. Repeated runs stress the sort_by_key(depth)
+        // discipline in apply_strategy_overrides.
+        for _ in 0..16 {
+            let mut content = test_content();
+            let overrides = HashMap::from([
+                (
+                    "strategy.priorities.mining".to_string(),
+                    serde_json::json!(0.99),
+                ),
+                (
+                    "strategy.fleet_size_target".to_string(),
+                    serde_json::json!(7),
+                ),
+            ]);
+            apply_overrides(&mut content, &overrides).unwrap();
+            assert!((content.default_strategy.priorities.mining - 0.99).abs() < f32::EPSILON);
+            assert_eq!(content.default_strategy.fleet_size_target, 7);
+        }
     }
 }
