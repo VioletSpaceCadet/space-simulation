@@ -455,11 +455,7 @@ export const eventSchemas = {
 
   SatelliteDeployed: z.object({
     satellite_id: z.string(),
-    position: z.object({
-      parent_body: z.string(),
-      radius_au_um: z.number(),
-      angle_mdeg: z.number(),
-    }),
+    position: positionSchema,
     satellite_type: z.string(),
   }),
 
