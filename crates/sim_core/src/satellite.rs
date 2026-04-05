@@ -43,9 +43,23 @@ pub(crate) fn tick_satellites(
             _ => {}
         }
 
-        // Accumulate wear.
+        // Accumulate wear and check for failure.
         if let Some(sat) = state.satellites.get_mut(&satellite_id) {
+            let was_functional = sat.wear < 1.0;
             sat.wear = (sat.wear + wear_rate).min(1.0);
+
+            if was_functional && sat.wear >= 1.0 {
+                sat.enabled = false;
+                let current_tick = state.meta.tick;
+                events.push(crate::emit(
+                    &mut state.counters,
+                    current_tick,
+                    Event::SatelliteFailed {
+                        satellite_id: satellite_id.clone(),
+                        satellite_type: satellite_type.clone(),
+                    },
+                ));
+            }
         }
     }
 }
@@ -72,9 +86,12 @@ fn tick_survey_satellite(
         return;
     }
 
-    // Use a base probability derived from content constants or a reasonable default.
-    // Survey satellites roll once per tick with probability scaled by multiplier.
-    let base_prob = 0.05; // 5% base per tick
+    // Base probability from content config, default 5% per tick.
+    let base_prob = def
+        .behavior_config
+        .get("base_discovery_probability")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or(0.05);
     let prob = (base_prob * multiplier).min(1.0);
     let roll: f64 = rng.gen();
     if roll >= prob {
@@ -135,8 +152,13 @@ fn tick_science_satellite(
         .and_then(serde_json::Value::as_f64)
         .unwrap_or(4.0) as f32;
 
-    // Science platforms generate orbital observation data.
-    let data_kind = DataKind::new(DataKind::OPTICAL);
+    // Data kind from content config, default to optical.
+    let data_kind_str = def
+        .behavior_config
+        .get("data_kind")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(DataKind::OPTICAL);
+    let data_kind = DataKind::new(data_kind_str);
     let action_key = format!("satellite_{def_id}");
 
     let base_amount = generate_data(
@@ -173,7 +195,7 @@ fn tick_science_satellite(
 mod tests {
     use super::*;
     use crate::test_fixtures::{base_content, base_state, test_position};
-    use crate::{SatelliteDef, SatelliteState, TechId};
+    use crate::{SatelliteDef, SatelliteState};
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
@@ -438,6 +460,44 @@ mod tests {
         assert!(
             spawn_events > 0,
             "survey satellite should discover sites over 500 ticks"
+        );
+    }
+
+    #[test]
+    fn wear_to_failure_emits_event_and_disables() {
+        let mut content = base_content();
+        let high_wear = 0.1; // Fails in ~10 ticks
+        add_satellite_def(&mut content, "sat_fragile", "navigation", high_wear);
+        let mut state = base_state(&content);
+        let id = add_satellite(&mut state, "sat_fragile", "navigation");
+
+        let mut rng = make_rng();
+        let mut all_events = Vec::new();
+
+        // Run enough ticks to guarantee failure (10 * 0.1 = 1.0).
+        for _ in 0..15 {
+            let mut events = Vec::new();
+            tick_satellites(&mut state, &content, &mut rng, &mut events);
+            all_events.extend(events);
+        }
+
+        // Satellite should be disabled with wear at 1.0.
+        let sat = &state.satellites[&id];
+        assert!(!sat.enabled, "failed satellite should be disabled");
+        assert!(
+            (sat.wear - 1.0).abs() < f64::EPSILON,
+            "wear should be clamped at 1.0"
+        );
+
+        // SatelliteFailed event should have been emitted exactly once.
+        let fail_events: Vec<_> = all_events
+            .iter()
+            .filter(|e| matches!(e.event, Event::SatelliteFailed { .. }))
+            .collect();
+        assert_eq!(
+            fail_events.len(),
+            1,
+            "should emit exactly one SatelliteFailed event"
         );
     }
 }
