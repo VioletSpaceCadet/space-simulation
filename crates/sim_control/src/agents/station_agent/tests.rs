@@ -223,6 +223,185 @@ fn recruit_crew_skips_when_salary_would_bankrupt() {
     );
 }
 
+// --- SF-06: Framed-station slot-aware install tests ------------------------
+
+/// Build a test environment where the starting station has a 2-slot frame
+/// (1 industrial + 1 research) and two test module defs that fit those
+/// slots: `sf06_industrial` and `sf06_research`.
+fn sf06_framed_setup() -> (sim_core::GameContent, sim_core::GameState, StationId) {
+    use sim_core::test_fixtures::ModuleDefBuilder;
+    use sim_core::{FrameDef, FrameId, ModuleBehaviorDef, SlotDef, SlotType};
+
+    let mut content = base_content();
+    content.module_defs.insert(
+        "sf06_industrial".to_string(),
+        ModuleDefBuilder::new("sf06_industrial")
+            .behavior(ModuleBehaviorDef::Equipment)
+            .compatible_slots(vec![SlotType("industrial".to_string())])
+            .build(),
+    );
+    content.module_defs.insert(
+        "sf06_research".to_string(),
+        ModuleDefBuilder::new("sf06_research")
+            .behavior(ModuleBehaviorDef::Equipment)
+            .compatible_slots(vec![SlotType("research".to_string())])
+            .build(),
+    );
+    let frame_id = FrameId("frame_sf06".to_string());
+    content.frames.insert(
+        frame_id.clone(),
+        FrameDef {
+            id: frame_id.clone(),
+            name: "SF06 Test Frame".to_string(),
+            base_cargo_capacity_m3: 500.0,
+            base_power_capacity_kw: 30.0,
+            slots: vec![
+                SlotDef {
+                    slot_type: SlotType("industrial".to_string()),
+                    label: "I1".to_string(),
+                },
+                SlotDef {
+                    slot_type: SlotType("research".to_string()),
+                    label: "R1".to_string(),
+                },
+            ],
+            bonuses: vec![],
+            required_tech: None,
+            tags: vec![],
+        },
+    );
+
+    let mut state = base_state(&content);
+    let station_id = state.stations.keys().next().unwrap().clone();
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.frame_id = Some(frame_id);
+    (content, state, station_id)
+}
+
+#[test]
+fn manage_modules_framed_picks_compatible_slot() {
+    let (content, mut state, station_id) = sf06_framed_setup();
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.core.inventory.push(InventoryItem::Module {
+        item_id: sim_core::ModuleItemId("item_ind".to_string()),
+        module_def_id: "sf06_industrial".to_string(),
+    });
+
+    let owner = PrincipalId("principal_autopilot".to_string());
+    let mut concern = ModuleManagement;
+    let mut next_id = 1;
+    let mut ctx = StationContext {
+        station_id: &station_id,
+        state: &state,
+        content: &content,
+        owner: &owner,
+        next_id: &mut next_id,
+        trade_import_unlocked: false,
+        trade_export_unlocked: false,
+        decisions: None,
+    };
+    let commands = concern.generate(&mut ctx);
+
+    let install = commands
+        .iter()
+        .find(|c| matches!(&c.command, Command::InstallModule { .. }))
+        .expect("should issue an install command");
+    match &install.command {
+        Command::InstallModule { slot_index, .. } => {
+            assert_eq!(
+                *slot_index,
+                Some(0),
+                "industrial module should go to slot 0"
+            );
+        }
+        other => panic!("expected InstallModule, got {other:?}"),
+    }
+}
+
+#[test]
+fn manage_modules_framed_skips_when_no_compatible_slot() {
+    // Station with a research-only inventory item but no research slot
+    // free: the autopilot should not issue an install command at all.
+    let (mut content, mut state, station_id) = sf06_framed_setup();
+    // Replace the research slot with another industrial slot so there is
+    // no research slot available at all.
+    let frame = content
+        .frames
+        .get_mut(&sim_core::FrameId("frame_sf06".to_string()))
+        .unwrap();
+    frame.slots[1].slot_type = sim_core::SlotType("industrial".to_string());
+
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.core.inventory.push(InventoryItem::Module {
+        item_id: sim_core::ModuleItemId("item_research".to_string()),
+        module_def_id: "sf06_research".to_string(),
+    });
+
+    let owner = PrincipalId("principal_autopilot".to_string());
+    let mut concern = ModuleManagement;
+    let mut next_id = 1;
+    let mut ctx = StationContext {
+        station_id: &station_id,
+        state: &state,
+        content: &content,
+        owner: &owner,
+        next_id: &mut next_id,
+        trade_import_unlocked: false,
+        trade_export_unlocked: false,
+        decisions: None,
+    };
+    let commands = concern.generate(&mut ctx);
+
+    assert!(
+        !commands
+            .iter()
+            .any(|c| matches!(&c.command, Command::InstallModule { .. })),
+        "autopilot should skip installs when no compatible slot exists"
+    );
+}
+
+#[test]
+fn manage_modules_framed_avoids_double_booking_same_tick() {
+    // Two industrial modules in inventory + only one industrial slot:
+    // the autopilot should issue exactly one install command and pick a
+    // distinct slot. The second item is skipped this tick.
+    let (content, mut state, station_id) = sf06_framed_setup();
+    let station = state.stations.get_mut(&station_id).unwrap();
+    station.core.inventory.push(InventoryItem::Module {
+        item_id: sim_core::ModuleItemId("item_ind_a".to_string()),
+        module_def_id: "sf06_industrial".to_string(),
+    });
+    station.core.inventory.push(InventoryItem::Module {
+        item_id: sim_core::ModuleItemId("item_ind_b".to_string()),
+        module_def_id: "sf06_industrial".to_string(),
+    });
+
+    let owner = PrincipalId("principal_autopilot".to_string());
+    let mut concern = ModuleManagement;
+    let mut next_id = 1;
+    let mut ctx = StationContext {
+        station_id: &station_id,
+        state: &state,
+        content: &content,
+        owner: &owner,
+        next_id: &mut next_id,
+        trade_import_unlocked: false,
+        trade_export_unlocked: false,
+        decisions: None,
+    };
+    let commands = concern.generate(&mut ctx);
+
+    let installs: Vec<_> = commands
+        .iter()
+        .filter(|c| matches!(&c.command, Command::InstallModule { .. }))
+        .collect();
+    assert_eq!(
+        installs.len(),
+        1,
+        "only one install should fire (one industrial slot, two candidates)"
+    );
+}
+
 // --- Ship assignment tests (ported from ShipAssignmentBridge) ---
 
 fn test_owner() -> PrincipalId {

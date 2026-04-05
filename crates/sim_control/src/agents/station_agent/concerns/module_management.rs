@@ -1,4 +1,6 @@
-use sim_core::{Command, CommandEnvelope, InventoryItem, ModuleKindState};
+use std::collections::HashSet;
+
+use sim_core::{Command, CommandEnvelope, InventoryItem, ModuleKindState, SlotType};
 
 use crate::behaviors::make_cmd;
 
@@ -100,6 +102,111 @@ fn manage_power(
     }
 }
 
+/// Frameless install path: queue an `InstallModule` command for every
+/// `InventoryItem::Module` on the station. Preserves legacy behavior for
+/// stations that do not have a frame assigned (test fixtures, legacy saves).
+fn enqueue_frameless_installs(
+    station: &sim_core::StationState,
+    ctx: &mut StationContext,
+    commands: &mut Vec<CommandEnvelope>,
+) {
+    for item in &station.core.inventory {
+        if let InventoryItem::Module { item_id, .. } = item {
+            commands.push(make_cmd(
+                ctx.owner,
+                ctx.state.meta.tick,
+                ctx.next_id,
+                Command::InstallModule {
+                    facility_id: ctx.station_id.clone().into(),
+                    module_item_id: item_id.clone(),
+                    slot_index: None,
+                },
+            ));
+        }
+    }
+}
+
+/// Framed install path: for each inventory module, pick a specific slot on
+/// the station frame that is (a) compatible with the module's
+/// `compatible_slots` and (b) not already occupied by an existing module
+/// or by a slot the autopilot just claimed in this batch. Modules with no
+/// compatible free slot are silently skipped until a slot opens up.
+///
+/// Sending an explicit `slot_index: Some(idx)` keeps the autopilot and the
+/// handler in sync — without this, two items in the same tick could both
+/// auto-find the same slot and the second one would be rejected by the
+/// handler with a `NoCompatibleSlot` event.
+fn enqueue_framed_installs(
+    station: &sim_core::StationState,
+    ctx: &mut StationContext,
+    commands: &mut Vec<CommandEnvelope>,
+) {
+    let Some(frame_id) = station.frame_id.as_ref() else {
+        return;
+    };
+    let Some(frame) = ctx.content.frames.get(frame_id) else {
+        // Frame references a missing catalog entry — fall back to the
+        // frameless path so content drops do not wedge the autopilot.
+        enqueue_frameless_installs(station, ctx, commands);
+        return;
+    };
+
+    // Slots that are already physically occupied by an existing module.
+    let mut claimed: HashSet<usize> = station
+        .core
+        .modules
+        .iter()
+        .filter_map(|m| m.slot_index)
+        .collect();
+
+    for item in &station.core.inventory {
+        let InventoryItem::Module {
+            item_id,
+            module_def_id,
+        } = item
+        else {
+            continue;
+        };
+        let Some(def) = ctx.content.module_defs.get(module_def_id) else {
+            continue;
+        };
+        let Some(slot_idx) = find_free_slot(&frame.slots, &def.compatible_slots, &claimed) else {
+            // No compatible free slot this tick — wait for one to open up.
+            continue;
+        };
+        claimed.insert(slot_idx);
+        commands.push(make_cmd(
+            ctx.owner,
+            ctx.state.meta.tick,
+            ctx.next_id,
+            Command::InstallModule {
+                facility_id: ctx.station_id.clone().into(),
+                module_item_id: item_id.clone(),
+                slot_index: Some(slot_idx),
+            },
+        ));
+    }
+}
+
+/// Return the first slot index that is compatible with `compatible_slots`
+/// and not already in `claimed`. Matches the handler's first-fit policy so
+/// the autopilot and handler agree on slot assignments.
+fn find_free_slot(
+    frame_slots: &[sim_core::SlotDef],
+    compatible_slots: &[SlotType],
+    claimed: &HashSet<usize>,
+) -> Option<usize> {
+    for (idx, slot) in frame_slots.iter().enumerate() {
+        if claimed.contains(&idx) {
+            continue;
+        }
+        if compatible_slots.contains(&slot.slot_type) {
+            return Some(idx);
+        }
+    }
+    None
+}
+
 impl StationConcern for ModuleManagement {
     fn name(&self) -> &'static str {
         "module_management"
@@ -114,21 +221,22 @@ impl StationConcern for ModuleManagement {
 
         let mut commands = Vec::new();
 
-        for item in &station.core.inventory {
-            if let InventoryItem::Module { item_id, .. } = item {
-                commands.push(make_cmd(
-                    ctx.owner,
-                    ctx.state.meta.tick,
-                    ctx.next_id,
-                    Command::InstallModule {
-                        facility_id: ctx.station_id.clone().into(),
-                        module_item_id: item_id.clone(),
-                        // SF-06 will add slot-aware selection; today the
-                        // autopilot lets the handler auto-find a slot.
-                        slot_index: None,
-                    },
-                ));
-            }
+        // SF-06: Generate slot-aware install commands.
+        //
+        // For framed stations, we track which slots are already occupied
+        // by existing modules *plus* any slots the autopilot has claimed
+        // earlier in this same command batch. This prevents two items in
+        // a single tick from both racing for the same slot — the handler
+        // would reject the second one with a NoCompatibleSlot event, but
+        // skipping the command up front keeps the emit pipeline quiet and
+        // the autopilot easier to reason about.
+        //
+        // For frameless stations, fall back to the legacy unlimited-slot
+        // behavior: queue every inventory module without any checks.
+        if station.frame_id.is_some() {
+            enqueue_framed_installs(station, ctx, &mut commands);
+        } else {
+            enqueue_frameless_installs(station, ctx, &mut commands);
         }
 
         manage_power(station, ctx, &mut commands);
