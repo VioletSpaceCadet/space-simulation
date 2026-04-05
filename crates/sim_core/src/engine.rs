@@ -532,6 +532,23 @@ fn apply_commands(
                     crate::Event::StrategyConfigChanged {},
                 ));
             }
+            Command::TransferItems {
+                ship_id,
+                from_station,
+                to_station,
+                items,
+            } => {
+                commands::handle_transfer_items(
+                    state,
+                    content,
+                    ship_id,
+                    from_station,
+                    to_station,
+                    items,
+                    current_tick,
+                    events,
+                );
+            }
         }
     }
 

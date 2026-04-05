@@ -70,6 +70,15 @@ pub enum Event {
         station_id: StationId,
         items: Vec<InventoryItem>,
     },
+    /// VIO-595: a ship has loaded inventory items from a station as part
+    /// of an inter-station transfer. `items` lists only what was actually
+    /// picked up (best-effort — may be empty or shorter than requested
+    /// due to availability or cargo capacity).
+    ItemsPickedUp {
+        ship_id: ShipId,
+        station_id: StationId,
+        items: Vec<InventoryItem>,
+    },
     ModuleInstalled {
         station_id: StationId,
         module_id: ModuleInstanceId,

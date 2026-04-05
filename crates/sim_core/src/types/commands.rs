@@ -162,4 +162,17 @@ pub enum Command {
     SetStrategyConfig {
         config: crate::StrategyConfig,
     },
+    /// VIO-595: Move inventory items from one orbital station to another
+    /// via a ship. The command handler builds a chained task
+    /// `Transit(src) → Pickup → Transit(dst) → Deposit` and assigns it
+    /// to the ship. Materials and Components may be partially filled
+    /// (split by mass/count); Modules are atomic. `items` with Crew
+    /// variants are ignored (crew transfer is not supported by this
+    /// command — use Import/Export via trade instead).
+    TransferItems {
+        ship_id: ShipId,
+        from_station: StationId,
+        to_station: StationId,
+        items: Vec<TradeItemSpec>,
+    },
 }

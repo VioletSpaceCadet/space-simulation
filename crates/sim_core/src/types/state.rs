@@ -876,6 +876,19 @@ pub enum TaskKind {
         /// is preserved for the completion event payload.
         kit_component_id: String,
     },
+    /// VIO-595: ship is loading inventory items from a station into its
+    /// own cargo hold. Chained like `Transit` — on completion the ship
+    /// immediately starts `then`, which is typically
+    /// `Transit { dest: to_station, then: Deposit { to_station } }` to
+    /// complete the inter-station transfer. Best-effort on both
+    /// availability (pickup what the station has) and capacity (stop
+    /// loading when ship cargo is full). Reuses `deposit_ticks` as the
+    /// loading duration so both ends of a transfer take the same time.
+    Pickup {
+        from_station: StationId,
+        items: Vec<crate::TradeItemSpec>,
+        then: Box<TaskKind>,
+    },
 }
 
 impl TaskKind {
@@ -886,7 +899,7 @@ impl TaskKind {
             Self::Survey { .. } => constants.survey_scan_ticks,
             Self::DeepScan { .. } => constants.deep_scan_ticks,
             Self::Mine { duration_ticks, .. } => *duration_ticks,
-            Self::Deposit { .. } => constants.deposit_ticks,
+            Self::Deposit { .. } | Self::Pickup { .. } => constants.deposit_ticks,
             Self::ConstructStation { assembly_ticks, .. } => *assembly_ticks,
             Self::Idle | Self::Refuel { .. } => 0,
         }
@@ -903,6 +916,7 @@ impl TaskKind {
             Self::Deposit { .. } => "Deposit",
             Self::Refuel { .. } => "Refuel",
             Self::ConstructStation { .. } => "ConstructStation",
+            Self::Pickup { .. } => "Pickup",
         }
     }
 
@@ -919,6 +933,7 @@ impl TaskKind {
                 ..
             } => Some(station.0.clone()),
             Self::ConstructStation { frame_id, .. } => Some(frame_id.0.clone()),
+            Self::Pickup { from_station, .. } => Some(from_station.0.clone()),
         }
     }
 }

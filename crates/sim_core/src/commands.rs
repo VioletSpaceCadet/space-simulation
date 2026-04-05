@@ -481,6 +481,139 @@ pub(crate) fn handle_deploy_station(
     true
 }
 
+/// VIO-595: Handle a `TransferItems` command. Validates the ship and
+/// both stations, computes travel times, and assigns a chained task
+/// `Transit(src) → Pickup → Transit(dst) → Deposit` to the ship.
+/// Returns `true` on successful assignment. Ignores `Crew` item specs
+/// (use Import/Export trade commands for crew).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn handle_transfer_items(
+    state: &mut GameState,
+    content: &GameContent,
+    ship_id: &ShipId,
+    from_station: &crate::StationId,
+    to_station: &crate::StationId,
+    items: &[crate::TradeItemSpec],
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    // Filter out Crew specs — unsupported by this command.
+    let filtered_items: Vec<crate::TradeItemSpec> = items
+        .iter()
+        .filter(|spec| !matches!(spec, crate::TradeItemSpec::Crew { .. }))
+        .cloned()
+        .collect();
+    if filtered_items.is_empty() {
+        return false;
+    }
+
+    // Source and destination stations must both exist.
+    let Some(from_station_state) = state.stations.get(from_station) else {
+        return false;
+    };
+    let Some(to_station_state) = state.stations.get(to_station) else {
+        return false;
+    };
+    let src_position = from_station_state.position.clone();
+    let dst_position = to_station_state.position.clone();
+
+    // Cannot transfer to the same station (no-op).
+    if from_station == to_station {
+        return false;
+    }
+
+    let Some(ship) = state.ships.get(ship_id) else {
+        return false;
+    };
+
+    // Pre-compute both travel legs so the final ETA is correct.
+    let src_travel = travel_ticks_to_build_site(state, content, ship, &src_position);
+    let dst_travel = travel_ticks_between(state, content, ship, &src_position, &dst_position);
+
+    // Build the task chain bottom-up: Deposit ← Transit(dst) ← Pickup ← Transit(src)
+    let deposit = TaskKind::Deposit {
+        station: to_station.clone(),
+        blocked: false,
+    };
+    let transit_to_dst = if dst_travel == 0 {
+        deposit
+    } else {
+        TaskKind::Transit {
+            destination: dst_position,
+            total_ticks: dst_travel,
+            then: Box::new(deposit),
+        }
+    };
+    let pickup = TaskKind::Pickup {
+        from_station: from_station.clone(),
+        items: filtered_items,
+        then: Box::new(transit_to_dst),
+    };
+    let final_task = if src_travel == 0 {
+        pickup
+    } else {
+        TaskKind::Transit {
+            destination: src_position,
+            total_ticks: src_travel,
+            then: Box::new(pickup),
+        }
+    };
+
+    let duration = final_task.duration(&content.constants);
+    let label = final_task.label().to_string();
+    let target = final_task.target();
+
+    let Some(ship_mut) = state.ships.get_mut(ship_id) else {
+        return false;
+    };
+    ship_mut.task = Some(crate::TaskState {
+        kind: final_task,
+        started_tick: current_tick,
+        eta_tick: current_tick + duration,
+    });
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::TaskStarted {
+            ship_id: ship_id.clone(),
+            task_kind: label,
+            target,
+        },
+    ));
+    true
+}
+
+/// Travel ticks between two positions using the ship's speed. Returns 0
+/// if the positions are already co-located within docking range.
+fn travel_ticks_between(
+    state: &GameState,
+    content: &GameContent,
+    ship: &crate::ShipState,
+    from_position: &crate::Position,
+    to_position: &crate::Position,
+) -> u64 {
+    if crate::is_co_located(
+        from_position,
+        to_position,
+        &state.body_cache,
+        content.constants.docking_range_au_um,
+    ) {
+        return 0;
+    }
+    let from_abs = crate::compute_entity_absolute(from_position, &state.body_cache);
+    let to_abs = crate::compute_entity_absolute(to_position, &state.body_cache);
+    let ticks_per_au = ship
+        .speed_ticks_per_au
+        .unwrap_or(content.constants.ticks_per_au);
+    crate::travel_ticks(
+        from_abs,
+        to_abs,
+        ticks_per_au,
+        content.constants.min_transit_ticks,
+    )
+}
+
 /// Uninstall a module from the station and return it to inventory.
 pub(crate) fn handle_uninstall_module(
     state: &mut GameState,

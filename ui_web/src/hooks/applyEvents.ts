@@ -153,6 +153,43 @@ function handleOreDeposited(state: SimState, event: EventPayload<'OreDeposited'>
   return { ...state, ships, stations };
 }
 
+// VIO-595: Ship picks up items from a station during an inter-station
+// transfer. Inverse of OreDeposited — items move from station inventory
+// onto the ship.
+function handleItemsPickedUp(state: SimState, event: EventPayload<'ItemsPickedUp'>): SimState {
+  if (event.items.length === 0) {
+    return state;
+  }
+  let { ships, stations } = state;
+  if (ships[event.ship_id]) {
+    ships = {
+      ...ships,
+      [event.ship_id]: {
+        ...ships[event.ship_id],
+        inventory: [...ships[event.ship_id].inventory, ...event.items],
+      },
+    };
+  }
+  if (stations[event.station_id]) {
+    // Remove the picked-up items from station inventory by identity match
+    // against each item object. Rust emits the exact same InventoryItem
+    // values that were moved, so reference-equivalent deduplication by
+    // content is sufficient for the UI-state projection.
+    const pickedSet = new Set(event.items.map((item) => JSON.stringify(item)));
+    const remaining = stations[event.station_id].inventory.filter(
+      (item) => !pickedSet.has(JSON.stringify(item))
+    );
+    stations = {
+      ...stations,
+      [event.station_id]: {
+        ...stations[event.station_id],
+        inventory: remaining,
+      },
+    };
+  }
+  return { ...state, ships, stations };
+}
+
 function handleModuleInstalled(state: SimState, event: EventPayload<'ModuleInstalled'>): SimState {
   if (!state.stations[event.station_id]) {return state;}
   const station = state.stations[event.station_id];
@@ -864,6 +901,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   AsteroidDiscovered: handleAsteroidDiscovered,
   OreMined: handleOreMined,
   OreDeposited: handleOreDeposited,
+  ItemsPickedUp: handleItemsPickedUp,
   ModuleInstalled: handleModuleInstalled,
   ModuleNoCompatibleSlot: noOp,
   ModuleUninstalled: handleModuleUninstalled,

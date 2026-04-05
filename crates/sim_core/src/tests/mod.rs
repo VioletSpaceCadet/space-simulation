@@ -45,6 +45,7 @@ mod transfer_molten;
 mod launch;
 mod research_lifecycle;
 mod satellite;
+mod transfer;
 
 // --- Shared test helpers ------------------------------------------------
 
