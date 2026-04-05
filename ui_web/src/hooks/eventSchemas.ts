@@ -87,6 +87,15 @@ export const eventSchemas = {
     items: z.array(inventoryItemSchema),
   }),
 
+  /** VIO-595: ship loaded items from a station during an inter-station
+   *  transfer. `items` lists only what was actually picked up
+   *  (best-effort — may be empty or shorter than requested). */
+  ItemsPickedUp: z.object({
+    ship_id: z.string(),
+    station_id: z.string(),
+    items: z.array(inventoryItemSchema),
+  }),
+
   ModuleInstalled: z.object({
     station_id: z.string(),
     module_id: z.string(),
