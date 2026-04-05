@@ -158,6 +158,28 @@ fn production_like_content() -> GameContent {
             .volume(8.0)
             .power(12.0)
             .behavior(ModuleBehaviorDef::Lab(LabDef {
+                domain: ResearchDomain::new(ResearchDomain::ENGINEERING),
+                data_consumption_per_run: 10.0,
+                research_points_per_run: 5.0,
+                accepted_data: vec![
+                    DataKind::new(DataKind::ENGINEERING),
+                    DataKind::new(DataKind::MANUFACTURING),
+                ],
+                research_interval_minutes: 60,
+                research_interval_ticks: 1,
+            }))
+            .build(),
+    );
+
+    // Manufacturing lab: produces Manufacturing domain points
+    content.module_defs.insert(
+        "module_manufacturing_lab".to_string(),
+        ModuleDefBuilder::new("module_manufacturing_lab")
+            .name("Manufacturing Lab")
+            .mass(4000.0)
+            .volume(8.0)
+            .power(12.0)
+            .behavior(ModuleBehaviorDef::Lab(LabDef {
                 domain: ResearchDomain::new(ResearchDomain::MANUFACTURING),
                 data_consumption_per_run: 10.0,
                 research_points_per_run: 5.0,
@@ -305,6 +327,10 @@ fn production_like_state(content: &GameContent) -> GameState {
         InventoryItem::Module {
             item_id: ModuleItemId("mi_004".to_string()),
             module_def_id: "module_engineering_lab".to_string(),
+        },
+        InventoryItem::Module {
+            item_id: ModuleItemId("mi_008".to_string()),
+            module_def_id: "module_manufacturing_lab".to_string(),
         },
         InventoryItem::Module {
             item_id: ModuleItemId("mi_005".to_string()),

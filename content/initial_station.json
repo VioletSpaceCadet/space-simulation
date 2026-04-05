@@ -6,6 +6,7 @@
     "module_exploration_lab",
     "module_materials_lab",
     "module_engineering_lab",
+    "module_manufacturing_lab",
     "module_sensor_array",
     "module_shipyard",
     "module_basic_solar_array",
@@ -60,6 +61,6 @@
     "operator": 11,
     "pilot": 2,
     "technician": 4,
-    "scientist": 4
+    "scientist": 5
   }
 }

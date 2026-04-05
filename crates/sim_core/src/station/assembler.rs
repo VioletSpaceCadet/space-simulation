@@ -536,11 +536,18 @@ fn resolve_assembler_run(
         }
     }
 
-    // Generate engineering data from assembly
+    // Generate manufacturing and engineering data from assembly
+    let action_key = format!("assemble_{}", recipe.id);
     crate::research::generate_data(
         &mut state.research,
         crate::DataKind::new(crate::DataKind::MANUFACTURING),
-        &format!("assemble_{}", recipe.id),
+        &action_key,
+        &content.constants,
+    );
+    crate::research::generate_data(
+        &mut state.research,
+        crate::DataKind::new(crate::DataKind::ENGINEERING),
+        &format!("assemble_eng_{}", recipe.id),
         &content.constants,
     );
 }
@@ -779,6 +786,50 @@ mod assembler_component_tests {
             .iter()
             .any(|e| matches!(&e.event, Event::AssemblerRan { .. }));
         assert!(assembler_ran, "expected AssemblerRan event");
+    }
+
+    #[test]
+    fn assembler_generates_manufacturing_and_engineering_data() {
+        let content = assembler_content_with_component_input();
+        let mut state = assembler_state(&content);
+        let station_id = StationId("station_test".to_string());
+
+        // Pool should start empty
+        assert!(state.research.data_pool.is_empty());
+
+        let mut events = Vec::new();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        super::tick_assembler_modules(
+            &mut state,
+            &station_id,
+            &content,
+            &mut rng,
+            &mut events,
+            &mut Vec::new(),
+        );
+
+        // Assembler should produce BOTH ManufacturingData and EngineeringData
+        let manufacturing_data = state
+            .research
+            .data_pool
+            .get(&crate::DataKind::new(crate::DataKind::MANUFACTURING))
+            .copied()
+            .unwrap_or(0.0);
+        assert!(
+            manufacturing_data > 0.0,
+            "expected ManufacturingData generated, got {manufacturing_data}"
+        );
+
+        let engineering_data = state
+            .research
+            .data_pool
+            .get(&crate::DataKind::new(crate::DataKind::ENGINEERING))
+            .copied()
+            .unwrap_or(0.0);
+        assert!(
+            engineering_data > 0.0,
+            "expected EngineeringData generated, got {engineering_data}"
+        );
     }
 
     #[test]

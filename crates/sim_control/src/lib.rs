@@ -911,10 +911,10 @@ mod tests {
             tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::from([(
-                sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),
+                sim_core::ResearchDomain::new(sim_core::ResearchDomain::ENGINEERING),
                 200.0,
             )]),
-            accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
+            accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::ENGINEERING)],
             effects: vec![],
         });
         content.module_defs.insert(
@@ -926,10 +926,13 @@ mod tests {
                 .power(12.0)
                 .wear(0.005)
                 .behavior(sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
-                    domain: sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),
+                    domain: sim_core::ResearchDomain::new(sim_core::ResearchDomain::ENGINEERING),
                     data_consumption_per_run: 10.0,
                     research_points_per_run: 5.0,
-                    accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
+                    accepted_data: vec![
+                        sim_core::DataKind::new(sim_core::DataKind::ENGINEERING),
+                        sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING),
+                    ],
                     research_interval_minutes: 1,
                     research_interval_ticks: 1,
                 }))
