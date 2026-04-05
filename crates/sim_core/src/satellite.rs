@@ -713,4 +713,95 @@ mod tests {
             "disabled satellite should not provide comm coverage"
         );
     }
+
+    #[test]
+    fn zone_comm_tier_worn_out_satellite_not_counted() {
+        let mut content = base_content();
+        add_distant_zone(&mut content);
+        add_satellite_def(&mut content, "sat_comm", "communication", 0.0001);
+        let mut state = base_state(&content);
+
+        let id = SatelliteId("sat_comm_worn".to_string());
+        state.satellites.insert(
+            id.clone(),
+            SatelliteState {
+                id,
+                def_id: "sat_comm".to_string(),
+                name: "Worn Comm".to_string(),
+                position: belt_position(),
+                deployed_tick: 0,
+                wear: 1.0,
+                enabled: true,
+                satellite_type: "communication".to_string(),
+                payload_config: None,
+            },
+        );
+        assert_eq!(
+            zone_comm_tier("distant_belt", &state, &content),
+            CommTier::None,
+            "worn-out satellite (wear=1.0) should not provide comm coverage"
+        );
+    }
+
+    #[test]
+    fn trade_rejected_in_no_comm_zone() {
+        use crate::test_fixtures::make_rng;
+
+        let mut content = base_content();
+        add_distant_zone(&mut content);
+        // Ensure trade tier is unlocked.
+        content.constants.trade_unlock_delay_minutes = 0;
+        let mut state = base_state(&content);
+        state.progression.trade_tier = crate::TradeTier::Export;
+
+        // Move station to distant_belt (no comm coverage).
+        let station_id = crate::test_fixtures::test_station_id();
+        if let Some(station) = state.stations.get_mut(&station_id) {
+            station.position = belt_position();
+        }
+
+        let mut rng = make_rng();
+        let mut events = Vec::new();
+        let tick = state.meta.tick;
+
+        let item = crate::TradeItemSpec::Material {
+            element: "Fe".to_string(),
+            kg: 100.0,
+        };
+
+        // Import should fail — no comm coverage.
+        let imported = crate::commands::handle_import(
+            &mut state,
+            &content,
+            &station_id,
+            &item,
+            tick,
+            &mut rng,
+            &mut events,
+        );
+        assert!(!imported, "import should fail in CommTier::None zone");
+
+        // Export should also fail.
+        state
+            .stations
+            .get_mut(&station_id)
+            .unwrap()
+            .core
+            .inventory
+            .push(crate::InventoryItem::Material {
+                element: "Fe".to_string(),
+                kg: 100.0,
+                quality: 1.0,
+                thermal: None,
+            });
+        let exported = crate::commands::handle_export(
+            &mut state,
+            &content,
+            &station_id,
+            &item,
+            tick,
+            &mut events,
+        );
+        assert!(!exported, "export should fail in CommTier::None zone");
+    }
 }
