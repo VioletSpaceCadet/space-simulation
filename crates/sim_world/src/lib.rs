@@ -349,19 +349,28 @@ fn validate_recipe_elements(
 }
 
 fn validate_hull_defs(content: &GameContent) {
-    // Collect all slot types defined across hulls
-    let hull_slot_types: HashSet<&sim_core::SlotType> = content
+    // Collect all slot types defined across hulls and frames. Modules are
+    // fitted to either a ship hull or a station frame, so both sources
+    // legitimately satisfy `compatible_slots`.
+    let mut known_slot_types: HashSet<&sim_core::SlotType> = content
         .hulls
         .values()
         .flat_map(|h| h.slots.iter().map(|s| &s.slot_type))
         .collect();
+    known_slot_types.extend(
+        content
+            .frames
+            .values()
+            .flat_map(|f| f.slots.iter().map(|s| &s.slot_type)),
+    );
 
-    // Warn about modules with compatible_slots referencing types not in any hull
+    // Warn about modules with compatible_slots referencing types not
+    // present in any hull or frame.
     for module_def in content.module_defs.values() {
         for slot_type in &module_def.compatible_slots {
-            if !hull_slot_types.contains(slot_type) {
+            if !known_slot_types.contains(slot_type) {
                 eprintln!(
-                    "WARNING: module '{}' has compatible_slot '{}' not found in any hull",
+                    "WARNING: module '{}' has compatible_slot '{}' not found in any hull or frame",
                     module_def.id, slot_type
                 );
             }
@@ -379,6 +388,22 @@ fn validate_hull_defs(content: &GameContent) {
                 eprintln!(
                     "WARNING: hull '{}' slot '{}' (type '{}') has no compatible modules",
                     hull.id, slot.label, slot.slot_type
+                );
+            }
+        }
+    }
+
+    // Warn about frame slot types with no compatible modules
+    for frame in content.frames.values() {
+        for slot in &frame.slots {
+            let has_compatible = content
+                .module_defs
+                .values()
+                .any(|m| m.compatible_slots.contains(&slot.slot_type));
+            if !has_compatible {
+                eprintln!(
+                    "WARNING: frame '{}' slot '{}' (type '{}') has no compatible modules",
+                    frame.id, slot.label, slot.slot_type
                 );
             }
         }
@@ -598,6 +623,30 @@ fn load_hull_defs(
     }
 }
 
+/// Load station frame definitions from `content/frame_defs.json`.
+/// Returns an empty map if the file does not exist.
+/// Panics on duplicate frame IDs.
+fn load_frame_defs(
+    dir: &Path,
+) -> Result<std::collections::BTreeMap<sim_core::FrameId, sim_core::FrameDef>> {
+    match std::fs::read_to_string(dir.join("frame_defs.json")) {
+        Ok(text) => {
+            let defs: Vec<sim_core::FrameDef> =
+                serde_json::from_str(&text).context("parsing frame_defs.json")?;
+            let mut map = std::collections::BTreeMap::new();
+            for def in defs {
+                let id = def.id.clone();
+                assert!(
+                    map.insert(id.clone(), def).is_none(),
+                    "duplicate frame ID: {id}"
+                );
+            }
+            Ok(map)
+        }
+        Err(_) => Ok(std::collections::BTreeMap::new()),
+    }
+}
+
 fn load_fitting_templates(
     dir: &Path,
 ) -> Result<std::collections::BTreeMap<sim_core::HullId, Vec<sim_core::FittedModule>>> {
@@ -766,6 +815,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         event.resolve_weight();
     }
     let hulls = load_hull_defs(dir)?;
+    let frames = load_frame_defs(dir)?;
     let fitting_templates = load_fitting_templates(dir)?;
     let initial_station: sim_core::InitialStationDef =
         load_optional_json(dir, "initial_station.json")?;
@@ -790,7 +840,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         alert_rules,
         events: sim_events,
         hulls,
-        frames: std::collections::BTreeMap::new(),
+        frames,
         fitting_templates,
         initial_station,
         autopilot,
@@ -899,7 +949,18 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             module_id_index: std::collections::HashMap::new(),
             power_budget_cache: sim_core::PowerBudgetCache::default(),
         },
-        frame_id: None,
+        // SF-03: Starting station uses the Industrial Hub frame when the
+        // content catalog provides it. Falls back to `None` (legacy
+        // unlimited-slot behavior) when frame_defs.json is missing, so
+        // test content without frame definitions keeps working.
+        frame_id: {
+            let hub = sim_core::FrameId("frame_industrial_hub".to_string());
+            if content.frames.contains_key(&hub) {
+                Some(hub)
+            } else {
+                None
+            }
+        },
         leaders: Vec::new(),
     };
     let (ship_id, ship) = build_initial_ship(content, c, &earth_orbit_pos);
@@ -1926,6 +1987,116 @@ mod tests {
         // No hull_defs.json written
         let hulls = load_hull_defs(dir.path()).unwrap();
         assert!(hulls.is_empty());
+    }
+
+    #[test]
+    fn test_load_frame_defs_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let frame_json = r#"[
+            {
+                "id": "frame_test",
+                "name": "Test Frame",
+                "base_cargo_capacity_m3": 500.0,
+                "base_power_capacity_kw": 30.0,
+                "slots": [
+                    { "slot_type": "utility", "label": "Utility 1" },
+                    { "slot_type": "research", "label": "Research 1" }
+                ],
+                "bonuses": [
+                    {
+                        "stat": "research_speed",
+                        "op": "pct_additive",
+                        "value": 0.15,
+                        "source": { "frame": "frame_test" }
+                    }
+                ]
+            }
+        ]"#;
+        std::fs::write(dir.path().join("frame_defs.json"), frame_json).unwrap();
+        let frames = load_frame_defs(dir.path()).unwrap();
+        assert_eq!(frames.len(), 1);
+        let frame = &frames[&sim_core::FrameId("frame_test".to_string())];
+        assert_eq!(frame.name, "Test Frame");
+        assert_eq!(frame.slots.len(), 2);
+        assert_eq!(frame.bonuses.len(), 1);
+        assert!((frame.bonuses[0].value - 0.15).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate frame ID")]
+    fn test_load_frame_defs_duplicate_panics() {
+        let dir = tempfile::tempdir().unwrap();
+        let frame_json = r#"[
+            {
+                "id": "frame_dup",
+                "name": "A",
+                "base_cargo_capacity_m3": 100.0,
+                "base_power_capacity_kw": 10.0,
+                "slots": []
+            },
+            {
+                "id": "frame_dup",
+                "name": "B",
+                "base_cargo_capacity_m3": 200.0,
+                "base_power_capacity_kw": 20.0,
+                "slots": []
+            }
+        ]"#;
+        std::fs::write(dir.path().join("frame_defs.json"), frame_json).unwrap();
+        let _ = load_frame_defs(dir.path()).unwrap();
+    }
+
+    #[test]
+    fn test_load_frame_defs_missing_file_returns_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        // No frame_defs.json written — graceful fallback to empty.
+        let frames = load_frame_defs(dir.path()).unwrap();
+        assert!(frames.is_empty());
+    }
+
+    #[test]
+    fn test_load_content_loads_real_frames() {
+        // Verify the real content/frame_defs.json loads into a non-empty map
+        // with the three expected frames and that each has at least one slot.
+        let content = load_content("../../content").unwrap();
+        assert!(
+            !content.frames.is_empty(),
+            "frames should load from content/"
+        );
+        for expected in [
+            "frame_outpost",
+            "frame_industrial_hub",
+            "frame_research_station",
+        ] {
+            let id = sim_core::FrameId(expected.to_string());
+            assert!(
+                content.frames.contains_key(&id),
+                "expected frame '{expected}' in catalog"
+            );
+            assert!(
+                !content.frames[&id].slots.is_empty(),
+                "frame '{expected}' has no slots"
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_initial_state_assigns_industrial_hub_frame() {
+        // build_initial_state should assign frame_industrial_hub when the
+        // content catalog contains it. The station is at station_earth_orbit.
+        let content = load_content("../../content").unwrap();
+        let seed = 42u64;
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+        let state = build_initial_state(&content, seed, &mut rng);
+        let station = state
+            .stations
+            .get(&StationId("station_earth_orbit".to_string()))
+            .expect("starting station missing");
+        assert_eq!(
+            station.frame_id,
+            Some(sim_core::FrameId("frame_industrial_hub".to_string())),
+            "starting station should use frame_industrial_hub"
+        );
     }
 
     #[test]
