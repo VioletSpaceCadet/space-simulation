@@ -320,6 +320,12 @@
       "exportable": true,
       "category": "component"
     },
+    "station_kit": {
+      "base_price_per_unit": 3000000.0,
+      "importable": false,
+      "exportable": true,
+      "category": "component"
+    },
     "module_ground_workshop": {
       "base_price_per_unit": 15000000.0,
       "importable": true,

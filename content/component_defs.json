@@ -196,5 +196,11 @@
     "name": "Medium Launcher",
     "mass_kg": 8000.0,
     "volume_m3": 40.0
+  },
+  {
+    "id": "station_kit",
+    "name": "Orbital Station Kit",
+    "mass_kg": 5000.0,
+    "volume_m3": 50.0
   }
 ]

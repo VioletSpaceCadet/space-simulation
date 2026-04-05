@@ -478,3 +478,70 @@ fn pad_recovers_after_countdown() {
     assert!(pad.available, "pad should be available after recovery");
     assert_eq!(pad.recovery_ticks_remaining, 0);
 }
+
+/// E2E: launch a station kit from ground facility, verify new station created.
+#[test]
+fn ground_to_orbit_station_kit_e2e() {
+    let content = launch_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Remove existing stations so StationKit is the only way to get one.
+    state.stations.clear();
+    let initial_station_count = state.stations.len();
+    assert_eq!(initial_station_count, 0);
+
+    // Add station kit component to facility inventory.
+    let facility = state
+        .ground_facilities
+        .get_mut(&GroundFacilityId("ground_earth".to_string()))
+        .unwrap();
+    facility.core.inventory.push(InventoryItem::Component {
+        component_id: ComponentId("rocket_medium".to_string()),
+        count: 1,
+        quality: 1.0,
+    });
+
+    // Launch station kit using medium rocket (16,000 kg capacity > 5,000 kg kit).
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::Launch {
+            facility_id: GroundFacilityId("ground_earth".to_string()),
+            rocket_def_id: "rocket_medium".to_string(),
+            payload: LaunchPayload::StationKit,
+            destination: test_position(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    let launched = events
+        .iter()
+        .any(|e| matches!(&e.event, Event::PayloadLaunched { .. }));
+    assert!(launched, "station kit should launch");
+
+    // Run ticks until payload arrives (transit_minutes=3, mpt=1 → 3 ticks).
+    let mut deployed = false;
+    for _ in 0..10 {
+        let events = tick(&mut state, &[], &content, &mut rng, None);
+        if events
+            .iter()
+            .any(|e| matches!(&e.event, Event::StationDeployed { .. }))
+        {
+            deployed = true;
+            break;
+        }
+    }
+
+    assert!(deployed, "station should deploy after transit");
+    assert_eq!(state.stations.len(), 1, "should have exactly 1 new station");
+
+    // Verify the station has basic properties.
+    let station = state.stations.values().next().unwrap();
+    assert!(
+        station.core.cargo_capacity_m3 > 0.0,
+        "new station should have cargo capacity"
+    );
+}
