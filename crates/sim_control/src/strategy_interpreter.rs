@@ -14,7 +14,8 @@
 //! - Global aggregates (fleet size, max wear) computed BEFORE per-station scoring.
 
 use sim_core::{
-    ConcernPriorities, GameContent, GameState, InventoryItem, PriorityWeights, StrategyConfig,
+    inventory_volume_m3, ConcernPriorities, GameContent, GameState, InventoryItem, PriorityWeights,
+    StrategyConfig,
 };
 
 use crate::behaviors::AUTOPILOT_OWNER;
@@ -115,45 +116,16 @@ pub fn evaluate_strategy(
     let config = &state.strategy_config;
 
     // --- Read phase: compute global aggregates once, BEFORE per-concern scoring. ---
-    let aggregates = compute_aggregates(state, config);
+    let aggregates = compute_aggregates(state, content);
 
     // --- Pure urgency derivation from state aggregates. ---
     let urgency = compute_state_urgency(&aggregates, config);
 
     // --- Combine: config_weight * state_urgency, scaled by mode multipliers. ---
-    let mode_mults = config.mode.multipliers();
-    let mut scores = PriorityWeights {
-        mining: config.priorities.mining * urgency.mining * mode_mults.mining,
-        survey: config.priorities.survey * urgency.survey * mode_mults.survey,
-        deep_scan: config.priorities.deep_scan * urgency.deep_scan * mode_mults.deep_scan,
-        research: config.priorities.research * urgency.research * mode_mults.research,
-        maintenance: config.priorities.maintenance * urgency.maintenance * mode_mults.maintenance,
-        export: config.priorities.export * urgency.export * mode_mults.export,
-        propellant: config.priorities.propellant * urgency.propellant * mode_mults.propellant,
-        fleet_expansion: config.priorities.fleet_expansion
-            * urgency.fleet_expansion
-            * mode_mults.fleet_expansion,
-    };
+    let mut scores = combine_weights(config, &urgency);
 
     // --- Hysteresis: active-in-previous-eval concerns get a stabilizing bonus. ---
-    if let Some(prev) = runtime.cached_priorities {
-        let prev_vec = prev.to_vec();
-        let score_fields = [
-            &mut scores.mining,
-            &mut scores.survey,
-            &mut scores.deep_scan,
-            &mut scores.research,
-            &mut scores.maintenance,
-            &mut scores.export,
-            &mut scores.propellant,
-            &mut scores.fleet_expansion,
-        ];
-        for (score, prev_value) in score_fields.into_iter().zip(prev_vec.into_iter()) {
-            if prev_value >= CONCERN_ACTIVE_THRESHOLD {
-                *score += HYSTERESIS_BONUS;
-            }
-        }
-    }
+    apply_hysteresis(&mut scores, runtime.cached_priorities.as_ref());
 
     // --- Temporal bias: concerns unserviced for a long time get a boost. ---
     let bias_saturation_ticks = content
@@ -171,17 +143,56 @@ pub fn evaluate_strategy(
     scores.clamp_unit();
 
     // --- Write phase: update runtime state. ---
-    let score_vec = scores.to_vec();
-    for (index, score) in score_vec.iter().enumerate() {
-        if *score >= CONCERN_ACTIVE_THRESHOLD {
-            runtime.last_serviced[index] = Some(current_tick);
-        }
-    }
+    refresh_last_serviced(&mut runtime.last_serviced, &scores, current_tick);
     runtime.cached_priorities = Some(scores);
     runtime.last_strategy_tick = current_tick;
     runtime.strategy_dirty = false;
 
     scores
+}
+
+/// Combine user-configured weights with state-derived urgency and the
+/// strategy mode multiplier table. Output is NOT clamped — downstream
+/// `clamp_unit` handles that after hysteresis and temporal bias apply.
+fn combine_weights(config: &StrategyConfig, urgency: &PriorityWeights) -> PriorityWeights {
+    let mode_mults = config.mode.multipliers();
+    PriorityWeights {
+        mining: config.priorities.mining * urgency.mining * mode_mults.mining,
+        survey: config.priorities.survey * urgency.survey * mode_mults.survey,
+        deep_scan: config.priorities.deep_scan * urgency.deep_scan * mode_mults.deep_scan,
+        research: config.priorities.research * urgency.research * mode_mults.research,
+        maintenance: config.priorities.maintenance * urgency.maintenance * mode_mults.maintenance,
+        export: config.priorities.export * urgency.export * mode_mults.export,
+        propellant: config.priorities.propellant * urgency.propellant * mode_mults.propellant,
+        fleet_expansion: config.priorities.fleet_expansion
+            * urgency.fleet_expansion
+            * mode_mults.fleet_expansion,
+    }
+}
+
+/// Add a hysteresis bonus to every concern that was "active" in the previous
+/// evaluation. Skips when the cache is empty (first run).
+fn apply_hysteresis(scores: &mut PriorityWeights, previous: Option<&ConcernPriorities>) {
+    let Some(prev) = previous else { return };
+    let prev_vec = prev.to_vec();
+    for (score, prev_value) in scores.fields_mut().into_iter().zip(prev_vec.into_iter()) {
+        if prev_value >= CONCERN_ACTIVE_THRESHOLD {
+            *score += HYSTERESIS_BONUS;
+        }
+    }
+}
+
+/// Write-phase helper: mark each "active" concern's last-serviced tick.
+fn refresh_last_serviced(
+    last_serviced: &mut [Option<u64>; PriorityWeights::LEN],
+    scores: &PriorityWeights,
+    current_tick: u64,
+) {
+    for (slot, score) in last_serviced.iter_mut().zip(scores.to_vec().into_iter()) {
+        if score >= CONCERN_ACTIVE_THRESHOLD {
+            *slot = Some(current_tick);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +212,7 @@ struct GlobalAggregates {
     total_techs: u32,
 }
 
-fn compute_aggregates(state: &GameState, _config: &StrategyConfig) -> GlobalAggregates {
+fn compute_aggregates(state: &GameState, content: &GameContent) -> GlobalAggregates {
     // Count autopilot-owned ships + aggregate propellant.
     let mut fleet_count = 0u32;
     let mut total_propellant_kg = 0.0f32;
@@ -228,9 +239,14 @@ fn compute_aggregates(state: &GameState, _config: &StrategyConfig) -> GlobalAggr
                 }
             }
         }
-        if let Some(volume) = station.core.cached_inventory_volume_m3 {
-            total_station_volume += volume;
-        }
+        // Prefer the cached volume when populated, but fall back to the full
+        // computation so tests and freshly built states (cache = None) get a
+        // real export-urgency signal instead of silently reading 0.
+        let station_volume = station
+            .core
+            .cached_inventory_volume_m3
+            .unwrap_or_else(|| inventory_volume_m3(&station.core.inventory, content));
+        total_station_volume += station_volume;
         for module in &station.core.modules {
             if module.wear.wear > max_module_wear {
                 max_module_wear = module.wear.wear;
@@ -253,16 +269,11 @@ fn compute_aggregates(state: &GameState, _config: &StrategyConfig) -> GlobalAggr
         station_cargo_occupied_frac,
         scan_sites_remaining: u32::try_from(state.scan_sites.len()).unwrap_or(u32::MAX),
         unlocked_techs: u32::try_from(state.research.unlocked.len()).unwrap_or(u32::MAX),
-        total_techs: u32::try_from(content_techs_len_from_research(state)).unwrap_or(u32::MAX),
+        // Authoritative tech count comes from content, not from runtime
+        // research state. Using `runtime.unlocked + evidence` silently reads 0
+        // on a fresh run and inverts the research urgency signal.
+        total_techs: u32::try_from(content.techs.len()).unwrap_or(u32::MAX),
     }
-}
-
-/// Approximate the total tech count using research `evidence` + `unlocked`.
-/// We intentionally do not reach into `GameContent` here so the aggregates
-/// compute function stays pure over `state`; see `compute_state_urgency`
-/// where we combine with the content view.
-fn content_techs_len_from_research(state: &GameState) -> usize {
-    state.research.unlocked.len() + state.research.evidence.len()
 }
 
 // ---------------------------------------------------------------------------
@@ -333,8 +344,10 @@ fn compute_state_urgency(agg: &GlobalAggregates, config: &StrategyConfig) -> Pri
 // ---------------------------------------------------------------------------
 
 /// Add a temporal-bias bonus to each concern score, proportional to how long
-/// it has been since the concern was last "serviced" (had a score above the
-/// activation threshold). Concerns never serviced receive the full bonus.
+/// it has been since the concern was last "serviced" — i.e. had a post-bonus
+/// score at or above `CONCERN_ACTIVE_THRESHOLD` in a prior evaluation.
+/// Concerns never serviced receive the full bonus. Bonus saturates linearly
+/// from 0 at `current_tick` to `TEMPORAL_BIAS_MAX` at `saturation_ticks` ago.
 fn apply_temporal_bias(
     scores: &mut PriorityWeights,
     last_serviced: &[Option<u64>; PriorityWeights::LEN],
@@ -342,17 +355,7 @@ fn apply_temporal_bias(
     saturation_ticks: u64,
 ) {
     let saturation = saturation_ticks.max(1) as f32;
-    let score_fields = [
-        &mut scores.mining,
-        &mut scores.survey,
-        &mut scores.deep_scan,
-        &mut scores.research,
-        &mut scores.maintenance,
-        &mut scores.export,
-        &mut scores.propellant,
-        &mut scores.fleet_expansion,
-    ];
-    for (score, last) in score_fields.into_iter().zip(last_serviced.iter()) {
+    for (score, last) in scores.fields_mut().into_iter().zip(last_serviced.iter()) {
         let gap = match *last {
             Some(last_tick) => current_tick.saturating_sub(last_tick) as f32,
             None => saturation,
@@ -369,6 +372,7 @@ fn apply_temporal_bias(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
     use sim_core::test_fixtures::{base_content, base_state};
     use sim_core::StrategyMode;
 
@@ -412,15 +416,28 @@ mod tests {
 
     #[test]
     fn dirty_flag_forces_recompute() {
-        let (state, content) = state_and_content();
+        let (mut state, content) = state_and_content();
         let mut runtime = StrategyRuntimeState::default();
         evaluate_strategy(&state, &content, &mut runtime);
         assert!(!runtime.strategy_dirty);
+
+        // Mutate state in a way the heuristics notice: clearing ships drives
+        // fleet_expansion urgency to 1.0 and propellant urgency to 0.0. Then
+        // mark dirty and verify the cached priorities actually change.
+        let before = runtime.cached_priorities.unwrap();
+        state.ships.clear();
+        state.strategy_config.fleet_size_target = 5;
+        state.strategy_config.priorities.fleet_expansion = 1.0;
         runtime.mark_dirty();
         assert!(runtime.strategy_dirty);
         evaluate_strategy(&state, &content, &mut runtime);
         // Dirty flag is consumed on recompute.
         assert!(!runtime.strategy_dirty);
+        let after = runtime.cached_priorities.unwrap();
+        assert_ne!(
+            before, after,
+            "dirty recompute should reflect changed state",
+        );
     }
 
     #[test]
@@ -537,12 +554,11 @@ mod tests {
 
     #[test]
     fn hysteresis_bonus_stabilizes_active_concerns() {
-        // Prime the runtime with a cached "active" score, then verify that on
-        // the next recompute the corresponding concern receives the hysteresis
-        // bonus. Uses a zero-weight config so the ONLY contribution to the new
-        // score is the bonus term.
-        let (mut state, content) = state_and_content();
-        state.strategy_config.priorities = PriorityWeights {
+        // Verify the hysteresis bonus contributes *specifically* to the
+        // previously-active concern. We compare "seeded cache" vs "no cache"
+        // runs of apply_hysteresis directly on zero-urgency scores so that
+        // temporal bias and other contributions cannot mask the signal.
+        let mut baseline = PriorityWeights {
             mining: 0.0,
             survey: 0.0,
             deep_scan: 0.0,
@@ -552,10 +568,7 @@ mod tests {
             propellant: 0.0,
             fleet_expansion: 0.0,
         };
-        state.strategy_config.mode = StrategyMode::Balanced;
-        let mut runtime = StrategyRuntimeState::default();
-        // Seed a cached "active" maintenance score.
-        runtime.cached_priorities = Some(PriorityWeights {
+        let previously_active = ConcernPriorities {
             mining: 0.0,
             survey: 0.0,
             deep_scan: 0.0,
@@ -564,11 +577,43 @@ mod tests {
             export: 0.0,
             propellant: 0.0,
             fleet_expansion: 0.0,
-        });
-        runtime.strategy_dirty = true;
+        };
+        apply_hysteresis(&mut baseline, Some(&previously_active));
+        // Only maintenance should have been boosted by the bonus; the other
+        // concerns must be untouched. This pins hysteresis contribution
+        // exactly and catches the failure mode where temporal bias masks it.
+        assert!((baseline.maintenance - HYSTERESIS_BONUS).abs() < 1e-6);
+        assert_eq!(baseline.mining, 0.0);
+        assert_eq!(baseline.survey, 0.0);
+        assert_eq!(baseline.export, 0.0);
+        assert_eq!(baseline.fleet_expansion, 0.0);
+    }
+
+    #[test]
+    fn evaluates_against_real_content() {
+        // Integration smoke: exercise the interpreter end-to-end against the
+        // full content tree. Catches drift between base_content fixtures and
+        // real content (e.g. a strategy.json field rename, a new tech id
+        // that trips the urgency heuristic, etc.). Per skills/rust-sim-core.md,
+        // at least one test per major system should hit real content.
+        let content = sim_world::load_content("../../content").unwrap();
+        let mut rng = rand_chacha::ChaCha8Rng::from_seed([42u8; 32]);
+        let state = sim_world::build_initial_state(&content, 42, &mut rng);
+        let mut runtime = StrategyRuntimeState::default();
         let scores = evaluate_strategy(&state, &content, &mut runtime);
-        // Base score is 0 for maintenance (zero config weight), so the only
-        // contribution above zero is HYSTERESIS_BONUS + any temporal bias.
-        assert!(scores.maintenance >= HYSTERESIS_BONUS - 1e-6);
+        for value in scores.to_vec() {
+            assert!(!value.is_nan());
+            assert!((0.0..=1.0).contains(&value));
+        }
+        // Research urgency must be nonzero on a fresh run: no techs unlocked
+        // against a content catalog with >0 techs means maximum urgency.
+        assert!(
+            !content.techs.is_empty(),
+            "real content has at least one tech",
+        );
+        assert!(
+            scores.research > 0.0,
+            "research urgency should fire on a fresh state with unlocked techs empty",
+        );
     }
 }

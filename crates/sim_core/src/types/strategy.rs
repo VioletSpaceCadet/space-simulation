@@ -171,6 +171,26 @@ impl PriorityWeights {
         }
     }
 
+    /// Mutable references to every field in a fixed canonical order matching
+    /// `to_vec` / `from_vec` / `LEN`. Used by code that needs to apply
+    /// element-wise in-place updates (hysteresis bonus, temporal bias) without
+    /// repeating the 8-line field list at every call site.
+    ///
+    /// Field order: `mining`, `survey`, `deep_scan`, `research`, `maintenance`,
+    /// `export`, `propellant`, `fleet_expansion`.
+    pub fn fields_mut(&mut self) -> [&mut f32; Self::LEN] {
+        [
+            &mut self.mining,
+            &mut self.survey,
+            &mut self.deep_scan,
+            &mut self.research,
+            &mut self.maintenance,
+            &mut self.export,
+            &mut self.propellant,
+            &mut self.fleet_expansion,
+        ]
+    }
+
     /// Clamp every field to \[0.0, 1.0\] in place. Used after applying mode
     /// multipliers so the rule interpreter can treat weights as probabilities.
     /// NaN values are replaced with 0.0 (safer default for an urgency weight
@@ -504,6 +524,25 @@ mod tests {
         // Unspecified fields preserve the struct defaults.
         assert!((parsed.priorities.maintenance - 0.8).abs() < 1e-6);
         assert!((parsed.priorities.propellant - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn fields_mut_matches_to_vec_order() {
+        // Pin the mutable-reference iteration order to the fixed canonical
+        // order. If this drifts, hysteresis/temporal-bias code that uses
+        // `fields_mut` will silently apply updates to the wrong concerns.
+        let mut weights = PriorityWeights {
+            mining: 1.0,
+            survey: 2.0,
+            deep_scan: 3.0,
+            research: 4.0,
+            maintenance: 5.0,
+            export: 6.0,
+            propellant: 7.0,
+            fleet_expansion: 8.0,
+        };
+        let values: Vec<f32> = weights.fields_mut().iter().map(|f| **f).collect();
+        assert_eq!(values, weights.to_vec());
     }
 
     #[test]
