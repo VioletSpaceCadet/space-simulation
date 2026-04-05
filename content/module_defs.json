@@ -17,7 +17,10 @@
     "power_stall_priority": 3,
     "crew_requirement": {
       "operator": 1
-    }
+    },
+    "compatible_slots": [
+      "industrial"
+    ]
   },
   {
     "id": "module_electrolysis_unit",
@@ -41,7 +44,10 @@
     ],
     "crew_requirement": {
       "operator": 1
-    }
+    },
+    "compatible_slots": [
+      "industrial"
+    ]
   },
   {
     "id": "module_heating_unit",
@@ -64,7 +70,10 @@
     ],
     "crew_requirement": {
       "operator": 1
-    }
+    },
+    "compatible_slots": [
+      "industrial"
+    ]
   },
   {
     "id": "module_maintenance_bay",
@@ -84,7 +93,10 @@
     "power_stall_priority": 4,
     "crew_requirement": {
       "technician": 1
-    }
+    },
+    "compatible_slots": [
+      "utility"
+    ]
   },
   {
     "id": "module_basic_assembler",
@@ -110,7 +122,10 @@
     "crew_requirement": {
       "operator": 1,
       "technician": 1
-    }
+    },
+    "compatible_slots": [
+      "industrial"
+    ]
   },
   {
     "id": "module_materials_lab",
@@ -134,7 +149,10 @@
     "power_stall_priority": 1,
     "crew_requirement": {
       "scientist": 1
-    }
+    },
+    "compatible_slots": [
+      "research"
+    ]
   },
   {
     "id": "module_exploration_lab",
@@ -157,7 +175,10 @@
     "power_stall_priority": 1,
     "crew_requirement": {
       "scientist": 1
-    }
+    },
+    "compatible_slots": [
+      "research"
+    ]
   },
   {
     "id": "module_engineering_lab",
@@ -181,7 +202,10 @@
     "power_stall_priority": 1,
     "crew_requirement": {
       "scientist": 1
-    }
+    },
+    "compatible_slots": [
+      "research"
+    ]
   },
   {
     "id": "module_manufacturing_lab",
@@ -204,7 +228,10 @@
     "power_stall_priority": 1,
     "crew_requirement": {
       "scientist": 1
-    }
+    },
+    "compatible_slots": [
+      "research"
+    ]
   },
   {
     "id": "module_propulsion_lab",
@@ -227,7 +254,10 @@
     "power_stall_priority": 1,
     "crew_requirement": {
       "scientist": 1
-    }
+    },
+    "compatible_slots": [
+      "research"
+    ]
   },
   {
     "id": "module_sensor_array",
@@ -247,7 +277,10 @@
     "power_stall_priority": 0,
     "crew_requirement": {
       "operator": 1
-    }
+    },
+    "compatible_slots": [
+      "utility"
+    ]
   },
   {
     "id": "module_optical_telescope",
@@ -263,7 +296,10 @@
         "action_key": "optical_scan",
         "scan_interval_minutes": 180,
         "sensor_type": "optical",
-        "discovery_zones": ["earth_orbit_zone", "earth_neos"],
+        "discovery_zones": [
+          "earth_orbit_zone",
+          "earth_neos"
+        ],
         "discovery_probability": 0.15
       }
     },
@@ -271,7 +307,10 @@
     "crew_requirement": {
       "operator": 1
     },
-    "operating_cost_per_tick": 100.0
+    "operating_cost_per_tick": 100.0,
+    "compatible_slots": [
+      "utility"
+    ]
   },
   {
     "id": "module_radio_telescope",
@@ -287,7 +326,10 @@
         "action_key": "radio_scan",
         "scan_interval_minutes": 240,
         "sensor_type": "radio",
-        "discovery_zones": ["inner_belt", "outer_belt"],
+        "discovery_zones": [
+          "inner_belt",
+          "outer_belt"
+        ],
         "discovery_probability": 0.08
       }
     },
@@ -296,7 +338,10 @@
       "operator": 1,
       "scientist": 1
     },
-    "operating_cost_per_tick": 250.0
+    "operating_cost_per_tick": 250.0,
+    "compatible_slots": [
+      "utility"
+    ]
   },
   {
     "id": "module_shipyard",
@@ -320,7 +365,10 @@
     "crew_requirement": {
       "operator": 1,
       "technician": 1
-    }
+    },
+    "compatible_slots": [
+      "industrial"
+    ]
   },
   {
     "id": "module_basic_solar_array",
@@ -333,7 +381,10 @@
       "SolarArray": {
         "base_output_kw": 50.0
       }
-    }
+    },
+    "compatible_slots": [
+      "utility"
+    ]
   },
   {
     "id": "module_basic_battery",
@@ -348,7 +399,10 @@
         "charge_rate_kw": 20.0,
         "discharge_rate_kw": 30.0
       }
-    }
+    },
+    "compatible_slots": [
+      "utility"
+    ]
   },
   {
     "id": "module_basic_smelter",
@@ -384,6 +438,9 @@
         "direction": "Output",
         "accepts": "AnyMolten"
       }
+    ],
+    "compatible_slots": [
+      "industrial"
     ]
   },
   {
@@ -403,7 +460,10 @@
       "passive_cooling_coefficient": 10.0,
       "max_temp_mk": 3000000,
       "thermal_group": "default"
-    }
+    },
+    "compatible_slots": [
+      "utility"
+    ]
   },
   {
     "id": "module_plate_press",
@@ -423,7 +483,10 @@
     "power_stall_priority": 3,
     "crew_requirement": {
       "operator": 1
-    }
+    },
+    "compatible_slots": [
+      "industrial"
+    ]
   },
   {
     "id": "module_structural_assembler",
@@ -457,7 +520,10 @@
     "crew_requirement": {
       "operator": 1,
       "technician": 1
-    }
+    },
+    "compatible_slots": [
+      "industrial"
+    ]
   },
   {
     "id": "module_mining_laser",
@@ -586,7 +652,10 @@
     },
     "power_stall_priority": 3,
     "crew_requirement": {},
-    "required_tech": "tech_automation_basic"
+    "required_tech": "tech_automation_basic",
+    "compatible_slots": [
+      "industrial"
+    ]
   },
   {
     "id": "module_automated_assembler",
@@ -608,7 +677,10 @@
     },
     "power_stall_priority": 2,
     "crew_requirement": {},
-    "required_tech": "tech_automation_basic"
+    "required_tech": "tech_automation_basic",
+    "compatible_slots": [
+      "industrial"
+    ]
   },
   {
     "id": "module_crucible",
@@ -640,6 +712,9 @@
         "direction": "Output",
         "accepts": "AnyMolten"
       }
+    ],
+    "compatible_slots": [
+      "industrial"
     ]
   },
   {
@@ -675,6 +750,9 @@
         "direction": "Input",
         "accepts": "AnyMolten"
       }
+    ],
+    "compatible_slots": [
+      "industrial"
     ]
   },
   {
@@ -690,7 +768,10 @@
         "recovery_minutes": 10080
       }
     },
-    "operating_cost_per_tick": 500.0
+    "operating_cost_per_tick": 500.0,
+    "compatible_slots": [
+      "structural"
+    ]
   },
   {
     "id": "module_launch_pad_medium",
@@ -708,7 +789,10 @@
     "crew_requirement": {
       "operator": 2
     },
-    "operating_cost_per_tick": 1500.0
+    "operating_cost_per_tick": 1500.0,
+    "compatible_slots": [
+      "structural"
+    ]
   },
   {
     "id": "module_launch_pad_large",
@@ -728,7 +812,10 @@
       "technician": 1
     },
     "required_tech": "tech_heavy_rocketry",
-    "operating_cost_per_tick": 3000.0
+    "operating_cost_per_tick": 3000.0,
+    "compatible_slots": [
+      "structural"
+    ]
   },
   {
     "id": "module_ground_workshop",
@@ -753,6 +840,9 @@
       "operator": 1,
       "technician": 1
     },
-    "operating_cost_per_tick": 200.0
+    "operating_cost_per_tick": 200.0,
+    "compatible_slots": [
+      "industrial"
+    ]
   }
 ]

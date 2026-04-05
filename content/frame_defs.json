@@ -1,0 +1,92 @@
+[
+  {
+    "id": "frame_outpost",
+    "name": "Outpost",
+    "base_cargo_capacity_m3": 500.0,
+    "base_power_capacity_kw": 30.0,
+    "slots": [
+      { "slot_type": "utility", "label": "Utility 1" },
+      { "slot_type": "utility", "label": "Utility 2" },
+      { "slot_type": "industrial", "label": "Industrial 1" },
+      { "slot_type": "industrial", "label": "Industrial 2" },
+      { "slot_type": "research", "label": "Research 1" },
+      { "slot_type": "structural", "label": "Structural 1" }
+    ],
+    "bonuses": [],
+    "tags": ["small", "remote"]
+  },
+  {
+    "id": "frame_industrial_hub",
+    "name": "Industrial Hub",
+    "base_cargo_capacity_m3": 2000.0,
+    "base_power_capacity_kw": 100.0,
+    "slots": [
+      { "slot_type": "utility", "label": "Utility 1" },
+      { "slot_type": "utility", "label": "Utility 2" },
+      { "slot_type": "utility", "label": "Utility 3" },
+      { "slot_type": "utility", "label": "Utility 4" },
+      { "slot_type": "utility", "label": "Utility 5" },
+      { "slot_type": "utility", "label": "Utility 6" },
+      { "slot_type": "utility", "label": "Utility 7" },
+      { "slot_type": "utility", "label": "Utility 8" },
+      { "slot_type": "utility", "label": "Utility 9" },
+      { "slot_type": "utility", "label": "Utility 10" },
+      { "slot_type": "utility", "label": "Utility 11" },
+      { "slot_type": "utility", "label": "Utility 12" },
+      { "slot_type": "industrial", "label": "Industrial 1" },
+      { "slot_type": "industrial", "label": "Industrial 2" },
+      { "slot_type": "industrial", "label": "Industrial 3" },
+      { "slot_type": "industrial", "label": "Industrial 4" },
+      { "slot_type": "industrial", "label": "Industrial 5" },
+      { "slot_type": "industrial", "label": "Industrial 6" },
+      { "slot_type": "industrial", "label": "Industrial 7" },
+      { "slot_type": "industrial", "label": "Industrial 8" },
+      { "slot_type": "industrial", "label": "Industrial 9" },
+      { "slot_type": "industrial", "label": "Industrial 10" },
+      { "slot_type": "research", "label": "Research 1" },
+      { "slot_type": "research", "label": "Research 2" },
+      { "slot_type": "research", "label": "Research 3" },
+      { "slot_type": "research", "label": "Research 4" },
+      { "slot_type": "research", "label": "Research 5" },
+      { "slot_type": "research", "label": "Research 6" },
+      { "slot_type": "structural", "label": "Structural 1" },
+      { "slot_type": "structural", "label": "Structural 2" },
+      { "slot_type": "structural", "label": "Structural 3" },
+      { "slot_type": "structural", "label": "Structural 4" },
+      { "slot_type": "structural", "label": "Structural 5" }
+    ],
+    "bonuses": [],
+    "tags": ["large", "balanced"]
+  },
+  {
+    "id": "frame_research_station",
+    "name": "Research Station",
+    "base_cargo_capacity_m3": 1000.0,
+    "base_power_capacity_kw": 80.0,
+    "slots": [
+      { "slot_type": "utility", "label": "Utility 1" },
+      { "slot_type": "utility", "label": "Utility 2" },
+      { "slot_type": "utility", "label": "Utility 3" },
+      { "slot_type": "utility", "label": "Utility 4" },
+      { "slot_type": "industrial", "label": "Industrial 1" },
+      { "slot_type": "industrial", "label": "Industrial 2" },
+      { "slot_type": "research", "label": "Research 1" },
+      { "slot_type": "research", "label": "Research 2" },
+      { "slot_type": "research", "label": "Research 3" },
+      { "slot_type": "research", "label": "Research 4" },
+      { "slot_type": "research", "label": "Research 5" },
+      { "slot_type": "research", "label": "Research 6" },
+      { "slot_type": "structural", "label": "Structural 1" },
+      { "slot_type": "structural", "label": "Structural 2" }
+    ],
+    "bonuses": [
+      {
+        "stat": "research_speed",
+        "op": "pct_additive",
+        "value": 0.15,
+        "source": { "frame": "frame_research_station" }
+      }
+    ],
+    "tags": ["research", "specialized"]
+  }
+]
