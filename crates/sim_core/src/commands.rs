@@ -753,6 +753,8 @@ fn consume_fuel(core: &mut crate::FacilityCore, fuel_element: &str, fuel_kg: f32
 }
 
 /// Remove `count` units of a component from a facility's inventory.
+/// Only removes from the first matching slot. Callers must validate that
+/// the slot has sufficient count before calling.
 fn remove_component(core: &mut crate::FacilityCore, component_id: &str, count: u32) {
     for item in &mut core.inventory {
         if let InventoryItem::Component {
@@ -1012,20 +1014,17 @@ pub(crate) fn handle_deploy_satellite(
     };
     remove_component(&mut station.core, satellite_def_id, 1);
 
-    // Create satellite at station's position.
-    let uuid = crate::generate_uuid(rng);
-    let satellite_id = crate::SatelliteId(format!("sat_{uuid}"));
-    let satellite = crate::SatelliteState {
-        id: satellite_id.clone(),
-        def_id: satellite_def_id.to_string(),
-        name: sat_def.name.clone(),
-        position: position.clone(),
-        deployed_tick: current_tick,
-        wear: 0.0,
-        enabled: true,
-        satellite_type: sat_def.satellite_type.clone(),
-        payload_config: None,
+    // Create satellite at station's position using the shared constructor.
+    let Some(satellite) = crate::engine::create_satellite(
+        satellite_def_id,
+        position.clone(),
+        current_tick,
+        content,
+        rng,
+    ) else {
+        return false;
     };
+    let satellite_id = satellite.id.clone();
     let satellite_type = satellite.satellite_type.clone();
     state.satellites.insert(satellite_id.clone(), satellite);
 

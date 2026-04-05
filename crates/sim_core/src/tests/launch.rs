@@ -846,3 +846,52 @@ fn orbital_deploy_rejected_unknown_def() {
     );
     assert!(state.satellites.is_empty());
 }
+
+#[test]
+fn orbital_deploy_rejected_tech_gated() {
+    let content = satellite_content();
+    let mut state = launch_state(&content);
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+
+    // Station with tech-gated satellite component (sat_comm_relay requires tech_gated).
+    let station_id = StationId("station_test".to_string());
+    state.stations.insert(
+        station_id.clone(),
+        StationState {
+            id: station_id.clone(),
+            position: test_position(),
+            core: FacilityCore {
+                inventory: vec![InventoryItem::Component {
+                    component_id: ComponentId("sat_comm_relay".to_string()),
+                    count: 1,
+                    quality: 1.0,
+                }],
+                cargo_capacity_m3: 1000.0,
+                ..Default::default()
+            },
+            leaders: Vec::new(),
+        },
+    );
+    crate::test_fixtures::rebuild_indices(&mut state, &content);
+
+    // tech_gated not unlocked — deploy should be rejected.
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("player".to_string()),
+        issued_tick: 0,
+        execute_at_tick: 0,
+        command: Command::DeploySatellite {
+            station_id,
+            satellite_def_id: "sat_comm_relay".to_string(),
+        },
+    };
+
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(&e.event, Event::SatelliteDeployed { .. })),
+        "should not deploy without required tech"
+    );
+    assert!(state.satellites.is_empty());
+}

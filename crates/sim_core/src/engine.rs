@@ -639,7 +639,7 @@ fn resolve_transit_payload(
 }
 
 /// Create a `SatelliteState` from a satellite def ID.
-fn create_satellite(
+pub(crate) fn create_satellite(
     satellite_def_id: &str,
     position: crate::Position,
     current_tick: u64,
