@@ -97,6 +97,7 @@ export const DATA_KIND_COLORS: Record<string, string> = {
   TransitData: '#a78bfa',
   OpticalData: '#7ec8e3',
   RadioData: '#e0a84c',
+  EngineeringData: '#e07a5f',
 };
 
 export const DATA_KIND_LABELS: Record<string, string> = {
@@ -106,6 +107,7 @@ export const DATA_KIND_LABELS: Record<string, string> = {
   TransitData: 'Transit',
   OpticalData: 'Optical',
   RadioData: 'Radio',
+  EngineeringData: 'Engineering',
 };
 
 // --- Research domains ---
@@ -114,6 +116,7 @@ export const DOMAIN_COLORS: Record<string, string> = {
   Materials: '#c89a4a',
   Manufacturing: '#4caf7d',
   Propulsion: '#a78bfa',
+  Engineering: '#e07a5f',
 };
 
 // --- Lab statuses ---
