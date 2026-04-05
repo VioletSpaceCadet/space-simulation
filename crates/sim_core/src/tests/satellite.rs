@@ -1,5 +1,5 @@
 use crate::test_fixtures::test_position;
-use crate::{SatelliteDef, SatelliteId, SatelliteState, TechId};
+use crate::{Event, SatelliteDef, SatelliteId, SatelliteState, TechId};
 
 #[test]
 fn satellite_state_json_round_trip() {
@@ -94,4 +94,30 @@ fn game_state_backward_compatible_no_satellites() {
     json_value.as_object_mut().unwrap().remove("satellites");
     let restored: crate::GameState = serde_json::from_value(json_value).unwrap();
     assert!(restored.satellites.is_empty());
+}
+
+#[test]
+fn satellite_event_variants_round_trip() {
+    let events = vec![
+        Event::SatelliteDeployed {
+            satellite_id: SatelliteId("sat_001".to_string()),
+            position: test_position(),
+            satellite_type: "survey".to_string(),
+        },
+        Event::SatelliteFailed {
+            satellite_id: SatelliteId("sat_002".to_string()),
+            satellite_type: "communication".to_string(),
+        },
+        Event::CommTierChanged {
+            zone_id: "belt".to_string(),
+            old_tier: "None".to_string(),
+            new_tier: "Basic".to_string(),
+        },
+    ];
+    for event in &events {
+        let json = serde_json::to_string(event).unwrap();
+        let round_trip: Event = serde_json::from_str(&json).unwrap();
+        let rt_json = serde_json::to_string(&round_trip).unwrap();
+        assert_eq!(json, rt_json);
+    }
 }
