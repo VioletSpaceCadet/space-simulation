@@ -189,7 +189,7 @@ fn compute_dimension_raw(
     tick: f64,
 ) -> f64 {
     match dimension_id {
-        "industrial_output" => compute_industrial(metrics, tick),
+        "industrial_output" => compute_industrial(metrics, state, tick),
         "research_progress" => compute_research(metrics, state, content),
         "economic_health" => compute_economic(metrics, state, tick),
         "fleet_operations" => compute_fleet(metrics, state),
@@ -200,14 +200,56 @@ fn compute_dimension_raw(
 }
 
 /// Industrial Output: material throughput per tick + assembler activity.
-fn compute_industrial(metrics: &MetricsSnapshot, tick: f64) -> f64 {
+///
+/// VIO-603: adds a multi-base diversification multiplier — running N
+/// productive bases amplifies throughput credit, rewarding distributed
+/// production over concentrating everything on one base. A "productive
+/// base" is a station or ground facility with at least one Assembler
+/// or Processor module (module `enabled` flag is ignored — structural
+/// diversification is what we want to reward, not current uptime).
+///
+/// The multiplier is proportional (not additive) so the bonus scales
+/// with actual throughput rather than being lost against the ceiling.
+/// Plateaus at 3 extra productive bases (+30% max) to avoid rewarding
+/// sprawl beyond what players can realistically manage.
+fn compute_industrial(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> f64 {
     let throughput = f64::from(metrics.total_material_kg) / tick;
     let assembler_active = metrics
         .per_module_metrics
         .get("assembler")
         .map_or(0, |m| m.active);
-    // Throughput rate plus small assembler activity bonus (0.1 per active assembler)
-    throughput + f64::from(assembler_active) * 0.1
+    let productive_bases = count_productive_bases(state) as f64;
+    // +10% throughput per extra productive base, capped at +30% (4 bases).
+    let extra_bases = (productive_bases - 1.0).clamp(0.0, 3.0);
+    let diversification_multiplier = 1.0 + extra_bases * 0.10;
+    throughput * diversification_multiplier + f64::from(assembler_active) * 0.1
+}
+
+/// Count productive bases: stations + ground facilities that host at
+/// least one Assembler or Processor module. Treats stations and ground
+/// facilities symmetrically so ground-start runs have access to the
+/// same diversification rewards as orbital-start runs.
+fn count_productive_bases(state: &GameState) -> usize {
+    let station_count = state
+        .stations
+        .values()
+        .filter(|s| has_productive_module(&s.core.modules))
+        .count();
+    let ground_count = state
+        .ground_facilities
+        .values()
+        .filter(|g| has_productive_module(&g.core.modules))
+        .count();
+    station_count + ground_count
+}
+
+fn has_productive_module(modules: &[crate::ModuleState]) -> bool {
+    modules.iter().any(|m| {
+        matches!(
+            m.kind_state,
+            crate::ModuleKindState::Assembler(_) | crate::ModuleKindState::Processor(_)
+        )
+    })
 }
 
 /// Research Progress: fraction of techs unlocked + scan data growth + science satellites.
@@ -317,6 +359,12 @@ fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
 }
 
 /// Expansion: bases (stations + ground facilities) + fleet + satellites.
+///
+/// VIO-603: adds a multi-base bonus *on top of* the original blend so
+/// single-base play is NOT regressed. Bases include both stations and
+/// ground facilities, keeping orbital- and ground-start runs symmetric.
+/// Plateaus at 4 total bases. Raw values can temporarily exceed 1.0;
+/// the outer normalizer clamps to the unit range (still within ceiling).
 fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     // Both station and ground facility count as operational bases.
     let base_count = (state.stations.len() + state.ground_facilities.len()) as f64;
@@ -324,8 +372,14 @@ fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
     let fleet_signal = (f64::from(metrics.fleet_total).sqrt() / 3.0).min(1.0);
     // Satellites contribute to expansion (orbital infrastructure).
     let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
-    // Blend: 40% bases, 30% fleet reach, 30% satellite infrastructure
-    base_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3
+    // Multi-base bonus: additive on top of the original blend so
+    // single-base runs are unchanged. Plateaus at 4 total bases
+    // (3 extras beyond the starting one).
+    let extra_bases = (base_count - 1.0).clamp(0.0, 3.0);
+    let multi_base_bonus = extra_bases / 3.0 * 0.15;
+    // Original 40/30/30 blend preserved. Bonus stacks on top; ceiling
+    // normalization clamps the final normalized value to [0, 1].
+    base_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3 + multi_base_bonus
 }
 
 /// Resolve the highest threshold name for a given composite score.
@@ -723,6 +777,64 @@ mod tests {
         assert_eq!(resolve_threshold(&thresholds, 2500.0), "Space Magnate");
     }
 
+    /// Build an empty station (no modules) with the given id.
+    /// Used by VIO-603 multi-station scoring tests.
+    fn test_empty_station(id: &str) -> crate::StationState {
+        crate::StationState {
+            id: crate::StationId(id.to_string()),
+            position: crate::test_fixtures::test_position(),
+            core: crate::FacilityCore {
+                inventory: vec![],
+                cargo_capacity_m3: 10_000.0,
+                power_available_per_tick: 100.0,
+                modules: vec![],
+                modifiers: crate::modifiers::ModifierSet::default(),
+                crew: Default::default(),
+                thermal_links: Vec::new(),
+                power: crate::PowerState::default(),
+                cached_inventory_volume_m3: None,
+                module_type_index: crate::ModuleTypeIndex::default(),
+                module_id_index: std::collections::HashMap::new(),
+                power_budget_cache: crate::PowerBudgetCache::default(),
+            },
+            leaders: Vec::new(),
+            frame_id: None,
+        }
+    }
+
+    /// Build a station with a single Processor module (a "productive" base).
+    fn test_productive_station(id: &str) -> crate::StationState {
+        let mut station = test_empty_station(id);
+        station.core.modules.push(crate::ModuleState {
+            id: crate::ModuleInstanceId(format!("mod_proc_{id}")),
+            def_id: "module_basic_smelter".to_string(),
+            enabled: true,
+            kind_state: crate::ModuleKindState::Processor(crate::ProcessorState {
+                threshold_kg: 500.0,
+                ticks_since_last_run: 0,
+                stalled: false,
+                selected_recipe: None,
+            }),
+            wear: crate::WearState::default(),
+            thermal: None,
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
+            slot_index: None,
+        });
+        station
+    }
+
+    fn expansion_raw(score: &RunScore) -> f64 {
+        score.dimensions.get("expansion").unwrap().raw_value
+    }
+
+    fn industrial_raw(score: &RunScore) -> f64 {
+        score.dimensions.get("industrial_output").unwrap().raw_value
+    }
+
     #[test]
     fn satellites_improve_expansion_score() {
         let content = scored_content();
@@ -746,6 +858,240 @@ mod tests {
             "active satellites should increase expansion score: {} vs {}",
             expansion_yes,
             expansion_no
+        );
+    }
+
+    #[test]
+    fn multi_base_improves_expansion_score() {
+        // VIO-603: deploying a second base should produce a visible
+        // expansion score bump via the multi_base_bonus.
+        let content = scored_content();
+        let metrics = make_metrics(100);
+
+        let state_one = crate::test_fixtures::base_state(&content);
+        let score_one = compute_run_score(&metrics, &state_one, &content);
+
+        let mut state_two = crate::test_fixtures::base_state(&content);
+        state_two.stations.insert(
+            crate::StationId("station_mars_orbit".into()),
+            test_empty_station("station_mars_orbit"),
+        );
+        let score_two = compute_run_score(&metrics, &state_two, &content);
+
+        assert!(
+            expansion_raw(&score_two) > expansion_raw(&score_one),
+            "second base should increase expansion score: {} vs {}",
+            expansion_raw(&score_two),
+            expansion_raw(&score_one)
+        );
+    }
+
+    #[test]
+    fn single_base_expansion_unchanged_by_vio_603() {
+        // VIO-603 regression guard: the multi_base_bonus must be purely
+        // additive — a single-base run must score *exactly* the
+        // pre-VIO-603 expansion raw_value:
+        //   base_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3
+        let content = scored_content();
+        let state = crate::test_fixtures::base_state(&content);
+        let metrics = make_metrics(100);
+
+        // Hand-compute expected raw from the original blend to pin it.
+        let base_signal = (1.0_f64 / 3.0).min(1.0);
+        let fleet_signal = (f64::from(metrics.fleet_total).sqrt() / 3.0).min(1.0);
+        let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
+        let expected = base_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3;
+
+        let actual = expansion_raw(&compute_run_score(&metrics, &state, &content));
+        assert!(
+            (actual - expected).abs() < 1e-10,
+            "single-base expansion raw_value changed (regression): expected {expected}, got {actual}"
+        );
+    }
+
+    #[test]
+    fn multi_base_bonus_plateaus_at_four_bases() {
+        // VIO-603: the multi_base_bonus must saturate at 4 total bases.
+        // Adding a 5th or 10th base must produce the same expansion
+        // raw_value as 4 bases — no reward for sprawl.
+        let content = scored_content();
+        let metrics = make_metrics(100);
+
+        let score_at = |n: usize| {
+            let mut state = crate::test_fixtures::base_state(&content);
+            for i in 1..n {
+                let id = format!("station_extra_{i}");
+                state
+                    .stations
+                    .insert(crate::StationId(id.clone()), test_empty_station(&id));
+            }
+            expansion_raw(&compute_run_score(&metrics, &state, &content))
+        };
+
+        let at_four = score_at(4);
+        let at_five = score_at(5);
+        let at_ten = score_at(10);
+
+        assert!(
+            (at_four - at_five).abs() < 1e-10,
+            "multi_base_bonus should plateau at 4 bases: n=4 {} vs n=5 {}",
+            at_four,
+            at_five
+        );
+        assert!(
+            (at_four - at_ten).abs() < 1e-10,
+            "multi_base_bonus should plateau at 4 bases: n=4 {} vs n=10 {}",
+            at_four,
+            at_ten
+        );
+    }
+
+    #[test]
+    fn multi_productive_bases_improve_industrial_score() {
+        // VIO-603: running N productive bases (assembler/processor)
+        // should produce a diversification multiplier on throughput,
+        // rewarding distributed production over concentrating everything
+        // on one base.
+        let content = scored_content();
+        let metrics = make_metrics(100);
+
+        // Baseline: single station with a processor.
+        let mut state_one = crate::test_fixtures::base_state(&content);
+        {
+            let station = state_one
+                .stations
+                .get_mut(&crate::test_fixtures::test_station_id())
+                .unwrap();
+            *station = {
+                let mut s = test_productive_station("earth_orbit");
+                s.id = crate::test_fixtures::test_station_id();
+                s
+            };
+        }
+        let score_one = compute_run_score(&metrics, &state_one, &content);
+
+        // Two productive bases.
+        let mut state_two = state_one.clone();
+        state_two.stations.insert(
+            crate::StationId("station_mars_orbit".into()),
+            test_productive_station("station_mars_orbit"),
+        );
+        let score_two = compute_run_score(&metrics, &state_two, &content);
+
+        assert!(
+            industrial_raw(&score_two) > industrial_raw(&score_one),
+            "second productive base should increase industrial score: {} vs {}",
+            industrial_raw(&score_two),
+            industrial_raw(&score_one)
+        );
+    }
+
+    #[test]
+    fn unproductive_second_base_no_industrial_bonus() {
+        // VIO-603: a base with no assembler/processor should NOT
+        // contribute to the industrial diversification multiplier —
+        // only productive bases count.
+        let content = scored_content();
+        let metrics = make_metrics(100);
+
+        let state_one = crate::test_fixtures::base_state(&content);
+        let score_one = compute_run_score(&metrics, &state_one, &content);
+
+        let mut state_two = crate::test_fixtures::base_state(&content);
+        state_two.stations.insert(
+            crate::StationId("station_mars_orbit".into()),
+            test_empty_station("station_mars_orbit"),
+        );
+        let score_two = compute_run_score(&metrics, &state_two, &content);
+
+        assert!(
+            (industrial_raw(&score_one) - industrial_raw(&score_two)).abs() < f64::EPSILON,
+            "empty second base should not change industrial score: {} vs {}",
+            industrial_raw(&score_one),
+            industrial_raw(&score_two)
+        );
+    }
+
+    #[test]
+    fn ground_facility_counts_as_productive_base() {
+        // VIO-603: ground facilities with productive modules must count
+        // toward the diversification multiplier so ground-start runs
+        // have access to the same rewards as orbital-start runs.
+        let content = scored_content();
+        let metrics = make_metrics(100);
+
+        // Baseline: one productive orbital station.
+        let mut state_orbital = crate::test_fixtures::base_state(&content);
+        {
+            let station = state_orbital
+                .stations
+                .get_mut(&crate::test_fixtures::test_station_id())
+                .unwrap();
+            *station = {
+                let mut s = test_productive_station("earth_orbit");
+                s.id = crate::test_fixtures::test_station_id();
+                s
+            };
+        }
+        let score_orbital = compute_run_score(&metrics, &state_orbital, &content);
+
+        // Add a productive ground facility.
+        let mut state_hybrid = state_orbital.clone();
+        let gf_id = crate::GroundFacilityId("gf_earth_kennedy".into());
+        state_hybrid.ground_facilities.insert(
+            gf_id.clone(),
+            crate::GroundFacilityState {
+                id: gf_id,
+                name: "Kennedy Launch Complex".into(),
+                position: crate::test_fixtures::test_position(),
+                core: crate::FacilityCore {
+                    inventory: vec![],
+                    cargo_capacity_m3: 10_000.0,
+                    power_available_per_tick: 100.0,
+                    modules: vec![crate::ModuleState {
+                        id: crate::ModuleInstanceId("mod_gf_proc".into()),
+                        def_id: "module_basic_smelter".into(),
+                        enabled: true,
+                        kind_state: crate::ModuleKindState::Processor(crate::ProcessorState {
+                            threshold_kg: 500.0,
+                            ticks_since_last_run: 0,
+                            stalled: false,
+                            selected_recipe: None,
+                        }),
+                        wear: crate::WearState::default(),
+                        thermal: None,
+                        power_stalled: false,
+                        module_priority: 0,
+                        assigned_crew: Default::default(),
+                        efficiency: 1.0,
+                        prev_crew_satisfied: true,
+                        slot_index: None,
+                    }],
+                    modifiers: crate::modifiers::ModifierSet::default(),
+                    crew: Default::default(),
+                    thermal_links: Vec::new(),
+                    power: crate::PowerState::default(),
+                    cached_inventory_volume_m3: None,
+                    module_type_index: crate::ModuleTypeIndex::default(),
+                    module_id_index: std::collections::HashMap::new(),
+                    power_budget_cache: crate::PowerBudgetCache::default(),
+                },
+                launch_transits: Vec::new(),
+            },
+        );
+        let score_hybrid = compute_run_score(&metrics, &state_hybrid, &content);
+
+        assert!(
+            industrial_raw(&score_hybrid) > industrial_raw(&score_orbital),
+            "ground facility should count as productive base (industrial): {} vs {}",
+            industrial_raw(&score_hybrid),
+            industrial_raw(&score_orbital)
+        );
+        assert!(
+            expansion_raw(&score_hybrid) > expansion_raw(&score_orbital),
+            "ground facility should count toward expansion multi-base bonus: {} vs {}",
+            expansion_raw(&score_hybrid),
+            expansion_raw(&score_orbital)
         );
     }
 
