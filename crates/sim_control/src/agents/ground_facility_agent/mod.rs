@@ -30,7 +30,8 @@ pub(crate) trait GroundFacilityConcern: Send {
 
 /// Per-ground-facility agent that composes ordered concerns.
 ///
-/// Execution order: install modules → purchase sensors → manage sensor budget.
+/// Execution order: install modules → purchase sensors → manage sensor budget →
+/// purchase components → execute launches.
 ///
 /// Sensor data flows into the global research pool, so station labs
 /// automatically benefit from ground sensor output.

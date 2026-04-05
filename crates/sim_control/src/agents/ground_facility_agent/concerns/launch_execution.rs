@@ -25,19 +25,8 @@ impl GroundFacilityConcern for LaunchExecution {
             return Vec::new();
         };
 
-        // Check if any pad is available.
-        let has_available_pad = facility.core.modules.iter().any(|module| {
-            module.enabled
-                && matches!(
-                    &module.kind_state,
-                    ModuleKindState::LaunchPad(pad) if pad.available
-                )
-        });
-        if !has_available_pad {
-            return Vec::new();
-        }
-
-        // Find a rocket component in inventory.
+        // Find the first rocket component in inventory. Uses first-found order
+        // (BTreeMap iteration = alphabetical by ID).
         let rocket_component = facility.core.inventory.iter().find_map(|item| {
             if let InventoryItem::Component { component_id, .. } = item {
                 // Match rocket component IDs against rocket_defs.
@@ -85,8 +74,12 @@ impl GroundFacilityConcern for LaunchExecution {
             return Vec::new();
         }
 
-        // Find a station to deliver supplies to. If none exists, launch a StationKit.
-        let payload = if ctx.state.stations.is_empty() {
+        // Pick payload. StationKit (5000 kg) only if no stations exist AND rocket
+        // has enough capacity. Otherwise send empty supplies.
+        let station_kit_mass = 5000.0_f32;
+        let payload = if ctx.state.stations.is_empty()
+            && rocket_def.payload_capacity_kg >= station_kit_mass
+        {
             LaunchPayload::StationKit
         } else {
             LaunchPayload::Supplies(vec![])

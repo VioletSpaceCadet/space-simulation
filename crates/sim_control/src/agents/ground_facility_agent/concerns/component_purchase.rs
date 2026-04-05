@@ -14,8 +14,8 @@ impl GroundFacilityConcern for ComponentPurchase {
     fn name(&self) -> &'static str {
         "component_purchase"
     }
-    fn should_run(&self, ctx: &GroundFacilityContext) -> bool {
-        !ctx.content.autopilot.ground_sensor_modules.is_empty()
+    fn should_run(&self, _ctx: &GroundFacilityContext) -> bool {
+        true
     }
     fn generate(&mut self, ctx: &mut GroundFacilityContext) -> Vec<CommandEnvelope> {
         let Some(facility) = ctx.state.ground_facilities.get(ctx.facility_id) else {
