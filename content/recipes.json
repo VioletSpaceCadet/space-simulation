@@ -763,6 +763,50 @@
     "tags": ["rocketry"]
   },
   {
+    "id": "recipe_outpost_kit",
+    "inputs": [
+      { "filter": { "Element": "Fe" }, "amount": { "Kg": 3000.0 } },
+      { "filter": { "Component": "structural_beam" }, "amount": { "Count": 10 } },
+      { "filter": { "Component": "hull_panel" }, "amount": { "Count": 6 } }
+    ],
+    "outputs": [
+      { "Component": { "component_id": "outpost_kit", "quality_formula": { "Fixed": 1.0 } } }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_station_construction",
+    "tags": ["construction", "kit"]
+  },
+  {
+    "id": "recipe_industrial_hub_kit",
+    "inputs": [
+      { "filter": { "Element": "Fe" }, "amount": { "Kg": 10000.0 } },
+      { "filter": { "Component": "structural_beam" }, "amount": { "Count": 30 } },
+      { "filter": { "Component": "hull_panel" }, "amount": { "Count": 18 } },
+      { "filter": { "Component": "guidance_unit" }, "amount": { "Count": 2 } }
+    ],
+    "outputs": [
+      { "Component": { "component_id": "industrial_hub_kit", "quality_formula": { "Fixed": 1.0 } } }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_station_construction",
+    "tags": ["construction", "kit"]
+  },
+  {
+    "id": "recipe_research_station_kit",
+    "inputs": [
+      { "filter": { "Element": "Fe" }, "amount": { "Kg": 6000.0 } },
+      { "filter": { "Component": "structural_beam" }, "amount": { "Count": 20 } },
+      { "filter": { "Component": "hull_panel" }, "amount": { "Count": 12 } },
+      { "filter": { "Component": "guidance_unit" }, "amount": { "Count": 1 } }
+    ],
+    "outputs": [
+      { "Component": { "component_id": "research_station_kit", "quality_formula": { "Fixed": 1.0 } } }
+    ],
+    "efficiency": 1.0,
+    "required_tech": "tech_station_construction",
+    "tags": ["construction", "kit"]
+  },
+  {
     "id": "recipe_build_construction_vessel",
     "inputs": [
       {
