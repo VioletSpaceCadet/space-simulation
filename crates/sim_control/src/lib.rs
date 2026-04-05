@@ -181,6 +181,16 @@ impl CommandSource for AutopilotController {
             ));
         }
 
+        // 3.5. Module delivery: cross-station module transfers for empty stations (VIO-596).
+        // Runs before ship objective assignment so assigned ships are not double-claimed.
+        agents::module_delivery::assign_module_deliveries(
+            ship_agents,
+            state,
+            content,
+            owner,
+            decision_log.as_mut(),
+        );
+
         // 4. Station agents assign objectives to idle ships (AD1).
         // Deduplication is per-station; multi-station needs strategic layer.
         for station_agent in station_agents.values() {

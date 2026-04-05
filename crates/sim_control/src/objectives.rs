@@ -1,4 +1,4 @@
-use sim_core::{AsteroidId, SiteId, StationId};
+use sim_core::{AsteroidId, SiteId, StationId, TradeItemSpec};
 
 /// Objective issued by a station agent to a ship agent.
 ///
@@ -15,6 +15,13 @@ pub(crate) enum ShipObjective {
     /// Deposit cargo at a specific station.
     #[allow(dead_code)] // Assigned by StationAgent in VIO-449
     Deposit { station_id: StationId },
+    /// Transfer items between stations (VIO-596: module delivery).
+    /// Ship agent converts this to a `Command::TransferItems`.
+    Transfer {
+        from_station: StationId,
+        to_station: StationId,
+        items: Vec<TradeItemSpec>,
+    },
     /// No objective — ship is idle and available for assignment.
     #[allow(dead_code)] // Used by StationAgent in VIO-449
     Idle,
