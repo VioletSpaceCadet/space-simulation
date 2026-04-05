@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import type { AsteroidState, ComponentItem, MaterialItem, ModuleKindState, OverheatZone, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
+import type { AsteroidState, ComponentItem, InventoryItem, MaterialItem, ModuleKindState, OverheatZone, ResearchState, ScanSite, ShipState, SimEvent, SlagItem, StationState, TaskState, TradeItemSpec } from '../types';
 import { getEventKey } from '../utils';
 
 import { eventSchemas } from './eventSchemas';
