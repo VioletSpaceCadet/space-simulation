@@ -169,6 +169,26 @@ fn try_launch_satellite(
         return Vec::new();
     }
 
+    // Check pad availability.
+    let pad_ok = facility.core.modules.iter().any(|module| {
+        if !module.enabled {
+            return false;
+        }
+        let Some(def) = ctx.content.module_defs.get(&module.def_id) else {
+            return false;
+        };
+        let sim_core::ModuleBehaviorDef::LaunchPad(pad_def) = &def.behavior else {
+            return false;
+        };
+        let sim_core::ModuleKindState::LaunchPad(pad_state) = &module.kind_state else {
+            return false;
+        };
+        pad_state.available && pad_def.max_payload_kg >= rocket_def.payload_capacity_kg
+    });
+    if !pad_ok {
+        return Vec::new();
+    }
+
     // Pick a destination — use the facility's own position (orbit above ground).
     let destination = facility.position.clone();
 
