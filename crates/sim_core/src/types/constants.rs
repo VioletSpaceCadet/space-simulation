@@ -153,6 +153,13 @@ pub struct Constants {
     /// Max module wear above which bottleneck detection flags `WearCritical`.
     #[serde(default = "default_bottleneck_wear_threshold")]
     pub bottleneck_wear_threshold: f32,
+    // Launch system
+    /// Cost per kg of fuel consumed during a rocket launch.
+    #[serde(default = "default_launch_fuel_cost_per_kg")]
+    pub launch_fuel_cost_per_kg: f64,
+    /// Element ID for rocket fuel (consumed from ground facility inventory on launch).
+    #[serde(default = "default_launch_fuel_element")]
+    pub launch_fuel_element: String,
 
     // -- Derived tick fields (computed at load time, not in JSON) --
     #[serde(skip_deserializing, default)]
@@ -326,6 +333,12 @@ fn default_bottleneck_slag_ratio_threshold() -> f32 {
 }
 fn default_bottleneck_wear_threshold() -> f32 {
     0.8
+}
+fn default_launch_fuel_cost_per_kg() -> f64 {
+    0.50 // $0.50/kg — propellant is ~0.3% of launch cost
+}
+fn default_launch_fuel_element() -> String {
+    "LH2".to_string()
 }
 
 // ---------------------------------------------------------------------------
