@@ -182,6 +182,7 @@ pub enum ModuleKindState {
     SolarArray(SolarArrayState),
     Battery(BatteryState),
     Radiator(RadiatorState),
+    LaunchPad(LaunchPadState),
     Equipment,
     ThermalContainer(ThermalContainerState),
 }
@@ -209,6 +210,7 @@ impl ModuleKindState {
             | Self::SolarArray(_)
             | Self::Battery(_)
             | Self::Radiator(_)
+            | Self::LaunchPad(_)
             | Self::Equipment
             | Self::ThermalContainer(_) => None,
         }
@@ -233,6 +235,34 @@ pub struct BatteryState {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RadiatorState {}
+
+/// Runtime state for a launch pad module.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaunchPadState {
+    /// Whether the pad is available for a launch. False during recovery.
+    #[serde(default = "default_true")]
+    pub available: bool,
+    /// Ticks remaining until the pad is available after a launch.
+    #[serde(default)]
+    pub recovery_ticks_remaining: u64,
+    /// Total launches completed on this pad.
+    #[serde(default)]
+    pub launches_count: u64,
+}
+
+impl Default for LaunchPadState {
+    fn default() -> Self {
+        Self {
+            available: true,
+            recovery_ticks_remaining: 0,
+            launches_count: 0,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessorState {

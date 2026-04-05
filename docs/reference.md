@@ -20,7 +20,9 @@ Detailed reference for sim_core types, content files, and inventory/refinery mec
 | `LaunchTransitState` | In-flight launch: `rocket_def_id`, `payload: LaunchPayload`, `destination`, `arrival_tick` |
 | `LaunchPayload` | Enum: `Supplies(Vec<InventoryItem>)`, `StationKit` |
 | `InventoryItem` | Enum: `Ore { lot_id, asteroid_id, kg, composition }`, `Material { element, kg, quality }`, `Slag { kg, composition }`, `Component { component_id, count, quality }`, `Module { item_id, module_def_id }` |
-| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, Assembler, Lab, SensorArray, SolarArray, Battery, Radiator), `wear: WearState`, optional `thermal: ThermalState`. Processor/Assembler have `stalled: bool`. Assembler also has `capped: bool`, `cap_override: HashMap<ComponentId, u32>` |
+| `ModuleState` | Installed module: `id`, `def_id`, `enabled`, `kind_state` (Processor, Storage, Maintenance, Assembler, Lab, SensorArray, SolarArray, Battery, Radiator, LaunchPad), `wear: WearState`, optional `thermal: ThermalState`. Processor/Assembler have `stalled: bool`. Assembler also has `capped: bool`, `cap_override: HashMap<ComponentId, u32>` |
+| `LaunchPadDef` | Launch pad module definition: `max_payload_kg`, `recovery_minutes` (derived `recovery_ticks`). |
+| `LaunchPadState` | Runtime state: `available` (bool), `recovery_ticks_remaining`, `launches_count`. |
 | `WearState` | `wear: f32` (0.0–1.0). Embedded on any wearable entity. |
 | `TaskKind` | `Idle`, `Survey`, `DeepScan`, `Mine { asteroid, duration_ticks }`, `Deposit { station, blocked }`, `Transit { destination, total_ticks, then }` |
 | `Command` | `AssignShipTask`, `InstallModule`, `UninstallModule`, `SetModuleEnabled`, `SetModuleThreshold`, `AssignLabTech`, `SetAssemblerCap`, `Import`, `Export`, `JettisonSlag` |

@@ -642,5 +642,58 @@
         "accepts": "AnyMolten"
       }
     ]
+  },
+  {
+    "id": "module_launch_pad_small",
+    "name": "Small Launch Pad",
+    "mass_kg": 10000.0,
+    "volume_m3": 50.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.01,
+    "behavior": {
+      "LaunchPad": {
+        "max_payload_kg": 2000.0,
+        "recovery_minutes": 10080
+      }
+    },
+    "operating_cost_per_tick": 500.0
+  },
+  {
+    "id": "module_launch_pad_medium",
+    "name": "Medium Launch Pad",
+    "mass_kg": 25000.0,
+    "volume_m3": 100.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.005,
+    "behavior": {
+      "LaunchPad": {
+        "max_payload_kg": 20000.0,
+        "recovery_minutes": 20160
+      }
+    },
+    "crew_requirement": {
+      "operator": 2
+    },
+    "operating_cost_per_tick": 1500.0
+  },
+  {
+    "id": "module_launch_pad_large",
+    "name": "Large Launch Pad",
+    "mass_kg": 50000.0,
+    "volume_m3": 200.0,
+    "power_consumption_per_run": 0.0,
+    "wear_per_run": 0.003,
+    "behavior": {
+      "LaunchPad": {
+        "max_payload_kg": 70000.0,
+        "recovery_minutes": 30240
+      }
+    },
+    "crew_requirement": {
+      "operator": 3,
+      "technician": 1
+    },
+    "required_tech": "tech_heavy_rocketry",
+    "operating_cost_per_tick": 3000.0
   }
 ]
