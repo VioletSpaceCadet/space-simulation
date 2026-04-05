@@ -682,7 +682,10 @@ mod tests {
             id: TechId("tech_materials_v1".to_string()),
             name: "Materials Research".to_string(),
             prereqs: vec![],
-            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Materials, 100.0)]),
+            domain_requirements: HashMap::from([(
+                sim_core::ResearchDomain::new(sim_core::ResearchDomain::MATERIALS),
+                100.0,
+            )]),
             accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::ASSAY)],
             effects: vec![],
         });
@@ -696,7 +699,7 @@ mod tests {
                 .power(2.0)
                 .wear(0.01)
                 .behavior(sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
-                    domain: sim_core::ResearchDomain::Materials,
+                    domain: sim_core::ResearchDomain::new(sim_core::ResearchDomain::MATERIALS),
                     data_consumption_per_run: 5.0,
                     research_points_per_run: 10.0,
                     accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::ASSAY)],
@@ -838,7 +841,10 @@ mod tests {
             id: TechId("tech_materials_v2".to_string()),
             name: "Materials Research v2".to_string(),
             prereqs: vec![TechId("tech_materials_v1".to_string())],
-            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Materials, 200.0)]),
+            domain_requirements: HashMap::from([(
+                sim_core::ResearchDomain::new(sim_core::ResearchDomain::MATERIALS),
+                200.0,
+            )]),
             accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::ASSAY)],
             effects: vec![],
         });
@@ -901,7 +907,10 @@ mod tests {
             id: TechId("tech_ship_construction".to_string()),
             name: "Ship Construction".to_string(),
             prereqs: vec![],
-            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Manufacturing, 200.0)]),
+            domain_requirements: HashMap::from([(
+                sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),
+                200.0,
+            )]),
             accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
             effects: vec![],
         });
@@ -914,7 +923,7 @@ mod tests {
                 .power(12.0)
                 .wear(0.005)
                 .behavior(sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
-                    domain: sim_core::ResearchDomain::Manufacturing,
+                    domain: sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),
                     data_consumption_per_run: 10.0,
                     research_points_per_run: 5.0,
                     accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
@@ -982,7 +991,10 @@ mod tests {
             id: TechId("tech_basic".to_string()),
             name: "Basic".to_string(),
             prereqs: vec![],
-            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Manufacturing, 10.0)]),
+            domain_requirements: HashMap::from([(
+                sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),
+                10.0,
+            )]),
             accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
             effects: vec![],
         });
@@ -990,7 +1002,10 @@ mod tests {
             id: TechId("tech_advanced".to_string()),
             name: "Advanced".to_string(),
             prereqs: vec![TechId("tech_basic".to_string())],
-            domain_requirements: HashMap::from([(sim_core::ResearchDomain::Manufacturing, 50.0)]),
+            domain_requirements: HashMap::from([(
+                sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),
+                50.0,
+            )]),
             accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],
             effects: vec![],
         });
@@ -1003,7 +1018,7 @@ mod tests {
                 .power(12.0)
                 .wear(0.005)
                 .behavior(sim_core::ModuleBehaviorDef::Lab(sim_core::LabDef {
-                    domain: sim_core::ResearchDomain::Manufacturing,
+                    domain: sim_core::ResearchDomain::new(sim_core::ResearchDomain::MANUFACTURING),
                     data_consumption_per_run: 10.0,
                     research_points_per_run: 5.0,
                     accepted_data: vec![sim_core::DataKind::new(sim_core::DataKind::MANUFACTURING)],

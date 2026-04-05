@@ -45,7 +45,10 @@ fn production_like_content() -> GameContent {
             id: TechId("tech_deep_scan_v1".to_string()),
             name: "Deep Scan v1".to_string(),
             prereqs: vec![],
-            domain_requirements: HashMap::from([(ResearchDomain::Survey, 100.0)]),
+            domain_requirements: HashMap::from([(
+                ResearchDomain::new(ResearchDomain::SURVEY),
+                100.0,
+            )]),
             accepted_data: vec![DataKind::new(DataKind::SURVEY)],
             effects: vec![
                 TechEffect::EnableDeepScan,
@@ -57,8 +60,8 @@ fn production_like_content() -> GameContent {
             name: "Advanced Refining".to_string(),
             prereqs: vec![],
             domain_requirements: HashMap::from([
-                (ResearchDomain::Materials, 150.0),
-                (ResearchDomain::Manufacturing, 50.0),
+                (ResearchDomain::new(ResearchDomain::MATERIALS), 150.0),
+                (ResearchDomain::new(ResearchDomain::MANUFACTURING), 50.0),
             ]),
             accepted_data: vec![
                 DataKind::new(DataKind::ASSAY),
@@ -70,7 +73,10 @@ fn production_like_content() -> GameContent {
             id: TechId("tech_ship_construction".to_string()),
             name: "Ship Construction".to_string(),
             prereqs: vec![],
-            domain_requirements: HashMap::from([(ResearchDomain::Manufacturing, 50.0)]),
+            domain_requirements: HashMap::from([(
+                ResearchDomain::new(ResearchDomain::MANUFACTURING),
+                50.0,
+            )]),
             accepted_data: vec![
                 DataKind::new(DataKind::MANUFACTURING),
                 DataKind::new(DataKind::ASSAY),
@@ -108,7 +114,7 @@ fn production_like_content() -> GameContent {
             .volume(7.0)
             .power(10.0)
             .behavior(ModuleBehaviorDef::Lab(LabDef {
-                domain: ResearchDomain::Survey,
+                domain: ResearchDomain::new(ResearchDomain::SURVEY),
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
                 accepted_data: vec![DataKind::new(DataKind::SURVEY)],
@@ -127,7 +133,7 @@ fn production_like_content() -> GameContent {
             .volume(8.0)
             .power(12.0)
             .behavior(ModuleBehaviorDef::Lab(LabDef {
-                domain: ResearchDomain::Materials,
+                domain: ResearchDomain::new(ResearchDomain::MATERIALS),
                 data_consumption_per_run: 10.0,
                 research_points_per_run: 5.0,
                 accepted_data: vec![
@@ -149,7 +155,7 @@ fn production_like_content() -> GameContent {
             .volume(8.0)
             .power(12.0)
             .behavior(ModuleBehaviorDef::Lab(LabDef {
-                domain: ResearchDomain::Manufacturing,
+                domain: ResearchDomain::new(ResearchDomain::MANUFACTURING),
                 data_consumption_per_run: 10.0,
                 research_points_per_run: 5.0,
                 accepted_data: vec![DataKind::new(DataKind::MANUFACTURING)],

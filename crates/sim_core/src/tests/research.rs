@@ -41,8 +41,10 @@ fn test_research_unlocks_when_requirements_met_via_tick() {
 #[test]
 fn test_research_no_unlock_when_requirements_unmet() {
     let mut content = test_content();
-    content.techs[0].domain_requirements =
-        std::collections::HashMap::from([(ResearchDomain::Survey, 1_000_000.0)]);
+    content.techs[0].domain_requirements = std::collections::HashMap::from([(
+        ResearchDomain::new(ResearchDomain::SURVEY),
+        1_000_000.0,
+    )]);
 
     let mut state = test_state(&content);
     let mut rng = make_rng();

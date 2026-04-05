@@ -200,12 +200,29 @@ impl DataKind {
     pub const RADIO: &str = "RadioData";
 }
 
+/// Data-driven research domain. Values come from content JSON (lab defs, tech requirements).
+/// Adding a new research domain = adding a JSON entry, not a code change.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ResearchDomain {
-    Survey,
-    Materials,
-    Manufacturing,
-    Propulsion,
+pub struct ResearchDomain(pub String);
+
+impl ResearchDomain {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+}
+
+impl std::fmt::Display for ResearchDomain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// Well-known research domain constants.
+impl ResearchDomain {
+    pub const SURVEY: &str = "Survey";
+    pub const MATERIALS: &str = "Materials";
+    pub const MANUFACTURING: &str = "Manufacturing";
+    pub const PROPULSION: &str = "Propulsion";
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

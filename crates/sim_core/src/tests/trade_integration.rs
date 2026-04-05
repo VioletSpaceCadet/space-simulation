@@ -13,7 +13,10 @@ fn economy_content() -> GameContent {
         id: TechId("tech_ship_construction".to_string()),
         name: "Ship Construction".to_string(),
         prereqs: vec![],
-        domain_requirements: HashMap::from([(ResearchDomain::Manufacturing, 1_000_000.0)]),
+        domain_requirements: HashMap::from([(
+            ResearchDomain::new(ResearchDomain::MANUFACTURING),
+            1_000_000.0,
+        )]),
         accepted_data: vec![],
         effects: vec![TechEffect::EnableShipConstruction],
     });

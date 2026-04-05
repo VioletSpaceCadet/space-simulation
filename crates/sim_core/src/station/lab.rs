@@ -151,7 +151,7 @@ mod tests {
                 .power(10.0)
                 .wear(0.005)
                 .behavior(ModuleBehaviorDef::Lab(LabDef {
-                    domain: ResearchDomain::Survey,
+                    domain: ResearchDomain::new(ResearchDomain::SURVEY),
                     data_consumption_per_run: 8.0,
                     research_points_per_run: 4.0,
                     accepted_data: vec![DataKind::new(DataKind::SURVEY)],
@@ -267,7 +267,7 @@ mod tests {
         // Should have produced 4.0 points in Exploration domain
         let tech_id = TechId("tech_deep_scan_v1".to_string());
         let progress = state.research.evidence.get(&tech_id).unwrap();
-        let points = progress.points[&ResearchDomain::Survey];
+        let points = progress.points[&ResearchDomain::new(ResearchDomain::SURVEY)];
         assert!(
             (points - 4.0).abs() < 1e-3,
             "expected 4.0 points, got {points}"
@@ -335,7 +335,7 @@ mod tests {
         // Should have produced 2.0 points (4.0 * 0.5 ratio)
         let tech_id = TechId("tech_deep_scan_v1".to_string());
         let progress = state.research.evidence.get(&tech_id).unwrap();
-        let points = progress.points[&ResearchDomain::Survey];
+        let points = progress.points[&ResearchDomain::new(ResearchDomain::SURVEY)];
         assert!(
             (points - 2.0).abs() < 1e-3,
             "expected 2.0 points, got {points}"

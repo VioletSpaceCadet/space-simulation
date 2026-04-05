@@ -174,13 +174,14 @@ mod research_threshold_tests {
     #[test]
     fn unlocks_when_all_domain_requirements_met() {
         let mut content = base_content();
-        content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Survey, 100.0)]);
+        content.techs[0].domain_requirements =
+            HashMap::from([(ResearchDomain::new(ResearchDomain::SURVEY), 100.0)]);
 
         let mut state = test_state_at_tick(1);
         state.research.evidence.insert(
             TechId("tech_deep_scan_v1".to_string()),
             DomainProgress {
-                points: HashMap::from([(ResearchDomain::Survey, 100.0)]),
+                points: HashMap::from([(ResearchDomain::new(ResearchDomain::SURVEY), 100.0)]),
             },
         );
 
@@ -206,14 +207,15 @@ mod research_threshold_tests {
     #[test]
     fn does_not_unlock_when_requirements_not_met() {
         let mut content = base_content();
-        content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Survey, 100.0)]);
+        content.techs[0].domain_requirements =
+            HashMap::from([(ResearchDomain::new(ResearchDomain::SURVEY), 100.0)]);
 
         let mut state = test_state_at_tick(1);
         // Only 99 points — not enough
         state.research.evidence.insert(
             TechId("tech_deep_scan_v1".to_string()),
             DomainProgress {
-                points: HashMap::from([(ResearchDomain::Survey, 99.0)]),
+                points: HashMap::from([(ResearchDomain::new(ResearchDomain::SURVEY), 99.0)]),
             },
         );
 
@@ -232,7 +234,8 @@ mod research_threshold_tests {
     #[test]
     fn zero_progress_means_no_unlock() {
         let mut content = base_content();
-        content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Survey, 100.0)]);
+        content.techs[0].domain_requirements =
+            HashMap::from([(ResearchDomain::new(ResearchDomain::SURVEY), 100.0)]);
 
         let mut state = test_state_at_tick(1);
         // No evidence at all
@@ -253,8 +256,8 @@ mod research_threshold_tests {
     fn multi_domain_requires_all_met() {
         let mut content = base_content();
         content.techs[0].domain_requirements = HashMap::from([
-            (ResearchDomain::Survey, 50.0),
-            (ResearchDomain::Materials, 50.0),
+            (ResearchDomain::new(ResearchDomain::SURVEY), 50.0),
+            (ResearchDomain::new(ResearchDomain::MATERIALS), 50.0),
         ]);
 
         let mut state = test_state_at_tick(1);
@@ -263,8 +266,8 @@ mod research_threshold_tests {
             TechId("tech_deep_scan_v1".to_string()),
             DomainProgress {
                 points: HashMap::from([
-                    (ResearchDomain::Survey, 100.0),
-                    (ResearchDomain::Materials, 10.0),
+                    (ResearchDomain::new(ResearchDomain::SURVEY), 100.0),
+                    (ResearchDomain::new(ResearchDomain::MATERIALS), 10.0),
                 ]),
             },
         );

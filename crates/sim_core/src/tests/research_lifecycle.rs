@@ -19,7 +19,7 @@ fn full_research_lifecycle() {
             .volume(7.0)
             .power(10.0)
             .behavior(ModuleBehaviorDef::Lab(LabDef {
-                domain: ResearchDomain::Survey,
+                domain: ResearchDomain::new(ResearchDomain::SURVEY),
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
                 accepted_data: vec![DataKind::new(DataKind::SURVEY)],
@@ -30,7 +30,8 @@ fn full_research_lifecycle() {
     );
 
     // Make tech require Survey domain — low threshold for test
-    content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Survey, 10.0)]);
+    content.techs[0].domain_requirements =
+        HashMap::from([(ResearchDomain::new(ResearchDomain::SURVEY), 10.0)]);
 
     let mut state = base_state(&content);
     let station_id = StationId("station_earth_orbit".to_string());
@@ -95,7 +96,7 @@ fn research_lifecycle_no_data_means_no_unlock() {
             .volume(7.0)
             .power(10.0)
             .behavior(ModuleBehaviorDef::Lab(LabDef {
-                domain: ResearchDomain::Survey,
+                domain: ResearchDomain::new(ResearchDomain::SURVEY),
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
                 accepted_data: vec![DataKind::new(DataKind::SURVEY)],
@@ -105,7 +106,8 @@ fn research_lifecycle_no_data_means_no_unlock() {
             .build(),
     );
 
-    content.techs[0].domain_requirements = HashMap::from([(ResearchDomain::Survey, 100.0)]);
+    content.techs[0].domain_requirements =
+        HashMap::from([(ResearchDomain::new(ResearchDomain::SURVEY), 100.0)]);
 
     let mut state = base_state(&content);
     let station_id = StationId("station_earth_orbit".to_string());

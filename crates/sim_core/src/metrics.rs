@@ -1480,13 +1480,13 @@ mod tests {
         state.research.evidence.insert(
             TechId("tech_c".to_string()),
             DomainProgress {
-                points: HashMap::from([(ResearchDomain::Survey, 15.0)]),
+                points: HashMap::from([(ResearchDomain::new(ResearchDomain::SURVEY), 15.0)]),
             },
         );
         state.research.evidence.insert(
             TechId("tech_d".to_string()),
             DomainProgress {
-                points: HashMap::from([(ResearchDomain::Materials, 30.0)]),
+                points: HashMap::from([(ResearchDomain::new(ResearchDomain::MATERIALS), 30.0)]),
             },
         );
 

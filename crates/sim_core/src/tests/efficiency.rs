@@ -113,7 +113,7 @@ fn lab_research_speed_scales_with_efficiency() {
             .power(10.0)
             .wear(0.005)
             .behavior(ModuleBehaviorDef::Lab(LabDef {
-                domain: ResearchDomain::Survey,
+                domain: ResearchDomain::new(ResearchDomain::SURVEY),
                 data_consumption_per_run: 8.0,
                 research_points_per_run: 4.0,
                 accepted_data: vec![DataKind::new(DataKind::SURVEY)],
@@ -158,7 +158,7 @@ fn lab_research_speed_scales_with_efficiency() {
         .research
         .evidence
         .get(&tech_id)
-        .and_then(|p| p.points.get(&ResearchDomain::Survey))
+        .and_then(|p| p.points.get(&ResearchDomain::new(ResearchDomain::SURVEY)))
         .copied()
         .unwrap_or(0.0);
 
