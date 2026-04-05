@@ -4,17 +4,20 @@ use crate::{
 };
 use std::collections::HashMap;
 
-/// Count enabled labs per research domain across all stations.
+/// Count enabled labs per research domain across all stations and ground facilities.
 ///
 /// Used for lab diminishing returns: Nth lab of a domain produces
-/// `base * factor^(N-1)`. Counts all enabled lab modules across the sim.
+/// `base * factor^(N-1)`. Counts enabled lab modules across the entire sim
+/// (both orbital stations and ground facilities) so DR is symmetric.
 pub(crate) fn count_labs_per_domain(
     state: &GameState,
     content: &GameContent,
 ) -> HashMap<ResearchDomain, u32> {
     let mut counts: HashMap<ResearchDomain, u32> = HashMap::new();
-    for station in state.stations.values() {
-        for module in &station.core.modules {
+    let station_cores = state.stations.values().map(|s| &s.core);
+    let facility_cores = state.ground_facilities.values().map(|g| &g.core);
+    for core in station_cores.chain(facility_cores) {
+        for module in &core.modules {
             if !module.enabled {
                 continue;
             }
@@ -138,8 +141,7 @@ fn execute(
         .techs
         .iter()
         .find(|t| t.id == tech_id)
-        .map(|t| t.tier)
-        .unwrap_or(1);
+        .map_or(1, |t| t.tier);
     let tier_scaling = content
         .constants
         .research_tier_scaling
@@ -604,6 +606,73 @@ mod tests {
         assert!(
             (points - 2.0).abs() < 1e-3,
             "expected 2.0 (0.5x DR), got {points}"
+        );
+    }
+
+    #[test]
+    fn pacing_lab_dr_counts_labs_across_ground_facilities() {
+        // Verify that lab DR counts both station labs and ground facility labs symmetrically.
+        let mut content = lab_content();
+        content.constants.research_lab_diminishing_returns = 0.5;
+        let mut state = lab_state(&content);
+        state
+            .research
+            .data_pool
+            .insert(DataKind::new(DataKind::SURVEY), 100.0);
+
+        // Add a ground facility with a Survey lab module. The station still has
+        // its Survey lab, so total Survey lab count across the sim = 2.
+        let gf_id = GroundFacilityId("gf_test".to_string());
+        let gf = GroundFacilityState {
+            id: gf_id.clone(),
+            name: "Test GF".to_string(),
+            position: crate::test_fixtures::test_position(),
+            core: FacilityCore {
+                inventory: vec![],
+                cargo_capacity_m3: 100.0,
+                power_available_per_tick: 100.0,
+                modules: vec![ModuleState {
+                    id: ModuleInstanceId("gf_lab_0001".to_string()),
+                    def_id: "module_exploration_lab".to_string(),
+                    enabled: true,
+                    kind_state: ModuleKindState::Lab(LabState {
+                        ticks_since_last_run: 0,
+                        assigned_tech: None,
+                        starved: false,
+                    }),
+                    wear: WearState::default(),
+                    power_stalled: false,
+                    module_priority: 0,
+                    assigned_crew: Default::default(),
+                    efficiency: 1.0,
+                    prev_crew_satisfied: true,
+                    thermal: None,
+                }],
+                modifiers: crate::modifiers::ModifierSet::default(),
+                crew: Default::default(),
+                thermal_links: Vec::new(),
+                power: PowerState::default(),
+                cached_inventory_volume_m3: None,
+                module_type_index: crate::ModuleTypeIndex::default(),
+                module_id_index: HashMap::new(),
+                power_budget_cache: crate::PowerBudgetCache::default(),
+            },
+            launch_transits: Vec::new(),
+        };
+        state.ground_facilities.insert(gf_id, gf);
+
+        let mut events = Vec::new();
+        let station_id = StationId("station_test".to_string());
+        super::tick_lab_modules(&mut state, &station_id, &content, &mut events);
+
+        // With 2 labs of Survey domain (1 station + 1 GF), DR = 0.5^1 = 0.5
+        // Expected: 4.0 * 0.5 = 2.0
+        let tech_id = TechId("tech_deep_scan_v1".to_string());
+        let points =
+            state.research.evidence[&tech_id].points[&ResearchDomain::new(ResearchDomain::SURVEY)];
+        assert!(
+            (points - 2.0).abs() < 1e-3,
+            "expected 2.0 (DR counts GF labs), got {points}"
         );
     }
 
