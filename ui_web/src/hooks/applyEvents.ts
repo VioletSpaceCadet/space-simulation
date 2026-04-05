@@ -937,6 +937,11 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   PayloadLaunched: noOp,
   PayloadDelivered: noOp,
   StationDeployed: noOp,
+  // StrategyConfigChanged carries no payload. Clients that care about the
+  // new config refetch it from GET /api/v1/strategy — keeping the SSE
+  // stream small. The FE does not yet render strategy state so this is
+  // a genuine no-op for now.
+  StrategyConfigChanged: noOp,
 };
 
 export function applyEvents(

@@ -142,4 +142,10 @@ pub enum Command {
         /// Matches `SatelliteDef.id` and `ComponentId` of the satellite product.
         satellite_def_id: String,
     },
+    /// Replace `GameState.strategy_config` with a new `StrategyConfig`. Full
+    /// replacement semantics (not merge). Applied at a tick boundary via the
+    /// command queue so runtime strategy changes remain deterministic.
+    SetStrategyConfig {
+        config: crate::StrategyConfig,
+    },
 }

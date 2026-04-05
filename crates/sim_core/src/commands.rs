@@ -2608,4 +2608,75 @@ mod tests {
         // Fe 1500 + Ore 500 + Component 0 = 2000
         assert!((crate::tasks::inventory_mass_kg(&inventory) - 2000.0).abs() < 0.01);
     }
+
+    // VIO-483: Command::SetStrategyConfig — full replacement semantics via tick().
+    #[test]
+    fn set_strategy_config_command_replaces_state_and_emits_event() {
+        use crate::{
+            Command, CommandEnvelope, CommandId, PrincipalId, StrategyConfig, StrategyMode,
+        };
+        use rand::SeedableRng;
+
+        let content = crate::test_fixtures::base_content();
+        let mut state = crate::test_fixtures::base_state(&content);
+        assert_eq!(state.strategy_config.mode, StrategyMode::Balanced);
+
+        let new_config = StrategyConfig {
+            mode: StrategyMode::Expand,
+            fleet_size_target: 9,
+            ..StrategyConfig::default()
+        };
+        let envelope = CommandEnvelope {
+            id: CommandId(1),
+            issued_by: PrincipalId("principal_player".to_string()),
+            issued_tick: 0,
+            execute_at_tick: 0,
+            command: Command::SetStrategyConfig {
+                config: new_config.clone(),
+            },
+        };
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let events = crate::tick(&mut state, &[envelope], &content, &mut rng, None);
+
+        assert_eq!(state.strategy_config.mode, StrategyMode::Expand);
+        assert_eq!(state.strategy_config.fleet_size_target, 9);
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e.event, crate::Event::StrategyConfigChanged)),
+            "expected StrategyConfigChanged event to be emitted",
+        );
+    }
+
+    #[test]
+    fn set_strategy_config_command_is_full_replacement_not_merge() {
+        // Starting from a config with one overridden threshold, applying
+        // SetStrategyConfig with default values should reset that threshold
+        // — proving replacement semantics, not merge.
+        use crate::{Command, CommandEnvelope, CommandId, PrincipalId, StrategyConfig};
+        use rand::SeedableRng;
+
+        let content = crate::test_fixtures::base_content();
+        let mut state = crate::test_fixtures::base_state(&content);
+        state.strategy_config.volatile_threshold_kg = 9999.0;
+
+        let fresh = StrategyConfig::default();
+        let envelope = CommandEnvelope {
+            id: CommandId(2),
+            issued_by: PrincipalId("principal_player".to_string()),
+            issued_tick: 0,
+            execute_at_tick: 0,
+            command: Command::SetStrategyConfig {
+                config: fresh.clone(),
+            },
+        };
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let _ = crate::tick(&mut state, &[envelope], &content, &mut rng, None);
+
+        assert!(
+            (state.strategy_config.volatile_threshold_kg - fresh.volatile_threshold_kg).abs()
+                < f32::EPSILON,
+            "volatile_threshold_kg should be reset to the default from the new config",
+        );
+    }
 }

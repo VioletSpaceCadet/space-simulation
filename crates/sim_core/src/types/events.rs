@@ -441,4 +441,9 @@ pub enum Event {
         station_id: StationId,
         position: Position,
     },
+    /// Emitted when `Command::SetStrategyConfig` replaces the live
+    /// `GameState.strategy_config`. Carries no payload: consumers refetch
+    /// the full config from `GET /api/v1/strategy` if they need it, keeping
+    /// the SSE stream small.
+    StrategyConfigChanged,
 }

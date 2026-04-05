@@ -56,6 +56,10 @@ pub fn make_router_with_cors(state: AppState, cors_origin: &str) -> anyhow::Resu
         .route("/api/v1/perf", get(perf_handler))
         .route("/api/v1/score", get(score_handler))
         .route("/api/v1/speed", post(speed_handler))
+        .route(
+            "/api/v1/strategy",
+            get(strategy_get_handler).post(strategy_post_handler),
+        )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state))
@@ -339,6 +343,47 @@ pub async fn pricing_handler(State(app_state): State<AppState>) -> Json<sim_core
     Json(sim.content.pricing.clone())
 }
 
+/// Return the currently active `StrategyConfig` from `GameState`. Used by
+/// the MCP advisor (VIO-484) and any UI/automation client tuning strategy.
+pub async fn strategy_get_handler(
+    State(app_state): State<AppState>,
+) -> Json<sim_core::StrategyConfig> {
+    let sim = app_state.sim.lock();
+    Json(sim.game_state.strategy_config.clone())
+}
+
+/// Queue a `SetStrategyConfig` command with a fresh `StrategyConfig`. The
+/// command is applied at the next tick boundary (same deterministic
+/// lifecycle as every other command), so repeated POSTs within a single
+/// tick coalesce to the last one.
+pub async fn strategy_post_handler(
+    State(app_state): State<AppState>,
+    Json(config): Json<sim_core::StrategyConfig>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let (command_id, tick) = {
+        let mut sim = app_state.sim.lock();
+        let id_num = sim.next_command_id;
+        sim.next_command_id += 1;
+        let tick = sim.game_state.meta.tick;
+        (CommandId(id_num), tick)
+    };
+
+    let envelope = CommandEnvelope {
+        id: command_id,
+        issued_by: PrincipalId("principal_player".to_string()),
+        issued_tick: tick,
+        execute_at_tick: tick,
+        command: sim_core::Command::SetStrategyConfig { config },
+    };
+
+    app_state.command_queue.lock().push(envelope);
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"command_id": command_id.0})),
+    )
+}
+
 #[derive(serde::Serialize)]
 struct SolarSystemConfig {
     bodies: Vec<OrbitalBodyDef>,
@@ -574,6 +619,40 @@ mod tests {
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("Invalid CORS origin"), "got: {err_msg}");
+    }
+
+    #[tokio::test]
+    async fn get_strategy_returns_current_config() {
+        let state = test_app_state();
+        let expected_mode = {
+            let sim = state.sim.lock();
+            sim.game_state.strategy_config.mode
+        };
+        let Json(config) = strategy_get_handler(State(state)).await;
+        assert_eq!(config.mode, expected_mode);
+    }
+
+    #[tokio::test]
+    async fn post_strategy_enqueues_set_strategy_config_command() {
+        let state = test_app_state();
+        let mut new_config = sim_core::StrategyConfig::default();
+        new_config.mode = sim_core::StrategyMode::Expand;
+        new_config.fleet_size_target = 9;
+
+        let (status, Json(_body)) =
+            strategy_post_handler(State(state.clone()), Json(new_config.clone())).await;
+        assert_eq!(status, StatusCode::OK);
+
+        let queue = state.command_queue.lock();
+        assert_eq!(queue.len(), 1, "command should be enqueued");
+        let envelope = &queue[0];
+        match &envelope.command {
+            sim_core::Command::SetStrategyConfig { config } => {
+                assert_eq!(config.mode, sim_core::StrategyMode::Expand);
+                assert_eq!(config.fleet_size_target, 9);
+            }
+            other => panic!("expected SetStrategyConfig, got {other:?}"),
+        }
     }
 }
 
