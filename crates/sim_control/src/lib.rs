@@ -137,6 +137,7 @@ impl CommandSource for AutopilotController {
         }
 
         // 4. Station agents assign objectives to idle ships (AD1).
+        // Deduplication is per-station; multi-station needs strategic layer.
         for station_agent in station_agents.values() {
             station_agent.assign_ship_objectives(
                 ship_agents,

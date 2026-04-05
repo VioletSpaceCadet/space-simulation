@@ -608,6 +608,119 @@ pub(crate) fn handle_ground_export(
     true
 }
 
+/// Install a module from ground facility inventory into the facility's active modules.
+pub(crate) fn handle_ground_install_module(
+    state: &mut GameState,
+    content: &GameContent,
+    gf_id: &crate::GroundFacilityId,
+    module_item_id: &crate::ModuleItemId,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
+        return false;
+    };
+    let item_pos = gf.core.inventory.iter().position(
+        |i| matches!(i, InventoryItem::Module { item_id, .. } if item_id == module_item_id),
+    );
+    let Some(pos) = item_pos else { return false };
+    let InventoryItem::Module {
+        item_id,
+        module_def_id,
+    } = gf.core.inventory.remove(pos)
+    else {
+        return false;
+    };
+    gf.core.invalidate_volume_cache();
+
+    let Some(def) = content.module_defs.get(&module_def_id) else {
+        return false;
+    };
+    if let Some(ref tech_id) = def.required_tech {
+        if !state.research.unlocked.contains(tech_id) {
+            let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
+                return false;
+            };
+            gf.core.inventory.push(InventoryItem::Module {
+                item_id,
+                module_def_id,
+            });
+            gf.core.invalidate_volume_cache();
+            return false;
+        }
+    }
+
+    let module_id_str = format!("module_inst_{:04}", state.counters.next_module_instance_id);
+    state.counters.next_module_instance_id += 1;
+    let module_id = crate::ModuleInstanceId(module_id_str);
+    let (kind_state, behavior_type, thermal) = default_module_state(def, content);
+
+    let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
+        return false;
+    };
+    gf.core.modules.push(crate::ModuleState {
+        id: module_id.clone(),
+        def_id: module_def_id.clone(),
+        enabled: false,
+        kind_state,
+        wear: crate::WearState::default(),
+        thermal,
+        power_stalled: false,
+        module_priority: 0,
+        assigned_crew: std::collections::BTreeMap::new(),
+        efficiency: if def.crew_requirement.is_empty() {
+            1.0
+        } else {
+            0.0
+        },
+        prev_crew_satisfied: def.crew_requirement.is_empty(),
+    });
+    gf.core.rebuild_module_index(content);
+    gf.core.invalidate_power_cache();
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::ModuleInstalled {
+            station_id: crate::StationId(gf_id.0.clone()),
+            module_id,
+            module_item_id: item_id,
+            module_def_id,
+            behavior_type,
+        },
+    ));
+    true
+}
+
+/// Toggle the enabled flag on a ground facility module.
+pub(crate) fn handle_ground_set_module_enabled(
+    state: &mut GameState,
+    gf_id: &crate::GroundFacilityId,
+    module_id: &crate::ModuleInstanceId,
+    enabled: bool,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    let Some(gf) = state.ground_facilities.get_mut(gf_id) else {
+        return false;
+    };
+    let Some(module) = gf.core.modules.iter_mut().find(|m| &m.id == module_id) else {
+        return false;
+    };
+    module.enabled = enabled;
+    gf.core.invalidate_power_cache();
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::ModuleToggled {
+            station_id: crate::StationId(gf_id.0.clone()),
+            module_id: module_id.clone(),
+            enabled,
+        },
+    ));
+    true
+}
+
 /// Jettison all slag from a station's inventory.
 pub(crate) fn handle_jettison_slag(
     state: &mut GameState,

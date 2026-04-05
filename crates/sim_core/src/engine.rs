@@ -174,19 +174,28 @@ fn apply_commands(
             Command::InstallModule {
                 facility_id,
                 module_item_id,
-            } => {
-                let crate::FacilityId::Station(station_id) = facility_id else {
-                    continue; // Ground facility install not yet implemented
-                };
-                commands::handle_install_module(
-                    state,
-                    content,
-                    station_id,
-                    module_item_id,
-                    current_tick,
-                    events,
-                );
-            }
+            } => match facility_id {
+                crate::FacilityId::Station(station_id) => {
+                    commands::handle_install_module(
+                        state,
+                        content,
+                        station_id,
+                        module_item_id,
+                        current_tick,
+                        events,
+                    );
+                }
+                crate::FacilityId::Ground(gf_id) => {
+                    commands::handle_ground_install_module(
+                        state,
+                        content,
+                        gf_id,
+                        module_item_id,
+                        current_tick,
+                        events,
+                    );
+                }
+            },
             Command::UninstallModule {
                 facility_id,
                 module_id,
@@ -207,19 +216,28 @@ fn apply_commands(
                 facility_id,
                 module_id,
                 enabled,
-            } => {
-                let crate::FacilityId::Station(station_id) = facility_id else {
-                    continue;
-                };
-                commands::handle_set_module_enabled(
-                    state,
-                    station_id,
-                    module_id,
-                    *enabled,
-                    current_tick,
-                    events,
-                );
-            }
+            } => match facility_id {
+                crate::FacilityId::Station(station_id) => {
+                    commands::handle_set_module_enabled(
+                        state,
+                        station_id,
+                        module_id,
+                        *enabled,
+                        current_tick,
+                        events,
+                    );
+                }
+                crate::FacilityId::Ground(gf_id) => {
+                    commands::handle_ground_set_module_enabled(
+                        state,
+                        gf_id,
+                        module_id,
+                        *enabled,
+                        current_tick,
+                        events,
+                    );
+                }
+            },
             Command::SetModuleThreshold {
                 facility_id,
                 module_id,
