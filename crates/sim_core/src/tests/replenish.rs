@@ -146,6 +146,7 @@ fn replenish_test_content() -> GameContent {
         fitting_templates: std::collections::BTreeMap::new(),
         initial_station: crate::InitialStationDef::default(),
         autopilot: crate::AutopilotConfig::default(),
+        default_strategy: crate::StrategyConfig::default(),
         crew_roles: std::collections::BTreeMap::new(),
         scoring: Default::default(),
         milestones: Vec::new(),
@@ -218,6 +219,7 @@ fn empty_sites_state(content: &GameContent) -> GameState {
         events: crate::sim_events::SimEventState::default(),
         propellant_consumed_total: 0.0,
         progression: Default::default(),
+        strategy_config: Default::default(),
         body_cache: AHashMap::default(),
     }
 }

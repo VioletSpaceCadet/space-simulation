@@ -319,6 +319,10 @@ pub struct GameContent {
     /// Autopilot behavior configuration from `content/autopilot.json`.
     #[serde(default)]
     pub autopilot: AutopilotConfig,
+    /// Default strategy configuration from `content/strategy.json`. Used by
+    /// `build_initial_state()` to seed `GameState.strategy_config`.
+    #[serde(default)]
+    pub default_strategy: crate::StrategyConfig,
     /// Crew role definitions loaded from `content/crew_roles.json`.
     #[serde(default)]
     pub crew_roles: BTreeMap<CrewRole, CrewRoleDef>,
