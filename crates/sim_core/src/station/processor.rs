@@ -1922,6 +1922,7 @@ mod tests {
             name: "Iron Ingot".to_string(),
             mass_kg: 10.0,
             volume_m3: 0.5,
+            deploys_frame: None,
         });
         let recipe = crate::RecipeDef {
             id: RecipeId("recipe_ore_to_ingot".to_string()),

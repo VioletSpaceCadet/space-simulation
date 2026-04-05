@@ -1302,6 +1302,7 @@ mod tests {
             name: "Thruster".to_string(),
             mass_kg: 200.0,
             volume_m3: 2.0,
+            deploys_frame: None,
         });
 
         // Set up pricing for thruster
@@ -1534,6 +1535,7 @@ mod tests {
             name: "Repair Kit".to_string(),
             mass_kg: 50.0,
             volume_m3: 0.05,
+            deploys_frame: None,
         });
 
         let mut state = autopilot_state(&content);

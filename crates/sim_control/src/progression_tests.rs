@@ -297,6 +297,7 @@ fn production_like_content() -> GameContent {
         name: "Repair Kit".to_string(),
         mass_kg: 1.0,
         volume_m3: 0.1,
+        deploys_frame: None,
     }];
 
     content
@@ -617,6 +618,7 @@ fn ships_built_after_tech_unlock_and_trade_available() {
         name: "Thruster".to_string(),
         mass_kg: 50.0,
         volume_m3: 1.0,
+        deploys_frame: None,
     });
 
     // Add pricing so trade works

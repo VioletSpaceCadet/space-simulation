@@ -65,6 +65,7 @@ fn economy_content() -> GameContent {
         name: "Thruster".to_string(),
         mass_kg: 200.0,
         volume_m3: 0.5,
+        deploys_frame: None,
     }];
 
     // Add a hull def for the shipyard test

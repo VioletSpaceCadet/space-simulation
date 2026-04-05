@@ -244,6 +244,7 @@ fn assembler_content() -> GameContent {
         name: "Repair Kit".to_string(),
         mass_kg: 5.0,
         volume_m3: 0.01,
+        deploys_frame: None,
     }];
     content
 }

@@ -568,12 +568,14 @@ mod assembler_component_tests {
             name: "Thruster".to_string(),
             mass_kg: 50.0,
             volume_m3: 2.0,
+            deploys_frame: None,
         });
         content.component_defs.push(ComponentDef {
             id: "hull_plate".to_string(),
             name: "Hull Plate".to_string(),
             mass_kg: 200.0,
             volume_m3: 5.0,
+            deploys_frame: None,
         });
         // Assembler recipe: 100kg Fe + 4 thrusters => 1 hull_plate
         let hull_plate_recipe = RecipeDef {
@@ -971,6 +973,7 @@ mod assembler_component_tests {
             name: "Thruster".to_string(),
             mass_kg: 50.0,
             volume_m3: 2.0,
+            deploys_frame: None,
         });
         // Add a hull def for the shipyard test
         content.hulls.insert(
