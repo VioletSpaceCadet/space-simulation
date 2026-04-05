@@ -180,6 +180,7 @@ function handleModuleInstalled(state: SimState, event: EventPayload<'ModuleInsta
             enabled: false,
             kind_state: kindState,
             wear: { wear: 0 },
+            slot_index: event.slot_index,
           },
         ],
       },

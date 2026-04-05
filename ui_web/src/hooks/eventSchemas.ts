@@ -93,12 +93,21 @@ export const eventSchemas = {
     module_item_id: z.string(),
     module_def_id: z.string(),
     behavior_type: z.string(),
+    /** Frame slot this module occupies, if the station has a frame. */
+    slot_index: z.number().int().nonnegative().optional(),
   }),
 
   ModuleUninstalled: z.object({
     station_id: z.string(),
     module_id: z.string(),
     module_item_id: z.string(),
+  }),
+
+  /** Emitted when InstallModule fails on a framed station because no
+   *  compatible unoccupied slot is available. The module stays in inventory. */
+  ModuleNoCompatibleSlot: z.object({
+    station_id: z.string(),
+    module_def_id: z.string(),
   }),
 
   ModuleToggled: z.object({

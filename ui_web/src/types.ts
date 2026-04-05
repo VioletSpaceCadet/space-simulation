@@ -150,6 +150,9 @@ export interface ModuleState {
   module_priority?: number
   assigned_crew?: Record<string, number>
   efficiency?: number
+  /** Frame slot this module occupies (SF-05). None on frameless stations
+   *  and on ship-fitted modules. */
+  slot_index?: number
 }
 
 export interface Position {
@@ -197,6 +200,10 @@ export interface StationState {
   power: PowerState
   crew?: Record<string, number>
   leaders?: string[]
+  /** Station frame ID from the content catalog. Determines slot layout and
+   *  contributes frame bonuses via the modifier pipeline. Missing on legacy
+   *  frameless stations. */
+  frame_id?: string
 }
 
 export interface AsteroidKnowledge {
@@ -404,6 +411,19 @@ export interface HullDef {
   tags: string[]
 }
 
+/** Station frame definition (SF-01+). Determines slot layout and frame
+ *  bonuses. Mirrors the Rust `FrameDef` struct. */
+export interface FrameDef {
+  id: string
+  name: string
+  base_cargo_capacity_m3: number
+  base_power_capacity_kw: number
+  slots: SlotDef[]
+  bonuses: unknown[]
+  required_tech?: string
+  tags: string[]
+}
+
 export interface ContentResponse {
   techs: TechDef[]
   lab_rates: LabRateInfo[]
@@ -411,4 +431,7 @@ export interface ContentResponse {
   minutes_per_tick: number
   recipes: Record<string, RecipeDef>
   hulls: Record<string, HullDef>
+  /** Station frame catalog (SF-07). Empty when the content drop has no
+   *  `frame_defs.json`. */
+  frames: Record<string, FrameDef>
 }
