@@ -1,0 +1,14 @@
+{
+  "name": "strategy_consolidate",
+  "ticks": 20000,
+  "metrics_every": 500,
+  "seeds": { "range": [1, 20] },
+  "overrides": {
+    "strategy.mode": "Consolidate",
+    "strategy.fleet_size_target": 2,
+    "strategy.priorities.research": 0.95,
+    "strategy.priorities.maintenance": 0.9,
+    "strategy.priorities.propellant": 0.95,
+    "strategy.priorities.fleet_expansion": 0.3
+  }
+}

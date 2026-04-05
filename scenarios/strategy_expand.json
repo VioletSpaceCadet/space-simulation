@@ -1,0 +1,14 @@
+{
+  "name": "strategy_expand",
+  "ticks": 20000,
+  "metrics_every": 500,
+  "seeds": { "range": [1, 20] },
+  "overrides": {
+    "strategy.mode": "Expand",
+    "strategy.fleet_size_target": 8,
+    "strategy.priorities.mining": 0.9,
+    "strategy.priorities.fleet_expansion": 0.9,
+    "strategy.priorities.export": 0.7,
+    "strategy.priorities.research": 0.4
+  }
+}
