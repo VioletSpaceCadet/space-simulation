@@ -1923,6 +1923,8 @@ mod tests {
             mass_kg: 10.0,
             volume_m3: 0.5,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         });
         let recipe = crate::RecipeDef {
             id: RecipeId("recipe_ore_to_ingot".to_string()),

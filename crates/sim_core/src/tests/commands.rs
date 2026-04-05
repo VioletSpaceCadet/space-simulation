@@ -582,13 +582,23 @@ fn deploy_station_setup() -> (crate::GameContent, crate::GameState, crate::ShipI
             tags: vec![],
         },
     );
-    // Register the kit component.
+    // Register the kit component with seed supplies (VIO-594).
     content.component_defs.push(crate::ComponentDef {
         id: "test_outpost_kit".to_string(),
         name: "Test Outpost Kit".to_string(),
         mass_kg: 5000.0,
         volume_m3: 30.0,
         deploys_frame: Some(frame_id.clone()),
+        deploys_seed_materials: vec![crate::InitialMaterial {
+            element: "Fe".to_string(),
+            kg: 1500.0,
+            quality: 1.0,
+        }],
+        deploys_seed_components: vec![crate::InitialComponent {
+            id: "repair_kit".to_string(),
+            count: 5,
+            quality: 1.0,
+        }],
     });
 
     let mut state = test_state(&content);
@@ -771,4 +781,67 @@ fn deploy_station_transits_first_when_not_co_located() {
         }
         other => panic!("expected Transit task, got {other:?}"),
     }
+}
+
+#[test]
+fn deploy_station_seeds_new_station_inventory_from_kit_def() {
+    // VIO-594: a freshly deployed station should come online with the
+    // kit's seed materials + seed components sitting in its inventory.
+    let (content, mut state, ship_id) = deploy_station_setup();
+    let mut rng = make_rng();
+
+    let target = state.ships[&ship_id].position.clone();
+    let cmd = CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("principal_autopilot".to_string()),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::DeployStation {
+            ship_id: ship_id.clone(),
+            kit_item_index: 0,
+            target_position: target,
+        },
+    };
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+    // Advance past assembly (kit mass 5000 / 300 = 16 clamped to 48).
+    for _ in 0..60 {
+        tick(&mut state, &[], &content, &mut rng, None);
+    }
+
+    let deployed = state
+        .stations
+        .values()
+        .find(|s| s.frame_id.as_ref() == Some(&crate::FrameId("frame_test_outpost".to_string())))
+        .expect("deployed station should exist");
+
+    // Fe material (1500 kg) from the seed materials list.
+    let fe_material = deployed
+        .core
+        .inventory
+        .iter()
+        .find_map(|i| match i {
+            InventoryItem::Material { element, kg, .. } if element == "Fe" => Some(*kg),
+            _ => None,
+        })
+        .expect("seed Fe material should be present");
+    assert!(
+        (fe_material - 1500.0).abs() < f32::EPSILON,
+        "expected 1500 kg Fe seed, got {fe_material}"
+    );
+
+    // Seed repair_kit components (5 of them).
+    let repair_kits = deployed
+        .core
+        .inventory
+        .iter()
+        .find_map(|i| match i {
+            InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } if component_id.0 == "repair_kit" => Some(*count),
+            _ => None,
+        })
+        .expect("seed repair_kit components should be present");
+    assert_eq!(repair_kits, 5, "expected 5 seed repair_kits");
 }

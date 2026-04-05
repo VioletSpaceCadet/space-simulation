@@ -78,6 +78,8 @@ fn ground_content() -> sim_core::GameContent {
         mass_kg: 150.0,
         volume_m3: 0.3,
         deploys_frame: None,
+        deploys_seed_materials: vec![],
+        deploys_seed_components: vec![],
     });
     content.component_defs.push(sim_core::ComponentDef {
         id: "guidance_unit".to_string(),
@@ -85,6 +87,8 @@ fn ground_content() -> sim_core::GameContent {
         mass_kg: 20.0,
         volume_m3: 0.05,
         deploys_frame: None,
+        deploys_seed_materials: vec![],
+        deploys_seed_components: vec![],
     });
 
     // Add launch pad module def for launch tests.
@@ -570,6 +574,8 @@ fn satellite_content() -> sim_core::GameContent {
         mass_kg: 800.0,
         volume_m3: 2.0,
         deploys_frame: None,
+        deploys_seed_materials: vec![],
+        deploys_seed_components: vec![],
     });
     content.component_defs.push(sim_core::ComponentDef {
         id: "sat_survey".to_string(),
@@ -577,6 +583,8 @@ fn satellite_content() -> sim_core::GameContent {
         mass_kg: 500.0,
         volume_m3: 1.5,
         deploys_frame: None,
+        deploys_seed_materials: vec![],
+        deploys_seed_components: vec![],
     });
 
     // Satellite config.

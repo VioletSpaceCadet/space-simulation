@@ -298,6 +298,8 @@ fn production_like_content() -> GameContent {
         mass_kg: 1.0,
         volume_m3: 0.1,
         deploys_frame: None,
+        deploys_seed_materials: vec![],
+        deploys_seed_components: vec![],
     }];
 
     content
@@ -619,6 +621,8 @@ fn ships_built_after_tech_unlock_and_trade_available() {
         mass_kg: 50.0,
         volume_m3: 1.0,
         deploys_frame: None,
+        deploys_seed_materials: vec![],
+        deploys_seed_components: vec![],
     });
 
     // Add pricing so trade works

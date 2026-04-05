@@ -1303,6 +1303,8 @@ mod tests {
             mass_kg: 200.0,
             volume_m3: 2.0,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         });
 
         // Set up pricing for thruster
@@ -1536,6 +1538,8 @@ mod tests {
             mass_kg: 50.0,
             volume_m3: 0.05,
             deploys_frame: None,
+            deploys_seed_materials: vec![],
+            deploys_seed_components: vec![],
         });
 
         let mut state = autopilot_state(&content);

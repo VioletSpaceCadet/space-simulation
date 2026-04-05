@@ -66,6 +66,8 @@ fn economy_content() -> GameContent {
         mass_kg: 200.0,
         volume_m3: 0.5,
         deploys_frame: None,
+        deploys_seed_materials: vec![],
+        deploys_seed_components: vec![],
     }];
 
     // Add a hull def for the shipyard test

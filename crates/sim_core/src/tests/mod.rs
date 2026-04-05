@@ -245,6 +245,8 @@ fn assembler_content() -> GameContent {
         mass_kg: 5.0,
         volume_m3: 0.01,
         deploys_frame: None,
+        deploys_seed_materials: vec![],
+        deploys_seed_components: vec![],
     }];
     content
 }

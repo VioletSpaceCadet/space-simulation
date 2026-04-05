@@ -425,6 +425,17 @@ pub struct ComponentDef {
     /// (plates, thrusters, repair kits, rocket grains, etc.).
     #[serde(default)]
     pub deploys_frame: Option<FrameId>,
+    /// Starting materials seeded into the new station's inventory when
+    /// this kit is consumed by `DeployStation` (VIO-594). Empty for
+    /// non-kit components. Reuses `InitialMaterial` for schema parity
+    /// with `initial_station.json`.
+    #[serde(default)]
+    pub deploys_seed_materials: Vec<InitialMaterial>,
+    /// Starting components seeded into the new station's inventory when
+    /// this kit is consumed by `DeployStation`. Empty for non-kit
+    /// components.
+    #[serde(default)]
+    pub deploys_seed_components: Vec<InitialComponent>,
 }
 
 // ---------------------------------------------------------------------------
