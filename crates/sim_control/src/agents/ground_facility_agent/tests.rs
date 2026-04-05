@@ -378,7 +378,6 @@ fn autopilot_managed_ground_facility_discovers_within_500_ticks() {
     let mut next_cmd_id = state.counters.next_command_id;
     let mut imported = false;
     let mut installed = false;
-    let mut enabled = false;
     for tick in 0..10 {
         state.meta.tick = tick;
         let commands = controller.generate_commands(&state, &content, &mut next_cmd_id);
@@ -388,7 +387,6 @@ fn autopilot_managed_ground_facility_discovers_within_500_ticks() {
             match &event.event {
                 Event::ItemImported { .. } => imported = true,
                 Event::ModuleInstalled { .. } => installed = true,
-                Event::ModuleToggled { enabled: true, .. } => enabled = true,
                 _ => {}
             }
         }
@@ -396,7 +394,6 @@ fn autopilot_managed_ground_facility_discovers_within_500_ticks() {
 
     assert!(imported, "sensor module should have been imported");
     assert!(installed, "sensor module should have been installed");
-    assert!(enabled, "sensor module should have been enabled");
 
     // Verify the ground facility has an installed, enabled sensor.
     let facility = state
