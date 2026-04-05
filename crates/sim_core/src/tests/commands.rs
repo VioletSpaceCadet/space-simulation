@@ -118,6 +118,7 @@ fn test_install_module_initializes_thermal_state_for_thermal_modules() {
         command: Command::InstallModule {
             facility_id: station_id.clone().into(),
             module_item_id,
+            slot_index: None,
         },
     };
 
@@ -183,6 +184,7 @@ fn test_install_module_no_thermal_state_for_non_thermal_modules() {
         command: Command::InstallModule {
             facility_id: station_id.clone().into(),
             module_item_id,
+            slot_index: None,
         },
     };
 
@@ -323,4 +325,230 @@ fn test_select_recipe_out_of_bounds_rejected() {
     } else {
         panic!("expected Processor state");
     }
+}
+
+// --------------------------------------------------------------------
+// SF-05: InstallModule slot validation (framed station)
+// --------------------------------------------------------------------
+
+/// Build a framed test environment: station carries a 2-slot test frame
+/// (1 industrial + 1 research) and has two minimal module defs registered:
+///   - `module_sf05_industrial` fits industrial slots
+///   - `module_sf05_research` fits research slots
+/// Both are seeded into station inventory as module items ready to install.
+fn framed_install_setup() -> (GameContent, GameState) {
+    let mut content = test_content();
+
+    // Register two minimal module defs with the right compatible_slots.
+    let industrial_def = ModuleDefBuilder::new("module_sf05_industrial")
+        .behavior(crate::ModuleBehaviorDef::Equipment)
+        .compatible_slots(vec![crate::SlotType("industrial".to_string())])
+        .build();
+    content
+        .module_defs
+        .insert("module_sf05_industrial".to_string(), industrial_def);
+    let research_def = ModuleDefBuilder::new("module_sf05_research")
+        .behavior(crate::ModuleBehaviorDef::Equipment)
+        .compatible_slots(vec![crate::SlotType("research".to_string())])
+        .build();
+    content
+        .module_defs
+        .insert("module_sf05_research".to_string(), research_def);
+
+    // Two slots: idx 0 industrial, idx 1 research.
+    let frame_id = crate::FrameId("frame_test_install".to_string());
+    content.frames.insert(
+        frame_id.clone(),
+        crate::FrameDef {
+            id: frame_id.clone(),
+            name: "Test Install".to_string(),
+            base_cargo_capacity_m3: 500.0,
+            base_power_capacity_kw: 30.0,
+            slots: vec![
+                crate::SlotDef {
+                    slot_type: crate::SlotType("industrial".to_string()),
+                    label: "I1".to_string(),
+                },
+                crate::SlotDef {
+                    slot_type: crate::SlotType("research".to_string()),
+                    label: "R1".to_string(),
+                },
+            ],
+            bonuses: vec![],
+            required_tech: None,
+            tags: vec![],
+        },
+    );
+
+    let mut state = test_state(&content);
+    let station = state.stations.get_mut(&test_station_id()).unwrap();
+    station.frame_id = Some(frame_id);
+    station.core.inventory.push(InventoryItem::Module {
+        item_id: crate::ModuleItemId("inv_industrial".to_string()),
+        module_def_id: "module_sf05_industrial".to_string(),
+    });
+    station.core.inventory.push(InventoryItem::Module {
+        item_id: crate::ModuleItemId("inv_research".to_string()),
+        module_def_id: "module_sf05_research".to_string(),
+    });
+
+    (content, state)
+}
+
+fn install_command(
+    state: &GameState,
+    station_id: &StationId,
+    item_id: &str,
+    slot_index: Option<usize>,
+) -> CommandEnvelope {
+    CommandEnvelope {
+        id: CommandId(0),
+        issued_by: PrincipalId("principal_autopilot".to_string()),
+        issued_tick: state.meta.tick,
+        execute_at_tick: state.meta.tick,
+        command: Command::InstallModule {
+            facility_id: station_id.clone().into(),
+            module_item_id: crate::ModuleItemId(item_id.to_string()),
+            slot_index,
+        },
+    }
+}
+
+#[test]
+fn install_module_auto_finds_compatible_slot_on_framed_station() {
+    let (content, mut state) = framed_install_setup();
+    let station_id = test_station_id();
+    let mut rng = make_rng();
+
+    let cmd = install_command(&state, &station_id, "inv_industrial", None);
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+
+    let station = &state.stations[&station_id];
+    let refinery = station
+        .core
+        .modules
+        .iter()
+        .find(|m| m.def_id == "module_sf05_industrial")
+        .expect("refinery should be installed");
+    assert_eq!(
+        refinery.slot_index,
+        Some(0),
+        "refinery should take the first compatible slot (industrial, idx 0)"
+    );
+}
+
+#[test]
+fn install_module_honors_explicit_slot_index() {
+    let (content, mut state) = framed_install_setup();
+    let station_id = test_station_id();
+    let mut rng = make_rng();
+
+    // Target slot 1 directly (research slot, propulsion_lab is compatible).
+    let cmd = install_command(&state, &station_id, "inv_research", Some(1));
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+
+    let station = &state.stations[&station_id];
+    let lab = station
+        .core
+        .modules
+        .iter()
+        .find(|m| m.def_id == "module_sf05_research")
+        .expect("lab should be installed");
+    assert_eq!(lab.slot_index, Some(1));
+}
+
+#[test]
+fn install_module_wrong_slot_type_rejected_and_event_emitted() {
+    let (content, mut state) = framed_install_setup();
+    let station_id = test_station_id();
+    let mut rng = make_rng();
+
+    // refinery (industrial) targeted at slot 1 (research) → should fail.
+    let cmd = install_command(&state, &station_id, "inv_industrial", Some(1));
+    let events = tick(&mut state, &[cmd], &content, &mut rng, None);
+
+    let station = &state.stations[&station_id];
+    assert!(
+        station
+            .core
+            .modules
+            .iter()
+            .all(|m| m.def_id != "module_sf05_industrial"),
+        "refinery should not be installed"
+    );
+    // Module should be back in inventory.
+    assert!(
+        station.core.inventory.iter().any(|i| matches!(
+            i,
+            InventoryItem::Module { module_def_id, .. } if module_def_id == "module_sf05_industrial"
+        )),
+        "refinery should be returned to inventory on failed install"
+    );
+    // ModuleNoCompatibleSlot event should have fired.
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(&e.event, Event::ModuleNoCompatibleSlot { .. })),
+        "expected ModuleNoCompatibleSlot event"
+    );
+}
+
+#[test]
+fn install_module_occupied_slot_rejected() {
+    let (content, mut state) = framed_install_setup();
+    let station_id = test_station_id();
+    let mut rng = make_rng();
+
+    // Pre-occupy slot 0 by installing the refinery first.
+    let first = install_command(&state, &station_id, "inv_industrial", Some(0));
+    tick(&mut state, &[first], &content, &mut rng, None);
+
+    // Add a second refinery item to inventory and try to install it at the
+    // same slot — should fail.
+    {
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.core.inventory.push(InventoryItem::Module {
+            item_id: crate::ModuleItemId("inv_industrial_2".to_string()),
+            module_def_id: "module_sf05_industrial".to_string(),
+        });
+    }
+
+    let second = install_command(&state, &station_id, "inv_industrial_2", Some(0));
+    let events = tick(&mut state, &[second], &content, &mut rng, None);
+
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(&e.event, Event::ModuleNoCompatibleSlot { .. })),
+        "occupied slot should emit ModuleNoCompatibleSlot"
+    );
+}
+
+#[test]
+fn install_module_frameless_station_keeps_legacy_behavior() {
+    // Reuse framed_install_setup so the test content includes the
+    // module_sf05_industrial def, then strip the frame to exercise the
+    // legacy path.
+    let (content, mut state) = framed_install_setup();
+    let station_id = test_station_id();
+    {
+        let station = state.stations.get_mut(&station_id).unwrap();
+        station.frame_id = None;
+    }
+    let mut rng = make_rng();
+
+    let cmd = install_command(&state, &station_id, "inv_industrial", None);
+    tick(&mut state, &[cmd], &content, &mut rng, None);
+
+    let station = &state.stations[&station_id];
+    let module = station
+        .core
+        .modules
+        .iter()
+        .find(|m| m.def_id == "module_sf05_industrial")
+        .expect("module should install on frameless station");
+    assert_eq!(
+        module.slot_index, None,
+        "frameless install should leave slot_index None"
+    );
 }

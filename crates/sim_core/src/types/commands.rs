@@ -30,6 +30,12 @@ pub enum Command {
     InstallModule {
         facility_id: FacilityId,
         module_item_id: ModuleItemId,
+        /// Target slot on the station frame. `None` = auto-find first
+        /// compatible unoccupied slot (autopilot's default path). Ignored
+        /// for frameless stations and ground facilities, which fall back
+        /// to the legacy unlimited-slot behavior.
+        #[serde(default)]
+        slot_index: Option<usize>,
     },
     UninstallModule {
         facility_id: FacilityId,

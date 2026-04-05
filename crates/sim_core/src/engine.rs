@@ -193,6 +193,7 @@ fn apply_commands(
             Command::InstallModule {
                 facility_id,
                 module_item_id,
+                slot_index,
             } => match facility_id {
                 crate::FacilityId::Station(station_id) => {
                     commands::handle_install_module(
@@ -200,11 +201,14 @@ fn apply_commands(
                         content,
                         station_id,
                         module_item_id,
+                        *slot_index,
                         current_tick,
                         events,
                     );
                 }
                 crate::FacilityId::Ground(gf_id) => {
+                    // Ground facilities don't use frames — the slot_index
+                    // field is ignored on the ground install path.
                     commands::handle_ground_install_module(
                         state,
                         content,

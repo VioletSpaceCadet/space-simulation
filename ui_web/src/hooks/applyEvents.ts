@@ -864,6 +864,7 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   OreMined: handleOreMined,
   OreDeposited: handleOreDeposited,
   ModuleInstalled: handleModuleInstalled,
+  ModuleNoCompatibleSlot: noOp,
   ModuleUninstalled: handleModuleUninstalled,
   ModuleToggled: handleModuleToggled,
   ModuleThresholdSet: handleModuleThresholdSet,

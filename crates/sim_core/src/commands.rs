@@ -60,6 +60,7 @@ pub(crate) fn handle_install_module(
     content: &GameContent,
     station_id: &crate::StationId,
     module_item_id: &crate::ModuleItemId,
+    requested_slot: Option<usize>,
     current_tick: u64,
     events: &mut Vec<EventEnvelope>,
 ) -> bool {
@@ -82,30 +83,41 @@ pub(crate) fn handle_install_module(
     let Some(def) = content.module_defs.get(&module_def_id) else {
         return false;
     };
-    // Check tech gate before allocating a module instance ID
-    if let Some(ref tech_id) = def.required_tech {
-        if !state.research.unlocked.contains(tech_id) {
-            let Some(station) = state.stations.get_mut(station_id) else {
-                return false;
-            };
-            station.core.inventory.push(InventoryItem::Module {
-                item_id,
-                module_def_id,
-            });
-            station.invalidate_volume_cache();
-            let module_id = crate::ModuleInstanceId(format!("pending_{}", tech_id.0));
-            events.push(crate::emit(
-                &mut state.counters,
-                current_tick,
-                crate::Event::ModuleAwaitingTech {
-                    station_id: station_id.clone(),
-                    module_id,
-                    tech_id: tech_id.clone(),
-                },
-            ));
-            return false;
-        }
+    if !tech_gate_passed(
+        state,
+        station_id,
+        def,
+        item_id.clone(),
+        module_def_id.clone(),
+        current_tick,
+        events,
+    ) {
+        return false;
     }
+    // Safe to re-borrow after tech gate check released the mutable borrow.
+    let station = state.stations.get_mut(station_id).expect("station exists");
+
+    // Resolve the target slot against the station frame, if any. Frameless
+    // stations keep legacy behavior (slot_index stays None). Framed stations
+    // either validate an explicit slot or auto-find the first compatible
+    // unoccupied slot. Failures return the module to inventory and emit a
+    // ModuleNoCompatibleSlot event.
+    let resolved_slot: Option<usize> =
+        match resolve_install_slot(station, def, requested_slot, content) {
+            SlotResolution::Frameless => None,
+            SlotResolution::Slot(idx) => Some(idx),
+            SlotResolution::NoCompatibleSlot => {
+                return_module_on_slot_failure(
+                    state,
+                    station_id,
+                    item_id,
+                    module_def_id,
+                    current_tick,
+                    events,
+                );
+                return false;
+            }
+        };
 
     let module_id_str = format!("module_inst_{:04}", state.counters.next_module_instance_id);
     state.counters.next_module_instance_id += 1;
@@ -122,7 +134,7 @@ pub(crate) fn handle_install_module(
         kind_state,
         wear: crate::WearState::default(),
         thermal,
-        slot_index: None,
+        slot_index: resolved_slot,
         power_stalled: false,
         module_priority: 0,
         assigned_crew: std::collections::BTreeMap::new(),
@@ -145,9 +157,142 @@ pub(crate) fn handle_install_module(
             module_item_id: item_id,
             module_def_id,
             behavior_type,
+            slot_index: resolved_slot,
         },
     ));
     true
+}
+
+/// Check the tech gate for an install. Returns `true` if the install may
+/// proceed, `false` if the module was put back into inventory and a
+/// `ModuleAwaitingTech` event was emitted. Extracted so
+/// `handle_install_module` stays under the clippy line budget.
+fn tech_gate_passed(
+    state: &mut GameState,
+    station_id: &crate::StationId,
+    def: &crate::ModuleDef,
+    item_id: crate::ModuleItemId,
+    module_def_id: String,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    let Some(tech_id) = def.required_tech.as_ref() else {
+        return true;
+    };
+    if state.research.unlocked.contains(tech_id) {
+        return true;
+    }
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return false;
+    };
+    station.core.inventory.push(InventoryItem::Module {
+        item_id,
+        module_def_id,
+    });
+    station.invalidate_volume_cache();
+    let module_id = crate::ModuleInstanceId(format!("pending_{}", tech_id.0));
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::ModuleAwaitingTech {
+            station_id: station_id.clone(),
+            module_id,
+            tech_id: tech_id.clone(),
+        },
+    ));
+    false
+}
+
+/// Put the module back into inventory and emit a `ModuleNoCompatibleSlot`
+/// event when slot resolution fails on a framed station.
+fn return_module_on_slot_failure(
+    state: &mut GameState,
+    station_id: &crate::StationId,
+    item_id: crate::ModuleItemId,
+    module_def_id: String,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) {
+    let Some(station) = state.stations.get_mut(station_id) else {
+        return;
+    };
+    station.core.inventory.push(InventoryItem::Module {
+        item_id,
+        module_def_id: module_def_id.clone(),
+    });
+    station.invalidate_volume_cache();
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::ModuleNoCompatibleSlot {
+            station_id: station_id.clone(),
+            module_def_id,
+        },
+    ));
+}
+
+/// Outcome of slot resolution when installing a module on a station.
+enum SlotResolution {
+    /// Station has no frame — legacy path, `slot_index` stays `None`.
+    Frameless,
+    /// A specific slot index was either validated or auto-discovered.
+    Slot(usize),
+    /// Framed station but no compatible, unoccupied slot found.
+    NoCompatibleSlot,
+}
+
+/// Resolve the target slot for an `InstallModule` command.
+///
+/// - Frameless station → `Frameless` (no validation).
+/// - `requested_slot: Some(idx)` → validate index is in range, slot type
+///   is in the module's `compatible_slots`, and no existing module is
+///   in that slot. Any failure returns `NoCompatibleSlot`.
+/// - `requested_slot: None` → return the first slot whose type matches
+///   `compatible_slots` and is not occupied. None available → `NoCompatibleSlot`.
+fn resolve_install_slot(
+    station: &crate::StationState,
+    def: &crate::ModuleDef,
+    requested_slot: Option<usize>,
+    content: &GameContent,
+) -> SlotResolution {
+    let Some(frame_id) = station.frame_id.as_ref() else {
+        return SlotResolution::Frameless;
+    };
+    let Some(frame) = content.frames.get(frame_id) else {
+        // Frame id references a missing catalog entry — treat as frameless
+        // for forward-compat with saves that predate a removed frame.
+        return SlotResolution::Frameless;
+    };
+
+    // Collect currently-occupied slot indices for the fast contains check.
+    let occupied: std::collections::HashSet<usize> = station
+        .core
+        .modules
+        .iter()
+        .filter_map(|m| m.slot_index)
+        .collect();
+
+    if let Some(idx) = requested_slot {
+        let Some(slot) = frame.slots.get(idx) else {
+            return SlotResolution::NoCompatibleSlot;
+        };
+        if !def.compatible_slots.contains(&slot.slot_type) {
+            return SlotResolution::NoCompatibleSlot;
+        }
+        if occupied.contains(&idx) {
+            return SlotResolution::NoCompatibleSlot;
+        }
+        return SlotResolution::Slot(idx);
+    }
+    for (idx, slot) in frame.slots.iter().enumerate() {
+        if occupied.contains(&idx) {
+            continue;
+        }
+        if def.compatible_slots.contains(&slot.slot_type) {
+            return SlotResolution::Slot(idx);
+        }
+    }
+    SlotResolution::NoCompatibleSlot
 }
 
 /// Uninstall a module from the station and return it to inventory.
@@ -701,6 +846,7 @@ pub(crate) fn handle_ground_install_module(
             module_item_id: item_id,
             module_def_id,
             behavior_type,
+            slot_index: None,
         },
     ));
     true

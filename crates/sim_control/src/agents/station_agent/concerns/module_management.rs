@@ -123,6 +123,9 @@ impl StationConcern for ModuleManagement {
                     Command::InstallModule {
                         facility_id: ctx.station_id.clone().into(),
                         module_item_id: item_id.clone(),
+                        // SF-06 will add slot-aware selection; today the
+                        // autopilot lets the handler auto-find a slot.
+                        slot_index: None,
                     },
                 ));
             }

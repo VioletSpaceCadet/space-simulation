@@ -76,11 +76,22 @@ pub enum Event {
         module_item_id: ModuleItemId,
         module_def_id: String,
         behavior_type: BehaviorType,
+        /// Frame slot the module was installed into. `None` = frameless
+        /// station or ground facility (legacy unlimited-slot behavior).
+        #[serde(default)]
+        slot_index: Option<usize>,
     },
     ModuleUninstalled {
         station_id: StationId,
         module_id: ModuleInstanceId,
         module_item_id: ModuleItemId,
+    },
+    /// Emitted when an `InstallModule` command on a framed station fails
+    /// because no compatible, unoccupied slot is available for the module.
+    /// The module is returned to the station inventory unchanged.
+    ModuleNoCompatibleSlot {
+        station_id: StationId,
+        module_def_id: String,
     },
     ModuleToggled {
         station_id: StationId,
