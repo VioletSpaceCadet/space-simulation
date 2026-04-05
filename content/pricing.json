@@ -254,6 +254,24 @@
       "exportable": false,
       "category": "module"
     },
+    "module_launch_pad_small": {
+      "base_price_per_unit": 10000000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "module"
+    },
+    "module_launch_pad_medium": {
+      "base_price_per_unit": 50000000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "module"
+    },
+    "module_launch_pad_large": {
+      "base_price_per_unit": 200000000.0,
+      "importable": true,
+      "exportable": false,
+      "category": "module"
+    },
     "module_crucible": {
       "base_price_per_unit": 3000000.0,
       "importable": true,

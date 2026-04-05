@@ -386,6 +386,24 @@ pub struct ComponentDef {
 }
 
 // ---------------------------------------------------------------------------
+// Launch pad definitions
+// ---------------------------------------------------------------------------
+
+/// Content definition for a launch pad module.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaunchPadDef {
+    /// Maximum payload capacity (kg) this pad can support. Must match
+    /// or exceed the rocket's `payload_capacity_kg`.
+    pub max_payload_kg: f32,
+    /// Recovery time (game-minutes) after a launch before the pad is available again.
+    #[serde(default)]
+    pub recovery_minutes: u64,
+    /// Derived from `recovery_minutes` via `derive_module_tick_values`.
+    #[serde(skip_deserializing, default)]
+    pub recovery_ticks: u64,
+}
+
+// ---------------------------------------------------------------------------
 // Rocket definitions
 // ---------------------------------------------------------------------------
 
@@ -778,6 +796,9 @@ pub enum ModuleBehaviorDef {
     SolarArray(SolarArrayDef),
     Battery(BatteryDef),
     Radiator(RadiatorDef),
+    /// Launch pad for ground facility rocket launches. Passive — launch
+    /// command checks pad availability, no periodic tick.
+    LaunchPad(LaunchPadDef),
     /// Passive stat provider for ship fitting. No tick behavior.
     Equipment,
     /// Thermal container: holds molten material at temperature.
@@ -798,6 +819,7 @@ impl ModuleBehaviorDef {
             Self::SolarArray(_) => "solar_array",
             Self::Battery(_) => "battery",
             Self::Radiator(_) => "radiator",
+            Self::LaunchPad(_) => "launch_pad",
             Self::Equipment => "equipment",
             Self::ThermalContainer(_) => "thermal_container",
         }
@@ -815,6 +837,7 @@ impl ModuleBehaviorDef {
             | Self::SolarArray(_)
             | Self::Battery(_)
             | Self::Radiator(_)
+            | Self::LaunchPad(_)
             | Self::Equipment
             | Self::ThermalContainer(_) => None,
         }
@@ -873,6 +896,10 @@ impl ModuleBehaviorDef {
                 ModuleKindState::Radiator(RadiatorState::default()),
                 BehaviorType::Radiator,
             ),
+            Self::LaunchPad(_) => (
+                ModuleKindState::LaunchPad(crate::LaunchPadState::default()),
+                BehaviorType::LaunchPad,
+            ),
             Self::Equipment => (ModuleKindState::Equipment, BehaviorType::Equipment),
             Self::ThermalContainer(_) => (
                 ModuleKindState::ThermalContainer(crate::ThermalContainerState::default()),
@@ -894,6 +921,7 @@ impl ModuleBehaviorDef {
             | Self::SolarArray(_)
             | Self::Battery(_)
             | Self::Radiator(_)
+            | Self::LaunchPad(_)
             | Self::Equipment
             | Self::ThermalContainer(_) => None,
         }
@@ -1141,6 +1169,9 @@ pub fn derive_module_tick_values(
             }
             ModuleBehaviorDef::SensorArray(s) => {
                 s.scan_interval_ticks = constants.game_minutes_to_ticks(s.scan_interval_minutes);
+            }
+            ModuleBehaviorDef::LaunchPad(lp) => {
+                lp.recovery_ticks = constants.game_minutes_to_ticks(lp.recovery_minutes);
             }
             _ => {}
         }

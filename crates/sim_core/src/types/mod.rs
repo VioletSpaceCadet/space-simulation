@@ -230,6 +230,7 @@ pub enum BehaviorType {
     SolarArray,
     Battery,
     Radiator,
+    LaunchPad,
     Equipment,
     ThermalContainer,
 }

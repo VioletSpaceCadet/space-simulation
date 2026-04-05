@@ -29,6 +29,7 @@ const MODULE_KIND_STATE_MAP: Record<string, ModuleKindState> = {
   SolarArray: { SolarArray: { ticks_since_last_run: 0 } },
   Battery: { Battery: { charge_kwh: 0 } },
   Radiator: { Radiator: {} },
+  LaunchPad: { LaunchPad: { available: true, recovery_ticks_remaining: 0, launches_count: 0 } },
 };
 
 function buildTaskStub(taskKind: string, target: string | null, tick: number): TaskState {

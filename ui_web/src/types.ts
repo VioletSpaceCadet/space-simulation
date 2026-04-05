@@ -113,8 +113,15 @@ export type ModuleKindState =
   | { Battery: BatteryState }
   | { Radiator: Record<string, never> }
   | { ThermalContainer: ThermalContainerState }
+  | { LaunchPad: LaunchPadState }
   | 'Storage'
   | 'Equipment'
+
+export interface LaunchPadState {
+  available: boolean
+  recovery_ticks_remaining: number
+  launches_count: number
+}
 
 export interface ThermalContainerState {
   held_items: InventoryItem[]

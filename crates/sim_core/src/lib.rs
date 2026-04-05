@@ -67,8 +67,9 @@ pub use types::{FittedModule, ShipState, TaskKind};
 // -- types: module state --
 pub use types::{
     compute_crew_factor, compute_module_efficiency, is_crew_satisfied, AssemblerState,
-    BatteryState, LabState, MaintenanceState, ModuleKindState, ModuleState, ProcessorState,
-    RadiatorState, SensorArrayState, SolarArrayState, ThermalContainerState, WearState,
+    BatteryState, LabState, LaunchPadState, MaintenanceState, ModuleKindState, ModuleState,
+    ProcessorState, RadiatorState, SensorArrayState, SolarArrayState, ThermalContainerState,
+    WearState,
 };
 // -- types: thermal state --
 pub use types::{MaterialThermalProps, ThermalState};
@@ -82,10 +83,10 @@ pub use types::{
 };
 // -- types: module & recipe definitions --
 pub use types::{
-    AssemblerDef, BatteryDef, InputAmount, InputFilter, LabDef, MaintenanceDef, ModuleBehaviorDef,
-    ModuleDef, ModulePort, OutputSpec, PortDirection, PortFilter, ProcessorDef, QualityFormula,
-    RadiatorDef, RecipeDef, RecipeInput, RecipeThermalReq, SensorArrayDef, SolarArrayDef,
-    ThermalContainerDef, YieldFormula,
+    AssemblerDef, BatteryDef, InputAmount, InputFilter, LabDef, LaunchPadDef, MaintenanceDef,
+    ModuleBehaviorDef, ModuleDef, ModulePort, OutputSpec, PortDirection, PortFilter, ProcessorDef,
+    QualityFormula, RadiatorDef, RecipeDef, RecipeInput, RecipeThermalReq, SensorArrayDef,
+    SolarArrayDef, ThermalContainerDef, YieldFormula,
 };
 // -- types: progression --
 pub use types::{
