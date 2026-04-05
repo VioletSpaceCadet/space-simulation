@@ -1,0 +1,7 @@
+{
+  "name": "ground_ci_smoke",
+  "ticks": 200,
+  "metrics_every": 50,
+  "seeds": [1, 2, 3, 4, 5],
+  "state": "./content/ground_start.json"
+}
