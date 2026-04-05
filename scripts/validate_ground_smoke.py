@@ -37,7 +37,7 @@ def main() -> int:
         return 1
 
     seed_count = summary.get("seed_count", "?")
-    balance_mean = agg.get("balance", {}).get("mean", "?")
+    balance_mean = agg.get("balance", {}).get("mean", 0)
     print(f"  ground smoke validated ({seed_count} seeds, 0 collapses, avg balance=${balance_mean:,.0f})")
     return 0
 
