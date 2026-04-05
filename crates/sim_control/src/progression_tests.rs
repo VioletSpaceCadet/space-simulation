@@ -1025,6 +1025,7 @@ fn manufacturing_pipeline_ore_to_cast_part() {
             next_asteroid_id: 0,
             next_lot_id: 0,
             next_module_instance_id: 1,
+            ..Default::default()
         },
         modifiers: Default::default(),
         events: Default::default(),

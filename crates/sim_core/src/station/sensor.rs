@@ -220,6 +220,7 @@ mod tests {
                 next_asteroid_id: 0,
                 next_lot_id: 0,
                 next_module_instance_id: 2,
+                ..Default::default()
             },
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),

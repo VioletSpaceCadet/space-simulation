@@ -76,13 +76,16 @@ pub struct ScanSite {
     pub template_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Counters {
     pub next_event_id: u64,
     pub next_command_id: u64,
     pub next_asteroid_id: u64,
     pub next_lot_id: u64,
     pub next_module_instance_id: u64,
+    /// Stations deployed from ground facility launches (StationKit payload).
+    #[serde(default)]
+    pub stations_deployed: u64,
 }
 
 // ---------------------------------------------------------------------------

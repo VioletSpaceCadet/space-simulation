@@ -195,6 +195,7 @@
     "name": "First Manufactured Component",
     "description": "Your workshop has assembled its first component. Manufacturing capability established.",
     "conditions": [
+      { "type": "milestone_completed", "milestone_id": "first_observation" },
       { "type": "counter_above", "counter": "assembler_runs", "threshold": 1 }
     ],
     "rewards": {
@@ -245,7 +246,7 @@
     "description": "Deploy a station kit to establish your first orbital outpost.",
     "conditions": [
       { "type": "milestone_completed", "milestone_id": "first_launch" },
-      { "type": "counter_above", "counter": "orbital_stations", "threshold": 1 }
+      { "type": "counter_above", "counter": "stations_deployed", "threshold": 1 }
     ],
     "rewards": {
       "grant_amount": 50000000,

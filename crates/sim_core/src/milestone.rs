@@ -106,7 +106,8 @@ fn resolve_counter(state: &GameState, content: &GameContent, counter: &str) -> O
                 .sum();
             Some(count as f64)
         }
-        "orbital_stations" => Some(state.stations.len() as f64),
+        "stations_deployed" => Some(state.counters.stations_deployed as f64),
+        "reusable_landings" => Some(0.0), // Placeholder — VIO-560 deferred
         _ => None,
     }
 }
@@ -697,10 +698,80 @@ mod tests {
             Some(0.0)
         );
 
-        // orbital_stations — count of stations
+        // stations_deployed — from counters, initially 0
         assert_eq!(
-            resolve_counter(&state, &content, "orbital_stations"),
-            Some(state.stations.len() as f64)
+            resolve_counter(&state, &content, "stations_deployed"),
+            Some(0.0)
+        );
+
+        // reusable_landings — placeholder, always 0
+        assert_eq!(
+            resolve_counter(&state, &content, "reusable_landings"),
+            Some(0.0)
+        );
+    }
+
+    #[test]
+    fn rockets_in_inventory_counter() {
+        let mut content = base_content();
+        // Add a test rocket def
+        content.rocket_defs.insert(
+            "rocket_test".into(),
+            crate::RocketDef {
+                id: "rocket_test".into(),
+                name: "Test Rocket".into(),
+                payload_capacity_kg: 100.0,
+                base_launch_cost: 1_000_000.0,
+                fuel_kg: 500.0,
+                transit_minutes: 60,
+                required_tech: None,
+            },
+        );
+
+        let mut state = base_state(&content);
+
+        // No rockets in inventory initially
+        assert_eq!(
+            resolve_counter(&state, &content, "rockets_in_inventory"),
+            Some(0.0)
+        );
+
+        // Add a non-rocket component — should not count
+        state
+            .stations
+            .values_mut()
+            .next()
+            .unwrap()
+            .core
+            .inventory
+            .push(crate::InventoryItem::Component {
+                component_id: crate::ComponentId("nozzle".into()),
+                count: 1,
+                quality: 1.0,
+            });
+        assert_eq!(
+            resolve_counter(&state, &content, "rockets_in_inventory"),
+            Some(0.0),
+            "non-rocket component should not count"
+        );
+
+        // Add a rocket component matching a rocket_def key
+        state
+            .stations
+            .values_mut()
+            .next()
+            .unwrap()
+            .core
+            .inventory
+            .push(crate::InventoryItem::Component {
+                component_id: crate::ComponentId("rocket_test".into()),
+                count: 1,
+                quality: 1.0,
+            });
+        assert_eq!(
+            resolve_counter(&state, &content, "rockets_in_inventory"),
+            Some(1.0),
+            "rocket component matching rocket_def key should count"
         );
     }
 
