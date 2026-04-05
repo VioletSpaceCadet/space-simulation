@@ -11,6 +11,7 @@ mod events;
 mod inventory;
 mod progression;
 mod state;
+mod strategy;
 
 pub use commands::*;
 pub use constants::*;
@@ -19,6 +20,7 @@ pub use events::*;
 pub use inventory::*;
 pub use progression::*;
 pub use state::*;
+pub use strategy::*;
 
 use std::collections::HashMap;
 

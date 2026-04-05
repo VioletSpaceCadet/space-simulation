@@ -770,6 +770,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let initial_station: sim_core::InitialStationDef =
         load_optional_json(dir, "initial_station.json")?;
     let autopilot: sim_core::AutopilotConfig = load_optional_json(dir, "autopilot.json")?;
+    let default_strategy: sim_core::StrategyConfig = load_optional_json(dir, "strategy.json")?;
     let scoring: sim_core::ScoringConfig = load_optional_json(dir, "scoring.json")?;
     let milestones: Vec<sim_core::MilestoneDef> = load_optional_json(dir, "milestones.json")?;
     let crew_roles = load_crew_roles(dir)?;
@@ -794,6 +795,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         fitting_templates,
         initial_station,
         autopilot,
+        default_strategy,
         crew_roles,
         scoring,
         milestones,
@@ -962,6 +964,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         events: sim_core::sim_events::SimEventState::default(),
         propellant_consumed_total: 0.0,
         progression: sim_core::ProgressionState::default(),
+        strategy_config: content.default_strategy.clone(),
         body_cache: sim_core::build_body_cache(&content.solar_system.bodies),
     }
 }
@@ -1693,6 +1696,7 @@ mod tests {
             events: sim_core::sim_events::SimEventState::default(),
             propellant_consumed_total: 0.0,
             progression: sim_core::ProgressionState::default(),
+            strategy_config: Default::default(),
             body_cache: AHashMap::default(),
         };
         validate_state(&state, &content);

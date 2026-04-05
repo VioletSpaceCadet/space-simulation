@@ -55,6 +55,11 @@ pub struct GameState {
     /// Progression system state (milestones, phase, grants, trade tier).
     #[serde(default)]
     pub progression: crate::ProgressionState,
+    /// Strategic configuration that shapes high-level autopilot behavior.
+    /// Seeded from `GameContent.default_strategy` at world-gen and can be
+    /// replaced at runtime via `Command::SetStrategyConfig` (VIO-483).
+    #[serde(default)]
+    pub strategy_config: crate::StrategyConfig,
     /// Cached absolute positions for orbital bodies. Not serialized -- recomputed on load.
     #[serde(skip, default)]
     pub body_cache: AHashMap<BodyId, crate::spatial::BodyCache>,

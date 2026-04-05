@@ -420,6 +420,7 @@ pub fn base_content() -> GameContent {
         fitting_templates: BTreeMap::new(),
         initial_station: InitialStationDef::default(),
         autopilot: AutopilotConfig::default(),
+        default_strategy: crate::StrategyConfig::default(),
         crew_roles: BTreeMap::new(),
         scoring: Default::default(),
         milestones: Vec::new(),
@@ -681,6 +682,7 @@ pub fn minimal_content() -> GameContent {
             deep_scan_targets: vec![],
             ..AutopilotConfig::default()
         },
+        default_strategy: crate::StrategyConfig::default(),
         crew_roles: BTreeMap::new(),
         scoring: Default::default(),
         milestones: Vec::new(),
@@ -782,6 +784,7 @@ pub fn base_state(content: &GameContent) -> GameState {
         events: crate::sim_events::SimEventState::default(),
         propellant_consumed_total: 0.0,
         progression: ProgressionState::default(),
+        strategy_config: Default::default(),
         body_cache: crate::build_body_cache(&content.solar_system.bodies),
     }
 }

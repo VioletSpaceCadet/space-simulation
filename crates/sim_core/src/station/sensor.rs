@@ -228,6 +228,7 @@ mod tests {
             events: crate::sim_events::SimEventState::default(),
             propellant_consumed_total: 0.0,
             progression: Default::default(),
+            strategy_config: Default::default(),
             body_cache: AHashMap::default(),
         };
         crate::test_fixtures::rebuild_indices(&mut state, content);
