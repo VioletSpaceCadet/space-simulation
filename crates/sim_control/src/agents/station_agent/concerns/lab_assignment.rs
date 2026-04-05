@@ -137,7 +137,7 @@ impl StationConcern for LabAssignment {
                             .map_or_else(String::new, |(t, _)| t.0.clone()),
                         alt_3_score: candidates.get(3).map_or(0.0, |(_, s)| f64::from(*s)),
                         context_json: format!(
-                            "{{\"domain\":\"{:?}\",\"module\":\"{}\"}}",
+                            "{{\"domain\":\"{}\",\"module\":\"{}\"}}",
                             lab_def.domain, module.id.0,
                         ),
                     });

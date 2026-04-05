@@ -4,8 +4,10 @@ use super::*;
 fn test_deep_scan_blocked_without_tech() {
     let mut content = test_content();
     // Set unmet domain requirements to prevent unlock
-    content.techs[0].domain_requirements =
-        std::collections::HashMap::from([(ResearchDomain::Survey, 1_000_000.0)]);
+    content.techs[0].domain_requirements = std::collections::HashMap::from([(
+        ResearchDomain::new(ResearchDomain::SURVEY),
+        1_000_000.0,
+    )]);
     let mut state = test_state(&content);
     let mut rng = make_rng();
 

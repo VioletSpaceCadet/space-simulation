@@ -189,7 +189,7 @@ pub enum EffectDef {
         item: TradeItemSpec,
     },
     AddResearchData {
-        domain: crate::ResearchDomain,
+        data_kind: crate::DataKind,
         amount: f32,
     },
     SpawnScanSite {
@@ -593,18 +593,6 @@ fn avg_station_wear(station: &crate::StationState) -> f32 {
 // Effect application
 // ---------------------------------------------------------------------------
 
-/// Map a research domain to its corresponding data kind.
-fn domain_to_data_kind(domain: &crate::ResearchDomain) -> crate::DataKind {
-    match domain {
-        crate::ResearchDomain::Survey => crate::DataKind::new(crate::DataKind::SURVEY),
-        crate::ResearchDomain::Materials => crate::DataKind::new(crate::DataKind::ASSAY),
-        crate::ResearchDomain::Manufacturing => {
-            crate::DataKind::new(crate::DataKind::MANUFACTURING)
-        }
-        crate::ResearchDomain::Propulsion => crate::DataKind::new(crate::DataKind::TRANSIT),
-    }
-}
-
 /// Apply all effects from a fired event. Returns the list of applied effects.
 /// Each effect also emits its own mechanical event (dual emission contract).
 fn apply_effects(
@@ -642,8 +630,7 @@ fn apply_single_effect(
             apply_damage_module(*wear_amount, effect, target, state, rng, events)
         }
         EffectDef::AddInventory { item } => apply_add_inventory(item, effect, target, state, rng),
-        EffectDef::AddResearchData { domain, amount } => {
-            let data_kind = domain_to_data_kind(domain);
+        EffectDef::AddResearchData { data_kind, amount } => {
             *state
                 .research
                 .data_pool
@@ -653,7 +640,7 @@ fn apply_single_effect(
                 &mut state.counters,
                 tick,
                 crate::Event::DataGenerated {
-                    kind: data_kind,
+                    kind: data_kind.clone(),
                     amount: *amount,
                 },
             ));
@@ -1135,7 +1122,7 @@ mod tests {
                 },
             },
             EffectDef::AddResearchData {
-                domain: crate::ResearchDomain::Survey,
+                data_kind: crate::DataKind::new(crate::DataKind::SURVEY),
                 amount: 10.0,
             },
             EffectDef::SpawnScanSite {
@@ -1803,7 +1790,7 @@ mod tests {
                 "evt_data",
                 TargetingRule::Global,
                 vec![EffectDef::AddResearchData {
-                    domain: crate::ResearchDomain::Survey,
+                    data_kind: crate::DataKind::new(crate::DataKind::SURVEY),
                     amount: 50.0,
                 }],
             );
