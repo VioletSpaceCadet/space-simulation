@@ -721,6 +721,117 @@ pub(crate) fn handle_ground_set_module_enabled(
     true
 }
 
+/// Launch a rocket from a ground facility. Validates pad availability,
+/// payload weight, and balance. Deducts cost, marks pad as recovering,
+/// and creates a `LaunchTransitState`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn handle_launch(
+    state: &mut GameState,
+    content: &GameContent,
+    facility_id: &crate::GroundFacilityId,
+    rocket_def_id: &str,
+    payload: &crate::LaunchPayload,
+    destination: &crate::Position,
+    current_tick: u64,
+    events: &mut Vec<EventEnvelope>,
+) -> bool {
+    // Look up rocket definition.
+    let Some(rocket_def) = content.rocket_defs.get(rocket_def_id) else {
+        return false;
+    };
+
+    // Check tech gate.
+    if let Some(ref tech_id) = rocket_def.required_tech {
+        if !state.research.unlocked.contains(tech_id) {
+            return false;
+        }
+    }
+
+    let Some(facility) = state.ground_facilities.get(facility_id) else {
+        return false;
+    };
+
+    // Find an available launch pad with sufficient capacity.
+    let pad_match = facility
+        .core
+        .modules
+        .iter()
+        .enumerate()
+        .find_map(|(index, module)| {
+            if !module.enabled {
+                return None;
+            }
+            let def = content.module_defs.get(&module.def_id)?;
+            let crate::ModuleBehaviorDef::LaunchPad(pad_def) = &def.behavior else {
+                return None;
+            };
+            let crate::ModuleKindState::LaunchPad(pad_state) = &module.kind_state else {
+                return None;
+            };
+            if !pad_state.available || pad_def.max_payload_kg < rocket_def.payload_capacity_kg {
+                return None;
+            }
+            Some((index, pad_def.recovery_ticks))
+        });
+    let Some((pad_index, recovery_ticks)) = pad_match else {
+        return false;
+    };
+
+    // Compute payload mass and check capacity.
+    let payload_mass_kg: f32 = match payload {
+        crate::LaunchPayload::Supplies(items) => crate::tasks::inventory_mass_kg(items),
+        crate::LaunchPayload::StationKit => 5000.0, // Station kit base mass
+    };
+    if payload_mass_kg > rocket_def.payload_capacity_kg {
+        return false;
+    }
+
+    // Check balance.
+    if state.balance < rocket_def.base_launch_cost {
+        return false;
+    }
+
+    // Deduct cost.
+    state.balance -= rocket_def.base_launch_cost;
+
+    // Mark pad as recovering and create launch transit.
+    let transit_ticks = content
+        .constants
+        .game_minutes_to_ticks(rocket_def.transit_minutes);
+    let arrival_tick = current_tick + transit_ticks;
+
+    let Some(facility) = state.ground_facilities.get_mut(facility_id) else {
+        return false;
+    };
+    if let crate::ModuleKindState::LaunchPad(ref mut pad_state) =
+        facility.core.modules[pad_index].kind_state
+    {
+        pad_state.available = false;
+        pad_state.recovery_ticks_remaining = recovery_ticks;
+        pad_state.launches_count += 1;
+    }
+    facility.launch_transits.push(crate::LaunchTransitState {
+        rocket_def_id: rocket_def_id.to_string(),
+        payload: payload.clone(),
+        destination: destination.clone(),
+        arrival_tick,
+    });
+
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        crate::Event::PayloadLaunched {
+            facility_id: facility_id.clone(),
+            rocket_def_id: rocket_def_id.to_string(),
+            payload: payload.clone(),
+            destination: destination.clone(),
+            cost: rocket_def.base_launch_cost,
+            arrival_tick,
+        },
+    ));
+    true
+}
+
 /// Jettison all slag from a station's inventory.
 pub(crate) fn handle_jettison_slag(
     state: &mut GameState,

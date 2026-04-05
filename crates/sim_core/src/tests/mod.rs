@@ -42,6 +42,7 @@ mod trade;
 mod trade_integration;
 mod transfer_molten;
 
+mod launch;
 mod research_lifecycle;
 mod satellite;
 

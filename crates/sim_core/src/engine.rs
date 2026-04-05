@@ -64,6 +64,8 @@ pub fn tick(
         tick_ground_facilities,
         tick_ground_facilities(state, content, rng, &mut events)
     );
+    resolve_launch_transits(state, content, rng, &mut events);
+    tick_launch_pad_recovery(state, content);
     timed!(
         timings,
         tick_satellites,
@@ -451,10 +453,134 @@ fn apply_commands(
                     events,
                 );
             }
+            Command::Launch {
+                facility_id,
+                rocket_def_id,
+                payload,
+                destination,
+            } => {
+                commands::handle_launch(
+                    state,
+                    content,
+                    facility_id,
+                    rocket_def_id,
+                    payload,
+                    destination,
+                    current_tick,
+                    events,
+                );
+            }
         }
     }
 
     commands::apply_ship_assignments(state, content, assignments, current_tick, events);
+}
+
+/// Resolve completed launch transits — deliver payloads that have arrived.
+fn resolve_launch_transits(
+    state: &mut GameState,
+    content: &GameContent,
+    rng: &mut impl Rng,
+    events: &mut Vec<crate::EventEnvelope>,
+) {
+    let current_tick = state.meta.tick;
+
+    // Collect facility IDs to process (avoid borrow issues).
+    let facility_ids: Vec<crate::GroundFacilityId> =
+        state.ground_facilities.keys().cloned().collect();
+
+    for facility_id in facility_ids {
+        // Partition transits into completed and ongoing.
+        let Some(facility) = state.ground_facilities.get_mut(&facility_id) else {
+            continue;
+        };
+        let mut completed = Vec::new();
+        let mut ongoing = Vec::new();
+        for transit in std::mem::take(&mut facility.launch_transits) {
+            if current_tick >= transit.arrival_tick {
+                completed.push(transit);
+            } else {
+                ongoing.push(transit);
+            }
+        }
+        facility.launch_transits = ongoing;
+
+        for transit in completed {
+            // Emit delivery event.
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                crate::Event::PayloadDelivered {
+                    facility_id: facility_id.clone(),
+                    rocket_def_id: transit.rocket_def_id.clone(),
+                    payload: transit.payload.clone(),
+                    destination: transit.destination.clone(),
+                },
+            ));
+
+            match transit.payload {
+                crate::LaunchPayload::Supplies(items) => {
+                    // Find the station closest to destination and deliver.
+                    let target_station = find_nearest_station(state, &transit.destination, content);
+                    if let Some(station_id) = target_station {
+                        if let Some(station) = state.stations.get_mut(&station_id) {
+                            crate::trade::merge_into_inventory(&mut station.core.inventory, items);
+                            station.core.invalidate_volume_cache();
+                        }
+                    }
+                }
+                crate::LaunchPayload::StationKit => {
+                    // Create a new orbital station at the destination.
+                    let uuid = crate::generate_uuid(rng);
+                    let station_id = crate::StationId(format!("station_{uuid}"));
+                    let station = crate::StationState {
+                        id: station_id.clone(),
+                        position: transit.destination.clone(),
+                        core: crate::FacilityCore {
+                            cargo_capacity_m3: 500.0,
+                            ..Default::default()
+                        },
+                        leaders: Vec::new(),
+                    };
+                    state.stations.insert(station_id.clone(), station);
+                    events.push(crate::emit(
+                        &mut state.counters,
+                        current_tick,
+                        crate::Event::StationDeployed {
+                            station_id,
+                            position: transit.destination,
+                        },
+                    ));
+                }
+            }
+        }
+    }
+}
+
+/// Find the nearest station to a position. Returns `None` if no stations exist.
+fn find_nearest_station(
+    state: &GameState,
+    _destination: &crate::Position,
+    _content: &GameContent,
+) -> Option<crate::StationId> {
+    // Simple: return the first station. Position-aware routing deferred.
+    state.stations.keys().next().cloned()
+}
+
+/// Tick launch pad recovery countdowns — pads become available after countdown.
+fn tick_launch_pad_recovery(state: &mut GameState, _content: &GameContent) {
+    for facility in state.ground_facilities.values_mut() {
+        for module in &mut facility.core.modules {
+            if let crate::ModuleKindState::LaunchPad(ref mut pad_state) = module.kind_state {
+                if !pad_state.available && pad_state.recovery_ticks_remaining > 0 {
+                    pad_state.recovery_ticks_remaining -= 1;
+                    if pad_state.recovery_ticks_remaining == 0 {
+                        pad_state.available = true;
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn resolve_ship_tasks(

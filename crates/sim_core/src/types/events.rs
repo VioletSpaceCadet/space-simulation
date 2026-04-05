@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AlertSeverity, AnomalyTag, AsteroidId, BehaviorType, ComponentId, CompositionVec, CrewRole,
-    DataKind, ElementId, EventId, FittedModule, HullId, InventoryItem, ModuleDefId,
-    ModuleInstanceId, ModuleItemId, PowerState, RecipeId, ResearchDomain, SatelliteId, ShipId,
-    SiteId, StationId, TechId, TradeItemSpec,
+    DataKind, ElementId, EventId, FittedModule, GroundFacilityId, HullId, InventoryItem,
+    LaunchPayload, ModuleDefId, ModuleInstanceId, ModuleItemId, Position, PowerState, RecipeId,
+    ResearchDomain, SatelliteId, ShipId, SiteId, StationId, TechId, TradeItemSpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -403,5 +403,26 @@ pub enum Event {
         zone_id: String,
         old_tier: String,
         new_tier: String,
+    },
+    /// Emitted when a rocket launches from a ground facility.
+    PayloadLaunched {
+        facility_id: GroundFacilityId,
+        rocket_def_id: String,
+        payload: LaunchPayload,
+        destination: Position,
+        cost: f64,
+        arrival_tick: u64,
+    },
+    /// Emitted when a launched payload arrives at its destination.
+    PayloadDelivered {
+        facility_id: GroundFacilityId,
+        rocket_def_id: String,
+        payload: LaunchPayload,
+        destination: Position,
+    },
+    /// Emitted when a `StationKit` payload creates a new orbital station.
+    StationDeployed {
+        station_id: StationId,
+        position: Position,
     },
 }

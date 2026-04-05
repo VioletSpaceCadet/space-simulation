@@ -3,8 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    CommandId, ComponentId, CrewRole, FacilityId, ModuleDefId, ModuleInstanceId, ModuleItemId,
-    PrincipalId, RecipeId, ShipId, StationId, TaskKind, TechId, TradeItemSpec,
+    CommandId, ComponentId, CrewRole, FacilityId, GroundFacilityId, LaunchPayload, ModuleDefId,
+    ModuleInstanceId, ModuleItemId, Position, PrincipalId, RecipeId, ShipId, StationId, TaskKind,
+    TechId, TradeItemSpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -113,6 +114,13 @@ pub enum Command {
         from_port_id: String,
         to_module_id: ModuleInstanceId,
         to_port_id: String,
+    },
+    /// Launch a rocket from a ground facility to deliver payload to orbit.
+    Launch {
+        facility_id: GroundFacilityId,
+        rocket_def_id: String,
+        payload: LaunchPayload,
+        destination: Position,
     },
     /// Transfer molten material along a thermal link.
     TransferMolten {

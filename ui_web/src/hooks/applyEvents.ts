@@ -932,6 +932,9 @@ const EVENT_HANDLERS: Record<string, AnyEventHandler> = {
   SatelliteDeployed: noOp,
   SatelliteFailed: noOp,
   CommTierChanged: noOp,
+  PayloadLaunched: noOp,
+  PayloadDelivered: noOp,
+  StationDeployed: noOp,
 };
 
 export function applyEvents(
