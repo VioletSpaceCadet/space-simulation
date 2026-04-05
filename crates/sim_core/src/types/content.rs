@@ -301,7 +301,7 @@ pub struct GameContent {
     pub milestones: Vec<super::progression::MilestoneDef>,
     /// Rocket definitions loaded from `content/rockets.json`.
     #[serde(default)]
-    pub rocket_defs: Vec<RocketDef>,
+    pub rocket_defs: BTreeMap<String, RocketDef>,
     /// Satellite definitions loaded from `content/satellite_defs.json`.
     #[serde(default)]
     pub satellite_defs: BTreeMap<String, SatelliteDef>,

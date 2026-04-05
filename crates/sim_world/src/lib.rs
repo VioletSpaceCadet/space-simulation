@@ -627,6 +627,15 @@ fn load_satellite_defs(
     Ok(defs.into_iter().map(|d| (d.id.clone(), d)).collect())
 }
 
+fn load_rocket_defs(dir: &Path) -> Result<std::collections::BTreeMap<String, sim_core::RocketDef>> {
+    let defs: Vec<sim_core::RocketDef> = load_optional_json(dir, "rockets.json")?;
+    let mut seen = std::collections::HashSet::new();
+    for def in &defs {
+        assert!(seen.insert(&def.id), "duplicate rocket def id '{}'", def.id);
+    }
+    Ok(defs.into_iter().map(|d| (d.id.clone(), d)).collect())
+}
+
 /// Load recipe definitions from `recipes.json`, validating unique IDs.
 fn load_recipes(
     dir: &Path,
@@ -708,7 +717,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     let milestones: Vec<sim_core::MilestoneDef> = load_optional_json(dir, "milestones.json")?;
     let crew_roles = load_crew_roles(dir)?;
     let recipe_map = load_recipes(dir)?;
-    let rocket_defs: Vec<sim_core::RocketDef> = load_optional_json(dir, "rockets.json")?;
+    let rocket_defs = load_rocket_defs(dir)?;
     let satellite_defs = load_satellite_defs(dir)?;
     let mut content = GameContent {
         content_version: techs_file.content_version,
