@@ -459,6 +459,9 @@ pub fn compute_metrics(state: &GameState, content: &GameContent) -> MetricsSnaps
     for station in state.stations.values() {
         acc.accumulate_station(station, content);
     }
+    for facility in state.ground_facilities.values() {
+        acc.accumulate_ground_facility(facility, content);
+    }
     for ship in state.ships.values() {
         acc.accumulate_ship(ship, content);
     }
@@ -632,6 +635,46 @@ impl MetricsAccumulator {
         if let ModuleKindState::Processor(ps) = &module.kind_state {
             if total_ore_at_station < ps.threshold_kg {
                 entry.starved += 1;
+            }
+        }
+    }
+
+    fn accumulate_ground_facility(
+        &mut self,
+        facility: &crate::GroundFacilityState,
+        content: &GameContent,
+    ) {
+        self.inv.accumulate(&facility.core.inventory);
+
+        // Crew salary
+        for (role, &count) in &facility.core.crew {
+            if let Some(role_def) = content.crew_roles.get(role) {
+                self.crew_salary_per_hour += role_def.salary_per_hour * f64::from(count);
+            }
+        }
+
+        let total_ore: f32 = facility
+            .core
+            .inventory
+            .iter()
+            .filter(|item| item.is_ore())
+            .map(InventoryItem::mass_kg)
+            .sum();
+
+        for module in &facility.core.modules {
+            self.accumulate_module(module, content, total_ore);
+        }
+
+        for item in &facility.core.inventory {
+            if let InventoryItem::Component {
+                component_id,
+                count,
+                ..
+            } = item
+            {
+                if component_id.0 == crate::COMPONENT_REPAIR_KIT {
+                    self.total_repair_kits += *count;
+                }
             }
         }
     }

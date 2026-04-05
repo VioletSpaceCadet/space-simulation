@@ -214,7 +214,14 @@ fn compute_industrial(metrics: &MetricsSnapshot, tick: f64) -> f64 {
 fn compute_research(metrics: &MetricsSnapshot, state: &GameState, content: &GameContent) -> f64 {
     let total_techs = content.techs.len().max(1) as f64;
     let tech_fraction = f64::from(metrics.techs_unlocked) / total_techs;
-    let data_signal = (f64::from(metrics.total_scan_data) / 1000.0).min(1.0);
+    // Use all raw data kinds (SURVEY, OpticalData, RadioData, etc.) — not just SURVEY.
+    let total_raw_data: f64 = state
+        .research
+        .data_pool
+        .values()
+        .map(|v| f64::from(*v))
+        .sum();
+    let data_signal = (total_raw_data / 1000.0).min(1.0);
     // Science satellites contribute to research capability.
     let science_count = state
         .satellites
@@ -226,27 +233,55 @@ fn compute_research(metrics: &MetricsSnapshot, state: &GameState, content: &Game
     tech_fraction * 0.6 + data_signal * 0.25 + science_signal * 0.15
 }
 
-/// Economic Health: balance trend + export revenue per tick.
+/// Economic Health: balance trend + export/grant revenue per tick.
 fn compute_economic(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> f64 {
-    let starting_balance = 1_000_000_000.0_f64;
+    // Use initial balance from constants for normalization (handles both $1B orbital
+    // and $50M ground starts). Falls back to $1B for backward compat.
+    let starting_balance = state.balance.max(50_000_000.0);
     let balance_ratio = (state.balance / starting_balance).clamp(0.0, 2.0) / 2.0;
     let revenue_rate = metrics.export_revenue_total / tick;
     let revenue_signal = (revenue_rate / 10_000.0).min(1.0);
-    // Blend: 50% balance health, 50% revenue generation
-    balance_ratio * 0.5 + revenue_signal * 0.5
+    // Grant income signals economic health for ground-start (no exports yet)
+    let grant_total: f64 = state
+        .progression
+        .grant_history
+        .iter()
+        .map(|g| g.amount)
+        .sum();
+    let grant_rate = grant_total / tick;
+    let grant_signal = (grant_rate / 50_000.0).min(1.0);
+    // Blend: 40% balance, 35% export revenue, 25% grant income
+    balance_ratio * 0.4 + revenue_signal * 0.35 + grant_signal * 0.25
 }
 
-/// Fleet Operations: utilization + fleet size + satellite deployments.
+/// Fleet Operations: utilization + fleet size + satellite deployments + launches.
 fn compute_fleet(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
-    let total = f64::from(metrics.fleet_total).max(1.0);
-    let active = total - f64::from(metrics.fleet_idle);
-    let utilization = active / total;
+    let has_fleet = metrics.fleet_total > 0;
+    let utilization = if has_fleet {
+        let total = f64::from(metrics.fleet_total);
+        let active = total - f64::from(metrics.fleet_idle);
+        active / total
+    } else {
+        0.0
+    };
     let ships_constructed = state.ships.len().saturating_sub(1) as f64; // subtract starting ship
     let construction_signal = (ships_constructed / 5.0).min(1.0);
     // Satellite deployments count as completed missions (sqrt diminishing returns).
     let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
-    // Blend: 50% utilization, 30% fleet growth, 20% satellite deployments
-    utilization * 0.5 + construction_signal * 0.3 + satellite_signal * 0.2
+    // Ground launches count as operational activity.
+    let total_launches = state.counters.stations_deployed as f64
+        + state
+            .ground_facilities
+            .values()
+            .flat_map(|f| f.core.modules.iter())
+            .filter_map(|m| match &m.kind_state {
+                crate::ModuleKindState::LaunchPad(pad) => Some(pad.launches_count as f64),
+                _ => None,
+            })
+            .sum::<f64>();
+    let launch_signal = (total_launches.sqrt() / 3.0).min(1.0);
+    // Blend: 35% utilization, 25% fleet growth, 20% satellites, 20% launches
+    utilization * 0.35 + construction_signal * 0.25 + satellite_signal * 0.2 + launch_signal * 0.2
 }
 
 /// Efficiency: inverted wear + power utilization + storage balance + satellite utilization.
@@ -277,15 +312,16 @@ fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
     (wear_score + power_util + storage_score + sat_util) / 4.0
 }
 
-/// Expansion: station count + fleet size + satellite count (sqrt diminishing returns).
+/// Expansion: bases (stations + ground facilities) + fleet + satellites.
 fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
-    let station_count = state.stations.len() as f64;
-    let station_signal = (station_count / 3.0).min(1.0);
+    // Both station and ground facility count as operational bases.
+    let base_count = (state.stations.len() + state.ground_facilities.len()) as f64;
+    let base_signal = (base_count / 3.0).min(1.0);
     let fleet_signal = (f64::from(metrics.fleet_total).sqrt() / 3.0).min(1.0);
     // Satellites contribute to expansion (orbital infrastructure).
     let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
-    // Blend: 40% stations, 30% fleet reach, 30% satellite infrastructure
-    station_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3
+    // Blend: 40% bases, 30% fleet reach, 30% satellite infrastructure
+    base_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3
 }
 
 /// Resolve the highest threshold name for a given composite score.
