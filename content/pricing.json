@@ -98,6 +98,12 @@
       "exportable": true,
       "category": "module"
     },
+    "module_manufacturing_lab": {
+      "base_price_per_unit": 2500000.0,
+      "importable": true,
+      "exportable": true,
+      "category": "module"
+    },
     "module_propulsion_lab": {
       "base_price_per_unit": 2500000.0,
       "importable": true,

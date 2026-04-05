@@ -168,6 +168,30 @@
     "wear_per_run": 0.005,
     "behavior": {
       "Lab": {
+        "domain": "Engineering",
+        "data_consumption_per_run": 10.0,
+        "research_points_per_run": 5.0,
+        "accepted_data": [
+          "EngineeringData",
+          "ManufacturingData"
+        ],
+        "research_interval_minutes": 60
+      }
+    },
+    "power_stall_priority": 1,
+    "crew_requirement": {
+      "scientist": 1
+    }
+  },
+  {
+    "id": "module_manufacturing_lab",
+    "name": "Manufacturing Lab",
+    "mass_kg": 4000.0,
+    "volume_m3": 8.0,
+    "power_consumption_per_run": 12.0,
+    "wear_per_run": 0.005,
+    "behavior": {
+      "Lab": {
         "domain": "Manufacturing",
         "data_consumption_per_run": 10.0,
         "research_points_per_run": 5.0,

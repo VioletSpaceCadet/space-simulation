@@ -177,6 +177,11 @@
         },
         {
           "kind": "Module",
+          "item_id": "module_item_0032",
+          "module_def_id": "module_manufacturing_lab"
+        },
+        {
+          "kind": "Module",
           "item_id": "module_item_0007",
           "module_def_id": "module_sensor_array"
         },
@@ -320,7 +325,7 @@
         "operator": 11,
         "pilot": 2,
         "technician": 4,
-        "scientist": 4
+        "scientist": 5
       },
       "leaders": []
     }

@@ -198,6 +198,7 @@ impl DataKind {
     pub const TRANSIT: &str = "TransitData";
     pub const OPTICAL: &str = "OpticalData";
     pub const RADIO: &str = "RadioData";
+    pub const ENGINEERING: &str = "EngineeringData";
 }
 
 /// Data-driven research domain. Values come from content JSON (lab defs, tech requirements).
@@ -223,6 +224,7 @@ impl ResearchDomain {
     pub const MATERIALS: &str = "Materials";
     pub const MANUFACTURING: &str = "Manufacturing";
     pub const PROPULSION: &str = "Propulsion";
+    pub const ENGINEERING: &str = "Engineering";
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

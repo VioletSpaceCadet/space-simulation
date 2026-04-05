@@ -536,11 +536,18 @@ fn resolve_assembler_run(
         }
     }
 
-    // Generate engineering data from assembly
+    // Generate manufacturing and engineering data from assembly
+    let action_key = format!("assemble_{}", recipe.id);
     crate::research::generate_data(
         &mut state.research,
         crate::DataKind::new(crate::DataKind::MANUFACTURING),
-        &format!("assemble_{}", recipe.id),
+        &action_key,
+        &content.constants,
+    );
+    crate::research::generate_data(
+        &mut state.research,
+        crate::DataKind::new(crate::DataKind::ENGINEERING),
+        &format!("eng_{}", recipe.id),
         &content.constants,
     );
 }
