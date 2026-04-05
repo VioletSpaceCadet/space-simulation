@@ -828,6 +828,52 @@ describe('applyEvents', () => {
         Processor: { threshold_kg: 0, ticks_since_last_run: 0, stalled: false },
       });
     });
+
+    it('propagates slot_index onto the installed ModuleState (SF-07)', () => {
+      const station = makeStation({
+        inventory: [
+          { kind: 'Module', item_id: 'item_ref', module_def_id: 'module_refinery' } as ModuleItem,
+        ],
+      });
+      const events = [{
+        id: 1, tick: 10,
+        event: {
+          ModuleInstalled: {
+            station_id: 'station_001', module_id: 'mod_1',
+            module_item_id: 'item_ref', module_def_id: 'module_refinery',
+            behavior_type: 'Processor',
+            slot_index: 3,
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+
+      expect(result.stations['station_001'].modules[0].slot_index).toBe(3);
+    });
+
+    it('leaves slot_index undefined for legacy frameless installs', () => {
+      const station = makeStation({
+        inventory: [
+          { kind: 'Module', item_id: 'item_ref', module_def_id: 'module_refinery' } as ModuleItem,
+        ],
+      });
+      const events = [{
+        id: 1, tick: 10,
+        event: {
+          ModuleInstalled: {
+            station_id: 'station_001', module_id: 'mod_1',
+            module_item_id: 'item_ref', module_def_id: 'module_refinery',
+            behavior_type: 'Processor',
+            // no slot_index — frameless station
+          },
+        },
+      }];
+
+      const result = applyEvents({}, {}, { station_001: station }, emptyResearch, [], defaultBalance, events);
+
+      expect(result.stations['station_001'].modules[0].slot_index).toBeUndefined();
+    });
   });
 
   describe('ModuleToggled', () => {

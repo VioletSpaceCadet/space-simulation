@@ -453,6 +453,7 @@ pub async fn content_handler(State(app_state): State<AppState>) -> Json<ContentR
         recipes: sim.content.recipes.clone(),
         event_defs,
         hulls: sim.content.hulls.clone(),
+        frames: sim.content.frames.clone(),
     })
 }
 
@@ -465,6 +466,8 @@ pub struct ContentResponse {
     pub recipes: std::collections::BTreeMap<sim_core::RecipeId, sim_core::RecipeDef>,
     pub event_defs: Vec<EventDefInfo>,
     pub hulls: std::collections::BTreeMap<sim_core::HullId, sim_core::HullDef>,
+    /// Station frame catalog. Empty when `content/frame_defs.json` is missing.
+    pub frames: std::collections::BTreeMap<sim_core::FrameId, sim_core::FrameDef>,
 }
 
 #[derive(serde::Serialize, Clone)]
