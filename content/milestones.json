@@ -103,5 +103,66 @@
       "unlock_zone_ids": ["inner_belt", "outer_belt"]
     },
     "phase_advance": "Expansion"
+  },
+  {
+    "id": "first_satellite_deployed",
+    "name": "First Satellite",
+    "description": "Deploy your first satellite into orbit. Space infrastructure begins.",
+    "conditions": [
+      { "type": "counter_above", "counter": "satellites_deployed", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 15000000,
+      "reputation": 20
+    }
+  },
+  {
+    "id": "first_comm_relay",
+    "name": "First Communication Relay",
+    "description": "Deploy a communication satellite, enabling remote zone operations.",
+    "conditions": [
+      { "type": "counter_above", "counter": "comm_satellites", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 10000000,
+      "reputation": 15
+    }
+  },
+  {
+    "id": "orbital_survey_network",
+    "name": "Orbital Survey Network",
+    "description": "Establish a network of 3 or more survey satellites for comprehensive asteroid discovery.",
+    "conditions": [
+      { "type": "counter_above", "counter": "survey_satellites", "threshold": 3 }
+    ],
+    "rewards": {
+      "grant_amount": 25000000,
+      "reputation": 30
+    }
+  },
+  {
+    "id": "deep_space_comm",
+    "name": "Deep Space Communications",
+    "description": "Deploy communication relays enabling operations in the asteroid belt.",
+    "conditions": [
+      { "type": "milestone_completed", "milestone_id": "first_comm_relay" },
+      { "type": "counter_above", "counter": "comm_satellites", "threshold": 2 }
+    ],
+    "rewards": {
+      "grant_amount": 30000000,
+      "reputation": 35
+    }
+  },
+  {
+    "id": "science_constellation",
+    "name": "Science Constellation",
+    "description": "Operate 2 or more science platforms for enhanced data collection.",
+    "conditions": [
+      { "type": "counter_above", "counter": "science_satellites", "threshold": 2 }
+    ],
+    "rewards": {
+      "grant_amount": 20000000,
+      "reputation": 25
+    }
   }
 ]
