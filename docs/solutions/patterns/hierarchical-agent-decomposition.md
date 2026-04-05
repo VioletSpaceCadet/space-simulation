@@ -2,8 +2,9 @@
 title: "Hierarchical Agent Decomposition: Flat Behaviors → Per-Entity Agents"
 category: patterns
 date: 2026-03-29
-tags: [architecture, agents, refactoring, sim_control, autopilot, scoping]
-tickets: [VIO-445, VIO-446, VIO-447, VIO-448, VIO-449, VIO-450, VIO-451, VIO-452, VIO-453, VIO-454]
+last_refreshed: 2026-04-05
+tags: [architecture, agents, refactoring, sim_control, autopilot, scoping, strategic-layer]
+tickets: [VIO-445, VIO-446, VIO-447, VIO-448, VIO-449, VIO-450, VIO-451, VIO-452, VIO-453, VIO-454, VIO-479, VIO-480]
 ---
 
 # Hierarchical Agent Decomposition
@@ -14,25 +15,51 @@ The autopilot was a flat monolithic controller with 9 behaviors (`Vec<Box<dyn Au
 
 ## Solution
 
-Decompose into per-entity agents: `StationAgent` (per-station, 9 sub-concerns) and `ShipAgent` (per-ship, tactical execution). Station agents set objectives for ship agents — layers communicate via typed `ShipObjective` enum, not direct commands.
+Decompose into per-entity agents: `StationAgent` (per-station, 9 sub-concerns), `GroundFacilityAgent` (per-facility, sensor/budget), and `ShipAgent` (per-ship, tactical execution). A `StrategyRuntimeState` sits above the agents and emits shared `ConcernPriorities` that station agents consume. Station agents set objectives for ship agents — layers communicate via typed `ShipObjective` enum, not direct commands.
 
 ### Architecture
 
 ```
 AutopilotController
+├── strategy_runtime: StrategyRuntimeState            // VIO-479/480 strategic layer
+│   └── evaluate_strategy(state, content) → ConcernPriorities
+│       (gated on interval or dirty flag; hysteresis + temporal bias)
 ├── station_agents: BTreeMap<StationId, StationAgent>
 │   └── generate() → station commands (modules, labs, crew, trade)
 │   └── assign_ship_objectives() → sets ShipObjective on co-located ships
+├── ground_facility_agents: BTreeMap<GroundFacilityId, GroundFacilityAgent>
+│   └── generate() → facility commands (sensor purchase, budget)
 └── ship_agents: BTreeMap<ShipId, ShipAgent>
     └── generate() → tactical commands (transit, mine, deposit, refuel)
 ```
 
 ### Execution Order
 
-1. Sync agent lifecycle (create/remove for new/deleted entities)
-2. Station agents `generate()` in BTreeMap order (deterministic)
-3. Station agents `assign_ship_objectives()` with shared-iterator deduplication
-4. Ship agents `generate()` in BTreeMap order (deterministic)
+0. **Strategic pass** — `evaluate_strategy()` refreshes cached `ConcernPriorities`
+   (cache-hit unless interval elapsed or dirty flag set). Runs first so every
+   per-entity agent within this tick sees consistent priorities.
+1. Sync agent lifecycle (create/remove for new/deleted stations, facilities, ships)
+2. Station agents `generate()` in `BTreeMap` order (deterministic)
+3. Ground facility agents `generate()` in `BTreeMap` order (deterministic)
+4. Station agents `assign_ship_objectives()` with shared-iterator deduplication
+5. Ship agents `generate()` in `BTreeMap` order (deterministic)
+
+### Strategic Layer Gating (VIO-480)
+
+`evaluate_strategy` is a hot path — it's called every `generate_commands` pass
+(every tick in sim_daemon). To keep it cheap:
+
+- **Interval gate**: recomputes only every `STRATEGY_EVAL_INTERVAL_MINUTES`
+  (600 min). Between evaluations, returns the cached `ConcernPriorities`.
+  The interval is converted via `Constants::game_minutes_to_ticks()` so
+  mpt=1 test fixtures behave the same as mpt=60 production.
+- **Dirty flag**: `mark_strategy_dirty()` forces a recompute on the next pass.
+  The `SetStrategyConfig` command handler (VIO-483) sets this so runtime strategy
+  changes take effect immediately instead of waiting for the next gate tick.
+- **Hysteresis**: once a concern is "active" (weight ≥ 0.5), it gets an
+  `HYSTERESIS_BONUS` next evaluation to prevent flicker between runs.
+- **Temporal bias**: per-concern `last_serviced` ticks push neglected concerns
+  up, capped at `TEMPORAL_BIAS_MAX` after `TEMPORAL_BIAS_SATURATION_MINUTES`.
 
 ## Key Pitfall: Global-to-Per-Entity Scoping
 
@@ -98,6 +125,14 @@ Examples of early exits in `StationAgent` sub-concerns:
 These early exits restored throughput to pre-refactor levels while keeping the clean per-concern method structure.
 
 ## Related Patterns
+
+### Strategic Layer Foundation (VIO-479/480, VIO-482–484, VIO-605)
+
+See [autopilot strategic layer foundation patterns](./autopilot-strategic-layer-foundation-patterns.md)
+for the full P6 Phase C learnings: rule-interpreter design, cache gating,
+content-vs-runtime-state counting, the `Command`+`Event` cross-layer checklist,
+and the "safe slice" multi-ticket parallelization strategy. The strategic layer
+was added on top of this per-entity agent architecture — it does not replace it.
 
 ### ModuleDefBuilder (VIO-436/437)
 
