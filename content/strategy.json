@@ -1,5 +1,5 @@
 {
-  "version": "strategy-v1",
+  "version": "strategy-v2",
   "mode": "Balanced",
   "priorities": {
     "mining": 0.7,
@@ -20,5 +20,9 @@
   "export_batch_size_kg": 500.0,
   "export_min_revenue": 1000.0,
   "budget_cap_fraction": 0.05,
-  "refuel_threshold_pct": 0.8
+  "refuel_threshold_pct": 0.8,
+  "refuel_max_pct": 0.99,
+  "shipyard_component_count": 4,
+  "power_deficit_threshold_kw": 0.01,
+  "crew_hire_projection_minutes": 43200
 }
