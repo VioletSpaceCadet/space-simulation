@@ -897,6 +897,7 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             next_asteroid_id: 0,
             next_lot_id: 0,
             next_module_instance_id: 0,
+            ..Default::default()
         },
         modifiers: sim_core::modifiers::ModifierSet::default(),
         events: sim_core::sim_events::SimEventState::default(),
@@ -1625,6 +1626,7 @@ mod tests {
                 next_asteroid_id: 0,
                 next_lot_id: 0,
                 next_module_instance_id: 0,
+                ..Default::default()
             },
             modifiers: sim_core::modifiers::ModifierSet::default(),
             events: sim_core::sim_events::SimEventState::default(),

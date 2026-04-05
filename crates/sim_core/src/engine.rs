@@ -582,6 +582,7 @@ fn resolve_transit_payload(
                 leaders: Vec::new(),
             };
             state.stations.insert(station_id.clone(), station);
+            state.counters.stations_deployed += 1;
             events.push(crate::emit(
                 &mut state.counters,
                 current_tick,

@@ -12,17 +12,23 @@ use crate::{
 ///
 /// Counter names map to computed properties that aren't in `MetricsSnapshot`
 /// but can be derived from `GameState` directly.
-fn resolve_counter(state: &GameState, counter: &str) -> Option<f64> {
+fn resolve_counter(state: &GameState, content: &GameContent, counter: &str) -> Option<f64> {
     match counter {
         "asteroids_discovered" => Some(state.asteroids.len() as f64),
         "techs_unlocked" => Some(state.research.unlocked.len() as f64),
         "ships_built" => Some(state.ships.len() as f64),
         "assembler_runs" => {
-            // Count total component items across all station inventories
+            // Count total component items across all station + ground facility inventories
             let count: usize = state
                 .stations
                 .values()
                 .flat_map(|s| s.core.inventory.iter())
+                .chain(
+                    state
+                        .ground_facilities
+                        .values()
+                        .flat_map(|f| f.core.inventory.iter()),
+                )
                 .filter(|item| matches!(item, crate::InventoryItem::Component { .. }))
                 .count();
             Some(count as f64)
@@ -58,18 +64,67 @@ fn resolve_counter(state: &GameState, counter: &str) -> Option<f64> {
                 .filter(|s| s.enabled && s.satellite_type == "navigation")
                 .count() as f64,
         ),
+        // Ground operations counters
+        "total_raw_data" => {
+            let total: f32 = state.research.data_pool.values().sum();
+            Some(f64::from(total))
+        }
+        "asteroids_classified" => Some(
+            state
+                .asteroids
+                .values()
+                .filter(|a| a.knowledge.composition.is_some())
+                .count() as f64,
+        ),
+        "rockets_in_inventory" => {
+            let count: usize = state
+                .stations
+                .values()
+                .flat_map(|s| s.core.inventory.iter())
+                .chain(
+                    state
+                        .ground_facilities
+                        .values()
+                        .flat_map(|f| f.core.inventory.iter()),
+                )
+                .filter(|item| {
+                    matches!(item, crate::InventoryItem::Component { component_id, .. }
+                        if content.rocket_defs.contains_key(component_id.0.as_str()))
+                })
+                .count();
+            Some(count as f64)
+        }
+        "total_launches" => {
+            let count: u64 = state
+                .ground_facilities
+                .values()
+                .flat_map(|f| f.core.modules.iter())
+                .filter_map(|m| match &m.kind_state {
+                    crate::ModuleKindState::LaunchPad(pad) => Some(pad.launches_count),
+                    _ => None,
+                })
+                .sum();
+            Some(count as f64)
+        }
+        "stations_deployed" => Some(state.counters.stations_deployed as f64),
+        "reusable_landings" => Some(0.0), // Placeholder — VIO-560 deferred
         _ => None,
     }
 }
 
 /// Check whether a single milestone condition is met.
-fn condition_met(cond: &MilestoneCondition, state: &GameState, metrics: &MetricsSnapshot) -> bool {
+fn condition_met(
+    cond: &MilestoneCondition,
+    state: &GameState,
+    content: &GameContent,
+    metrics: &MetricsSnapshot,
+) -> bool {
     match cond {
         MilestoneCondition::MetricAbove { field, threshold } => metrics
             .get_field_f64(field)
             .is_some_and(|val| val >= *threshold),
         MilestoneCondition::CounterAbove { counter, threshold } => {
-            resolve_counter(state, counter).is_some_and(|val| val >= *threshold)
+            resolve_counter(state, content, counter).is_some_and(|val| val >= *threshold)
         }
         MilestoneCondition::MilestoneCompleted { milestone_id } => {
             state.progression.is_milestone_completed(milestone_id)
@@ -116,7 +171,7 @@ pub fn evaluate_milestones(
             let all_met = milestone
                 .conditions
                 .iter()
-                .all(|c| condition_met(c, state, &metrics));
+                .all(|c| condition_met(c, state, content, &metrics));
 
             if all_met {
                 // Mark completed
@@ -443,10 +498,22 @@ mod tests {
         let mut state = base_state(&content);
 
         // No satellites — all counters should be 0.
-        assert_eq!(resolve_counter(&state, "satellites_deployed"), Some(0.0));
-        assert_eq!(resolve_counter(&state, "comm_satellites"), Some(0.0));
-        assert_eq!(resolve_counter(&state, "survey_satellites"), Some(0.0));
-        assert_eq!(resolve_counter(&state, "science_satellites"), Some(0.0));
+        assert_eq!(
+            resolve_counter(&state, &content, "satellites_deployed"),
+            Some(0.0)
+        );
+        assert_eq!(
+            resolve_counter(&state, &content, "comm_satellites"),
+            Some(0.0)
+        );
+        assert_eq!(
+            resolve_counter(&state, &content, "survey_satellites"),
+            Some(0.0)
+        );
+        assert_eq!(
+            resolve_counter(&state, &content, "science_satellites"),
+            Some(0.0)
+        );
 
         // Add satellites.
         state.satellites.insert(
@@ -492,10 +559,22 @@ mod tests {
             },
         );
 
-        assert_eq!(resolve_counter(&state, "satellites_deployed"), Some(2.0));
-        assert_eq!(resolve_counter(&state, "comm_satellites"), Some(1.0));
-        assert_eq!(resolve_counter(&state, "survey_satellites"), Some(1.0));
-        assert_eq!(resolve_counter(&state, "science_satellites"), Some(0.0));
+        assert_eq!(
+            resolve_counter(&state, &content, "satellites_deployed"),
+            Some(2.0)
+        );
+        assert_eq!(
+            resolve_counter(&state, &content, "comm_satellites"),
+            Some(1.0)
+        );
+        assert_eq!(
+            resolve_counter(&state, &content, "survey_satellites"),
+            Some(1.0)
+        );
+        assert_eq!(
+            resolve_counter(&state, &content, "science_satellites"),
+            Some(0.0)
+        );
     }
 
     #[test]
@@ -549,6 +628,274 @@ mod tests {
         assert!(
             (state.balance - initial_balance - 15_000_000.0).abs() < f64::EPSILON,
             "grant should be applied"
+        );
+    }
+
+    #[test]
+    fn ground_operations_counters() {
+        let content = base_content();
+        let mut state = base_state(&content);
+
+        // total_raw_data — initially 0
+        assert_eq!(
+            resolve_counter(&state, &content, "total_raw_data"),
+            Some(0.0)
+        );
+
+        // Add some raw data
+        state
+            .research
+            .data_pool
+            .insert(crate::DataKind::new("OpticalData"), 5.0);
+        assert_eq!(
+            resolve_counter(&state, &content, "total_raw_data"),
+            Some(5.0)
+        );
+
+        // asteroids_classified — initially 0
+        assert_eq!(
+            resolve_counter(&state, &content, "asteroids_classified"),
+            Some(0.0)
+        );
+
+        // Add an asteroid without classification
+        let asteroid_id = crate::AsteroidId("a1".into());
+        state.asteroids.insert(
+            asteroid_id.clone(),
+            crate::AsteroidState {
+                id: asteroid_id,
+                position: crate::test_fixtures::test_position(),
+                true_composition: std::collections::HashMap::from([("Fe".into(), 0.7)]),
+                anomaly_tags: vec![],
+                mass_kg: 1000.0,
+                knowledge: crate::AsteroidKnowledge {
+                    tag_beliefs: vec![],
+                    composition: None,
+                },
+            },
+        );
+        assert_eq!(
+            resolve_counter(&state, &content, "asteroids_classified"),
+            Some(0.0),
+            "unclassified asteroid should not count"
+        );
+
+        // Classify the asteroid
+        state
+            .asteroids
+            .get_mut(&crate::AsteroidId("a1".into()))
+            .unwrap()
+            .knowledge
+            .composition = Some(std::collections::HashMap::from([("Fe".into(), 0.7)]));
+        assert_eq!(
+            resolve_counter(&state, &content, "asteroids_classified"),
+            Some(1.0)
+        );
+
+        // total_launches — initially 0
+        assert_eq!(
+            resolve_counter(&state, &content, "total_launches"),
+            Some(0.0)
+        );
+
+        // stations_deployed — from counters, initially 0
+        assert_eq!(
+            resolve_counter(&state, &content, "stations_deployed"),
+            Some(0.0)
+        );
+
+        // reusable_landings — placeholder, always 0
+        assert_eq!(
+            resolve_counter(&state, &content, "reusable_landings"),
+            Some(0.0)
+        );
+    }
+
+    #[test]
+    fn rockets_in_inventory_counter() {
+        let mut content = base_content();
+        // Add a test rocket def
+        content.rocket_defs.insert(
+            "rocket_test".into(),
+            crate::RocketDef {
+                id: "rocket_test".into(),
+                name: "Test Rocket".into(),
+                payload_capacity_kg: 100.0,
+                base_launch_cost: 1_000_000.0,
+                fuel_kg: 500.0,
+                transit_minutes: 60,
+                required_tech: None,
+            },
+        );
+
+        let mut state = base_state(&content);
+
+        // No rockets in inventory initially
+        assert_eq!(
+            resolve_counter(&state, &content, "rockets_in_inventory"),
+            Some(0.0)
+        );
+
+        // Add a non-rocket component — should not count
+        state
+            .stations
+            .values_mut()
+            .next()
+            .unwrap()
+            .core
+            .inventory
+            .push(crate::InventoryItem::Component {
+                component_id: crate::ComponentId("nozzle".into()),
+                count: 1,
+                quality: 1.0,
+            });
+        assert_eq!(
+            resolve_counter(&state, &content, "rockets_in_inventory"),
+            Some(0.0),
+            "non-rocket component should not count"
+        );
+
+        // Add a rocket component matching a rocket_def key
+        state
+            .stations
+            .values_mut()
+            .next()
+            .unwrap()
+            .core
+            .inventory
+            .push(crate::InventoryItem::Component {
+                component_id: crate::ComponentId("rocket_test".into()),
+                count: 1,
+                quality: 1.0,
+            });
+        assert_eq!(
+            resolve_counter(&state, &content, "rockets_in_inventory"),
+            Some(1.0),
+            "rocket component matching rocket_def key should count"
+        );
+    }
+
+    #[test]
+    fn first_observation_milestone_triggers() {
+        let mut content = base_content();
+        content.milestones = vec![test_milestone(
+            "first_observation",
+            vec![MilestoneCondition::CounterAbove {
+                counter: "total_raw_data".into(),
+                threshold: 1.0,
+            }],
+        )];
+
+        let mut state = base_state(&content);
+
+        // No data — should not trigger
+        let mut events = Vec::new();
+        let completed = evaluate_milestones(&mut state, &content, &mut events);
+        assert!(completed.is_empty());
+
+        // Add raw data
+        state
+            .research
+            .data_pool
+            .insert(crate::DataKind::new("OpticalData"), 3.0);
+        let completed = evaluate_milestones(&mut state, &content, &mut events);
+        assert_eq!(completed, vec!["first_observation"]);
+    }
+
+    #[test]
+    fn first_launch_milestone_triggers() {
+        let mut content = base_content();
+        content.milestones = vec![MilestoneDef {
+            id: "first_launch".into(),
+            name: "First Launch".into(),
+            description: String::new(),
+            conditions: vec![MilestoneCondition::CounterAbove {
+                counter: "total_launches".into(),
+                threshold: 1.0,
+            }],
+            rewards: MilestoneReward {
+                grant_amount: 25_000_000.0,
+                reputation: 30.0,
+                unlock_trade_tier: None,
+                unlock_zone_ids: vec![],
+                unlock_module_ids: vec![],
+            },
+            phase_advance: Some(GamePhase::Orbital),
+        }];
+
+        let mut state = base_state(&content);
+        assert_eq!(state.progression.phase, GamePhase::Startup);
+
+        // No launches — should not trigger
+        let mut events = Vec::new();
+        let completed = evaluate_milestones(&mut state, &content, &mut events);
+        assert!(completed.is_empty());
+
+        // Add a ground facility with a launched pad
+        let facility_id = crate::GroundFacilityId("gf1".into());
+        let mut facility = crate::GroundFacilityState {
+            id: facility_id.clone(),
+            name: "Test Facility".into(),
+            position: crate::test_fixtures::test_position(),
+            core: crate::FacilityCore::default(),
+            launch_transits: vec![],
+        };
+        facility.core.modules.push(crate::ModuleState {
+            id: crate::ModuleInstanceId("1".into()),
+            def_id: "module_launch_pad_small".into(),
+            enabled: true,
+            wear: crate::WearState::default(),
+            kind_state: crate::ModuleKindState::LaunchPad(crate::LaunchPadState {
+                available: true,
+                recovery_ticks_remaining: 0,
+                launches_count: 1,
+            }),
+            thermal: None,
+            power_stalled: false,
+            module_priority: 0,
+            assigned_crew: Default::default(),
+            efficiency: 1.0,
+            prev_crew_satisfied: true,
+        });
+        state.ground_facilities.insert(facility_id, facility);
+
+        let completed = evaluate_milestones(&mut state, &content, &mut events);
+        assert_eq!(completed, vec!["first_launch"]);
+        assert_eq!(state.progression.phase, GamePhase::Orbital);
+    }
+
+    #[test]
+    fn assembler_runs_includes_ground_facilities() {
+        let content = base_content();
+        let mut state = base_state(&content);
+
+        // Start with just station components
+        let station_count = resolve_counter(&state, &content, "assembler_runs").unwrap_or(0.0);
+
+        // Add a component to a ground facility
+        let facility_id = crate::GroundFacilityId("gf1".into());
+        let mut facility = crate::GroundFacilityState {
+            id: facility_id.clone(),
+            name: "Test Facility".into(),
+            position: crate::test_fixtures::test_position(),
+            core: crate::FacilityCore::default(),
+            launch_transits: vec![],
+        };
+        facility
+            .core
+            .inventory
+            .push(crate::InventoryItem::Component {
+                component_id: crate::ComponentId("nozzle".into()),
+                count: 1,
+                quality: 1.0,
+            });
+        state.ground_facilities.insert(facility_id, facility);
+
+        let new_count = resolve_counter(&state, &content, "assembler_runs").unwrap();
+        assert_eq!(
+            new_count,
+            station_count + 1.0,
+            "ground facility components should count in assembler_runs"
         );
     }
 }
