@@ -12,70 +12,33 @@ use crate::{
 ///
 /// Counter names map to computed properties that aren't in `MetricsSnapshot`
 /// but can be derived from `GameState` directly.
-fn resolve_counter(state: &GameState, content: &GameContent, counter: &str) -> Option<f64> {
+/// Resolve a counter whose value is pulled from satellite aggregates.
+/// Returns `None` for non-satellite counter names so the outer
+/// `resolve_counter` can fall through to other handlers.
+fn resolve_satellite_counter(state: &GameState, counter: &str) -> Option<f64> {
+    let filter = |kind: &str| {
+        state
+            .satellites
+            .values()
+            .filter(|s| s.enabled && s.satellite_type == kind)
+            .count() as f64
+    };
     match counter {
-        "asteroids_discovered" => Some(state.asteroids.len() as f64),
-        "techs_unlocked" => Some(state.research.unlocked.len() as f64),
-        "ships_built" => Some(state.ships.len() as f64),
-        "assembler_runs" => {
-            // Count total component items across all station + ground facility inventories
-            let count: usize = state
-                .stations
-                .values()
-                .flat_map(|s| s.core.inventory.iter())
-                .chain(
-                    state
-                        .ground_facilities
-                        .values()
-                        .flat_map(|f| f.core.inventory.iter()),
-                )
-                .filter(|item| matches!(item, crate::InventoryItem::Component { .. }))
-                .count();
-            Some(count as f64)
-        }
         "satellites_deployed" => {
             Some(state.satellites.values().filter(|s| s.enabled).count() as f64)
         }
-        "comm_satellites" => Some(
-            state
-                .satellites
-                .values()
-                .filter(|s| s.enabled && s.satellite_type == "communication")
-                .count() as f64,
-        ),
-        "survey_satellites" => Some(
-            state
-                .satellites
-                .values()
-                .filter(|s| s.enabled && s.satellite_type == "survey")
-                .count() as f64,
-        ),
-        "science_satellites" => Some(
-            state
-                .satellites
-                .values()
-                .filter(|s| s.enabled && s.satellite_type == "science_platform")
-                .count() as f64,
-        ),
-        "nav_satellites" => Some(
-            state
-                .satellites
-                .values()
-                .filter(|s| s.enabled && s.satellite_type == "navigation")
-                .count() as f64,
-        ),
-        // Ground operations counters
-        "total_raw_data" => {
-            let total: f32 = state.research.data_pool.values().sum();
-            Some(f64::from(total))
-        }
-        "asteroids_classified" => Some(
-            state
-                .asteroids
-                .values()
-                .filter(|a| a.knowledge.composition.is_some())
-                .count() as f64,
-        ),
+        "comm_satellites" => Some(filter("communication")),
+        "survey_satellites" => Some(filter("survey")),
+        "science_satellites" => Some(filter("science_platform")),
+        "nav_satellites" => Some(filter("navigation")),
+        _ => None,
+    }
+}
+
+/// Resolve a counter whose value is pulled from the ground launch system
+/// (rocket inventory, launch pad counts).
+fn resolve_launch_counter(state: &GameState, content: &GameContent, counter: &str) -> Option<f64> {
+    match counter {
         "rockets_in_inventory" => {
             let count: usize = state
                 .stations
@@ -106,9 +69,76 @@ fn resolve_counter(state: &GameState, content: &GameContent, counter: &str) -> O
                 .sum();
             Some(count as f64)
         }
+        _ => None,
+    }
+}
+
+/// Resolve a P5 station-structure counter (VIO-601). Covers the
+/// `total_stations` and `max_labs_on_any_station` counters used by the
+/// station construction milestones.
+fn resolve_station_structure_counter(state: &GameState, counter: &str) -> Option<f64> {
+    match counter {
+        "total_stations" => Some(state.stations.len() as f64),
+        "max_labs_on_any_station" => {
+            // Max count of Lab modules on any single station — feeds the
+            // `research_station_operational` milestone which requires a
+            // station with 3+ labs (i.e. a specialized research outpost).
+            let max = state
+                .stations
+                .values()
+                .map(|s| {
+                    s.core
+                        .modules
+                        .iter()
+                        .filter(|m| matches!(m.kind_state, crate::ModuleKindState::Lab(_)))
+                        .count()
+                })
+                .max()
+                .unwrap_or(0);
+            Some(max as f64)
+        }
+        _ => None,
+    }
+}
+
+fn resolve_counter(state: &GameState, content: &GameContent, counter: &str) -> Option<f64> {
+    match counter {
+        "asteroids_discovered" => Some(state.asteroids.len() as f64),
+        "techs_unlocked" => Some(state.research.unlocked.len() as f64),
+        "ships_built" => Some(state.ships.len() as f64),
+        "assembler_runs" => {
+            // Count total component items across all station + ground facility inventories
+            let count: usize = state
+                .stations
+                .values()
+                .flat_map(|s| s.core.inventory.iter())
+                .chain(
+                    state
+                        .ground_facilities
+                        .values()
+                        .flat_map(|f| f.core.inventory.iter()),
+                )
+                .filter(|item| matches!(item, crate::InventoryItem::Component { .. }))
+                .count();
+            Some(count as f64)
+        }
+        // Ground operations counters
+        "total_raw_data" => {
+            let total: f32 = state.research.data_pool.values().sum();
+            Some(f64::from(total))
+        }
+        "asteroids_classified" => Some(
+            state
+                .asteroids
+                .values()
+                .filter(|a| a.knowledge.composition.is_some())
+                .count() as f64,
+        ),
         "stations_deployed" => Some(state.counters.stations_deployed as f64),
         "reusable_landings" => Some(0.0), // Placeholder — VIO-560 deferred
-        _ => None,
+        _ => resolve_satellite_counter(state, counter)
+            .or_else(|| resolve_launch_counter(state, content, counter))
+            .or_else(|| resolve_station_structure_counter(state, counter)),
     }
 }
 
@@ -733,6 +763,75 @@ mod tests {
         assert_eq!(
             resolve_counter(&state, &content, "reusable_landings"),
             Some(0.0)
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // VIO-601: P5 station construction milestone counters
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn total_stations_counter_counts_state_stations() {
+        let content = base_content();
+        let state = base_state(&content);
+        // base_state seeds one station (station_earth_orbit).
+        assert_eq!(
+            resolve_counter(&state, &content, "total_stations"),
+            Some(1.0),
+            "base_state should have exactly 1 station"
+        );
+    }
+
+    #[test]
+    fn total_stations_counter_increments_with_new_stations() {
+        let content = base_content();
+        let mut state = base_state(&content);
+        // Add a second station
+        let new_station_id = crate::StationId("station_second".to_string());
+        state.stations.insert(
+            new_station_id.clone(),
+            crate::StationState {
+                id: new_station_id,
+                position: crate::test_fixtures::test_position(),
+                core: crate::FacilityCore::default(),
+                frame_id: None,
+                leaders: Vec::new(),
+            },
+        );
+        assert_eq!(
+            resolve_counter(&state, &content, "total_stations"),
+            Some(2.0)
+        );
+    }
+
+    #[test]
+    fn max_labs_on_any_station_counter() {
+        use crate::test_fixtures::test_module;
+        let content = base_content();
+        let mut state = base_state(&content);
+        // No labs initially on the starting station.
+        assert_eq!(
+            resolve_counter(&state, &content, "max_labs_on_any_station"),
+            Some(0.0),
+            "no labs on base station initially"
+        );
+
+        // Push 3 lab modules onto the starting station.
+        let station = state.stations.values_mut().next().unwrap();
+        for i in 0..3 {
+            station.core.modules.push(test_module(
+                &format!("lab_{i}"),
+                crate::ModuleKindState::Lab(crate::LabState {
+                    ticks_since_last_run: 0,
+                    assigned_tech: None,
+                    starved: false,
+                }),
+            ));
+        }
+        assert_eq!(
+            resolve_counter(&state, &content, "max_labs_on_any_station"),
+            Some(3.0),
+            "3 labs on one station should report max=3"
         );
     }
 

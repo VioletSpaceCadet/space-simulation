@@ -265,5 +265,72 @@
       "grant_amount": 30000000,
       "reputation": 35
     }
+  },
+  {
+    "id": "first_station_constructed",
+    "name": "First Station Constructed",
+    "description": "Deploy your first additional station beyond the starting outpost. Construction or launched delivery both count.",
+    "conditions": [
+      { "type": "counter_above", "counter": "stations_deployed", "threshold": 1 }
+    ],
+    "rewards": {
+      "grant_amount": 50000000,
+      "reputation": 40
+    }
+  },
+  {
+    "id": "belt_outpost",
+    "name": "Belt Outpost",
+    "description": "Expand operations into the asteroid belt by deploying a second station. Unlocks belt mining zones.",
+    "conditions": [
+      { "type": "milestone_completed", "milestone_id": "first_station_constructed" },
+      { "type": "counter_above", "counter": "stations_deployed", "threshold": 2 }
+    ],
+    "rewards": {
+      "grant_amount": 40000000,
+      "reputation": 35,
+      "unlock_zone_ids": ["inner_belt", "outer_belt"]
+    }
+  },
+  {
+    "id": "multi_station_logistics",
+    "name": "Multi-Station Logistics",
+    "description": "Operate a network of two or more stations working in concert.",
+    "conditions": [
+      { "type": "milestone_completed", "milestone_id": "first_station_constructed" },
+      { "type": "counter_above", "counter": "total_stations", "threshold": 2 }
+    ],
+    "rewards": {
+      "grant_amount": 30000000,
+      "reputation": 30
+    }
+  },
+  {
+    "id": "research_station_operational",
+    "name": "Research Station",
+    "description": "Deploy a dedicated research outpost equipped with three or more laboratories.",
+    "conditions": [
+      { "type": "milestone_completed", "milestone_id": "first_station_constructed" },
+      { "type": "counter_above", "counter": "max_labs_on_any_station", "threshold": 3 }
+    ],
+    "rewards": {
+      "grant_amount": 25000000,
+      "reputation": 30
+    }
+  },
+  {
+    "id": "self_sustaining_network",
+    "name": "Self-Sustaining Station Network",
+    "description": "Operate three or more stations with a positive treasury balance. The network pays for itself.",
+    "conditions": [
+      { "type": "milestone_completed", "milestone_id": "multi_station_logistics" },
+      { "type": "counter_above", "counter": "total_stations", "threshold": 3 },
+      { "type": "metric_above", "field": "balance", "threshold": 0.0 }
+    ],
+    "rewards": {
+      "grant_amount": 100000000,
+      "reputation": 50
+    },
+    "phase_advance": "DeepSpace"
   }
 ]

@@ -1735,6 +1735,109 @@ fn progression_start_module_defs_exist() {
     }
 }
 
+/// VIO-601: All P5 station construction milestones are present and have
+/// resolvable prereq chains.
+#[test]
+fn p5_station_construction_milestones_are_valid() {
+    let content = load_test_content();
+    let expected_ids = [
+        "first_station_constructed",
+        "belt_outpost",
+        "multi_station_logistics",
+        "research_station_operational",
+        "self_sustaining_network",
+    ];
+    for id in expected_ids {
+        let milestone = content
+            .milestones
+            .iter()
+            .find(|m| m.id == id)
+            .unwrap_or_else(|| panic!("milestone '{id}' missing from content/milestones.json"));
+        assert!(
+            milestone.rewards.grant_amount > 0.0,
+            "milestone '{id}' should award a grant"
+        );
+    }
+    // Prereq chain: belt_outpost, multi_station_logistics, and
+    // research_station_operational all depend on first_station_constructed.
+    // self_sustaining_network depends on multi_station_logistics. Verify.
+    let find = |id: &str| {
+        content
+            .milestones
+            .iter()
+            .find(|m| m.id == id)
+            .expect("milestone")
+    };
+    let depends_on = |milestone: &sim_core::MilestoneDef, prereq: &str| {
+        milestone.conditions.iter().any(|c| {
+            matches!(
+                c,
+                sim_core::MilestoneCondition::MilestoneCompleted { milestone_id }
+                    if milestone_id == prereq
+            )
+        })
+    };
+    assert!(depends_on(
+        find("belt_outpost"),
+        "first_station_constructed"
+    ));
+    assert!(depends_on(
+        find("multi_station_logistics"),
+        "first_station_constructed"
+    ));
+    assert!(depends_on(
+        find("research_station_operational"),
+        "first_station_constructed"
+    ));
+    assert!(depends_on(
+        find("self_sustaining_network"),
+        "multi_station_logistics"
+    ));
+}
+
+/// VIO-601: `first_station_constructed` fires when `stations_deployed`
+/// counter crosses the threshold during a tick.
+#[test]
+fn first_station_constructed_fires_on_counter_increment() {
+    use rand::SeedableRng;
+    let content = load_test_content();
+    let seed = 42u64;
+    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+    let mut state = crate::build_initial_state(&content, seed, &mut rng);
+
+    // Initially no P5 milestones completed.
+    assert!(
+        !state
+            .progression
+            .completed_milestones
+            .contains("first_station_constructed"),
+        "milestone should not be completed at start"
+    );
+
+    // Simulate a station deployment by bumping the counter.
+    state.counters.stations_deployed = 1;
+
+    // Evaluate milestones directly.
+    let mut events = Vec::new();
+    sim_core::milestone::evaluate_milestones(&mut state, &content, &mut events);
+
+    assert!(
+        state
+            .progression
+            .completed_milestones
+            .contains("first_station_constructed"),
+        "first_station_constructed should fire once stations_deployed >= 1"
+    );
+    // Grant should have been applied.
+    let grant = state
+        .progression
+        .grant_history
+        .iter()
+        .find(|g| g.milestone_id == "first_station_constructed")
+        .expect("grant record should exist");
+    assert!((grant.amount - 50_000_000.0).abs() < 1.0);
+}
+
 /// progression_start has expected minimal starting conditions.
 #[test]
 fn progression_start_is_minimal() {
