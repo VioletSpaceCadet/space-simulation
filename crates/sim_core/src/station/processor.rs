@@ -1735,6 +1735,7 @@ mod tests {
         content.techs.push(crate::TechDef {
             id: tech_id.clone(),
             name: "Advanced Smelting".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::new(),
             accepted_data: vec![],

@@ -222,6 +222,7 @@ pub fn base_content() -> GameContent {
         techs: vec![TechDef {
             id: TechId("tech_deep_scan_v1".to_string()),
             name: "Deep Scan v1".to_string(),
+            tier: 1,
             prereqs: vec![],
             domain_requirements: HashMap::new(),
             accepted_data: vec![DataKind::new(DataKind::SURVEY)],
@@ -406,6 +407,11 @@ pub fn base_content() -> GameContent {
             // Launch system
             launch_fuel_cost_per_kg: 0.50,
             launch_fuel_element: "LH2".to_string(),
+            // Research pacing (defaults = no effect)
+            research_speed_multiplier: 1.0,
+            research_domain_rates: std::collections::HashMap::new(),
+            research_tier_scaling: Vec::new(),
+            research_lab_diminishing_returns: 1.0,
         },
         alert_rules: Vec::new(),
         events: Vec::new(),
@@ -645,6 +651,11 @@ pub fn minimal_content() -> GameContent {
             // Launch system
             launch_fuel_cost_per_kg: 0.50,
             launch_fuel_element: "LH2".to_string(),
+            // Research pacing (defaults = no effect)
+            research_speed_multiplier: 1.0,
+            research_domain_rates: std::collections::HashMap::new(),
+            research_tier_scaling: Vec::new(),
+            research_lab_diminishing_returns: 1.0,
         },
         alert_rules: Vec::new(),
         events: Vec::new(),

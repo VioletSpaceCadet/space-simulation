@@ -72,6 +72,11 @@ fn validate_elements(element_ids: &HashSet<&str>) {
 fn validate_techs(content: &GameContent, _element_ids: &HashSet<&str>) {
     let tech_ids: HashSet<&TechId> = content.techs.iter().map(|t| &t.id).collect();
     for tech in &content.techs {
+        assert!(
+            tech.tier > 0,
+            "tech '{}' has tier 0 (must be >= 1)",
+            tech.id.0
+        );
         for prereq in &tech.prereqs {
             assert!(
                 tech_ids.contains(prereq),
@@ -94,6 +99,58 @@ fn validate_techs(content: &GameContent, _element_ids: &HashSet<&str>) {
                     value,
                 );
             }
+        }
+    }
+
+    // Cross-reference: required_tech on rockets, satellites, modules, recipes, hulls
+    for rocket in content.rocket_defs.values() {
+        if let Some(ref tech) = rocket.required_tech {
+            assert!(
+                tech_ids.contains(tech),
+                "rocket '{}' requires unknown tech '{}'",
+                rocket.id,
+                tech.0,
+            );
+        }
+    }
+    for sat in content.satellite_defs.values() {
+        if let Some(ref tech) = sat.required_tech {
+            assert!(
+                tech_ids.contains(tech),
+                "satellite '{}' requires unknown tech '{}'",
+                sat.id,
+                tech.0,
+            );
+        }
+    }
+    for module in content.module_defs.values() {
+        if let Some(ref tech) = module.required_tech {
+            assert!(
+                tech_ids.contains(tech),
+                "module '{}' requires unknown tech '{}'",
+                module.id,
+                tech.0,
+            );
+        }
+    }
+    for recipe in content.recipes.values() {
+        if let Some(ref tech) = recipe.required_tech {
+            assert!(
+                tech_ids.contains(tech),
+                "recipe '{}' requires unknown tech '{}'",
+                recipe.id.0,
+                tech.0,
+            );
+        }
+    }
+    for hull in content.hulls.values() {
+        if let Some(ref tech) = hull.required_tech {
+            assert!(
+                tech_ids.contains(tech),
+                "hull '{}' requires unknown tech '{}'",
+                hull.id.0,
+                tech.0,
+            );
         }
     }
 }
@@ -1197,6 +1254,7 @@ mod tests {
         content.techs.push(TechDef {
             id: TechId("tech_a".to_string()),
             name: "A".to_string(),
+            tier: 1,
             prereqs: vec![TechId("tech_nonexistent".to_string())],
             domain_requirements: HashMap::new(),
             accepted_data: vec![],

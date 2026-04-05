@@ -134,6 +134,11 @@ fn replenish_test_content() -> GameContent {
             bottleneck_wear_threshold: 0.8,
             launch_fuel_cost_per_kg: 0.50,
             launch_fuel_element: "LH2".to_string(),
+            // Research pacing (defaults = no effect)
+            research_speed_multiplier: 1.0,
+            research_domain_rates: std::collections::HashMap::new(),
+            research_tier_scaling: Vec::new(),
+            research_lab_diminishing_returns: 1.0,
         },
         alert_rules: Vec::new(),
         events: Vec::new(),

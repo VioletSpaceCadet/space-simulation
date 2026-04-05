@@ -153,6 +153,19 @@ pub struct Constants {
     /// Max module wear above which bottleneck detection flags `WearCritical`.
     #[serde(default = "default_bottleneck_wear_threshold")]
     pub bottleneck_wear_threshold: f32,
+    // Research pacing
+    /// Global multiplier for all research point production (1.0 = normal, 2.0 = 2x speed).
+    #[serde(default = "default_research_speed_multiplier")]
+    pub research_speed_multiplier: f64,
+    /// Per-domain rate multipliers. Keys are domain strings (e.g. "Survey"). Missing = 1.0.
+    #[serde(default)]
+    pub research_domain_rates: std::collections::HashMap<String, f64>,
+    /// Per-tier speed scaling. Index 0 = tier 1, index 1 = tier 2, etc. Missing tiers = 1.0.
+    #[serde(default)]
+    pub research_tier_scaling: Vec<f64>,
+    /// Lab diminishing returns factor. Nth lab produces base * factor^(N-1). 1.0 = no DR.
+    #[serde(default = "default_research_lab_diminishing_returns")]
+    pub research_lab_diminishing_returns: f64,
     // Launch system
     /// Cost per kg of fuel consumed during a rocket launch.
     #[serde(default = "default_launch_fuel_cost_per_kg")]
@@ -333,6 +346,12 @@ fn default_bottleneck_slag_ratio_threshold() -> f32 {
 }
 fn default_bottleneck_wear_threshold() -> f32 {
     0.8
+}
+fn default_research_speed_multiplier() -> f64 {
+    1.0
+}
+fn default_research_lab_diminishing_returns() -> f64 {
+    1.0 // 1.0 = no diminishing returns
 }
 fn default_launch_fuel_cost_per_kg() -> f64 {
     0.50 // $0.50/kg — propellant is ~0.3% of launch cost
