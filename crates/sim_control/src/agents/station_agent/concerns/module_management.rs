@@ -19,7 +19,7 @@ fn manage_power(
 ) {
     let has_power_gen = station.core.power.generated_kw > 0.0;
     let deficit_kw = station.core.power.deficit_kw;
-    if has_power_gen && deficit_kw > ctx.content.autopilot.power_deficit_threshold_kw {
+    if has_power_gen && deficit_kw > ctx.state.strategy_config.power_deficit_threshold_kw {
         // Power deficit: disable least-critical consumers to shed load.
         // Uses power_priority() — None = infrastructure (never shed), lower = shed first.
         let mut shedding_candidates: Vec<(usize, f32, u8)> = station
@@ -251,7 +251,7 @@ impl StationConcern for ModuleManagement {
                         Command::SetModuleThreshold {
                             facility_id: ctx.station_id.clone().into(),
                             module_id: module.id.clone(),
-                            threshold_kg: ctx.content.autopilot.refinery_threshold_kg,
+                            threshold_kg: ctx.state.strategy_config.refinery_threshold_kg,
                         },
                     ));
                 }

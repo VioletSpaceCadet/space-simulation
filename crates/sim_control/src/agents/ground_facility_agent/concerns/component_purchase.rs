@@ -56,7 +56,7 @@ impl GroundFacilityConcern for ComponentPurchase {
             else {
                 continue;
             };
-            if cost > ctx.state.balance * ctx.content.autopilot.budget_cap_fraction {
+            if cost > ctx.state.balance * ctx.state.strategy_config.budget_cap_fraction {
                 continue;
             }
 

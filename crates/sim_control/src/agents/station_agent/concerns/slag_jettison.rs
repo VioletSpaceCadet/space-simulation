@@ -19,7 +19,7 @@ impl StationConcern for SlagJettison {
             return Vec::new();
         };
 
-        let threshold = ctx.content.autopilot.slag_jettison_pct;
+        let threshold = ctx.state.strategy_config.slag_jettison_pct;
         if station.core.cargo_capacity_m3 <= 0.0 {
             return Vec::new();
         }

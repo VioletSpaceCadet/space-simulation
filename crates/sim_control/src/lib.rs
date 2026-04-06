@@ -117,9 +117,10 @@ impl CommandSource for AutopilotController {
         let mut commands = Vec::new();
 
         // Strategic-layer pass: refresh (or cache-hit) ConcernPriorities
-        // BEFORE per-station scoring so downstream consumers (VIO-481 wiring)
-        // observe consistent priorities across agents within a tick.
-        let _priorities =
+        // BEFORE per-station scoring so downstream consumers see consistent
+        // priorities across agents within a tick. Station agents consume these
+        // for weighted ship objective assignment (VIO-481).
+        let priorities =
             strategy_interpreter::evaluate_strategy(state, content, &mut self.strategy_runtime);
 
         // Destructure for disjoint field borrows.
@@ -204,12 +205,14 @@ impl CommandSource for AutopilotController {
 
         // 4. Station agents assign objectives to idle ships (AD1).
         // Deduplication is per-station; multi-station needs strategic layer.
+        // Priorities drive weighted task selection with priority halving (VIO-481).
         for station_agent in station_agents.values() {
             station_agent.assign_ship_objectives(
                 ship_agents,
                 state,
                 content,
                 owner,
+                &priorities,
                 decision_log.as_mut(),
             );
         }
@@ -1173,16 +1176,12 @@ mod tests {
     // --- Task priority ordering tests ---
 
     #[test]
-    fn test_task_priority_survey_before_mine_when_reordered() {
-        let mut content = autopilot_content();
-        // Reorder: Survey before Mine (normally Mine is higher priority)
-        content.autopilot.task_priority = vec![
-            "Deposit".to_string(),
-            "Survey".to_string(),
-            "Mine".to_string(),
-            "DeepScan".to_string(),
-        ];
+    fn test_strategy_weights_survey_before_mine() {
+        let content = autopilot_content();
         let mut state = autopilot_state(&content);
+        // Set survey weight higher than mining so survey is preferred
+        state.strategy_config.priorities.survey = 1.0;
+        state.strategy_config.priorities.mining = 0.1;
 
         // Add both a known asteroid (mine target) and a scan site (survey target)
         let asteroid_id = AsteroidId("asteroid_0001".to_string());
@@ -1200,18 +1199,21 @@ mod tests {
                 },
             },
         );
-        // autopilot_state clears scan_sites, so add one back
-        state.scan_sites.push(sim_core::ScanSite {
-            id: sim_core::SiteId("site_test_001".to_string()),
-            position: test_position(),
-            template_id: "tmpl_iron_rich".to_string(),
-        });
+        // autopilot_state clears scan_sites — add enough to saturate survey urgency
+        // (urgency = sites/20, so 20 sites → urgency 1.0)
+        for i in 0..20 {
+            state.scan_sites.push(sim_core::ScanSite {
+                id: sim_core::SiteId(format!("site_test_{i:03}")),
+                position: test_position(),
+                template_id: "tmpl_iron_rich".to_string(),
+            });
+        }
 
         let mut autopilot = AutopilotController::new();
         let mut next_id = 0u64;
         let commands = autopilot.generate_commands(&state, &content, &mut next_id);
 
-        // With reordered priority, ship should survey (not mine) since Survey is before Mine
+        // With survey weight > mining weight, ship should survey first
         let assigned = commands
             .iter()
             .find(|cmd| matches!(&cmd.command, sim_core::Command::AssignShipTask { .. }));
@@ -1225,15 +1227,18 @@ mod tests {
         );
         assert!(
             is_survey,
-            "with Survey before Mine in task_priority, ship should survey first"
+            "with survey weight > mining weight, ship should survey first"
         );
     }
 
     #[test]
-    fn test_empty_task_priority_assigns_nothing() {
-        let mut content = autopilot_content();
-        content.autopilot.task_priority = vec![];
-        let state = autopilot_state(&content);
+    fn test_zero_weights_assign_nothing() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+        // Zero all task weights — no ship objectives should be assigned
+        state.strategy_config.priorities.mining = 0.0;
+        state.strategy_config.priorities.survey = 0.0;
+        state.strategy_config.priorities.deep_scan = 0.0;
 
         let mut autopilot = AutopilotController::new();
         let mut next_id = 0u64;
@@ -1244,7 +1249,7 @@ mod tests {
             .any(|cmd| matches!(&cmd.command, sim_core::Command::AssignShipTask { .. }));
         assert!(
             !has_ship_task,
-            "empty task_priority should assign no ship tasks"
+            "zero strategy weights should assign no ship tasks"
         );
     }
 
@@ -1490,6 +1495,51 @@ mod tests {
                 }
             )),
             "autopilot should NOT import thrusters when cost exceeds 5% budget cap"
+        );
+    }
+
+    #[test]
+    fn test_autopilot_no_thruster_import_at_fleet_target() {
+        let (content, mut state) = thruster_import_setup();
+        // Default fleet_size_target is 3 — add 3 ships to reach it
+        let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
+        for i in 0..3 {
+            let ship_id = ShipId(format!("ship_fleet_{i}"));
+            state.ships.insert(
+                ship_id.clone(),
+                sim_core::ShipState {
+                    id: ship_id,
+                    owner: owner.clone(),
+                    position: test_position(),
+                    inventory: vec![],
+                    task: None,
+                    hull_id: sim_core::HullId("hull_test_ship".to_string()),
+                    fitted_modules: vec![],
+                    modifiers: Default::default(),
+                    propellant_kg: 0.0,
+                    propellant_capacity_kg: 0.0,
+                    cargo_capacity_m3: 50.0,
+                    speed_ticks_per_au: None,
+                    crew: std::collections::BTreeMap::new(),
+                    leaders: vec![],
+                    home_station: None,
+                },
+            );
+        }
+
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                Command::Import {
+                    item_spec: TradeItemSpec::Component { .. },
+                    ..
+                }
+            )),
+            "should NOT import shipyard components when fleet is at target size"
         );
     }
 
@@ -2246,9 +2296,9 @@ mod tests {
 
     #[test]
     fn test_propellant_disables_when_lh2_abundant() {
-        let mut content = autopilot_content();
-        content.autopilot.lh2_threshold_kg = 1000.0;
+        let content = autopilot_content();
         let mut state = autopilot_state(&content);
+        state.strategy_config.lh2_threshold_kg = 1000.0;
         add_electrolysis_module(&mut state, true);
         rebuild_station_indexes(&mut state, &content);
         add_lh2_inventory(&mut state, 3000.0); // > 2x threshold (2000)
@@ -2274,9 +2324,9 @@ mod tests {
 
     #[test]
     fn test_propellant_dead_band_no_commands() {
-        let mut content = autopilot_content();
-        content.autopilot.lh2_threshold_kg = 1000.0;
+        let content = autopilot_content();
         let mut state = autopilot_state(&content);
+        state.strategy_config.lh2_threshold_kg = 1000.0;
         add_electrolysis_module(&mut state, true);
         rebuild_station_indexes(&mut state, &content);
         add_lh2_inventory(&mut state, 1500.0); // Between threshold (1000) and 2x (2000)
@@ -2580,6 +2630,29 @@ mod tests {
         let mut rng = ChaCha8Rng::seed_from_u64(42);
         let mut state = sim_world::build_initial_state(&content, 42, &mut rng);
         sim_world::validate_state(&state, &content);
+
+        // VIO-481: Verify all 13 StrategyConfig thresholds match AutopilotConfig defaults
+        // so the migration from content.autopilot to state.strategy_config is behavioral-equivalent.
+        let sc = &state.strategy_config;
+        let ap = &content.autopilot;
+        assert!((sc.lh2_threshold_kg - ap.lh2_threshold_kg).abs() < f32::EPSILON);
+        assert!((sc.lh2_abundant_multiplier - ap.lh2_abundant_multiplier).abs() < f32::EPSILON);
+        assert!((sc.volatile_threshold_kg - ap.volatile_threshold_kg).abs() < f32::EPSILON);
+        assert!((sc.refinery_threshold_kg - ap.refinery_threshold_kg).abs() < f32::EPSILON);
+        assert!((sc.slag_jettison_pct - ap.slag_jettison_pct).abs() < f32::EPSILON);
+        assert!((sc.export_batch_size_kg - ap.export_batch_size_kg).abs() < f32::EPSILON);
+        assert!((sc.export_min_revenue - ap.export_min_revenue).abs() < f64::EPSILON);
+        assert!((sc.budget_cap_fraction - ap.budget_cap_fraction).abs() < f64::EPSILON);
+        assert!((sc.refuel_threshold_pct - ap.refuel_threshold_pct).abs() < f32::EPSILON);
+        assert!((sc.refuel_max_pct - ap.refuel_max_pct).abs() < f32::EPSILON);
+        assert!(
+            (sc.power_deficit_threshold_kw - ap.power_deficit_threshold_kw).abs() < f32::EPSILON
+        );
+        assert_eq!(sc.shipyard_component_count, ap.shipyard_component_count);
+        assert_eq!(
+            sc.crew_hire_projection_minutes,
+            ap.crew_hire_projection_minutes
+        );
 
         // Run 500 ticks with autopilot
         let mut controller = AutopilotController::new();
