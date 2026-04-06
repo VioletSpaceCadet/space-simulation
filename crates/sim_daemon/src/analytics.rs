@@ -141,6 +141,11 @@ const TRACKED_METRICS: &[TrackedMetric] = &[
         extract: |s| f64::from(s.heat_wear_multiplier_avg),
         higher_is_better: false,
     },
+    TrackedMetric {
+        name: "transfer_volume_kg",
+        extract: |s| f64::from(s.transfer_volume_kg),
+        higher_is_better: true,
+    },
 ];
 
 const SHORT_WINDOW: usize = 10;
@@ -389,6 +394,8 @@ mod tests {
             heat_wear_multiplier_avg: 0.0,
             satellites_active: 0,
             satellites_failed: 0,
+            transfer_volume_kg: 0.0,
+            transfer_count: 0,
         }
     }
 

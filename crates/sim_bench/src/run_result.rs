@@ -71,6 +71,8 @@ pub struct SummaryMetrics {
     pub heat_wear_multiplier_avg: f64,
     pub satellites_active: u32,
     pub satellites_failed: u32,
+    pub transfer_volume_kg: f64,
+    pub transfer_count: u32,
 }
 
 impl SummaryMetrics {
@@ -105,6 +107,8 @@ impl SummaryMetrics {
             heat_wear_multiplier_avg: f64::from(snapshot.heat_wear_multiplier_avg),
             satellites_active: snapshot.satellites_active,
             satellites_failed: snapshot.satellites_failed,
+            transfer_volume_kg: f64::from(snapshot.transfer_volume_kg),
+            transfer_count: snapshot.transfer_count,
         }
     }
 }
@@ -232,6 +236,8 @@ mod tests {
             heat_wear_multiplier_avg: 0.0,
             satellites_active: 0,
             satellites_failed: 0,
+            transfer_volume_kg: 0.0,
+            transfer_count: 0,
         }
     }
 

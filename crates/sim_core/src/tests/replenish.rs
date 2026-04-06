@@ -218,6 +218,8 @@ fn empty_sites_state(content: &GameContent) -> GameState {
         modifiers: crate::modifiers::ModifierSet::default(),
         events: crate::sim_events::SimEventState::default(),
         propellant_consumed_total: 0.0,
+        transfer_volume_kg: 0.0,
+        transfer_count: 0,
         progression: Default::default(),
         strategy_config: Default::default(),
         body_cache: AHashMap::default(),

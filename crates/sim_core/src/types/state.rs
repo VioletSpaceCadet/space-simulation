@@ -52,6 +52,12 @@ pub struct GameState {
     /// Cumulative propellant consumed (kg) since simulation start.
     #[serde(default)]
     pub propellant_consumed_total: f64,
+    /// Cumulative inter-station transfer volume (kg) since simulation start.
+    #[serde(default)]
+    pub transfer_volume_kg: f64,
+    /// Total number of inter-station transfer pickups since simulation start.
+    #[serde(default)]
+    pub transfer_count: u32,
     /// Progression system state (milestones, phase, grants, trade tier).
     #[serde(default)]
     pub progression: crate::ProgressionState,
