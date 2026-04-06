@@ -56,7 +56,7 @@ impl StationConcern for CrewRecruitment {
             else {
                 continue;
             };
-            let budget_cap = ctx.state.balance * ctx.content.autopilot.budget_cap_fraction;
+            let budget_cap = ctx.state.balance * ctx.state.strategy_config.budget_cap_fraction;
             if cost > budget_cap {
                 continue;
             }
@@ -65,7 +65,7 @@ impl StationConcern for CrewRecruitment {
             let projection_ticks = ctx
                 .content
                 .constants
-                .game_minutes_to_ticks(ctx.content.autopilot.crew_hire_projection_minutes);
+                .game_minutes_to_ticks(ctx.state.strategy_config.crew_hire_projection_minutes);
             let current_salary_per_tick: f64 = ctx
                 .state
                 .stations

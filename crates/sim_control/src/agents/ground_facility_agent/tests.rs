@@ -15,7 +15,6 @@ fn ground_content() -> sim_core::GameContent {
         "module_radio_telescope".to_string(),
     ];
     content.autopilot.ground_opex_max_fraction = 0.001;
-    content.autopilot.budget_cap_fraction = 0.05;
 
     // Add telescope module defs
     content.module_defs.insert(

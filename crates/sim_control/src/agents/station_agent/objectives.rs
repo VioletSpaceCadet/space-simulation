@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use sim_core::{
-    compute_entity_absolute, AsteroidId, GameContent, GameState, PrincipalId, ShipId, SiteId,
-    StationId, TechId,
+    compute_entity_absolute, AsteroidId, ConcernPriorities, GameContent, GameState, PrincipalId,
+    ShipId, SiteId, StationId, TechId,
 };
 
 use crate::agents::ship_agent::ShipAgent;
@@ -119,10 +119,10 @@ pub(in crate::agents) fn collect_mine_candidates(
     let primary_element = &content.autopilot.primary_mining_element;
     let needs_volatiles = station_has_module_with_role(state, support_role)
         && (total_element_inventory(state, volatile_element)
-            < content.autopilot.volatile_threshold_kg
+            < state.strategy_config.volatile_threshold_kg
             || (has_propellant_module
                 && total_element_inventory(state, propellant_element)
-                    < content.autopilot.lh2_threshold_kg));
+                    < state.strategy_config.lh2_threshold_kg));
 
     let sort_element = if needs_volatiles {
         volatile_element
@@ -154,6 +154,7 @@ impl StationAgent {
         state: &GameState,
         content: &GameContent,
         owner: &PrincipalId,
+        priorities: &ConcernPriorities,
         mut decisions: Option<&mut Vec<DecisionRecord>>,
     ) {
         let Some(station) = state.stations.get(&self.station_id) else {
@@ -197,7 +198,17 @@ impl StationAgent {
         let mut next_site = survey_candidates.iter();
         let mut next_mine = mine_candidates.iter();
 
-        // Assign objectives using shared iterators (AD1)
+        // Weighted priority halving (DFHack labormanager pattern).
+        // Each task type has a running weight starting from ConcernPriorities.
+        // For each ship, pick the type with the highest current weight that has
+        // available candidates. After assignment, halve that type's weight so
+        // subsequent ships are distributed proportionally.
+        let mut weights = [
+            ("Mine", priorities.mining),
+            ("Survey", priorities.survey),
+            ("DeepScan", priorities.deep_scan),
+        ];
+
         for ship_id in assignable {
             let Some(ship) = state.ships.get(&ship_id) else {
                 continue;
@@ -211,8 +222,15 @@ impl StationAgent {
                 continue;
             }
 
-            for priority in &content.autopilot.task_priority {
-                let objective = match priority.as_str() {
+            // Sort by weight descending (stable: equal weights keep insertion order)
+            weights.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+            let mut assigned = false;
+            for &mut (priority, ref mut weight) in &mut weights {
+                if *weight <= 0.0 {
+                    break; // All remaining weights are zero — skip assignment
+                }
+                let objective = match priority {
                     "Mine" => next_mine.next().map(|id| ShipObjective::Mine {
                         asteroid_id: id.clone(),
                     }),
@@ -245,9 +263,12 @@ impl StationAgent {
                     if let Some(agent) = ship_agents.get_mut(&ship_id) {
                         agent.objective = Some(obj);
                     }
+                    *weight *= 0.5; // Halve after assignment
+                    assigned = true;
                     break;
                 }
             }
+            let _ = assigned; // Unused ships simply get no objective this tick
         }
     }
 }

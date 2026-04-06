@@ -77,7 +77,7 @@ pub(crate) fn should_opportunistic_refuel(
         return false;
     }
     let fuel_pct = ship.propellant_kg / ship.propellant_capacity_kg;
-    if fuel_pct >= content.autopilot.refuel_threshold_pct {
+    if fuel_pct >= state.strategy_config.refuel_threshold_pct {
         return false;
     }
     // Only refuel if at a station with LH2
@@ -94,7 +94,7 @@ pub(crate) fn try_refuel(
         return None;
     }
     // Only refuel if below max capacity threshold
-    if ship.propellant_kg >= ship.propellant_capacity_kg * content.autopilot.refuel_max_pct {
+    if ship.propellant_kg >= ship.propellant_capacity_kg * state.strategy_config.refuel_max_pct {
         return None;
     }
     // Find co-located station with LH2

@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use sim_core::test_fixtures::{base_content, base_state, test_position};
 use sim_core::{
-    AsteroidId, AsteroidKnowledge, AsteroidState, Command, HullId, InventoryItem, LotId,
-    PrincipalId, ShipId, StationId, TaskKind, TaskState, TechId,
+    AsteroidId, AsteroidKnowledge, AsteroidState, Command, ConcernPriorities, HullId,
+    InventoryItem, LotId, PrincipalId, ShipId, StationId, TaskKind, TaskState, TechId,
 };
 
 use crate::agents::ship_agent::ShipAgent;
@@ -108,9 +108,9 @@ fn manage_modules_installs_from_inventory() {
 
 #[test]
 fn jettison_slag_fires_above_threshold() {
-    let mut content = base_content();
-    content.autopilot.slag_jettison_pct = 0.5;
+    let content = base_content();
     let mut state = base_state(&content);
+    state.strategy_config.slag_jettison_pct = 0.5;
     let owner = PrincipalId("principal_autopilot".to_string());
     let station_id = state.stations.keys().next().unwrap().clone();
 
@@ -490,7 +490,14 @@ fn assign_no_idle_ships_no_assignments() {
     let station_id = station_id_from_state(&state);
     let agent = StationAgent::new(station_id);
 
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     assert!(ship_agents.is_empty());
 }
@@ -511,8 +518,22 @@ fn assign_two_ships_two_asteroids_no_double_assignment() {
     add_mineable_asteroid(&mut state, asteroid_1.clone(), 0.8);
     add_mineable_asteroid(&mut state, asteroid_2.clone(), 0.5);
 
+    // Mining-only priorities to test deduplication without survey/deep_scan interference
+    let priorities = ConcernPriorities {
+        mining: 1.0,
+        survey: 0.0,
+        deep_scan: 0.0,
+        ..ConcernPriorities::default()
+    };
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &priorities,
+        None,
+    );
 
     let obj_a = ship_agents[&ship_a]
         .objective
@@ -569,7 +590,14 @@ fn assign_ship_with_cargo_skipped_no_iterator_consumption() {
         });
 
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     assert!(ship_agents[&ship_a].objective.is_none());
     assert!(matches!(
@@ -599,7 +627,14 @@ fn assign_busy_ship_not_assigned() {
     add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
 
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     assert!(ship_agents[&ship_id].objective.is_none());
 }
@@ -639,7 +674,14 @@ fn assign_deep_scan_when_tech_unlocked() {
     );
 
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     assert!(matches!(
         ship_agents[&ship_id].objective,
@@ -679,7 +721,14 @@ fn assign_deep_scan_skipped_without_tech() {
     );
 
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     assert!(ship_agents[&ship_id].objective.is_none());
 }
@@ -702,7 +751,14 @@ fn assign_ship_not_at_station_still_assigned() {
     add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
 
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     // Ship at remote position still gets assigned (ship agent handles transit)
     assert!(ship_agents[&ship_id].objective.is_some());
@@ -732,7 +788,14 @@ fn assign_three_ships_waterfall_mine_then_survey() {
     });
 
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     assert!(matches!(
         ship_agents[&ship_a].objective,
@@ -762,7 +825,14 @@ fn assign_existing_objective_not_overwritten() {
     });
 
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     assert!(matches!(
         ship_agents[&ship_id].objective,
@@ -787,7 +857,14 @@ fn assign_survey_when_no_mine_candidates() {
     });
 
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     assert!(matches!(
         ship_agents[&ship_id].objective,
@@ -807,7 +884,14 @@ fn assign_no_candidates_no_objective() {
     state.scan_sites.clear();
 
     let agent = StationAgent::new(station_id);
-    agent.assign_ship_objectives(&mut ship_agents, &state, &content, &owner, None);
+    agent.assign_ship_objectives(
+        &mut ship_agents,
+        &state,
+        &content,
+        &owner,
+        &ConcernPriorities::default(),
+        None,
+    );
 
     assert!(ship_agents[&ship_id].objective.is_none());
 }
@@ -978,6 +1062,7 @@ fn decision_logging_captures_ship_objective() {
         &state,
         &content,
         &owner,
+        &ConcernPriorities::default(),
         Some(&mut decisions),
     );
 

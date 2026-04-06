@@ -28,10 +28,10 @@ impl StationConcern for PropellantManagement {
 
         let propellant_kg =
             total_element_inventory(ctx.state, &ctx.content.autopilot.propellant_element);
-        let threshold = ctx.content.autopilot.lh2_threshold_kg;
+        let threshold = ctx.state.strategy_config.lh2_threshold_kg;
         let mut commands = Vec::new();
 
-        if propellant_kg > threshold * ctx.content.autopilot.lh2_abundant_multiplier {
+        if propellant_kg > threshold * ctx.state.strategy_config.lh2_abundant_multiplier {
             for &module_idx in station.modules_with_role(propellant_role) {
                 let module = &station.core.modules[module_idx];
                 if module.enabled && module.wear.wear < 1.0 {

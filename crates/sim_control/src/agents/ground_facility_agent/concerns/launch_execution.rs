@@ -70,7 +70,7 @@ impl GroundFacilityConcern for LaunchExecution {
         let fuel_cost =
             f64::from(rocket_def.fuel_kg) * ctx.content.constants.launch_fuel_cost_per_kg;
         let total_cost = rocket_def.base_launch_cost + fuel_cost;
-        if total_cost > ctx.state.balance * ctx.content.autopilot.budget_cap_fraction {
+        if total_cost > ctx.state.balance * ctx.state.strategy_config.budget_cap_fraction {
             return Vec::new();
         }
 

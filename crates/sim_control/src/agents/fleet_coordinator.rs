@@ -148,7 +148,7 @@ fn build_transfer_plans(state: &GameState, content: &GameContent) -> Vec<Transfe
 
     // --- Propellant element (LH2): highest priority ---
     let propellant_element = &content.autopilot.propellant_element;
-    let lh2_threshold = content.autopilot.lh2_threshold_kg;
+    let lh2_threshold = state.strategy_config.lh2_threshold_kg;
     let propellant_levels = material_levels(state, propellant_element);
     match_surplus_to_deficit(
         &propellant_levels,
@@ -159,7 +159,7 @@ fn build_transfer_plans(state: &GameState, content: &GameContent) -> Vec<Transfe
             kg,
         },
         0,
-        content.autopilot.export_batch_size_kg,
+        state.strategy_config.export_batch_size_kg,
         &mut plans,
     );
 
@@ -197,7 +197,7 @@ fn build_transfer_plans(state: &GameState, content: &GameContent) -> Vec<Transfe
                 kg,
             },
             2_u8.saturating_add(u8::try_from(idx).unwrap_or(u8::MAX - 2)),
-            content.autopilot.export_batch_size_kg,
+            state.strategy_config.export_batch_size_kg,
             &mut plans,
         );
     }
@@ -484,7 +484,7 @@ mod tests {
         let content = fleet_content();
         let mut state = fleet_state(&content);
         let propellant_element = content.autopilot.propellant_element.clone();
-        let lh2_threshold = content.autopilot.lh2_threshold_kg;
+        let lh2_threshold = state.strategy_config.lh2_threshold_kg;
 
         // Station A: surplus of both LH2 and Fe.
         if let Some(station) = state.stations.get_mut(&station_a()) {

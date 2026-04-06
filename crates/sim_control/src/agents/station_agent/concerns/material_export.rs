@@ -19,8 +19,8 @@ impl StationConcern for MaterialExport {
             return Vec::new();
         };
 
-        let batch_size_kg = ctx.content.autopilot.export_batch_size_kg;
-        let min_revenue = ctx.content.autopilot.export_min_revenue;
+        let batch_size_kg = ctx.state.strategy_config.export_batch_size_kg;
+        let min_revenue = ctx.state.strategy_config.export_min_revenue;
         let mut commands = Vec::new();
 
         let candidates = build_export_candidates(station, &ctx.content.autopilot, batch_size_kg);

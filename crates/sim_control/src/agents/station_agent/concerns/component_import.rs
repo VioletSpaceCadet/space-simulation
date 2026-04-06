@@ -29,6 +29,17 @@ impl StationConcern for ComponentImport {
             return Vec::new();
         }
 
+        // Skip if fleet is already at or above target size
+        let fleet_count = ctx
+            .state
+            .ships
+            .values()
+            .filter(|s| s.owner == *ctx.owner)
+            .count();
+        if fleet_count >= ctx.state.strategy_config.fleet_size_target as usize {
+            return Vec::new();
+        }
+
         let shipyard_role = &ctx.content.autopilot.shipyard_role;
         let import_component = &ctx.content.autopilot.shipyard_import_component;
 
@@ -49,20 +60,23 @@ impl StationConcern for ComponentImport {
                     .and_then(|recipe_id| ctx.content.recipes.get(recipe_id)),
                 _ => None,
             })
-            .map_or(ctx.content.autopilot.shipyard_component_count, |recipe| {
-                recipe
-                    .inputs
-                    .iter()
-                    .find_map(|input| match (&input.filter, &input.amount) {
-                        (InputFilter::Component(cid), InputAmount::Count(n))
-                            if cid.0 == *import_component =>
-                        {
-                            Some(*n)
-                        }
-                        _ => None,
-                    })
-                    .unwrap_or(ctx.content.autopilot.shipyard_component_count)
-            });
+            .map_or(
+                ctx.state.strategy_config.shipyard_component_count,
+                |recipe| {
+                    recipe
+                        .inputs
+                        .iter()
+                        .find_map(|input| match (&input.filter, &input.amount) {
+                            (InputFilter::Component(cid), InputAmount::Count(n))
+                                if cid.0 == *import_component =>
+                            {
+                                Some(*n)
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or(ctx.state.strategy_config.shipyard_component_count)
+                },
+            );
 
         let has_shipyard = station
             .modules_with_role(shipyard_role)
@@ -99,7 +113,7 @@ impl StationConcern for ComponentImport {
         else {
             return Vec::new();
         };
-        if cost > ctx.state.balance * ctx.content.autopilot.budget_cap_fraction {
+        if cost > ctx.state.balance * ctx.state.strategy_config.budget_cap_fraction {
             return Vec::new();
         }
 
