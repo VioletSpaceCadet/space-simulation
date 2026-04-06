@@ -419,6 +419,7 @@ pub fn base_content() -> GameContent {
         hulls: BTreeMap::new(),
         fitting_templates: BTreeMap::new(),
         initial_station: InitialStationDef::default(),
+        initial_stations: Vec::new(),
         autopilot: AutopilotConfig::default(),
         default_strategy: crate::StrategyConfig::default(),
         crew_roles: BTreeMap::new(),
@@ -666,6 +667,7 @@ pub fn minimal_content() -> GameContent {
         hulls: BTreeMap::new(),
         fitting_templates: BTreeMap::new(),
         initial_station: InitialStationDef::default(),
+        initial_stations: Vec::new(),
         autopilot: AutopilotConfig {
             propellant_role: String::new(),
             propellant_support_role: String::new(),

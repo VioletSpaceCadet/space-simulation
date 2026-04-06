@@ -145,6 +145,7 @@ fn replenish_test_content() -> GameContent {
         hulls: std::collections::BTreeMap::new(),
         fitting_templates: std::collections::BTreeMap::new(),
         initial_station: crate::InitialStationDef::default(),
+        initial_stations: Vec::new(),
         autopilot: crate::AutopilotConfig::default(),
         default_strategy: crate::StrategyConfig::default(),
         crew_roles: std::collections::BTreeMap::new(),
