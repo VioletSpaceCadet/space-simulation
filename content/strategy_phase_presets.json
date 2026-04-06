@@ -1,0 +1,52 @@
+{
+  "Startup": {
+    "mining": 0.4,
+    "survey": 0.8,
+    "deep_scan": 0.3,
+    "research": 0.9,
+    "maintenance": 0.6,
+    "export": 0.2,
+    "propellant": 0.7,
+    "fleet_expansion": 0.3
+  },
+  "Orbital": {
+    "mining": 0.8,
+    "survey": 0.6,
+    "deep_scan": 0.5,
+    "research": 0.7,
+    "maintenance": 0.8,
+    "export": 0.5,
+    "propellant": 0.9,
+    "fleet_expansion": 0.5
+  },
+  "Industrial": {
+    "mining": 0.7,
+    "survey": 0.5,
+    "deep_scan": 0.6,
+    "research": 0.5,
+    "maintenance": 0.8,
+    "export": 0.8,
+    "propellant": 0.8,
+    "fleet_expansion": 0.7
+  },
+  "Expansion": {
+    "mining": 0.6,
+    "survey": 0.4,
+    "deep_scan": 0.5,
+    "research": 0.4,
+    "maintenance": 0.9,
+    "export": 0.7,
+    "propellant": 0.9,
+    "fleet_expansion": 0.9
+  },
+  "DeepSpace": {
+    "mining": 0.7,
+    "survey": 0.5,
+    "deep_scan": 0.7,
+    "research": 0.6,
+    "maintenance": 0.9,
+    "export": 0.6,
+    "propellant": 0.9,
+    "fleet_expansion": 0.8
+  }
+}
