@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 
 use sim_core::{
-    compute_entity_absolute, AsteroidId, ConcernPriorities, GameContent, GameState, PrincipalId,
-    ShipId, SiteId, StationId, TechId,
+    compute_entity_absolute, AsteroidId, ConcernPriorities, GameContent, GameState, ShipId, SiteId,
+    StationId, TechId,
 };
 
 use crate::agents::ship_agent::ShipAgent;
 use crate::agents::DecisionRecord;
 use crate::behaviors::{
-    collect_deep_scan_candidates, collect_idle_ships, deposit_priority, element_mining_value,
+    collect_deep_scan_candidates, deposit_priority, element_mining_value,
     should_opportunistic_refuel, station_has_module_with_role, total_element_inventory,
 };
 use crate::objectives::ShipObjective;
@@ -153,29 +153,31 @@ impl StationAgent {
         ship_agents: &mut BTreeMap<ShipId, ShipAgent>,
         state: &GameState,
         content: &GameContent,
-        owner: &PrincipalId,
         priorities: &ConcernPriorities,
+        home_ships: &[ShipId],
         mut decisions: Option<&mut Vec<DecisionRecord>>,
     ) {
         let Some(station) = state.stations.get(&self.station_id) else {
             return;
         };
 
-        // Collect idle ships owned by this station's owner with no current objective.
-        // Ships can be at any position — the ship agent will generate Transit
-        // tasks to reach assigned targets (fixes VIO-457: ships stranded after
-        // completing tasks at remote locations).
-        // VIO-599: Exclude logistics-tagged ships — they are reserved for
-        // inter-station transfers (FleetCoordinator / module delivery).
-        let idle_ships = collect_idle_ships(state, owner);
-        let assignable: Vec<ShipId> = idle_ships
-            .into_iter()
+        // VIO-487: Only consider ships homed to this station (pre-partitioned
+        // by the controller). Filter to idle, no current objective, non-logistics.
+        let assignable: Vec<ShipId> = home_ships
+            .iter()
             .filter(|id| {
-                ship_agents.get(id).is_some_and(|a| a.objective.is_none())
-                    && !state.ships.get(id).is_some_and(|s| {
+                let is_idle = state.ships.get(*id).is_some_and(|s| {
+                    s.task
+                        .as_ref()
+                        .is_none_or(|t| matches!(t.kind, sim_core::TaskKind::Idle))
+                });
+                is_idle
+                    && ship_agents.get(*id).is_some_and(|a| a.objective.is_none())
+                    && !state.ships.get(*id).is_some_and(|s| {
                         crate::behaviors::ship_has_hull_tag(s, "logistics", content)
                     })
             })
+            .cloned()
             .collect();
 
         if assignable.is_empty() {
