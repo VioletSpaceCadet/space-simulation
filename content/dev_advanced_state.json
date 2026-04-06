@@ -128,6 +128,36 @@
       "propellant_kg": 15000.0,
       "propellant_capacity_kg": 15000.0,
       "speed_ticks_per_au": 2133
+    },
+    "ship_0002": {
+      "id": "ship_0002",
+      "position": {
+        "parent_body": "inner_belt",
+        "radius_au_um": 2450000,
+        "angle_mdeg": 180000
+      },
+      "owner": "principal_autopilot",
+      "inventory": [],
+      "cargo_capacity_m3": 65.0,
+      "task": null,
+      "hull_id": "hull_general_purpose",
+      "fitted_modules": [
+        {
+          "slot_index": 0,
+          "module_def_id": "module_cargo_expander"
+        },
+        {
+          "slot_index": 1,
+          "module_def_id": "module_propellant_tank"
+        },
+        {
+          "slot_index": 2,
+          "module_def_id": "module_mining_laser"
+        }
+      ],
+      "propellant_kg": 15000.0,
+      "propellant_capacity_kg": 15000.0,
+      "speed_ticks_per_au": 2133
     }
   },
   "stations": {
@@ -326,6 +356,164 @@
         "pilot": 2,
         "technician": 4,
         "scientist": 5
+      },
+      "leaders": []
+    },
+    "station_inner_belt": {
+      "id": "station_inner_belt",
+      "position": {
+        "parent_body": "inner_belt",
+        "radius_au_um": 2450000,
+        "angle_mdeg": 180000
+      },
+      "inventory": [
+        {
+          "kind": "Module",
+          "item_id": "module_item_0033",
+          "module_def_id": "module_basic_iron_refinery"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0034",
+          "module_def_id": "module_maintenance_bay"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0035",
+          "module_def_id": "module_basic_assembler"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0036",
+          "module_def_id": "module_sensor_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0037",
+          "module_def_id": "module_exploration_lab"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0038",
+          "module_def_id": "module_materials_lab"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0039",
+          "module_def_id": "module_basic_smelter"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0040",
+          "module_def_id": "module_heating_unit"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0041",
+          "module_def_id": "module_basic_radiator"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0042",
+          "module_def_id": "module_basic_radiator"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0043",
+          "module_def_id": "module_electrolysis_unit"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0044",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0045",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0046",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0047",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0048",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0049",
+          "module_def_id": "module_basic_solar_array"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0050",
+          "module_def_id": "module_basic_battery"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0051",
+          "module_def_id": "module_mining_laser"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0052",
+          "module_def_id": "module_cargo_expander"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0053",
+          "module_def_id": "module_propellant_tank"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0054",
+          "module_def_id": "module_mining_laser"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0055",
+          "module_def_id": "module_cargo_expander"
+        },
+        {
+          "kind": "Module",
+          "item_id": "module_item_0056",
+          "module_def_id": "module_propellant_tank"
+        },
+        {
+          "kind": "Material",
+          "element": "Fe",
+          "kg": 500.0,
+          "quality": 0.7
+        },
+        {
+          "kind": "Material",
+          "element": "H2O",
+          "kg": 5000.0,
+          "quality": 1.0
+        },
+        {
+          "kind": "Component",
+          "component_id": "repair_kit",
+          "count": 10,
+          "quality": 1.0
+        }
+      ],
+      "cargo_capacity_m3": 2000.0,
+      "power_available_per_tick": 6000.0,
+      "modules": [],
+      "crew": {
+        "operator": 7,
+        "pilot": 1,
+        "technician": 2,
+        "scientist": 2
       },
       "leaders": []
     }

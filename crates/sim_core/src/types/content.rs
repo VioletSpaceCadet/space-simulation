@@ -316,6 +316,11 @@ pub struct GameContent {
     /// Initial station configuration from `content/initial_station.json`.
     #[serde(default)]
     pub initial_station: InitialStationDef,
+    /// Multi-station setup definitions from `content/initial_stations.json`.
+    /// When non-empty, `build_initial_state()` uses these instead of
+    /// `initial_station` to create multiple stations with their ships.
+    #[serde(default)]
+    pub initial_stations: Vec<StationSetupDef>,
     /// Autopilot behavior configuration from `content/autopilot.json`.
     #[serde(default)]
     pub autopilot: AutopilotConfig,
@@ -401,6 +406,35 @@ pub struct InitialComponent {
     pub count: u32,
     #[serde(default = "default_quality")]
     pub quality: f32,
+}
+
+// ---------------------------------------------------------------------------
+// Multi-station setup definitions
+// ---------------------------------------------------------------------------
+
+/// Per-station setup for multi-station world generation.
+/// Loaded from `content/initial_stations.json`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StationSetupDef {
+    pub station_id: String,
+    pub parent_body: String,
+    pub radius_au_um: u64,
+    pub angle_mdeg: u32,
+    /// Frame to assign. Ignored if the frame catalog doesn't contain it.
+    #[serde(default)]
+    pub frame_id: Option<String>,
+    /// Equipment, materials, components, and crew for this station.
+    pub initial: InitialStationDef,
+    /// Ships to create at this station's position.
+    #[serde(default)]
+    pub ships: Vec<ShipSetupDef>,
+}
+
+/// Per-ship setup within a station definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShipSetupDef {
+    pub ship_id: String,
+    pub hull_id: String,
 }
 
 fn default_ground_opex_max_fraction() -> f64 {

@@ -761,8 +761,24 @@ fn load_recipes(
     Ok(recipes.into_iter().map(|r| (r.id.clone(), r)).collect())
 }
 
-pub fn load_content(content_dir: &str) -> Result<GameContent> {
-    let dir = Path::new(content_dir);
+/// Load required JSON files (constants, techs, solar system, etc.) that must
+/// exist. Returns parsed values to feed into `GameContent`. Extracted from
+/// `load_content` to keep function size under the clippy line limit.
+#[allow(clippy::type_complexity)]
+fn load_required_json(
+    dir: &Path,
+) -> Result<(
+    Constants,
+    TechsFile,
+    SolarSystemDef,
+    AsteroidTemplatesFile,
+    ElementsFile,
+    AHashMap<String, ModuleDef>,
+    Vec<sim_core::ComponentDef>,
+    PricingTable,
+    Vec<AlertRuleDef>,
+    Vec<sim_core::sim_events::SimEventDef>,
+)> {
     let constants: Constants = serde_json::from_str(
         &std::fs::read_to_string(dir.join("constants.json")).context("reading constants.json")?,
     )
@@ -814,11 +830,41 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     for event in &mut sim_events {
         event.resolve_weight();
     }
+    Ok((
+        constants,
+        techs_file,
+        solar_system,
+        templates_file,
+        elements_file,
+        module_defs,
+        component_defs,
+        pricing,
+        alert_rules,
+        sim_events,
+    ))
+}
+
+pub fn load_content(content_dir: &str) -> Result<GameContent> {
+    let dir = Path::new(content_dir);
+    let (
+        constants,
+        techs_file,
+        solar_system,
+        templates_file,
+        elements_file,
+        module_defs,
+        component_defs,
+        pricing,
+        alert_rules,
+        sim_events,
+    ) = load_required_json(dir)?;
     let hulls = load_hull_defs(dir)?;
     let frames = load_frame_defs(dir)?;
     let fitting_templates = load_fitting_templates(dir)?;
     let initial_station: sim_core::InitialStationDef =
         load_optional_json(dir, "initial_station.json")?;
+    let initial_stations: Vec<sim_core::StationSetupDef> =
+        load_optional_json(dir, "initial_stations.json")?;
     let autopilot: sim_core::AutopilotConfig = load_optional_json(dir, "autopilot.json")?;
     let default_strategy: sim_core::StrategyConfig = load_optional_json(dir, "strategy.json")?;
     let phase_presets: std::collections::BTreeMap<sim_core::GamePhase, sim_core::PriorityWeights> =
@@ -846,6 +892,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         frames,
         fitting_templates,
         initial_station,
+        initial_stations,
         autopilot,
         default_strategy,
         phase_presets,
@@ -864,41 +911,17 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
     Ok(content)
 }
 
-/// Build inventory items from an `InitialStationDef`.
-fn build_initial_inventory(init: &sim_core::InitialStationDef) -> Vec<InventoryItem> {
-    let mut inventory = Vec::new();
-    for (index, module_def_id) in init.modules.iter().enumerate() {
-        inventory.push(InventoryItem::Module {
-            item_id: ModuleItemId(format!("module_item_{:04}", index + 1)),
-            module_def_id: module_def_id.clone(),
-        });
-    }
-    for mat in &init.materials {
-        inventory.push(InventoryItem::Material {
-            element: mat.element.clone(),
-            kg: mat.kg,
-            quality: mat.quality,
-            thermal: None,
-        });
-    }
-    for comp in &init.components {
-        inventory.push(InventoryItem::Component {
-            component_id: ComponentId(comp.id.clone()),
-            count: comp.count,
-            quality: comp.quality,
-        });
-    }
-    inventory
-}
-
 fn build_initial_ship(
     content: &GameContent,
     c: &sim_core::Constants,
     position: &sim_core::Position,
+    ship_id_str: &str,
+    hull_id_str: &str,
+    home_station: &StationId,
 ) -> (ShipId, ShipState) {
-    let ship_id = ShipId("ship_0001".to_string());
+    let ship_id = ShipId(ship_id_str.to_string());
     let owner = PrincipalId("principal_autopilot".to_string());
-    let hull_id = sim_core::HullId("hull_general_purpose".to_string());
+    let hull_id = sim_core::HullId(hull_id_str.to_string());
     let fitted_modules = content
         .fitting_templates
         .get(&hull_id)
@@ -919,8 +942,7 @@ fn build_initial_ship(
         propellant_capacity_kg: 0.0,
         crew: std::collections::BTreeMap::new(),
         leaders: Vec::new(),
-        // VIO-486: initial ship belongs to the starting Earth orbit station.
-        home_station: Some(StationId("station_earth_orbit".to_string())),
+        home_station: Some(home_station.clone()),
     };
     if content.hulls.contains_key(&hull_id) {
         sim_core::recompute_ship_stats(&mut ship, content);
@@ -929,26 +951,60 @@ fn build_initial_ship(
     (ship_id, ship)
 }
 
-pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
-    // Station is in Earth orbit zone (~3000 µAU from Earth, i.e. ~450km altitude)
-    let earth_orbit_pos = sim_core::Position {
-        parent_body: sim_core::BodyId("earth_orbit_zone".to_string()),
-        radius_au_um: sim_core::RadiusAuMicro(3_000),
-        angle_mdeg: sim_core::AngleMilliDeg(0),
+/// Build a station + its ships from a `StationSetupDef`.
+fn build_station_from_setup(
+    setup: &sim_core::StationSetupDef,
+    content: &GameContent,
+    module_id_offset: usize,
+) -> (StationId, StationState, Vec<(ShipId, ShipState)>) {
+    let station_id = StationId(setup.station_id.clone());
+    let position = sim_core::Position {
+        parent_body: sim_core::BodyId(setup.parent_body.clone()),
+        radius_au_um: sim_core::RadiusAuMicro(setup.radius_au_um),
+        angle_mdeg: sim_core::AngleMilliDeg(setup.angle_mdeg),
     };
     let c = &content.constants;
-    let station_id = StationId("station_earth_orbit".to_string());
+
+    // Build inventory with module item IDs offset to avoid collisions
+    // across stations.
+    let mut inventory = Vec::new();
+    for (index, module_def_id) in setup.initial.modules.iter().enumerate() {
+        inventory.push(InventoryItem::Module {
+            item_id: ModuleItemId(format!("module_item_{:04}", module_id_offset + index + 1)),
+            module_def_id: module_def_id.clone(),
+        });
+    }
+    for mat in &setup.initial.materials {
+        inventory.push(InventoryItem::Material {
+            element: mat.element.clone(),
+            kg: mat.kg,
+            quality: mat.quality,
+            thermal: None,
+        });
+    }
+    for comp in &setup.initial.components {
+        inventory.push(InventoryItem::Component {
+            component_id: ComponentId(comp.id.clone()),
+            count: comp.count,
+            quality: comp.quality,
+        });
+    }
+
+    let frame_id = setup.frame_id.as_ref().and_then(|fid| {
+        let id = sim_core::FrameId(fid.clone());
+        content.frames.contains_key(&id).then_some(id)
+    });
 
     let mut station = StationState {
         id: station_id.clone(),
-        position: earth_orbit_pos.clone(),
+        position: position.clone(),
         core: sim_core::FacilityCore {
-            inventory: build_initial_inventory(&content.initial_station),
+            inventory,
             cargo_capacity_m3: c.station_cargo_capacity_m3,
             power_available_per_tick: c.station_power_available_per_tick,
             modules: vec![],
             modifiers: sim_core::modifiers::ModifierSet::default(),
-            crew: content.initial_station.crew.clone(),
+            crew: setup.initial.crew.clone(),
             thermal_links: Vec::new(),
             power: PowerState::default(),
             cached_inventory_volume_m3: None,
@@ -956,25 +1012,85 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             module_id_index: std::collections::HashMap::new(),
             power_budget_cache: sim_core::PowerBudgetCache::default(),
         },
-        // SF-03: Starting station uses the Industrial Hub frame when the
-        // content catalog provides it. Falls back to `None` (legacy
-        // unlimited-slot behavior) when frame_defs.json is missing, so
-        // test content without frame definitions keeps working.
-        frame_id: {
-            let hub = sim_core::FrameId("frame_industrial_hub".to_string());
-            if content.frames.contains_key(&hub) {
-                Some(hub)
-            } else {
-                None
-            }
-        },
+        frame_id,
         leaders: Vec::new(),
     };
-    // SF-04: Apply frame bonuses through the modifier pipeline. This is a
-    // no-op when the station is frameless (test fixtures without frame
-    // content), so it is safe to call unconditionally.
     sim_core::recompute_station_stats(&mut station, content);
-    let (ship_id, ship) = build_initial_ship(content, c, &earth_orbit_pos);
+
+    let ships: Vec<(ShipId, ShipState)> = setup
+        .ships
+        .iter()
+        .map(|ship_setup| {
+            build_initial_ship(
+                content,
+                c,
+                &position,
+                &ship_setup.ship_id,
+                &ship_setup.hull_id,
+                &station_id,
+            )
+        })
+        .collect();
+
+    (station_id, station, ships)
+}
+
+/// Build all stations + ships from content definitions. Uses `initial_stations`
+/// when available, falls back to legacy single-station from `initial_station`.
+fn build_all_stations(
+    content: &GameContent,
+) -> (
+    std::collections::BTreeMap<StationId, StationState>,
+    std::collections::BTreeMap<ShipId, ShipState>,
+) {
+    let mut stations = std::collections::BTreeMap::new();
+    let mut ships = std::collections::BTreeMap::new();
+
+    if content.initial_stations.is_empty() {
+        let fallback = sim_core::StationSetupDef {
+            station_id: "station_earth_orbit".to_string(),
+            parent_body: "earth_orbit_zone".to_string(),
+            radius_au_um: 3_000,
+            angle_mdeg: 0,
+            frame_id: Some("frame_industrial_hub".to_string()),
+            initial: content.initial_station.clone(),
+            ships: vec![sim_core::ShipSetupDef {
+                ship_id: "ship_0001".to_string(),
+                hull_id: "hull_general_purpose".to_string(),
+            }],
+        };
+        let (sid, station, station_ships) = build_station_from_setup(&fallback, content, 0);
+        stations.insert(sid, station);
+        for (ship_id, ship) in station_ships {
+            ships.insert(ship_id, ship);
+        }
+    } else {
+        let mut module_id_offset = 0;
+        for setup in &content.initial_stations {
+            let (sid, station, station_ships) =
+                build_station_from_setup(setup, content, module_id_offset);
+            module_id_offset += setup.initial.modules.len();
+            assert!(
+                stations.insert(sid.clone(), station).is_none(),
+                "duplicate station_id in initial_stations: {}",
+                sid.0
+            );
+            for (ship_id, ship) in station_ships {
+                assert!(
+                    ships.insert(ship_id.clone(), ship).is_none(),
+                    "duplicate ship_id in initial_stations: {}",
+                    ship_id.0
+                );
+            }
+        }
+    }
+    (stations, ships)
+}
+
+pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
+    let c = &content.constants;
+    let (stations, ships) = build_all_stations(content);
+
     // Place scan sites in zone bodies using weighted picking + area-sampled positions.
     let zone_bodies: Vec<&sim_core::OrbitalBodyDef> = content
         .solar_system
@@ -1009,8 +1125,8 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
         },
         scan_sites,
         asteroids: std::collections::BTreeMap::new(),
-        ships: [(ship_id, ship)].into_iter().collect(),
-        stations: [(station_id, station)].into_iter().collect(),
+        ships,
+        stations,
         ground_facilities: std::collections::BTreeMap::new(),
         satellites: std::collections::BTreeMap::new(),
         research: ResearchState {
@@ -1441,6 +1557,66 @@ mod tests {
         );
     }
 
+    /// Multi-station generation: initial_stations.json produces 2 stations + 2 ships
+    /// with correct positions, modules, and home_station assignment.
+    #[test]
+    fn multi_station_generation_from_content() {
+        let content = load_content("../../content").unwrap();
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let state = build_initial_state(&content, 42, &mut rng);
+
+        assert_eq!(state.stations.len(), 2, "expected 2 stations");
+        assert_eq!(state.ships.len(), 2, "expected 2 ships");
+
+        // Earth orbit station
+        let earth = &state.stations[&StationId("station_earth_orbit".to_string())];
+        assert_eq!(earth.position.parent_body.0, "earth_orbit_zone");
+
+        // Inner belt station
+        let belt = &state.stations[&StationId("station_inner_belt".to_string())];
+        assert_eq!(belt.position.parent_body.0, "inner_belt");
+        assert_eq!(belt.position.angle_mdeg.0, 180_000);
+
+        // Ships assigned to correct home stations
+        let ship1 = &state.ships[&ShipId("ship_0001".to_string())];
+        assert_eq!(
+            ship1.home_station.as_ref().unwrap().0,
+            "station_earth_orbit"
+        );
+        let ship2 = &state.ships[&ShipId("ship_0002".to_string())];
+        assert_eq!(ship2.home_station.as_ref().unwrap().0, "station_inner_belt");
+
+        // Ships co-located with their home stations
+        assert_eq!(ship1.position, earth.position);
+        assert_eq!(ship2.position, belt.position);
+
+        // Module item IDs don't collide across stations
+        let earth_ids: Vec<&str> = earth
+            .core
+            .inventory
+            .iter()
+            .filter_map(|i| match i {
+                InventoryItem::Module { item_id, .. } => Some(item_id.0.as_str()),
+                _ => None,
+            })
+            .collect();
+        let belt_ids: Vec<&str> = belt
+            .core
+            .inventory
+            .iter()
+            .filter_map(|i| match i {
+                InventoryItem::Module { item_id, .. } => Some(item_id.0.as_str()),
+                _ => None,
+            })
+            .collect();
+        for id in &belt_ids {
+            assert!(
+                !earth_ids.contains(id),
+                "module item ID collision: {id} exists in both stations"
+            );
+        }
+    }
+
     #[test]
     #[should_panic(expected = "required element 'ore' is missing")]
     fn test_missing_ore_element_panics() {
@@ -1866,8 +2042,23 @@ mod tests {
         assert!(setup.run_dir.is_none());
     }
 
-    /// Verify build_initial_state() produces the same module set as dev_advanced_state.json.
-    /// Prevents drift between the two initial state sources.
+    /// Extract sorted module def IDs from a station's inventory.
+    fn station_module_ids(station: &StationState) -> Vec<String> {
+        let mut modules: Vec<String> = station
+            .core
+            .inventory
+            .iter()
+            .filter_map(|item| match item {
+                InventoryItem::Module { module_def_id, .. } => Some(module_def_id.clone()),
+                _ => None,
+            })
+            .collect();
+        modules.sort();
+        modules
+    }
+
+    /// Verify build_initial_state() produces the same module set as dev_advanced_state.json
+    /// for ALL stations. Prevents drift between the two initial state sources.
     #[test]
     fn build_initial_state_matches_dev_advanced_state_modules() {
         let content = load_content("../../content").unwrap();
@@ -1877,38 +2068,35 @@ mod tests {
         let json = std::fs::read_to_string("../../content/dev_advanced_state.json").unwrap();
         let loaded: GameState = serde_json::from_str(&json).unwrap();
 
-        let station_id = StationId("station_earth_orbit".to_string());
-        let built_station = &built.stations[&station_id];
-        let loaded_station = &loaded.stations[&station_id];
-
-        // Extract module def_ids from both, sorted for comparison
-        let mut built_modules: Vec<&str> = built_station
-            .core
-            .inventory
-            .iter()
-            .filter_map(|item| match item {
-                InventoryItem::Module { module_def_id, .. } => Some(module_def_id.as_str()),
-                _ => None,
-            })
-            .collect();
-        built_modules.sort();
-
-        let mut loaded_modules: Vec<&str> = loaded_station
-            .core
-            .inventory
-            .iter()
-            .filter_map(|item| match item {
-                InventoryItem::Module { module_def_id, .. } => Some(module_def_id.as_str()),
-                _ => None,
-            })
-            .collect();
-        loaded_modules.sort();
-
+        // Both paths must produce the same set of stations.
+        let mut built_ids: Vec<&str> = built.stations.keys().map(|k| k.0.as_str()).collect();
+        let mut loaded_ids: Vec<&str> = loaded.stations.keys().map(|k| k.0.as_str()).collect();
+        built_ids.sort();
+        loaded_ids.sort();
         assert_eq!(
-            built_modules, loaded_modules,
-            "build_initial_state() modules differ from dev_advanced_state.json.\n\
-             Built: {built_modules:?}\n\
-             Loaded: {loaded_modules:?}"
+            built_ids, loaded_ids,
+            "Station IDs differ: built {built_ids:?} vs loaded {loaded_ids:?}"
+        );
+
+        // Check modules match for each station.
+        for station_id in built.stations.keys() {
+            let built_modules = station_module_ids(&built.stations[station_id]);
+            let loaded_modules = station_module_ids(&loaded.stations[station_id]);
+            assert_eq!(
+                built_modules, loaded_modules,
+                "Modules differ for {}: built {built_modules:?} vs loaded {loaded_modules:?}",
+                station_id.0
+            );
+        }
+
+        // Both paths must produce the same set of ships.
+        let mut built_ship_ids: Vec<&str> = built.ships.keys().map(|k| k.0.as_str()).collect();
+        let mut loaded_ship_ids: Vec<&str> = loaded.ships.keys().map(|k| k.0.as_str()).collect();
+        built_ship_ids.sort();
+        loaded_ship_ids.sort();
+        assert_eq!(
+            built_ship_ids, loaded_ship_ids,
+            "Ship IDs differ: built {built_ship_ids:?} vs loaded {loaded_ship_ids:?}"
         );
     }
 
