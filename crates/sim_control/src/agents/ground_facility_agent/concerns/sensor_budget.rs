@@ -23,7 +23,11 @@ impl GroundFacilityConcern for SensorBudget {
             return Vec::new();
         };
 
-        let max_opex_per_tick = ctx.state.balance * ctx.content.autopilot.ground_opex_max_fraction;
+        // Scale opex tolerance by research priority — higher research = more
+        // willing to sustain sensor costs (VIO-609).
+        let research_scale = 0.5 + 0.5 * f64::from(ctx.state.strategy_config.priorities.research);
+        let max_opex_per_tick =
+            ctx.state.balance * ctx.content.autopilot.ground_opex_max_fraction * research_scale;
 
         // Collect all sensor modules with their operating costs.
         let mut sensors: Vec<(usize, f64, bool)> = facility

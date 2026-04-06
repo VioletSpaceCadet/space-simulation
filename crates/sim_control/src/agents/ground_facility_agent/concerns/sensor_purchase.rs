@@ -66,7 +66,13 @@ impl GroundFacilityConcern for SensorPurchase {
             else {
                 continue;
             };
-            if cost > ctx.state.balance * ctx.state.strategy_config.budget_cap_fraction {
+            // Scale budget willingness by research priority — higher research
+            // weight = more willing to invest in sensors (VIO-609).
+            let research_scale =
+                0.5 + 0.5 * f64::from(ctx.state.strategy_config.priorities.research);
+            if cost
+                > ctx.state.balance * ctx.state.strategy_config.budget_cap_fraction * research_scale
+            {
                 continue;
             }
 

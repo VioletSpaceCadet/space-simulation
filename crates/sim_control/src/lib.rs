@@ -1364,6 +1364,52 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_phase_transition_applies_preset_priorities() {
+        let mut content = autopilot_content();
+        // Set a distinct preset for Industrial phase
+        let industrial_preset = sim_core::PriorityWeights {
+            mining: 0.3,
+            survey: 0.2,
+            deep_scan: 0.1,
+            research: 0.4,
+            maintenance: 0.9,
+            export: 0.8,
+            propellant: 0.7,
+            fleet_expansion: 0.6,
+        };
+        content
+            .phase_presets
+            .insert(sim_core::GamePhase::Industrial, industrial_preset);
+
+        let mut state = autopilot_state(&content);
+
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+        // First tick: establish phase tracking
+        let _ = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        // Advance to Industrial
+        state.progression.phase = sim_core::GamePhase::Industrial;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let set_cmd = commands.iter().find_map(|cmd| match &cmd.command {
+            sim_core::Command::SetStrategyConfig { config } => Some(config),
+            _ => None,
+        });
+        let config = set_cmd.expect("should emit SetStrategyConfig on phase transition");
+        assert_eq!(config.mode, sim_core::StrategyMode::Expand);
+        assert!(
+            (config.priorities.mining - 0.3).abs() < f32::EPSILON,
+            "priorities should come from preset, got {}",
+            config.priorities.mining
+        );
+        assert!(
+            (config.priorities.export - 0.8).abs() < f32::EPSILON,
+            "export priority should be 0.8 from preset"
+        );
+    }
+
     // --- Thruster import tests ---
 
     /// Helper to set up state for thruster import tests.
