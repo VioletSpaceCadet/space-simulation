@@ -101,6 +101,41 @@ impl AutopilotController {
     }
 }
 
+impl AutopilotController {
+    /// VIO-607: Emit a `SetStrategyConfig` command if the game phase changed
+    /// and no manual `mode_override` is set. Updates `runtime.last_phase` so
+    /// we only fire once per transition.
+    fn maybe_switch_mode(
+        runtime: &mut StrategyRuntimeState,
+        owner: &PrincipalId,
+        state: &GameState,
+        next_id: &mut u64,
+        commands: &mut Vec<CommandEnvelope>,
+    ) {
+        let current_phase = state.progression.phase;
+        if runtime.last_phase == Some(current_phase) {
+            return;
+        }
+        runtime.last_phase = Some(current_phase);
+        if state.strategy_config.mode_override.is_some() {
+            return;
+        }
+        let target_mode = sim_core::StrategyMode::for_phase(current_phase);
+        if state.strategy_config.mode == target_mode {
+            return;
+        }
+        let mut new_config = state.strategy_config.clone();
+        new_config.mode = target_mode;
+        commands.push(behaviors::make_cmd(
+            owner,
+            state.meta.tick,
+            next_id,
+            sim_core::Command::SetStrategyConfig { config: new_config },
+        ));
+        runtime.mark_dirty();
+    }
+}
+
 impl Default for AutopilotController {
     fn default() -> Self {
         Self::new()
@@ -123,26 +158,14 @@ impl CommandSource for AutopilotController {
         let priorities =
             strategy_interpreter::evaluate_strategy(state, content, &mut self.strategy_runtime);
 
-        // VIO-607: Auto-switch strategy mode when game phase transitions,
-        // unless the user has set a manual mode_override.
-        let current_phase = state.progression.phase;
-        if self.strategy_runtime.last_phase != Some(current_phase) {
-            self.strategy_runtime.last_phase = Some(current_phase);
-            if state.strategy_config.mode_override.is_none() {
-                let target_mode = sim_core::StrategyMode::for_phase(current_phase);
-                if state.strategy_config.mode != target_mode {
-                    let mut new_config = state.strategy_config.clone();
-                    new_config.mode = target_mode;
-                    commands.push(behaviors::make_cmd(
-                        &self.owner,
-                        state.meta.tick,
-                        next_command_id,
-                        sim_core::Command::SetStrategyConfig { config: new_config },
-                    ));
-                    self.strategy_runtime.mark_dirty();
-                }
-            }
-        }
+        // VIO-607: Auto-switch strategy mode on phase transition.
+        Self::maybe_switch_mode(
+            &mut self.strategy_runtime,
+            &self.owner,
+            state,
+            next_command_id,
+            &mut commands,
+        );
 
         // Destructure for disjoint field borrows.
         let Self {
