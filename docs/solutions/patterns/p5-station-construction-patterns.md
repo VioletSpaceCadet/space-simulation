@@ -402,10 +402,13 @@ if let TaskKind::ConstructStation { frame_id, position, assembly_ticks, .. } = t
 
 **Reusable when:** Semantic is "go here, then do a specific thing atomically at arrival". Candidates: `Transit→Dock`, `Transit→Mine`, `Transit→Refuel`.
 
+**Already used by:** `Transit→Pickup→Transit→Deposit` in `Command::TransferItems` (VIO-595). This is a 4-node chain — the most complex real-world consumer of Transit chaining.
+
 **Caveats:**
 1. `Box<TaskKind>` adds 8 bytes to every TaskKind variant. Acceptable for ships (not hot-loop data); watch it on per-frame structs.
 2. The co-located fast path **must** be tested independently. Otherwise you get the "I built the chain correctly but only exercised transit mode" bug.
 3. Don't nest `Transit { then: Transit { ... } }` — legal but a code smell. Use intermediate variants.
+4. **Fuel accounting for multi-leg chains.** `resolve_transit` does NOT re-charge propellant when handing off to `then`. Any command building a chain with 2+ Transit nodes must pre-deduct fuel for ALL legs atomically at command time. See [`chained-task-fuel-accounting.md`](./chained-task-fuel-accounting.md) for the full pattern and test fixtures.
 
 ### Pattern C3 — Content-side binding: `deploys_frame` on ComponentDef
 
@@ -594,10 +597,12 @@ For future session planning: **14 tickets in ~10.5 hours ≈ 45 min/ticket** wit
 - Parallel session overlap was minimal (disjoint ownership held)
 - Construction layer tickets reused infrastructure from SF-series (no new abstractions per ticket)
 
-**What deferred from the original P5 epic:** 11 tickets remain — logistics layer (VIO-595/596/598/599), ownership (VIO-486/488), polish (VIO-597/600..604). This is an intentional slice: the core deployment loop is shippable without the inter-station logistics. A future session should pick up with the logistics layer as its own self-contained block.
+**What deferred from the original P5 epic:** 4 tickets remain — ownership (VIO-488), polish (VIO-597, VIO-602, VIO-604). The logistics layer (VIO-595/596/598/599/600) and scoring (VIO-601/603) shipped in a follow-up session. VIO-486 (home_station) also shipped. VIO-488 (asteroid dedup) is blocked by VIO-487 (P6).
 
 ## See also
 
+- **`patterns/chained-task-fuel-accounting.md`** — Pre-deduction pattern for multi-leg Transit fuel. Directly extends Pattern C2's caveats with fuel accounting discipline.
+- **`patterns/cross-station-autopilot-coordination.md`** — Layered execution ordering for FleetCoordinator, module delivery, and station agent objectives. The architectural pattern for the logistics layer that this P5 doc deferred.
 - **`patterns/multi-ticket-satellite-system-implementation.md`** — prior multi-ticket pattern doc. This P5 doc extends it with stacked-PR cascade recovery, parallel-session coordination, and the `#[serde(default)]` codemod gotcha.
 - **`patterns/multi-epic-project-execution.md`** — covers sequential cross-epic obsolescence. Does not cover parallel sessions or stacked PRs; this doc adds both.
 - **`patterns/p3-tech-tree-expansion-patterns.md`** — the parallel session's compound doc from the same day, covering tech tree work. Useful companion reference for what the other agent was doing.

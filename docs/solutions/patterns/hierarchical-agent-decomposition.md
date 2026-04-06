@@ -26,11 +26,13 @@ AutopilotController
 │       (gated on interval or dirty flag; hysteresis + temporal bias)
 ├── station_agents: BTreeMap<StationId, StationAgent>
 │   └── generate() → station commands (modules, labs, crew, trade)
-│   └── assign_ship_objectives() → sets ShipObjective on co-located ships
+│   └── assign_ship_objectives() → sets ShipObjective on home ships
 ├── ground_facility_agents: BTreeMap<GroundFacilityId, GroundFacilityAgent>
 │   └── generate() → facility commands (sensor purchase, budget)
+├── fleet_coordinator (VIO-598) → global supply/demand, Transfer objectives
+├── module_delivery (VIO-596) → cross-station module transfers for empty stations
 └── ship_agents: BTreeMap<ShipId, ShipAgent>
-    └── generate() → tactical commands (transit, mine, deposit, refuel)
+    └── generate() → tactical commands (transit, mine, deposit, refuel, transfer)
 ```
 
 ### Execution Order
@@ -41,7 +43,9 @@ AutopilotController
 1. Sync agent lifecycle (create/remove for new/deleted stations, facilities, ships)
 2. Station agents `generate()` in `BTreeMap` order (deterministic)
 3. Ground facility agents `generate()` in `BTreeMap` order (deterministic)
-4. Station agents `assign_ship_objectives()` with shared-iterator deduplication
+3.5a. `fleet_coordinator::evaluate_and_assign()` — global supply/demand, assigns Transfer objectives to idle ships (VIO-598). Prefers logistics-tagged ships, excludes mining-tagged.
+3.5b. `module_delivery::assign_module_deliveries()` — cross-station module transfers for empty stations (VIO-596). Same hull filtering as 3.5a.
+4. Station agents `assign_ship_objectives()` with shared-iterator deduplication. Excludes logistics-tagged ships (VIO-599).
 5. Ship agents `generate()` in `BTreeMap` order (deterministic)
 
 ### Strategic Layer Gating (VIO-480)
@@ -85,7 +89,7 @@ let current_salary_per_tick: f64 = state.stations.values()
 
 ### Example: Shared-Iterator Deduplication
 
-The flat `ShipAssignmentBridge` ran once globally — its shared iterators ensured no two ships targeted the same asteroid. When moved to per-station agents, deduplication became per-station. With multiple stations, two stations could assign the same asteroid. Acceptable for single-station game, but documented with a comment pointing to the strategic layer for future multi-station support.
+The flat `ShipAssignmentBridge` ran once globally — its shared iterators ensured no two ships targeted the same asteroid. When moved to per-station agents, deduplication became per-station. With multiple stations, two stations could assign the same asteroid. This is now mitigated by execution ordering: `FleetCoordinator` (step 3.5a) and `module_delivery` (step 3.5b) claim ships before per-station `assign_ship_objectives` (step 4), and hull tag filtering (VIO-599) keeps logistics ships out of mining pools. See [`cross-station-autopilot-coordination.md`](./cross-station-autopilot-coordination.md) for the full coordination pattern.
 
 ### Example: Hardcoded Tick Counts
 
