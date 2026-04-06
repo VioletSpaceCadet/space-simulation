@@ -821,6 +821,8 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         load_optional_json(dir, "initial_station.json")?;
     let autopilot: sim_core::AutopilotConfig = load_optional_json(dir, "autopilot.json")?;
     let default_strategy: sim_core::StrategyConfig = load_optional_json(dir, "strategy.json")?;
+    let phase_presets: std::collections::BTreeMap<sim_core::GamePhase, sim_core::PriorityWeights> =
+        load_optional_json(dir, "strategy_phase_presets.json")?;
     let scoring: sim_core::ScoringConfig = load_optional_json(dir, "scoring.json")?;
     let milestones: Vec<sim_core::MilestoneDef> = load_optional_json(dir, "milestones.json")?;
     let crew_roles = load_crew_roles(dir)?;
@@ -846,6 +848,7 @@ pub fn load_content(content_dir: &str) -> Result<GameContent> {
         initial_station,
         autopilot,
         default_strategy,
+        phase_presets,
         crew_roles,
         scoring,
         milestones,

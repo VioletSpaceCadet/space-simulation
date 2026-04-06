@@ -102,13 +102,15 @@ impl AutopilotController {
 }
 
 impl AutopilotController {
-    /// VIO-607: Emit a `SetStrategyConfig` command if the game phase changed
-    /// and no manual `mode_override` is set. Updates `runtime.last_phase` so
-    /// we only fire once per transition.
+    /// VIO-607/608: Emit a `SetStrategyConfig` command if the game phase changed
+    /// and no manual `mode_override` is set. Applies per-phase priority presets
+    /// from `content.phase_presets` when available. Updates `runtime.last_phase`
+    /// so we only fire once per transition.
     fn maybe_switch_mode(
         runtime: &mut StrategyRuntimeState,
         owner: &PrincipalId,
         state: &GameState,
+        content: &GameContent,
         next_id: &mut u64,
         commands: &mut Vec<CommandEnvelope>,
     ) {
@@ -121,11 +123,18 @@ impl AutopilotController {
             return;
         }
         let target_mode = sim_core::StrategyMode::for_phase(current_phase);
-        if state.strategy_config.mode == target_mode {
+        let preset_priorities = content.phase_presets.get(&current_phase).copied();
+        let mode_changed = state.strategy_config.mode != target_mode;
+        let priorities_changed =
+            preset_priorities.is_some_and(|preset| preset != state.strategy_config.priorities);
+        if !mode_changed && !priorities_changed {
             return;
         }
         let mut new_config = state.strategy_config.clone();
         new_config.mode = target_mode;
+        if let Some(preset) = preset_priorities {
+            new_config.priorities = preset;
+        }
         commands.push(behaviors::make_cmd(
             owner,
             state.meta.tick,
@@ -158,11 +167,12 @@ impl CommandSource for AutopilotController {
         let priorities =
             strategy_interpreter::evaluate_strategy(state, content, &mut self.strategy_runtime);
 
-        // VIO-607: Auto-switch strategy mode on phase transition.
+        // VIO-607/608: Auto-switch strategy mode + apply phase presets.
         Self::maybe_switch_mode(
             &mut self.strategy_runtime,
             &self.owner,
             state,
+            content,
             next_command_id,
             &mut commands,
         );

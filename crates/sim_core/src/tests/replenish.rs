@@ -153,6 +153,7 @@ fn replenish_test_content() -> GameContent {
         rocket_defs: std::collections::BTreeMap::new(),
         satellite_defs: std::collections::BTreeMap::new(),
         frames: std::collections::BTreeMap::new(),
+        phase_presets: std::collections::BTreeMap::new(),
         density_map: AHashMap::default(),
     };
     content.constants.derive_tick_values();

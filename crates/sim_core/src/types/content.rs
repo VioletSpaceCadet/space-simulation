@@ -323,6 +323,11 @@ pub struct GameContent {
     /// `build_initial_state()` to seed `GameState.strategy_config`.
     #[serde(default)]
     pub default_strategy: crate::StrategyConfig,
+    /// Per-phase priority presets from `content/strategy_phase_presets.json`.
+    /// When auto-switching mode on phase transition (VIO-607/608), the
+    /// matching preset's priorities replace `strategy_config.priorities`.
+    #[serde(default)]
+    pub phase_presets: BTreeMap<crate::GamePhase, crate::PriorityWeights>,
     /// Crew role definitions loaded from `content/crew_roles.json`.
     #[serde(default)]
     pub crew_roles: BTreeMap<CrewRole, CrewRoleDef>,
