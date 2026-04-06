@@ -764,6 +764,7 @@ fn load_recipes(
 /// Load required JSON files (constants, techs, solar system, etc.) that must
 /// exist. Returns parsed values to feed into `GameContent`. Extracted from
 /// `load_content` to keep function size under the clippy line limit.
+#[allow(clippy::type_complexity)]
 fn load_required_json(
     dir: &Path,
 ) -> Result<(
