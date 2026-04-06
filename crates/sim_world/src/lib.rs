@@ -1035,16 +1035,18 @@ fn build_station_from_setup(
     (station_id, station, ships)
 }
 
-pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
-    let c = &content.constants;
-
-    // Build stations + ships from initial_stations.json (multi-station)
-    // or fall back to single-station from initial_station.json.
+/// Build all stations + ships from content definitions. Uses `initial_stations`
+/// when available, falls back to legacy single-station from `initial_station`.
+fn build_all_stations(
+    content: &GameContent,
+) -> (
+    std::collections::BTreeMap<StationId, StationState>,
+    std::collections::BTreeMap<ShipId, ShipState>,
+) {
     let mut stations = std::collections::BTreeMap::new();
     let mut ships = std::collections::BTreeMap::new();
 
     if content.initial_stations.is_empty() {
-        // Legacy single-station path: use initial_station.json
         let fallback = sim_core::StationSetupDef {
             station_id: "station_earth_orbit".to_string(),
             parent_body: "earth_orbit_zone".to_string(),
@@ -1082,6 +1084,12 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             }
         }
     }
+    (stations, ships)
+}
+
+pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng) -> GameState {
+    let c = &content.constants;
+    let (stations, ships) = build_all_stations(content);
 
     // Place scan sites in zone bodies using weighted picking + area-sampled positions.
     let zone_bodies: Vec<&sim_core::OrbitalBodyDef> = content
