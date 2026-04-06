@@ -145,8 +145,8 @@ fn match_surplus_to_deficit(
 /// Evaluate supply/demand across all stations and assign Transfer objectives
 /// to idle ships for material/component redistribution.
 ///
-/// Runs as step 2.5 in `generate_commands`, before module delivery (step 3.5)
-/// and station agent commands (step 2 already completed by this point).
+/// Runs as step 3.5a in `generate_commands`, before module delivery (step 3.5b)
+/// and ship objective assignment (step 4).
 pub(crate) fn evaluate_and_assign(
     ship_agents: &mut BTreeMap<ShipId, ShipAgent>,
     state: &GameState,
@@ -505,5 +505,52 @@ mod tests {
         let result1 = run();
         let result2 = run();
         assert_eq!(result1, result2, "same state should produce same plans");
+    }
+
+    #[test]
+    fn repair_kit_surplus_generates_component_transfer() {
+        let content = fleet_content();
+        let mut state = fleet_state(&content);
+        let repair_kit_id = &content.autopilot.export_component.component_id;
+        let reserve = content.autopilot.export_component.reserve;
+
+        // Station A: surplus repair kits (above 2x reserve).
+        if let Some(station) = state.stations.get_mut(&station_a()) {
+            station.core.inventory.push(InventoryItem::Component {
+                component_id: ComponentId(repair_kit_id.clone()),
+                count: reserve * 3, // 3x reserve → surplus
+                quality: 1.0,
+            });
+        }
+        // Station B has 0 repair kits (below 50% reserve → deficit).
+
+        // Remove Fe surplus so repair_kit is the only matching transfer.
+        if let Some(station) = state.stations.get_mut(&station_a()) {
+            station.core.inventory.retain(
+                |item| !matches!(item, InventoryItem::Material { element, .. } if element == "Fe"),
+            );
+        }
+
+        let mut ship_agents = BTreeMap::new();
+        ship_agents.insert(ship_id(), ShipAgent::new(ship_id()));
+
+        evaluate_and_assign(&mut ship_agents, &state, &content, &owner(), None);
+
+        match &ship_agents[&ship_id()].objective {
+            Some(ShipObjective::Transfer {
+                from_station,
+                to_station,
+                items,
+            }) => {
+                assert_eq!(*from_station, station_a());
+                assert_eq!(*to_station, station_b());
+                assert!(matches!(
+                    &items[0],
+                    TradeItemSpec::Component { component_id, count }
+                        if component_id.0 == *repair_kit_id && *count > 0
+                ));
+            }
+            other => panic!("expected Transfer with repair kits, got {other:?}"),
+        }
     }
 }
