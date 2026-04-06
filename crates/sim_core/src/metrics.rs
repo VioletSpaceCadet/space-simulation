@@ -342,6 +342,9 @@ impl MetricsSnapshot {
             // Satellites
             ("satellites_active", U32),
             ("satellites_failed", U32),
+            // Supply chain
+            ("transfer_volume_kg", F32),
+            ("transfer_count", U32),
         ]
     }
 
