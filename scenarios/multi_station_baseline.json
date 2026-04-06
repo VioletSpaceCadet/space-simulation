@@ -1,0 +1,7 @@
+{
+  "name": "multi_station_baseline",
+  "ticks": 4000,
+  "metrics_every": 100,
+  "seeds": { "range": [1, 10] },
+  "state": "./content/dev_advanced_state.json"
+}

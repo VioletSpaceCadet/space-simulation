@@ -1,0 +1,7 @@
+{
+  "name": "multi_station_ci_smoke",
+  "ticks": 100,
+  "metrics_every": 50,
+  "seeds": [1, 2],
+  "state": "./content/dev_advanced_state.json"
+}
