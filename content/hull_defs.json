@@ -34,7 +34,7 @@
         "source": { "hull": "hull_mining_barge" }
       }
     ],
-    "tags": []
+    "tags": ["mining"]
   },
   {
     "id": "hull_transport_hauler",
@@ -56,7 +56,7 @@
         "source": { "hull": "hull_transport_hauler" }
       }
     ],
-    "tags": []
+    "tags": ["logistics"]
   },
   {
     "id": "hull_survey_scout",

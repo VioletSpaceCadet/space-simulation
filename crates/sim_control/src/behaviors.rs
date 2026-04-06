@@ -131,6 +131,42 @@ pub(crate) fn collect_idle_ships(state: &GameState, owner: &PrincipalId) -> Vec<
         .collect()
 }
 
+/// Check if a ship's hull has a specific tag. Returns `false` if the hull
+/// definition is not found in content.
+pub(crate) fn ship_has_hull_tag(
+    ship: &sim_core::ShipState,
+    tag: &str,
+    content: &sim_core::GameContent,
+) -> bool {
+    content
+        .hulls
+        .get(&ship.hull_id)
+        .is_some_and(|hull| hull.tags.iter().any(|t| t == tag))
+}
+
+/// Returns idle ships whose hull has the given tag. Logistics-tagged ships
+/// are preferred for inter-station transfers (VIO-599).
+pub(crate) fn collect_idle_ships_with_tag(
+    state: &GameState,
+    owner: &PrincipalId,
+    tag: &str,
+    content: &sim_core::GameContent,
+) -> Vec<ShipId> {
+    state
+        .ships
+        .values()
+        .filter(|ship| {
+            ship.owner == *owner
+                && ship
+                    .task
+                    .as_ref()
+                    .is_none_or(|t| matches!(t.kind, TaskKind::Idle))
+                && ship_has_hull_tag(ship, tag, content)
+        })
+        .map(|ship| ship.id.clone())
+        .collect()
+}
+
 /// Returns asteroid IDs above confidence threshold with unknown composition,
 /// sorted by distance from `reference_pos` (nearest first), with ID tiebreak for determinism.
 /// Targets are read from `content.autopilot.deep_scan_targets`.
