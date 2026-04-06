@@ -14,8 +14,8 @@
 //! - Global aggregates (fleet size, max wear) computed BEFORE per-station scoring.
 
 use sim_core::{
-    inventory_volume_m3, ConcernPriorities, GameContent, GameState, InventoryItem, PriorityWeights,
-    StrategyConfig,
+    inventory_volume_m3, ConcernPriorities, GameContent, GamePhase, GameState, InventoryItem,
+    PriorityWeights, StrategyConfig,
 };
 
 use crate::behaviors::AUTOPILOT_OWNER;
@@ -66,6 +66,8 @@ pub struct StrategyRuntimeState {
     pub last_strategy_tick: u64,
     pub strategy_dirty: bool,
     pub last_serviced: [Option<u64>; PriorityWeights::LEN],
+    /// Last observed game phase for auto-mode switching (VIO-607).
+    pub last_phase: Option<GamePhase>,
 }
 
 impl StrategyRuntimeState {
