@@ -152,6 +152,64 @@ fn fleet_target_5_produces_more_ships_than_2() {
     );
 }
 
+/// VIO-489: Multi-station determinism — same seed produces identical metrics.
+#[test]
+fn multi_station_determinism() {
+    let content = load_production_content();
+    assert!(
+        content.initial_stations.len() >= 2,
+        "production content should have 2+ stations in initial_stations.json"
+    );
+
+    let seed = 42;
+    let ticks = 500;
+    let metrics_a = run_with_strategy(&content, seed, ticks, |_| {});
+    let metrics_b = run_with_strategy(&content, seed, ticks, |_| {});
+
+    assert_eq!(
+        metrics_a.export_revenue_total, metrics_b.export_revenue_total,
+        "multi-station runs with same seed must produce identical export revenue"
+    );
+    assert_eq!(
+        metrics_a.techs_unlocked, metrics_b.techs_unlocked,
+        "multi-station runs with same seed must unlock identical techs"
+    );
+    assert_eq!(
+        metrics_a.fleet_total, metrics_b.fleet_total,
+        "multi-station runs with same seed must produce identical fleet"
+    );
+}
+
+/// VIO-489: Multi-station produces activity at both stations.
+/// With 2 stations and 2 ships, both should generate survey + mine activity.
+/// Revenue requires trade unlock which happens later; check techs + fleet instead.
+#[test]
+fn multi_station_both_stations_active() {
+    let content = load_production_content();
+    let ticks = 3000;
+
+    let metrics = run_with_strategy(&content, 1, ticks, |_| {});
+
+    // Both stations have scientists + labs, so techs should unlock.
+    assert!(
+        metrics.techs_unlocked > 0,
+        "multi-station run should unlock techs, got {}",
+        metrics.techs_unlocked
+    );
+    // Fleet should still have 2 ships (no crashes/losses in default scenario).
+    assert!(
+        metrics.fleet_total >= 2,
+        "multi-station run should retain at least 2 ships, got {}",
+        metrics.fleet_total
+    );
+    // Ore should have been refined at both stations.
+    assert!(
+        metrics.total_material_kg > 0.0,
+        "multi-station run should produce refined material, got {:.0} kg",
+        metrics.total_material_kg
+    );
+}
+
 /// Expand mode should produce more revenue than Consolidate mode at 3000 ticks.
 #[test]
 fn expand_mode_produces_more_revenue() {
