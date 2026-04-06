@@ -101,6 +101,41 @@ impl AutopilotController {
     }
 }
 
+impl AutopilotController {
+    /// VIO-607: Emit a `SetStrategyConfig` command if the game phase changed
+    /// and no manual `mode_override` is set. Updates `runtime.last_phase` so
+    /// we only fire once per transition.
+    fn maybe_switch_mode(
+        runtime: &mut StrategyRuntimeState,
+        owner: &PrincipalId,
+        state: &GameState,
+        next_id: &mut u64,
+        commands: &mut Vec<CommandEnvelope>,
+    ) {
+        let current_phase = state.progression.phase;
+        if runtime.last_phase == Some(current_phase) {
+            return;
+        }
+        runtime.last_phase = Some(current_phase);
+        if state.strategy_config.mode_override.is_some() {
+            return;
+        }
+        let target_mode = sim_core::StrategyMode::for_phase(current_phase);
+        if state.strategy_config.mode == target_mode {
+            return;
+        }
+        let mut new_config = state.strategy_config.clone();
+        new_config.mode = target_mode;
+        commands.push(behaviors::make_cmd(
+            owner,
+            state.meta.tick,
+            next_id,
+            sim_core::Command::SetStrategyConfig { config: new_config },
+        ));
+        runtime.mark_dirty();
+    }
+}
+
 impl Default for AutopilotController {
     fn default() -> Self {
         Self::new()
@@ -122,6 +157,15 @@ impl CommandSource for AutopilotController {
         // for weighted ship objective assignment (VIO-481).
         let priorities =
             strategy_interpreter::evaluate_strategy(state, content, &mut self.strategy_runtime);
+
+        // VIO-607: Auto-switch strategy mode on phase transition.
+        Self::maybe_switch_mode(
+            &mut self.strategy_runtime,
+            &self.owner,
+            state,
+            next_command_id,
+            &mut commands,
+        );
 
         // Destructure for disjoint field borrows.
         let Self {
@@ -1250,6 +1294,63 @@ mod tests {
         assert!(
             !has_ship_task,
             "zero strategy weights should assign no ship tasks"
+        );
+    }
+
+    // --- Phase-driven strategy mode switching tests (VIO-607) ---
+
+    #[test]
+    fn test_phase_transition_switches_strategy_mode() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+        // Start in Startup phase with Balanced mode (default)
+        assert_eq!(state.progression.phase, sim_core::GamePhase::Startup);
+        assert_eq!(state.strategy_config.mode, sim_core::StrategyMode::Balanced);
+
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+
+        // First tick: establishes phase tracking, no mode switch needed
+        let _ = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        // Advance phase to Industrial (maps to Expand mode)
+        state.progression.phase = sim_core::GamePhase::Industrial;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let has_set_strategy = commands.iter().any(|cmd| {
+            matches!(&cmd.command, sim_core::Command::SetStrategyConfig { config }
+                if config.mode == sim_core::StrategyMode::Expand)
+        });
+        assert!(
+            has_set_strategy,
+            "phase transition to Industrial should emit SetStrategyConfig with Expand mode"
+        );
+    }
+
+    #[test]
+    fn test_mode_override_prevents_auto_switch() {
+        let content = autopilot_content();
+        let mut state = autopilot_state(&content);
+        // Set manual override to Consolidate
+        state.strategy_config.mode_override = Some(sim_core::StrategyMode::Consolidate);
+        state.strategy_config.mode = sim_core::StrategyMode::Consolidate;
+
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+
+        // First tick
+        let _ = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        // Advance phase to Industrial — should NOT auto-switch because override is set
+        state.progression.phase = sim_core::GamePhase::Industrial;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        let has_set_strategy = commands
+            .iter()
+            .any(|cmd| matches!(&cmd.command, sim_core::Command::SetStrategyConfig { .. }));
+        assert!(
+            !has_set_strategy,
+            "with mode_override set, phase transition should NOT emit SetStrategyConfig"
         );
     }
 

@@ -9,6 +9,7 @@
 //! This module defines types only — no behavior. Consumers are wired in VIO-480
 //! (rule interpreter) and VIO-481 (station agent consumption).
 
+use crate::GamePhase;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,16 @@ impl StrategyMode {
                 propellant: 1.15,
                 fleet_expansion: 0.75,
             },
+        }
+    }
+
+    /// Default strategy mode for a given game phase (VIO-607).
+    /// Used by phase-driven auto-switching when no manual override is set.
+    #[must_use]
+    pub fn for_phase(phase: GamePhase) -> Self {
+        match phase {
+            GamePhase::Startup | GamePhase::Orbital => Self::Balanced,
+            GamePhase::Industrial | GamePhase::Expansion | GamePhase::DeepSpace => Self::Expand,
         }
     }
 }
@@ -284,6 +295,12 @@ pub struct StrategyConfig {
     /// station. Default 0.8. Mirrors `Constants.autopilot_refuel_threshold_pct`.
     pub refuel_threshold_pct: f32,
 
+    /// Manual mode override. When `Some`, auto-switching based on game phase
+    /// is disabled and this mode is used instead. Set to `None` to re-enable
+    /// phase-driven auto-switching (VIO-607).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode_override: Option<StrategyMode>,
+
     // -- strategy-v2 additions (VIO-605): remaining P0 AutopilotConfig behavioral params --
     /// Propellant fraction at or above which refueling is considered complete.
     /// Default 0.99. Mirrors `AutopilotConfig::refuel_max_pct` /
@@ -309,6 +326,7 @@ impl Default for StrategyConfig {
             mode: StrategyMode::Balanced,
             priorities: PriorityWeights::default(),
             fleet_size_target: 3,
+            mode_override: None,
             volatile_threshold_kg: 500.0,
             lh2_threshold_kg: 5000.0,
             lh2_abundant_multiplier: 2.0,
