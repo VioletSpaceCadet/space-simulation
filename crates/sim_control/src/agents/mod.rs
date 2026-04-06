@@ -1,3 +1,4 @@
+pub(crate) mod fleet_coordinator;
 pub(crate) mod ground_facility_agent;
 pub(crate) mod module_delivery;
 pub(crate) mod ship_agent;

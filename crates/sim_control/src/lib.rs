@@ -181,8 +181,19 @@ impl CommandSource for AutopilotController {
             ));
         }
 
-        // 3.5. Module delivery: cross-station module transfers for empty stations (VIO-596).
-        // Runs before ship objective assignment so assigned ships are not double-claimed.
+        // 3.5a. FleetCoordinator: global supply/demand evaluation (VIO-598).
+        // Evaluates per-station inventory levels, matches surpluses to deficits,
+        // and assigns Transfer objectives to idle ships.
+        agents::fleet_coordinator::evaluate_and_assign(
+            ship_agents,
+            state,
+            content,
+            owner,
+            decision_log.as_mut(),
+        );
+
+        // 3.5b. Module delivery: cross-station module transfers for empty stations (VIO-596).
+        // Runs after fleet coordinator so material transfers are assigned first.
         agents::module_delivery::assign_module_deliveries(
             ship_agents,
             state,
