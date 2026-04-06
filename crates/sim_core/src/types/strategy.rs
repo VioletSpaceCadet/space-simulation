@@ -78,8 +78,7 @@ impl StrategyMode {
     pub fn for_phase(phase: GamePhase) -> Self {
         match phase {
             GamePhase::Startup | GamePhase::Orbital => Self::Balanced,
-            GamePhase::Industrial | GamePhase::DeepSpace => Self::Expand,
-            GamePhase::Expansion => Self::Expand,
+            GamePhase::Industrial | GamePhase::Expansion | GamePhase::DeepSpace => Self::Expand,
         }
     }
 }
