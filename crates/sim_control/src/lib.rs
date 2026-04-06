@@ -1498,6 +1498,51 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_autopilot_no_thruster_import_at_fleet_target() {
+        let (content, mut state) = thruster_import_setup();
+        // Default fleet_size_target is 3 — add 3 ships to reach it
+        let owner = PrincipalId(AUTOPILOT_OWNER.to_string());
+        for i in 0..3 {
+            let ship_id = ShipId(format!("ship_fleet_{i}"));
+            state.ships.insert(
+                ship_id.clone(),
+                sim_core::ShipState {
+                    id: ship_id,
+                    owner: owner.clone(),
+                    position: test_position(),
+                    inventory: vec![],
+                    task: None,
+                    hull_id: sim_core::HullId("hull_test_ship".to_string()),
+                    fitted_modules: vec![],
+                    modifiers: Default::default(),
+                    propellant_kg: 0.0,
+                    propellant_capacity_kg: 0.0,
+                    cargo_capacity_m3: 50.0,
+                    speed_ticks_per_au: None,
+                    crew: std::collections::BTreeMap::new(),
+                    leaders: vec![],
+                    home_station: None,
+                },
+            );
+        }
+
+        let mut autopilot = AutopilotController::new();
+        let mut next_id = 0u64;
+        let commands = autopilot.generate_commands(&state, &content, &mut next_id);
+
+        assert!(
+            !commands.iter().any(|cmd| matches!(
+                &cmd.command,
+                Command::Import {
+                    item_spec: TradeItemSpec::Component { .. },
+                    ..
+                }
+            )),
+            "should NOT import shipyard components when fleet is at target size"
+        );
+    }
+
     // -----------------------------------------------------------------------
     // Export tests
     // -----------------------------------------------------------------------
@@ -2586,16 +2631,28 @@ mod tests {
         let mut state = sim_world::build_initial_state(&content, 42, &mut rng);
         sim_world::validate_state(&state, &content);
 
-        // VIO-481: Verify StrategyConfig defaults match AutopilotConfig thresholds
+        // VIO-481: Verify all 13 StrategyConfig thresholds match AutopilotConfig defaults
         // so the migration from content.autopilot to state.strategy_config is behavioral-equivalent.
         let sc = &state.strategy_config;
         let ap = &content.autopilot;
         assert!((sc.lh2_threshold_kg - ap.lh2_threshold_kg).abs() < f32::EPSILON);
-        assert!((sc.budget_cap_fraction - ap.budget_cap_fraction).abs() < f64::EPSILON);
-        assert!((sc.refuel_threshold_pct - ap.refuel_threshold_pct).abs() < f32::EPSILON);
+        assert!((sc.lh2_abundant_multiplier - ap.lh2_abundant_multiplier).abs() < f32::EPSILON);
+        assert!((sc.volatile_threshold_kg - ap.volatile_threshold_kg).abs() < f32::EPSILON);
+        assert!((sc.refinery_threshold_kg - ap.refinery_threshold_kg).abs() < f32::EPSILON);
         assert!((sc.slag_jettison_pct - ap.slag_jettison_pct).abs() < f32::EPSILON);
         assert!((sc.export_batch_size_kg - ap.export_batch_size_kg).abs() < f32::EPSILON);
+        assert!((sc.export_min_revenue - ap.export_min_revenue).abs() < f64::EPSILON);
+        assert!((sc.budget_cap_fraction - ap.budget_cap_fraction).abs() < f64::EPSILON);
+        assert!((sc.refuel_threshold_pct - ap.refuel_threshold_pct).abs() < f32::EPSILON);
+        assert!((sc.refuel_max_pct - ap.refuel_max_pct).abs() < f32::EPSILON);
+        assert!(
+            (sc.power_deficit_threshold_kw - ap.power_deficit_threshold_kw).abs() < f32::EPSILON
+        );
         assert_eq!(sc.shipyard_component_count, ap.shipyard_component_count);
+        assert_eq!(
+            sc.crew_hire_projection_minutes,
+            ap.crew_hire_projection_minutes
+        );
 
         // Run 500 ticks with autopilot
         let mut controller = AutopilotController::new();

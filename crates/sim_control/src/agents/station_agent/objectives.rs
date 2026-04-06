@@ -225,7 +225,6 @@ impl StationAgent {
             // Sort by weight descending (stable: equal weights keep insertion order)
             weights.sort_by(|a, b| b.1.total_cmp(&a.1));
 
-            let mut assigned = false;
             for &mut (priority, ref mut weight) in &mut weights {
                 if *weight <= 0.0 {
                     break; // All remaining weights are zero — skip assignment
@@ -264,11 +263,9 @@ impl StationAgent {
                         agent.objective = Some(obj);
                     }
                     *weight *= 0.5; // Halve after assignment
-                    assigned = true;
                     break;
                 }
             }
-            let _ = assigned; // Unused ships simply get no objective this tick
         }
     }
 }
