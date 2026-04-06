@@ -164,10 +164,17 @@ impl StationAgent {
         // Ships can be at any position — the ship agent will generate Transit
         // tasks to reach assigned targets (fixes VIO-457: ships stranded after
         // completing tasks at remote locations).
+        // VIO-599: Exclude logistics-tagged ships — they are reserved for
+        // inter-station transfers (FleetCoordinator / module delivery).
         let idle_ships = collect_idle_ships(state, owner);
         let assignable: Vec<ShipId> = idle_ships
             .into_iter()
-            .filter(|id| ship_agents.get(id).is_some_and(|a| a.objective.is_none()))
+            .filter(|id| {
+                ship_agents.get(id).is_some_and(|a| a.objective.is_none())
+                    && !state.ships.get(id).is_some_and(|s| {
+                        crate::behaviors::ship_has_hull_tag(s, "logistics", content)
+                    })
+            })
             .collect();
 
         if assignable.is_empty() {

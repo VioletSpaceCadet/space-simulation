@@ -17,7 +17,7 @@ use sim_core::{
 
 use super::ship_agent::ShipAgent;
 use super::DecisionRecord;
-use crate::behaviors::collect_idle_ships;
+use crate::behaviors::{collect_idle_ships, collect_idle_ships_with_tag};
 use crate::objectives::ShipObjective;
 
 /// A planned inter-station resource transfer.
@@ -142,6 +142,77 @@ fn match_surplus_to_deficit(
     }
 }
 
+/// Build transfer plans for all resource types, sorted by priority.
+fn build_transfer_plans(state: &GameState, content: &GameContent) -> Vec<TransferPlan> {
+    let mut plans: Vec<TransferPlan> = Vec::new();
+
+    // --- Propellant element (LH2): highest priority ---
+    let propellant_element = &content.autopilot.propellant_element;
+    let lh2_threshold = content.autopilot.lh2_threshold_kg;
+    let propellant_levels = material_levels(state, propellant_element);
+    match_surplus_to_deficit(
+        &propellant_levels,
+        lh2_threshold * 2.0,
+        lh2_threshold,
+        &|kg| TradeItemSpec::Material {
+            element: propellant_element.clone(),
+            kg,
+        },
+        0,
+        content.autopilot.export_batch_size_kg,
+        &mut plans,
+    );
+
+    // --- Repair kits: priority 1 ---
+    let repair_kit_id = &content.autopilot.export_component.component_id;
+    let repair_reserve = content.autopilot.export_component.reserve as f32;
+    let repair_levels = component_levels(state, repair_kit_id);
+    match_surplus_to_deficit(
+        &repair_levels,
+        repair_reserve * 2.0,
+        repair_reserve * 0.5,
+        &|count| {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let count = count.clamp(0.0, f32::from(u16::MAX)) as u32;
+            TradeItemSpec::Component {
+                component_id: ComponentId(repair_kit_id.clone()),
+                count,
+            }
+        },
+        1,
+        repair_reserve,
+        &mut plans,
+    );
+
+    // --- Export elements (Fe, Si, He): priority 2+ ---
+    for (idx, export_cfg) in content.autopilot.export_elements.iter().enumerate() {
+        let levels = material_levels(state, &export_cfg.element);
+        let reserve = export_cfg.reserve_kg;
+        match_surplus_to_deficit(
+            &levels,
+            reserve * 2.0,
+            reserve * 0.25,
+            &|kg| TradeItemSpec::Material {
+                element: export_cfg.element.clone(),
+                kg,
+            },
+            2_u8.saturating_add(u8::try_from(idx).unwrap_or(u8::MAX - 2)),
+            content.autopilot.export_batch_size_kg,
+            &mut plans,
+        );
+    }
+
+    // Sort by priority then deterministic tiebreak.
+    plans.sort_by(|a, b| {
+        a.priority
+            .cmp(&b.priority)
+            .then_with(|| a.target.0.cmp(&b.target.0))
+            .then_with(|| a.source.0.cmp(&b.source.0))
+    });
+
+    plans
+}
+
 /// Evaluate supply/demand across all stations and assign Transfer objectives
 /// to idle ships for material/component redistribution.
 ///
@@ -154,91 +225,34 @@ pub(crate) fn evaluate_and_assign(
     owner: &PrincipalId,
     mut decisions: Option<&mut Vec<DecisionRecord>>,
 ) {
-    // Only act when there are 2+ stations.
     if state.stations.len() < 2 {
         return;
     }
 
-    // Collect idle ships with no objective.
-    let idle_ships = collect_idle_ships(state, owner);
-    let mut available_ships: Vec<ShipId> = idle_ships
+    // VIO-599: Prefer logistics-tagged ships for transfers; fall back to
+    // general-purpose ships (but never use mining-tagged ships).
+    // Order: general-purpose first, logistics last — `pop()` takes from end.
+    let logistics_ships = collect_idle_ships_with_tag(state, owner, "logistics", content);
+    let all_idle = collect_idle_ships(state, owner);
+    let mut available_ships: Vec<ShipId> = all_idle
         .into_iter()
+        .filter(|id| {
+            state.ships.get(id).is_some_and(|s| {
+                !crate::behaviors::ship_has_hull_tag(s, "logistics", content)
+                    && !crate::behaviors::ship_has_hull_tag(s, "mining", content)
+            })
+        })
+        .chain(logistics_ships)
         .filter(|id| ship_agents.get(id).is_some_and(|a| a.objective.is_none()))
         .collect();
     if available_ships.is_empty() {
         return;
     }
 
-    let mut plans: Vec<TransferPlan> = Vec::new();
-
-    // --- Propellant element (LH2): highest priority ---
-    // Surplus: station has > 2x the LH2 threshold. Deficit: below threshold.
-    let propellant_element = &content.autopilot.propellant_element;
-    let lh2_threshold = content.autopilot.lh2_threshold_kg;
-    let propellant_levels = material_levels(state, propellant_element);
-    match_surplus_to_deficit(
-        &propellant_levels,
-        lh2_threshold * 2.0, // surplus: above 2x threshold
-        lh2_threshold,       // deficit: below threshold
-        &|kg| TradeItemSpec::Material {
-            element: propellant_element.clone(),
-            kg,
-        },
-        0, // priority 0 = highest
-        content.autopilot.export_batch_size_kg,
-        &mut plans,
-    );
-
-    // --- Repair kits: priority 1 ---
-    let repair_kit_id = &content.autopilot.export_component.component_id;
-    let repair_reserve = content.autopilot.export_component.reserve as f32;
-    let repair_levels = component_levels(state, repair_kit_id);
-    match_surplus_to_deficit(
-        &repair_levels,
-        repair_reserve * 2.0, // surplus: above 2x reserve
-        repair_reserve * 0.5, // deficit: below half reserve
-        &|count| {
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let count = count.clamp(0.0, f32::from(u16::MAX)) as u32;
-            TradeItemSpec::Component {
-                component_id: ComponentId(repair_kit_id.clone()),
-                count,
-            }
-        },
-        1,
-        repair_reserve, // transfer up to one reserve batch
-        &mut plans,
-    );
-
-    // --- Export elements (Fe, Si, He): priority 2+ ---
-    for (idx, export_cfg) in content.autopilot.export_elements.iter().enumerate() {
-        let levels = material_levels(state, &export_cfg.element);
-        let reserve = export_cfg.reserve_kg;
-        match_surplus_to_deficit(
-            &levels,
-            reserve * 2.0,  // surplus: above 2x reserve
-            reserve * 0.25, // deficit: below 25% of reserve
-            &|kg| TradeItemSpec::Material {
-                element: export_cfg.element.clone(),
-                kg,
-            },
-            2_u8.saturating_add(u8::try_from(idx).unwrap_or(u8::MAX - 2)),
-            content.autopilot.export_batch_size_kg,
-            &mut plans,
-        );
-    }
-
+    let plans = build_transfer_plans(state, content);
     if plans.is_empty() {
         return;
     }
-
-    // Sort by priority then deterministic tiebreak.
-    plans.sort_by(|a, b| {
-        a.priority
-            .cmp(&b.priority)
-            .then_with(|| a.target.0.cmp(&b.target.0))
-            .then_with(|| a.source.0.cmp(&b.source.0))
-    });
 
     // Assign one transfer per idle ship.
     for plan in plans {
@@ -297,8 +311,41 @@ mod tests {
     }
 
     /// Content with export config for Fe (12000 kg reserve) and repair kits (10 reserve).
+    /// Includes hull defs with tags for role-based ship filtering (VIO-599).
     fn fleet_content() -> GameContent {
-        base_content()
+        let mut content = base_content();
+        // Add tagged hull defs for role filtering tests.
+        content.hulls.insert(
+            HullId("hull_mining_barge".to_string()),
+            sim_core::HullDef {
+                id: HullId("hull_mining_barge".to_string()),
+                name: "Mining Barge".to_string(),
+                mass_kg: 8000.0,
+                cargo_capacity_m3: 80.0,
+                base_speed_ticks_per_au: 3200,
+                base_propellant_capacity_kg: 8000.0,
+                slots: vec![],
+                bonuses: vec![],
+                required_tech: None,
+                tags: vec!["mining".to_string()],
+            },
+        );
+        content.hulls.insert(
+            HullId("hull_transport_hauler".to_string()),
+            sim_core::HullDef {
+                id: HullId("hull_transport_hauler".to_string()),
+                name: "Transport Hauler".to_string(),
+                mass_kg: 12000.0,
+                cargo_capacity_m3: 200.0,
+                base_speed_ticks_per_au: 2666,
+                base_propellant_capacity_kg: 15000.0,
+                slots: vec![],
+                bonuses: vec![],
+                required_tech: None,
+                tags: vec!["logistics".to_string()],
+            },
+        );
+        content
     }
 
     /// State with two stations and one idle ship. Station A has surplus Fe,
@@ -552,5 +599,82 @@ mod tests {
             }
             other => panic!("expected Transfer with repair kits, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn mining_ship_excluded_from_transfers() {
+        let content = fleet_content();
+        let mut state = fleet_state(&content);
+        // Replace the ship with a mining barge.
+        state.ships.clear();
+        let mining_ship = ShipState {
+            id: ship_id(),
+            owner: owner(),
+            position: test_position(),
+            inventory: vec![],
+            task: None,
+            hull_id: HullId("hull_mining_barge".to_string()),
+            fitted_modules: vec![],
+            modifiers: Default::default(),
+            propellant_kg: 0.0,
+            propellant_capacity_kg: 0.0,
+            cargo_capacity_m3: 80.0,
+            speed_ticks_per_au: None,
+            crew: BTreeMap::new(),
+            leaders: vec![],
+            home_station: None,
+        };
+        state.ships.insert(ship_id(), mining_ship);
+
+        let mut ship_agents = BTreeMap::new();
+        ship_agents.insert(ship_id(), ShipAgent::new(ship_id()));
+
+        evaluate_and_assign(&mut ship_agents, &state, &content, &owner(), None);
+
+        assert!(
+            ship_agents[&ship_id()].objective.is_none(),
+            "mining ships should not be assigned logistics transfers"
+        );
+    }
+
+    #[test]
+    fn logistics_ship_preferred_over_general_purpose() {
+        let content = fleet_content();
+        let mut state = fleet_state(&content);
+
+        // Add a logistics ship alongside the existing general-purpose ship.
+        let hauler_id = ShipId("ship_hauler_logistics".to_string());
+        state.ships.insert(
+            hauler_id.clone(),
+            ShipState {
+                id: hauler_id.clone(),
+                owner: owner(),
+                position: test_position(),
+                inventory: vec![],
+                task: None,
+                hull_id: HullId("hull_transport_hauler".to_string()),
+                fitted_modules: vec![],
+                modifiers: Default::default(),
+                propellant_kg: 0.0,
+                propellant_capacity_kg: 0.0,
+                cargo_capacity_m3: 200.0,
+                speed_ticks_per_au: None,
+                crew: BTreeMap::new(),
+                leaders: vec![],
+                home_station: None,
+            },
+        );
+
+        let mut ship_agents = BTreeMap::new();
+        ship_agents.insert(ship_id(), ShipAgent::new(ship_id()));
+        ship_agents.insert(hauler_id.clone(), ShipAgent::new(hauler_id.clone()));
+
+        evaluate_and_assign(&mut ship_agents, &state, &content, &owner(), None);
+
+        // The logistics ship should be assigned (it's preferred).
+        assert!(
+            ship_agents[&hauler_id].objective.is_some(),
+            "logistics ship should be assigned a transfer"
+        );
     }
 }

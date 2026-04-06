@@ -13,7 +13,7 @@ use sim_core::{
 
 use super::ship_agent::ShipAgent;
 use super::DecisionRecord;
-use crate::behaviors::collect_idle_ships;
+use crate::behaviors::{collect_idle_ships, collect_idle_ships_with_tag};
 use crate::objectives::ShipObjective;
 
 /// Delivery priority: lower = more urgent. Determines the order in which
@@ -141,10 +141,20 @@ pub(crate) fn assign_module_deliveries(
         return;
     }
 
-    // Collect idle ships that have no objective yet.
-    let idle_ships = collect_idle_ships(state, owner);
-    let mut available_ships: Vec<ShipId> = idle_ships
+    // VIO-599: Prefer logistics-tagged ships; fall back to general-purpose
+    // (exclude mining-tagged ships from module delivery).
+    // Order: general-purpose first, logistics last — `pop()` takes from end.
+    let logistics_ships = collect_idle_ships_with_tag(state, owner, "logistics", content);
+    let all_idle = collect_idle_ships(state, owner);
+    let mut available_ships: Vec<ShipId> = all_idle
         .into_iter()
+        .filter(|id| {
+            state.ships.get(id).is_some_and(|s| {
+                !crate::behaviors::ship_has_hull_tag(s, "logistics", content)
+                    && !crate::behaviors::ship_has_hull_tag(s, "mining", content)
+            })
+        })
+        .chain(logistics_ships)
         .filter(|id| ship_agents.get(id).is_some_and(|a| a.objective.is_none()))
         .collect();
     if available_ships.is_empty() {
