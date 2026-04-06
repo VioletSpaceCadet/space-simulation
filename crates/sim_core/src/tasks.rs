@@ -780,6 +780,11 @@ pub(crate) fn resolve_pickup(
         }
     }
 
+    // VIO-600: Track inter-station transfer volume.
+    let pickup_mass_kg: f32 = picked_up.iter().map(|item| item.mass_kg()).sum();
+    state.transfer_volume_kg += f64::from(pickup_mass_kg);
+    state.transfer_count += 1;
+
     events.push(crate::emit(
         &mut state.counters,
         current_tick,

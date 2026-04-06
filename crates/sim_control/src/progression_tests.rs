@@ -1076,6 +1076,8 @@ fn manufacturing_pipeline_ore_to_cast_part() {
         modifiers: Default::default(),
         events: Default::default(),
         propellant_consumed_total: 0.0,
+        transfer_volume_kg: 0.0,
+        transfer_count: 0,
         progression: Default::default(),
         strategy_config: Default::default(),
         body_cache: sim_core::build_body_cache(&content.solar_system.bodies),

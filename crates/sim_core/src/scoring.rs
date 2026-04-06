@@ -677,6 +677,8 @@ mod tests {
             heat_wear_multiplier_avg: 1.0,
             satellites_active: 0,
             satellites_failed: 0,
+            transfer_volume_kg: 0.0,
+            transfer_count: 0,
         }
     }
 

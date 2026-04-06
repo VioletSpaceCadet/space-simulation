@@ -15,7 +15,7 @@ use std::io::Write;
 
 /// Current schema version — bump when fields are added/removed/reordered.
 /// v11: Replace per-module-type fields with dynamic `per_module_metrics` `BTreeMap`.
-pub const METRICS_VERSION: u32 = 13;
+pub const METRICS_VERSION: u32 = 14;
 
 /// A typed metric value extracted from a [`MetricsSnapshot`] field.
 #[derive(Clone, Copy, Debug)]
@@ -169,6 +169,10 @@ pub struct MetricsSnapshot {
     // Satellites
     pub satellites_active: u32,
     pub satellites_failed: u32,
+
+    // Supply chain (VIO-600)
+    pub transfer_volume_kg: f32,
+    pub transfer_count: u32,
 }
 
 impl MetricsSnapshot {
@@ -194,6 +198,9 @@ impl MetricsSnapshot {
             // Satellites
             ("satellites_active", U32(self.satellites_active)),
             ("satellites_failed", U32(self.satellites_failed)),
+            // Supply chain
+            ("transfer_volume_kg", F32(self.transfer_volume_kg)),
+            ("transfer_count", U32(self.transfer_count)),
         ]);
         fields
     }
@@ -851,6 +858,9 @@ impl MetricsAccumulator {
             heat_wear_multiplier_avg: avgs.heat_wear_multiplier_avg,
             satellites_active: state.satellites.values().filter(|s| s.enabled).count() as u32,
             satellites_failed: state.satellites.values().filter(|s| !s.enabled).count() as u32,
+            #[allow(clippy::cast_possible_truncation)]
+            transfer_volume_kg: state.transfer_volume_kg as f32,
+            transfer_count: state.transfer_count,
         }
     }
 }
@@ -1096,6 +1106,8 @@ mod tests {
             modifiers: crate::modifiers::ModifierSet::default(),
             events: crate::sim_events::SimEventState::default(),
             propellant_consumed_total: 0.0,
+            transfer_volume_kg: 0.0,
+            transfer_count: 0,
             progression: Default::default(),
             strategy_config: Default::default(),
             body_cache: AHashMap::default(),
