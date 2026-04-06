@@ -166,16 +166,16 @@ impl StationAgent {
         let assignable: Vec<ShipId> = home_ships
             .iter()
             .filter(|id| {
-                let is_idle = state.ships.get(*id).is_some_and(|s| {
-                    s.task
-                        .as_ref()
-                        .is_none_or(|t| matches!(t.kind, sim_core::TaskKind::Idle))
-                });
+                let Some(ship) = state.ships.get(*id) else {
+                    return false;
+                };
+                let is_idle = ship
+                    .task
+                    .as_ref()
+                    .is_none_or(|t| matches!(t.kind, sim_core::TaskKind::Idle));
                 is_idle
                     && ship_agents.get(*id).is_some_and(|a| a.objective.is_none())
-                    && !state.ships.get(*id).is_some_and(|s| {
-                        crate::behaviors::ship_has_hull_tag(s, "logistics", content)
-                    })
+                    && !crate::behaviors::ship_has_hull_tag(ship, "logistics", content)
             })
             .cloned()
             .collect();
