@@ -1068,9 +1068,17 @@ pub fn build_initial_state(content: &GameContent, seed: u64, rng: &mut impl Rng)
             let (sid, station, station_ships) =
                 build_station_from_setup(setup, content, module_id_offset);
             module_id_offset += setup.initial.modules.len();
-            stations.insert(sid, station);
+            assert!(
+                stations.insert(sid.clone(), station).is_none(),
+                "duplicate station_id in initial_stations: {}",
+                sid.0
+            );
             for (ship_id, ship) in station_ships {
-                ships.insert(ship_id, ship);
+                assert!(
+                    ships.insert(ship_id.clone(), ship).is_none(),
+                    "duplicate ship_id in initial_stations: {}",
+                    ship_id.0
+                );
             }
         }
     }
