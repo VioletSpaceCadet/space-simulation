@@ -151,6 +151,25 @@ impl Default for AutopilotController {
     }
 }
 
+/// VIO-487: Pre-partition ships by their `home_station`. Returns a map from
+/// station ID to the list of ship IDs homed there. Ships without a home
+/// station are omitted (they can only be assigned via fleet coordinator).
+fn partition_ships_by_station(
+    state: &GameState,
+    owner: &PrincipalId,
+) -> BTreeMap<StationId, Vec<ShipId>> {
+    let mut map: BTreeMap<StationId, Vec<ShipId>> = BTreeMap::new();
+    for ship in state.ships.values() {
+        if ship.owner != *owner {
+            continue;
+        }
+        if let Some(home) = &ship.home_station {
+            map.entry(home.clone()).or_default().push(ship.id.clone());
+        }
+    }
+    map
+}
+
 impl CommandSource for AutopilotController {
     fn generate_commands(
         &mut self,
@@ -257,16 +276,22 @@ impl CommandSource for AutopilotController {
             decision_log.as_mut(),
         );
 
-        // 4. Station agents assign objectives to idle ships (AD1).
-        // Deduplication is per-station; multi-station needs strategic layer.
+        // 4. Pre-partition ships by home_station for scoped assignment (VIO-487).
+        // O(K) partitioning once, then O(K_i) per station instead of O(S*K).
+        let ships_by_station = partition_ships_by_station(state, owner);
+
+        // Station agents assign objectives only to their home ships.
         // Priorities drive weighted task selection with priority halving (VIO-481).
         for station_agent in station_agents.values() {
+            let home_ships = ships_by_station
+                .get(&station_agent.station_id)
+                .map_or(&[][..], |v| v.as_slice());
             station_agent.assign_ship_objectives(
                 ship_agents,
                 state,
                 content,
-                owner,
                 &priorities,
+                home_ships,
                 decision_log.as_mut(),
             );
         }
@@ -633,8 +658,9 @@ mod tests {
 
         let owner = PrincipalId("principal_autopilot".to_string());
 
-        // Add a second idle ship.
+        // Add a second idle ship homed to the same station.
         let ship_2 = ShipId("ship_0002".to_string());
+        let station_id = state.stations.keys().next().unwrap().clone();
         state.ships.insert(
             ship_2.clone(),
             ShipState {
@@ -652,7 +678,7 @@ mod tests {
                 propellant_capacity_kg: 0.0,
                 crew: Default::default(),
                 leaders: Vec::new(),
-                home_station: None,
+                home_station: Some(station_id),
             },
         );
 

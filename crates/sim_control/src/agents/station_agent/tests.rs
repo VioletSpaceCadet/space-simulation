@@ -448,10 +448,15 @@ fn add_idle_ship(
         speed_ticks_per_au: None,
         crew: std::collections::BTreeMap::new(),
         leaders: vec![],
-        home_station: None,
+        home_station: state.stations.keys().next().cloned(),
     };
     state.ships.insert(ship_id.clone(), ship);
     agents.insert(ship_id.clone(), ShipAgent::new(ship_id));
+}
+
+/// Collect all ship IDs from agents, for use as `home_ships` parameter.
+fn all_ship_ids(agents: &BTreeMap<ShipId, ShipAgent>) -> Vec<ShipId> {
+    agents.keys().cloned().collect()
 }
 
 fn add_mineable_asteroid(
@@ -486,16 +491,16 @@ fn station_id_from_state(state: &sim_core::GameState) -> StationId {
 #[test]
 fn assign_no_idle_ships_no_assignments() {
     let (state, content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
     let agent = StationAgent::new(station_id);
 
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -505,7 +510,6 @@ fn assign_no_idle_ships_no_assignments() {
 #[test]
 fn assign_two_ships_two_asteroids_no_double_assignment() {
     let (mut state, content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_a = make_ship_id("ship_a");
@@ -526,12 +530,13 @@ fn assign_two_ships_two_asteroids_no_double_assignment() {
         ..ConcernPriorities::default()
     };
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &priorities,
+        &home_ships,
         None,
     );
 
@@ -561,7 +566,6 @@ fn assign_two_ships_two_asteroids_no_double_assignment() {
 #[test]
 fn assign_ship_with_cargo_skipped_no_iterator_consumption() {
     let (mut state, content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_a = make_ship_id("ship_a");
@@ -590,12 +594,13 @@ fn assign_ship_with_cargo_skipped_no_iterator_consumption() {
         });
 
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -609,7 +614,6 @@ fn assign_ship_with_cargo_skipped_no_iterator_consumption() {
 #[test]
 fn assign_busy_ship_not_assigned() {
     let (mut state, content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_id = make_ship_id("ship_a");
@@ -627,12 +631,13 @@ fn assign_busy_ship_not_assigned() {
     add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
 
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -642,7 +647,6 @@ fn assign_busy_ship_not_assigned() {
 #[test]
 fn assign_deep_scan_when_tech_unlocked() {
     let (mut state, mut content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_id = make_ship_id("ship_a");
@@ -674,12 +678,13 @@ fn assign_deep_scan_when_tech_unlocked() {
     );
 
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -692,7 +697,6 @@ fn assign_deep_scan_when_tech_unlocked() {
 #[test]
 fn assign_deep_scan_skipped_without_tech() {
     let (mut state, mut content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_id = make_ship_id("ship_a");
@@ -721,12 +725,13 @@ fn assign_deep_scan_skipped_without_tech() {
     );
 
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -736,7 +741,6 @@ fn assign_deep_scan_skipped_without_tech() {
 #[test]
 fn assign_ship_not_at_station_still_assigned() {
     let (mut state, content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_id = make_ship_id("ship_a");
@@ -751,12 +755,13 @@ fn assign_ship_not_at_station_still_assigned() {
     add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 0.8);
 
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -767,7 +772,6 @@ fn assign_ship_not_at_station_still_assigned() {
 #[test]
 fn assign_three_ships_waterfall_mine_then_survey() {
     let (mut state, content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_a = make_ship_id("ship_a");
@@ -788,12 +792,13 @@ fn assign_three_ships_waterfall_mine_then_survey() {
     });
 
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -812,7 +817,6 @@ fn assign_three_ships_waterfall_mine_then_survey() {
 #[test]
 fn assign_existing_objective_not_overwritten() {
     let (mut state, content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_id = make_ship_id("ship_a");
@@ -825,12 +829,13 @@ fn assign_existing_objective_not_overwritten() {
     });
 
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -843,7 +848,6 @@ fn assign_existing_objective_not_overwritten() {
 #[test]
 fn assign_survey_when_no_mine_candidates() {
     let (mut state, content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_id = make_ship_id("ship_a");
@@ -857,12 +861,13 @@ fn assign_survey_when_no_mine_candidates() {
     });
 
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -875,7 +880,6 @@ fn assign_survey_when_no_mine_candidates() {
 #[test]
 fn assign_no_candidates_no_objective() {
     let (mut state, content, mut ship_agents) = assignment_setup();
-    let owner = test_owner();
     let station_id = station_id_from_state(&state);
 
     let ship_id = make_ship_id("ship_a");
@@ -884,12 +888,13 @@ fn assign_no_candidates_no_objective() {
     state.scan_sites.clear();
 
     let agent = StationAgent::new(station_id);
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         None,
     );
 
@@ -1056,13 +1061,13 @@ fn decision_logging_captures_ship_objective() {
     add_mineable_asteroid(&mut state, make_asteroid_id("asteroid_1"), 1.0);
 
     let mut decisions = Vec::new();
-    let owner = test_owner();
+    let home_ships = all_ship_ids(&ship_agents);
     agent.assign_ship_objectives(
         &mut ship_agents,
         &state,
         &content,
-        &owner,
         &ConcernPriorities::default(),
+        &home_ships,
         Some(&mut decisions),
     );
 

@@ -736,7 +736,7 @@ pub fn base_state(content: &GameContent) -> GameState {
                 propellant_capacity_kg: 0.0,
                 crew: Default::default(),
                 leaders: Vec::new(),
-                home_station: None,
+                home_station: Some(station_id.clone()),
             },
         )]
         .into_iter()
