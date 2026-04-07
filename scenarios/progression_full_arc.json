@@ -1,0 +1,7 @@
+{
+  "name": "progression_full_arc",
+  "ticks": 30000,
+  "metrics_every": 1000,
+  "seeds": [1, 2, 3, 4, 5],
+  "state": "./content/ground_start.json"
+}

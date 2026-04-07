@@ -173,6 +173,12 @@ pub struct MetricsSnapshot {
     // Supply chain (VIO-600)
     pub transfer_volume_kg: f32,
     pub transfer_count: u32,
+
+    // Progression (VIO-611)
+    /// Number of milestones completed.
+    pub milestones_completed: u32,
+    /// Current game phase as ordinal (0=Startup, 1=Orbital, 2=Industrial, 3=Expansion, 4=DeepSpace).
+    pub game_phase: u32,
 }
 
 impl MetricsSnapshot {
@@ -201,6 +207,9 @@ impl MetricsSnapshot {
             // Supply chain
             ("transfer_volume_kg", F32(self.transfer_volume_kg)),
             ("transfer_count", U32(self.transfer_count)),
+            // Progression
+            ("milestones_completed", U32(self.milestones_completed)),
+            ("game_phase", U32(self.game_phase)),
         ]);
         fields
     }
@@ -345,6 +354,9 @@ impl MetricsSnapshot {
             // Supply chain
             ("transfer_volume_kg", F32),
             ("transfer_count", U32),
+            // Progression
+            ("milestones_completed", U32),
+            ("game_phase", U32),
         ]
     }
 
@@ -864,6 +876,8 @@ impl MetricsAccumulator {
             #[allow(clippy::cast_possible_truncation)]
             transfer_volume_kg: state.transfer_volume_kg as f32,
             transfer_count: state.transfer_count,
+            milestones_completed: state.progression.completed_milestones.len() as u32,
+            game_phase: state.progression.phase as u32,
         }
     }
 }
@@ -1211,6 +1225,8 @@ mod tests {
         assert_eq!(snapshot.overheat_warning_count, 0);
         assert_eq!(snapshot.overheat_critical_count, 0);
         assert!((snapshot.heat_wear_multiplier_avg - 0.0).abs() < f32::EPSILON);
+        assert_eq!(snapshot.milestones_completed, 0);
+        assert_eq!(snapshot.game_phase, 0);
     }
 
     #[test]

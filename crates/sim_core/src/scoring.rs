@@ -679,6 +679,8 @@ mod tests {
             satellites_failed: 0,
             transfer_volume_kg: 0.0,
             transfer_count: 0,
+            milestones_completed: 0,
+            game_phase: 0,
         }
     }
 
