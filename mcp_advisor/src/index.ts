@@ -699,12 +699,14 @@ server.tool(
       .describe("Text to search for in notes, observations, and playbook content"),
     tags: z.array(z.string()).optional()
       .describe("Filter journals by tags"),
+    phase: z.string().optional()
+      .describe("Filter journals by game_phase (e.g. 'Startup', 'Industrial', 'Expansion')"),
     source: z.enum(["journals", "playbook", "all"]).default("all")
       .describe("Which knowledge source to search"),
     limit: z.number().int().min(1).default(5)
       .describe("Maximum total results across all sources"),
   },
-  async ({ query, tags, source, limit }) => {
+  async ({ query, tags, phase, source, limit }) => {
     try {
       const results: { journals: JournalSummary[]; playbook: PlaybookMatch[] } = {
         journals: [],
@@ -736,6 +738,12 @@ server.tool(
             if (tags && tags.length > 0) {
               const hasTag = tags.some((t) => journalTags.includes(t));
               if (!hasTag) continue;
+            }
+
+            // Phase filter (VIO-612)
+            if (phase) {
+              const journalPhase = journal["game_phase"] as string | undefined;
+              if (!journalPhase || journalPhase.toLowerCase() !== phase.toLowerCase()) continue;
             }
 
             // Text search
