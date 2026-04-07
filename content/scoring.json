@@ -4,37 +4,69 @@
       "id": "industrial_output",
       "name": "Industrial Output",
       "weight": 0.25,
-      "ceiling": 1000.0
+      "ceiling": 1000.0,
+      "signals": [
+        { "source": "industrial_throughput", "blend": 1.0, "transform": "identity" },
+        { "source": "assembler_active", "blend": 0.1, "transform": "identity" }
+      ]
     },
     {
       "id": "research_progress",
       "name": "Research Progress",
       "weight": 0.20,
-      "ceiling": 1.0
+      "ceiling": 1.0,
+      "signals": [
+        { "source": "tech_fraction", "blend": 0.6, "transform": "identity" },
+        { "source": "total_raw_data", "blend": 0.25, "saturation": 1000.0, "transform": "linear_saturate" },
+        { "source": "science_satellites", "blend": 0.15, "saturation": 3.0, "transform": "linear_saturate" }
+      ]
     },
     {
       "id": "economic_health",
       "name": "Economic Health",
       "weight": 0.20,
-      "ceiling": 1.0
+      "ceiling": 1.0,
+      "signals": [
+        { "source": "balance", "blend": 0.3, "saturation": 1000000000.0, "transform": "clamp_saturate", "clamp_max": 2.0 },
+        { "source": "revenue_rate", "blend": 0.35, "saturation": 10000.0, "transform": "linear_saturate" },
+        { "source": "grant_rate", "blend": 0.35, "saturation": 50000.0, "transform": "linear_saturate" }
+      ]
     },
     {
       "id": "fleet_operations",
       "name": "Fleet Operations",
       "weight": 0.15,
-      "ceiling": 1.0
+      "ceiling": 1.0,
+      "signals": [
+        { "source": "fleet_utilization", "blend": 0.35, "transform": "identity" },
+        { "source": "ships_constructed", "blend": 0.25, "saturation": 5.0, "transform": "linear_saturate" },
+        { "source": "satellites_active", "blend": 0.2, "saturation": 3.0, "transform": "sqrt_saturate" },
+        { "source": "total_launches", "blend": 0.2, "saturation": 3.0, "transform": "sqrt_saturate" }
+      ]
     },
     {
       "id": "efficiency",
       "name": "Efficiency",
       "weight": 0.10,
-      "ceiling": 1.0
+      "ceiling": 1.0,
+      "signals": [
+        { "source": "avg_module_wear", "blend": 0.25, "transform": "inverse" },
+        { "source": "power_utilization", "blend": 0.25, "transform": "identity" },
+        { "source": "station_storage_used_pct", "blend": 0.25, "transform": "band", "band_low": 0.1, "band_high": 0.95 },
+        { "source": "satellite_utilization", "blend": 0.25, "transform": "identity" }
+      ]
     },
     {
       "id": "expansion",
       "name": "Expansion",
       "weight": 0.10,
-      "ceiling": 1.0
+      "ceiling": 1.0,
+      "signals": [
+        { "source": "base_count", "blend": 0.4, "saturation": 3.0, "transform": "linear_saturate" },
+        { "source": "fleet_total", "blend": 0.3, "saturation": 3.0, "transform": "sqrt_saturate" },
+        { "source": "satellites_active", "blend": 0.3, "saturation": 3.0, "transform": "sqrt_saturate" },
+        { "source": "extra_bases", "blend": 0.15, "saturation": 3.0, "transform": "linear_saturate" }
+      ]
     }
   ],
   "thresholds": [

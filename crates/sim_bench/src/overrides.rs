@@ -6,10 +6,11 @@ pub fn apply_overrides(
     content: &mut GameContent,
     overrides: &HashMap<String, serde_json::Value>,
 ) -> Result<()> {
-    // Split overrides into constant, module, autopilot, and strategy groups.
+    // Split overrides into constant, module, autopilot, strategy, and scoring groups.
     let mut constant_overrides = Vec::new();
     let mut autopilot_overrides = Vec::new();
     let mut strategy_overrides = Vec::new();
+    let mut scoring_overrides = Vec::new();
     for (key, value) in overrides {
         if let Some(rest) = key.strip_prefix("module.") {
             apply_module_override(&mut content.module_defs, rest, key, value)?;
@@ -17,6 +18,8 @@ pub fn apply_overrides(
             autopilot_overrides.push((rest, value));
         } else if let Some(rest) = key.strip_prefix("strategy.") {
             strategy_overrides.push((rest, value, key.as_str()));
+        } else if let Some(rest) = key.strip_prefix("scoring.") {
+            scoring_overrides.push((rest, value, key.as_str()));
         } else {
             constant_overrides.push((key.as_str(), value));
         }
@@ -30,6 +33,9 @@ pub fn apply_overrides(
     }
     if !strategy_overrides.is_empty() {
         apply_strategy_overrides(&mut content.default_strategy, &strategy_overrides)?;
+    }
+    if !scoring_overrides.is_empty() {
+        apply_scoring_overrides(&mut content.scoring, &scoring_overrides)?;
     }
     Ok(())
 }
@@ -330,6 +336,83 @@ fn as_u32(key: &str, value: &serde_json::Value) -> Result<u32> {
     let val = as_u64(key, value)?;
     u32::try_from(val)
         .map_err(|_| anyhow::anyhow!("override '{key}': value {val} exceeds u32 range"))
+}
+
+/// Apply overrides to `ScoringConfig`. Supports dotted paths:
+/// - `scoring.scale_factor` → top-level field
+/// - `scoring.computation_interval_ticks` → top-level field
+/// - `scoring.dimensions.DIMID.weight` → dimension field by ID
+/// - `scoring.dimensions.DIMID.ceiling` → dimension field by ID
+/// - `scoring.dimensions.DIMID.signals.SOURCE.blend` → signal field by source name
+/// - `scoring.dimensions.DIMID.signals.SOURCE.saturation` → signal field by source name
+fn apply_scoring_overrides(
+    scoring: &mut sim_core::ScoringConfig,
+    overrides: &[(&str, &serde_json::Value, &str)],
+) -> Result<()> {
+    for &(key, value, full_key) in overrides {
+        let parts: Vec<&str> = key.split('.').collect();
+        match parts.as_slice() {
+            ["scale_factor"] => {
+                scoring.scale_factor = value
+                    .as_f64()
+                    .ok_or_else(|| anyhow::anyhow!("'{full_key}': expected number"))?;
+            }
+            ["computation_interval_ticks"] => {
+                scoring.computation_interval_ticks = as_u64(full_key, value)?;
+            }
+            ["dimensions", dim_id, field] => {
+                let dim = scoring
+                    .dimensions
+                    .iter_mut()
+                    .find(|d| d.id == *dim_id)
+                    .ok_or_else(|| anyhow::anyhow!("'{full_key}': unknown dimension '{dim_id}'"))?;
+                match *field {
+                    "weight" => {
+                        dim.weight = value
+                            .as_f64()
+                            .ok_or_else(|| anyhow::anyhow!("'{full_key}': expected number"))?;
+                    }
+                    "ceiling" => {
+                        dim.ceiling = value
+                            .as_f64()
+                            .ok_or_else(|| anyhow::anyhow!("'{full_key}': expected number"))?;
+                    }
+                    _ => bail!("'{full_key}': unknown dimension field '{field}'"),
+                }
+            }
+            ["dimensions", dim_id, "signals", source, field] => {
+                let dim = scoring
+                    .dimensions
+                    .iter_mut()
+                    .find(|d| d.id == *dim_id)
+                    .ok_or_else(|| anyhow::anyhow!("'{full_key}': unknown dimension '{dim_id}'"))?;
+                let signal = dim
+                    .signals
+                    .iter_mut()
+                    .find(|s| s.source == *source)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("'{full_key}': unknown signal source '{source}'")
+                    })?;
+                let num = value
+                    .as_f64()
+                    .ok_or_else(|| anyhow::anyhow!("'{full_key}': expected number"))?;
+                match *field {
+                    "blend" => signal.blend = num,
+                    "saturation" => signal.saturation = Some(num),
+                    "band_low" => signal.band_low = Some(num),
+                    "band_high" => signal.band_high = Some(num),
+                    "clamp_max" => signal.clamp_max = Some(num),
+                    _ => bail!("'{full_key}': unknown signal field '{field}'"),
+                }
+            }
+            _ => bail!(
+                "unknown scoring override key '{full_key}'. \
+                 Use scoring.scale_factor, scoring.dimensions.<id>.weight, \
+                 scoring.dimensions.<id>.signals.<source>.<field>"
+            ),
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -965,6 +1048,109 @@ mod tests {
             apply_overrides(&mut content, &overrides).unwrap();
             assert!((content.default_strategy.priorities.mining - 0.99).abs() < f32::EPSILON);
             assert_eq!(content.default_strategy.fleet_size_target, 7);
+        }
+    }
+
+    mod scoring_overrides {
+        use super::*;
+
+        #[test]
+        fn test_scoring_scale_factor_override() {
+            let mut content = test_content();
+            let overrides = HashMap::from([(
+                "scoring.scale_factor".to_string(),
+                serde_json::json!(5000.0),
+            )]);
+            apply_overrides(&mut content, &overrides).unwrap();
+            assert!((content.scoring.scale_factor - 5000.0).abs() < f64::EPSILON);
+        }
+
+        #[test]
+        fn test_scoring_dimension_weight_override() {
+            let mut content = test_content();
+            let overrides = HashMap::from([(
+                "scoring.dimensions.research_progress.weight".to_string(),
+                serde_json::json!(0.30),
+            )]);
+            apply_overrides(&mut content, &overrides).unwrap();
+            let dim = content
+                .scoring
+                .dimensions
+                .iter()
+                .find(|d| d.id == "research_progress")
+                .unwrap();
+            assert!((dim.weight - 0.30).abs() < f64::EPSILON);
+        }
+
+        #[test]
+        fn test_scoring_signal_blend_override() {
+            let mut content = test_content();
+            let overrides = HashMap::from([(
+                "scoring.dimensions.research_progress.signals.tech_fraction.blend".to_string(),
+                serde_json::json!(0.8),
+            )]);
+            apply_overrides(&mut content, &overrides).unwrap();
+            let dim = content
+                .scoring
+                .dimensions
+                .iter()
+                .find(|d| d.id == "research_progress")
+                .unwrap();
+            let signal = dim
+                .signals
+                .iter()
+                .find(|s| s.source == "tech_fraction")
+                .unwrap();
+            assert!((signal.blend - 0.8).abs() < f64::EPSILON);
+        }
+
+        #[test]
+        fn test_scoring_signal_saturation_override() {
+            let mut content = test_content();
+            let overrides = HashMap::from([(
+                "scoring.dimensions.research_progress.signals.total_raw_data.saturation"
+                    .to_string(),
+                serde_json::json!(2000.0),
+            )]);
+            apply_overrides(&mut content, &overrides).unwrap();
+            let dim = content
+                .scoring
+                .dimensions
+                .iter()
+                .find(|d| d.id == "research_progress")
+                .unwrap();
+            let signal = dim
+                .signals
+                .iter()
+                .find(|s| s.source == "total_raw_data")
+                .unwrap();
+            assert!((signal.saturation.unwrap() - 2000.0).abs() < f64::EPSILON);
+        }
+
+        #[test]
+        fn test_unknown_scoring_dimension_errors() {
+            let mut content = test_content();
+            let overrides = HashMap::from([(
+                "scoring.dimensions.nonexistent.weight".to_string(),
+                serde_json::json!(0.5),
+            )]);
+            let err = apply_overrides(&mut content, &overrides)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("unknown dimension"), "{err}");
+        }
+
+        #[test]
+        fn test_unknown_scoring_signal_errors() {
+            let mut content = test_content();
+            let overrides = HashMap::from([(
+                "scoring.dimensions.research_progress.signals.nonexistent.blend".to_string(),
+                serde_json::json!(0.5),
+            )]);
+            let err = apply_overrides(&mut content, &overrides)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("unknown signal source"), "{err}");
         }
     }
 }

@@ -2,6 +2,9 @@
 //!
 //! `ScoringConfig` is loaded from `content/scoring.json` as part of `GameContent`.
 //! `compute_run_score()` is a pure function producing a `RunScore` from game state.
+//!
+//! Signal sources are resolved by code (they encode game mechanics), but signal
+//! combination (blending, saturation, transforms) is config-driven via `scoring.json`.
 
 use crate::{GameContent, GameState, MetricsSnapshot};
 use serde::{Deserialize, Serialize};
@@ -10,6 +13,49 @@ use std::collections::BTreeMap;
 // ---------------------------------------------------------------------------
 // Content configuration (loaded from scoring.json)
 // ---------------------------------------------------------------------------
+
+/// Transform applied to a signal source value before blending.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SignalTransform {
+    /// Pass-through: value used as-is (assumed already in useful range).
+    #[default]
+    Identity,
+    /// `(value / saturation).min(1.0)` — linear ramp to 1.0 at saturation.
+    LinearSaturate,
+    /// `(value.sqrt() / saturation).min(1.0)` — diminishing returns.
+    SqrtSaturate,
+    /// `(1.0 - value).clamp(0.0, 1.0)` — inversion (e.g. wear → health).
+    Inverse,
+    /// Piecewise: 1.0 in `[band_low, band_high]`, linear penalty outside.
+    Band,
+    /// `(value / saturation).clamp(0.0, clamp_max) / clamp_max` — bounded ratio.
+    ClampSaturate,
+}
+
+/// A single signal within a scoring dimension.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SignalDef {
+    /// Named signal source (resolved by `resolve_signal_source`).
+    pub source: String,
+    /// Contribution weight within this dimension.
+    pub blend: f64,
+    /// Transform applied to the raw source value.
+    #[serde(default)]
+    pub transform: SignalTransform,
+    /// Denominator for saturation transforms (`linear_saturate`, `sqrt_saturate`, `clamp_saturate`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saturation: Option<f64>,
+    /// Lower boundary for `band` transform (value below this is penalized).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_low: Option<f64>,
+    /// Upper boundary for `band` transform (value above this is penalized).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_high: Option<f64>,
+    /// Upper clamp for `clamp_saturate` (value is clamped to `[0, clamp_max]` then normalized).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clamp_max: Option<f64>,
+}
 
 /// A single scoring dimension definition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -22,6 +68,10 @@ pub struct DimensionDef {
     pub weight: f64,
     /// Normalization ceiling — the raw value at which the dimension scores 1.0.
     pub ceiling: f64,
+    /// Signal definitions that compose this dimension's raw value.
+    /// `raw = Σ(transform(resolve(source)) * blend)`
+    #[serde(default)]
+    pub signals: Vec<SignalDef>,
 }
 
 /// A named score threshold (e.g., "Enterprise" at 500 points).
@@ -36,7 +86,7 @@ pub struct ThresholdDef {
 /// Scoring configuration loaded from `content/scoring.json`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoringConfig {
-    /// The 6 scoring dimensions with weights and normalization ceilings.
+    /// The scoring dimensions with weights and normalization ceilings.
     pub dimensions: Vec<DimensionDef>,
     /// Named score thresholds, ordered ascending by `min_score`.
     pub thresholds: Vec<ThresholdDef>,
@@ -67,6 +117,29 @@ impl Default for ScoringConfig {
     }
 }
 
+/// All recognized signal source names. Used for content validation.
+pub const KNOWN_SIGNAL_SOURCES: &[&str] = &[
+    "assembler_active",
+    "avg_module_wear",
+    "balance",
+    "base_count",
+    "extra_bases",
+    "fleet_total",
+    "fleet_utilization",
+    "grant_rate",
+    "industrial_throughput",
+    "power_utilization",
+    "revenue_rate",
+    "satellites_active",
+    "satellite_utilization",
+    "science_satellites",
+    "ships_constructed",
+    "station_storage_used_pct",
+    "tech_fraction",
+    "total_launches",
+    "total_raw_data",
+];
+
 /// Validate a scoring config. Returns an error message if invalid.
 pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
     if config.dimensions.is_empty() {
@@ -94,6 +167,7 @@ pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
                 dim.id, dim.ceiling
             ));
         }
+        validate_dimension_signals(dim)?;
     }
 
     let weight_sum: f64 = config.dimensions.iter().map(|d| d.weight).sum();
@@ -127,6 +201,57 @@ pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_dimension_signals(dim: &DimensionDef) -> Result<(), String> {
+    for signal in &dim.signals {
+        if signal.blend <= 0.0 {
+            return Err(format!(
+                "dimension '{}' signal '{}' has non-positive blend {}",
+                dim.id, signal.source, signal.blend
+            ));
+        }
+        if !KNOWN_SIGNAL_SOURCES.contains(&signal.source.as_str()) {
+            return Err(format!(
+                "dimension '{}' signal '{}' has unknown source",
+                dim.id, signal.source
+            ));
+        }
+        match signal.transform {
+            SignalTransform::LinearSaturate
+            | SignalTransform::SqrtSaturate
+            | SignalTransform::ClampSaturate => {
+                let sat = signal.saturation.unwrap_or(0.0);
+                if sat <= 0.0 {
+                    return Err(format!(
+                        "dimension '{}' signal '{}' requires saturation > 0 for {:?}",
+                        dim.id, signal.source, signal.transform
+                    ));
+                }
+            }
+            SignalTransform::Band => {
+                let low = signal.band_low.unwrap_or(0.0);
+                let high = signal.band_high.unwrap_or(0.0);
+                if low >= high {
+                    return Err(format!(
+                        "dimension '{}' signal '{}' band requires band_low < band_high",
+                        dim.id, signal.source
+                    ));
+                }
+            }
+            SignalTransform::Identity | SignalTransform::Inverse => {}
+        }
+        if signal.transform == SignalTransform::ClampSaturate {
+            let max = signal.clamp_max.unwrap_or(0.0);
+            if max <= 0.0 {
+                return Err(format!(
+                    "dimension '{}' signal '{}' clamp_saturate requires clamp_max > 0",
+                    dim.id, signal.source
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Score computation
 // ---------------------------------------------------------------------------
@@ -134,9 +259,9 @@ pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
 /// Compute a run score from the current metrics snapshot and game state.
 ///
 /// Pure function — no state mutation, no IO. Deterministic for the same inputs.
-/// Each dimension produces a raw value, which is normalized to [0.0, 1.0] by
-/// dividing by the dimension's ceiling (clamped). The composite score is the
-/// weighted sum scaled by `scale_factor`.
+/// Each dimension produces a raw value from its config-driven signals, which is
+/// normalized to [0.0, 1.0] by dividing by the dimension's ceiling (clamped).
+/// The composite score is the weighted sum scaled by `scale_factor`.
 pub fn compute_run_score(
     metrics: &MetricsSnapshot,
     state: &GameState,
@@ -153,7 +278,7 @@ pub fn compute_run_score(
     let mut composite = 0.0;
 
     for dim in &config.dimensions {
-        let raw_value = compute_dimension_raw(&dim.id, metrics, state, content, tick);
+        let raw_value = compute_dimension_raw(dim, metrics, state, content, tick);
         let normalized = (raw_value / dim.ceiling).clamp(0.0, 1.0);
         let weighted = normalized * dim.weight * config.scale_factor;
         composite += weighted;
@@ -180,55 +305,149 @@ pub fn compute_run_score(
     }
 }
 
-/// Compute the raw value for a single dimension by its ID.
+/// Compute the raw value for a single dimension from its signal config.
+///
+/// `raw = Σ(apply_transform(resolve_source(signal.source), signal) * signal.blend)`
 fn compute_dimension_raw(
-    dimension_id: &str,
+    dim: &DimensionDef,
     metrics: &MetricsSnapshot,
     state: &GameState,
     content: &GameContent,
     tick: f64,
 ) -> f64 {
-    match dimension_id {
-        "industrial_output" => compute_industrial(metrics, state, tick),
-        "research_progress" => compute_research(metrics, state, content),
-        "economic_health" => compute_economic(metrics, state, tick),
-        "fleet_operations" => compute_fleet(metrics, state),
-        "efficiency" => compute_efficiency(metrics),
-        "expansion" => compute_expansion(metrics, state),
-        _ => 0.0, // unknown dimension — content-defined, scores zero
+    dim.signals
+        .iter()
+        .map(|signal| {
+            let raw = resolve_signal_source(&signal.source, metrics, state, content, tick);
+            apply_transform(raw, signal) * signal.blend
+        })
+        .sum()
+}
+
+// ---------------------------------------------------------------------------
+// Signal source resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve a named signal source to its raw value.
+///
+/// Signal sources encode game mechanics — adding a new source requires code.
+/// The signal *combination* (blending, saturation, transforms) is config-driven.
+fn resolve_signal_source(
+    source: &str,
+    metrics: &MetricsSnapshot,
+    state: &GameState,
+    content: &GameContent,
+    tick: f64,
+) -> f64 {
+    match source {
+        // -- Industrial --
+        "industrial_throughput" => {
+            let throughput = f64::from(metrics.total_material_kg) / tick;
+            let productive_bases = count_productive_bases(state) as f64;
+            let extra_bases = (productive_bases - 1.0).clamp(0.0, 3.0);
+            let diversification_multiplier = 1.0 + extra_bases * 0.10;
+            throughput * diversification_multiplier
+        }
+        "assembler_active" => f64::from(
+            metrics
+                .per_module_metrics
+                .get("assembler")
+                .map_or(0, |m| m.active),
+        ),
+
+        // -- Research --
+        "tech_fraction" => {
+            let total_techs = content.techs.len().max(1) as f64;
+            f64::from(metrics.techs_unlocked) / total_techs
+        }
+        "total_raw_data" => {
+            let mut data_values: Vec<f64> = state
+                .research
+                .data_pool
+                .values()
+                .map(|v| f64::from(*v))
+                .collect();
+            data_values.sort_by(f64::total_cmp);
+            data_values.iter().sum()
+        }
+        "science_satellites" => state
+            .satellites
+            .values()
+            .filter(|s| s.enabled && s.satellite_type == "science_platform")
+            .count() as f64,
+
+        // -- Economic --
+        "balance" => state.balance,
+        "revenue_rate" => metrics.export_revenue_total / tick,
+        "grant_rate" => {
+            let grant_total: f64 = state
+                .progression
+                .grant_history
+                .iter()
+                .map(|g| g.amount)
+                .sum();
+            grant_total / tick
+        }
+
+        // -- Fleet --
+        "fleet_utilization" => {
+            if metrics.fleet_total > 0 {
+                let total = f64::from(metrics.fleet_total);
+                let active = total - f64::from(metrics.fleet_idle);
+                active / total
+            } else {
+                0.0
+            }
+        }
+        "ships_constructed" => (state.ships.len() as f64 - 1.0).max(0.0),
+        "satellites_active" => f64::from(metrics.satellites_active),
+        "total_launches" => {
+            state.counters.stations_deployed as f64
+                + state
+                    .ground_facilities
+                    .values()
+                    .flat_map(|f| f.core.modules.iter())
+                    .filter_map(|m| match &m.kind_state {
+                        crate::ModuleKindState::LaunchPad(pad) => Some(pad.launches_count as f64),
+                        _ => None,
+                    })
+                    .sum::<f64>()
+        }
+
+        // -- Efficiency --
+        "avg_module_wear" => f64::from(metrics.avg_module_wear),
+        "power_utilization" => {
+            if metrics.power_generated_kw > 0.0 {
+                (f64::from(metrics.power_consumed_kw) / f64::from(metrics.power_generated_kw))
+                    .min(1.0)
+            } else {
+                0.0
+            }
+        }
+        "station_storage_used_pct" => f64::from(metrics.station_storage_used_pct),
+        "satellite_utilization" => {
+            let total_sats = f64::from(metrics.satellites_active + metrics.satellites_failed);
+            if total_sats > 0.0 {
+                f64::from(metrics.satellites_active) / total_sats
+            } else {
+                1.0
+            }
+        }
+
+        // -- Expansion --
+        "base_count" => (state.stations.len() + state.ground_facilities.len()) as f64,
+        "fleet_total" => f64::from(metrics.fleet_total),
+        "extra_bases" => {
+            let base_count = (state.stations.len() + state.ground_facilities.len()) as f64;
+            (base_count - 1.0).clamp(0.0, 3.0)
+        }
+
+        _ => 0.0,
     }
 }
 
-/// Industrial Output: material throughput per tick + assembler activity.
-///
-/// VIO-603: adds a multi-base diversification multiplier — running N
-/// productive bases amplifies throughput credit, rewarding distributed
-/// production over concentrating everything on one base. A "productive
-/// base" is a station or ground facility with at least one Assembler
-/// or Processor module (module `enabled` flag is ignored — structural
-/// diversification is what we want to reward, not current uptime).
-///
-/// The multiplier is proportional (not additive) so the bonus scales
-/// with actual throughput rather than being lost against the ceiling.
-/// Plateaus at 3 extra productive bases (+30% max) to avoid rewarding
-/// sprawl beyond what players can realistically manage.
-fn compute_industrial(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> f64 {
-    let throughput = f64::from(metrics.total_material_kg) / tick;
-    let assembler_active = metrics
-        .per_module_metrics
-        .get("assembler")
-        .map_or(0, |m| m.active);
-    let productive_bases = count_productive_bases(state) as f64;
-    // +10% throughput per extra productive base, capped at +30% (4 bases).
-    let extra_bases = (productive_bases - 1.0).clamp(0.0, 3.0);
-    let diversification_multiplier = 1.0 + extra_bases * 0.10;
-    throughput * diversification_multiplier + f64::from(assembler_active) * 0.1
-}
-
 /// Count productive bases: stations + ground facilities that host at
-/// least one Assembler or Processor module. Treats stations and ground
-/// facilities symmetrically so ground-start runs have access to the
-/// same diversification rewards as orbital-start runs.
+/// least one Assembler or Processor module.
 fn count_productive_bases(state: &GameState) -> usize {
     let station_count = state
         .stations
@@ -252,134 +471,34 @@ fn has_productive_module(modules: &[crate::ModuleState]) -> bool {
     })
 }
 
-/// Research Progress: fraction of techs unlocked + scan data growth + science satellites.
-fn compute_research(metrics: &MetricsSnapshot, state: &GameState, content: &GameContent) -> f64 {
-    let total_techs = content.techs.len().max(1) as f64;
-    let tech_fraction = f64::from(metrics.techs_unlocked) / total_techs;
-    // Use all raw data kinds (SURVEY, OpticalData, RadioData, etc.) — not just SURVEY.
-    // Collect and sort for deterministic floating-point sum across AHashMap iterations.
-    let mut data_values: Vec<f64> = state
-        .research
-        .data_pool
-        .values()
-        .map(|v| f64::from(*v))
-        .collect();
-    data_values.sort_by(f64::total_cmp);
-    let total_raw_data: f64 = data_values.iter().sum();
-    let data_signal = (total_raw_data / 1000.0).min(1.0);
-    // Science satellites contribute to research capability.
-    let science_count = state
-        .satellites
-        .values()
-        .filter(|s| s.enabled && s.satellite_type == "science_platform")
-        .count() as f64;
-    let science_signal = (science_count / 3.0).min(1.0);
-    // Blend: 60% tech unlocks, 25% data accumulation, 15% science infrastructure
-    tech_fraction * 0.6 + data_signal * 0.25 + science_signal * 0.15
-}
+// ---------------------------------------------------------------------------
+// Signal transforms
+// ---------------------------------------------------------------------------
 
-/// Economic Health: balance trend + export/grant revenue per tick.
-fn compute_economic(metrics: &MetricsSnapshot, state: &GameState, tick: f64) -> f64 {
-    // Fixed reference balance for normalization. Ground starts ($50M) will have a
-    // lower ratio than orbital starts ($1B), but grant income compensates.
-    let reference_balance = 1_000_000_000.0_f64;
-    let balance_ratio = (state.balance / reference_balance).clamp(0.0, 2.0) / 2.0;
-    let revenue_rate = metrics.export_revenue_total / tick;
-    let revenue_signal = (revenue_rate / 10_000.0).min(1.0);
-    // Grant income signals economic health for ground-start (no exports yet)
-    let grant_total: f64 = state
-        .progression
-        .grant_history
-        .iter()
-        .map(|g| g.amount)
-        .sum();
-    let grant_rate = grant_total / tick;
-    let grant_signal = (grant_rate / 50_000.0).min(1.0);
-    // Blend: 30% balance, 35% export revenue, 35% grant income
-    balance_ratio * 0.3 + revenue_signal * 0.35 + grant_signal * 0.35
-}
-
-/// Fleet Operations: utilization + fleet size + satellite deployments + launches.
-fn compute_fleet(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
-    let has_fleet = metrics.fleet_total > 0;
-    let utilization = if has_fleet {
-        let total = f64::from(metrics.fleet_total);
-        let active = total - f64::from(metrics.fleet_idle);
-        active / total
-    } else {
-        0.0
-    };
-    // ships_built counter: total ships minus any that existed at start (max 1 starting ship)
-    let ships_constructed = (state.ships.len() as f64 - 1.0).max(0.0);
-    let construction_signal = (ships_constructed / 5.0).min(1.0);
-    // Satellite deployments count as completed missions (sqrt diminishing returns).
-    let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
-    // Ground launches count as operational activity.
-    let total_launches = state.counters.stations_deployed as f64
-        + state
-            .ground_facilities
-            .values()
-            .flat_map(|f| f.core.modules.iter())
-            .filter_map(|m| match &m.kind_state {
-                crate::ModuleKindState::LaunchPad(pad) => Some(pad.launches_count as f64),
-                _ => None,
-            })
-            .sum::<f64>();
-    let launch_signal = (total_launches.sqrt() / 3.0).min(1.0);
-    // Blend: 35% utilization, 25% fleet growth, 20% satellites, 20% launches
-    utilization * 0.35 + construction_signal * 0.25 + satellite_signal * 0.2 + launch_signal * 0.2
-}
-
-/// Efficiency: inverted wear + power utilization + storage balance + satellite utilization.
-fn compute_efficiency(metrics: &MetricsSnapshot) -> f64 {
-    let wear_score = 1.0 - f64::from(metrics.avg_module_wear);
-    let power_util = if metrics.power_generated_kw > 0.0 {
-        (f64::from(metrics.power_consumed_kw) / f64::from(metrics.power_generated_kw)).min(1.0)
-    } else {
-        0.0
-    };
-    let storage_pct = f64::from(metrics.station_storage_used_pct);
-    // Penalize extremes: empty (<10%) or overflowing (>95%)
-    let storage_score = if storage_pct < 0.1 {
-        storage_pct / 0.1
-    } else if storage_pct > 0.95 {
-        (1.0 - storage_pct) / 0.05
-    } else {
-        1.0
-    };
-    // Satellite utilization: active / total (1.0 if no satellites yet).
-    let total_sats = f64::from(metrics.satellites_active + metrics.satellites_failed);
-    let sat_util = if total_sats > 0.0 {
-        f64::from(metrics.satellites_active) / total_sats
-    } else {
-        1.0
-    };
-    // Blend: 25% each of four efficiency signals
-    (wear_score + power_util + storage_score + sat_util) / 4.0
-}
-
-/// Expansion: bases (stations + ground facilities) + fleet + satellites.
-///
-/// VIO-603: adds a multi-base bonus *on top of* the original blend so
-/// single-base play is NOT regressed. Bases include both stations and
-/// ground facilities, keeping orbital- and ground-start runs symmetric.
-/// Plateaus at 4 total bases. Raw values can temporarily exceed 1.0;
-/// the outer normalizer clamps to the unit range (still within ceiling).
-fn compute_expansion(metrics: &MetricsSnapshot, state: &GameState) -> f64 {
-    // Both station and ground facility count as operational bases.
-    let base_count = (state.stations.len() + state.ground_facilities.len()) as f64;
-    let base_signal = (base_count / 3.0).min(1.0);
-    let fleet_signal = (f64::from(metrics.fleet_total).sqrt() / 3.0).min(1.0);
-    // Satellites contribute to expansion (orbital infrastructure).
-    let satellite_signal = (f64::from(metrics.satellites_active).sqrt() / 3.0).min(1.0);
-    // Multi-base bonus: additive on top of the original blend so
-    // single-base runs are unchanged. Plateaus at 4 total bases
-    // (3 extras beyond the starting one).
-    let extra_bases = (base_count - 1.0).clamp(0.0, 3.0);
-    let multi_base_bonus = extra_bases / 3.0 * 0.15;
-    // Original 40/30/30 blend preserved. Bonus stacks on top; ceiling
-    // normalization clamps the final normalized value to [0, 1].
-    base_signal * 0.4 + fleet_signal * 0.3 + satellite_signal * 0.3 + multi_base_bonus
+/// Apply the configured transform to a raw signal value.
+fn apply_transform(raw: f64, signal: &SignalDef) -> f64 {
+    match signal.transform {
+        SignalTransform::Identity => raw,
+        SignalTransform::LinearSaturate => (raw / signal.saturation.unwrap_or(1.0)).min(1.0),
+        SignalTransform::SqrtSaturate => (raw.sqrt() / signal.saturation.unwrap_or(1.0)).min(1.0),
+        SignalTransform::Inverse => (1.0 - raw).clamp(0.0, 1.0),
+        SignalTransform::Band => {
+            let low = signal.band_low.unwrap_or(0.0);
+            let high = signal.band_high.unwrap_or(1.0);
+            if raw < low {
+                raw / low
+            } else if raw > high {
+                (1.0 - raw) / (1.0 - high)
+            } else {
+                1.0
+            }
+        }
+        SignalTransform::ClampSaturate => {
+            let sat = signal.saturation.unwrap_or(1.0);
+            let max = signal.clamp_max.unwrap_or(1.0);
+            (raw / sat).clamp(0.0, max) / max
+        }
+    }
 }
 
 /// Resolve the highest threshold name for a given composite score.
@@ -447,36 +566,228 @@ mod tests {
                     name: "Industrial Output".into(),
                     weight: 0.25,
                     ceiling: 1000.0,
+                    signals: vec![
+                        SignalDef {
+                            source: "industrial_throughput".into(),
+                            blend: 1.0,
+                            transform: SignalTransform::Identity,
+                            saturation: None,
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "assembler_active".into(),
+                            blend: 0.1,
+                            transform: SignalTransform::Identity,
+                            saturation: None,
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                    ],
                 },
                 DimensionDef {
                     id: "research_progress".into(),
                     name: "Research Progress".into(),
                     weight: 0.20,
                     ceiling: 1.0,
+                    signals: vec![
+                        SignalDef {
+                            source: "tech_fraction".into(),
+                            blend: 0.6,
+                            transform: SignalTransform::Identity,
+                            saturation: None,
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "total_raw_data".into(),
+                            blend: 0.25,
+                            transform: SignalTransform::LinearSaturate,
+                            saturation: Some(1000.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "science_satellites".into(),
+                            blend: 0.15,
+                            transform: SignalTransform::LinearSaturate,
+                            saturation: Some(3.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                    ],
                 },
                 DimensionDef {
                     id: "economic_health".into(),
                     name: "Economic Health".into(),
                     weight: 0.20,
                     ceiling: 1.0,
+                    signals: vec![
+                        SignalDef {
+                            source: "balance".into(),
+                            blend: 0.3,
+                            transform: SignalTransform::ClampSaturate,
+                            saturation: Some(1_000_000_000.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: Some(2.0),
+                        },
+                        SignalDef {
+                            source: "revenue_rate".into(),
+                            blend: 0.35,
+                            transform: SignalTransform::LinearSaturate,
+                            saturation: Some(10_000.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "grant_rate".into(),
+                            blend: 0.35,
+                            transform: SignalTransform::LinearSaturate,
+                            saturation: Some(50_000.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                    ],
                 },
                 DimensionDef {
                     id: "fleet_operations".into(),
                     name: "Fleet Operations".into(),
                     weight: 0.15,
                     ceiling: 1.0,
+                    signals: vec![
+                        SignalDef {
+                            source: "fleet_utilization".into(),
+                            blend: 0.35,
+                            transform: SignalTransform::Identity,
+                            saturation: None,
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "ships_constructed".into(),
+                            blend: 0.25,
+                            transform: SignalTransform::LinearSaturate,
+                            saturation: Some(5.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "satellites_active".into(),
+                            blend: 0.2,
+                            transform: SignalTransform::SqrtSaturate,
+                            saturation: Some(3.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "total_launches".into(),
+                            blend: 0.2,
+                            transform: SignalTransform::SqrtSaturate,
+                            saturation: Some(3.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                    ],
                 },
                 DimensionDef {
                     id: "efficiency".into(),
                     name: "Efficiency".into(),
                     weight: 0.10,
                     ceiling: 1.0,
+                    signals: vec![
+                        SignalDef {
+                            source: "avg_module_wear".into(),
+                            blend: 0.25,
+                            transform: SignalTransform::Inverse,
+                            saturation: None,
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "power_utilization".into(),
+                            blend: 0.25,
+                            transform: SignalTransform::Identity,
+                            saturation: None,
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "station_storage_used_pct".into(),
+                            blend: 0.25,
+                            transform: SignalTransform::Band,
+                            saturation: None,
+                            band_low: Some(0.1),
+                            band_high: Some(0.95),
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "satellite_utilization".into(),
+                            blend: 0.25,
+                            transform: SignalTransform::Identity,
+                            saturation: None,
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                    ],
                 },
                 DimensionDef {
                     id: "expansion".into(),
                     name: "Expansion".into(),
                     weight: 0.10,
                     ceiling: 1.0,
+                    signals: vec![
+                        SignalDef {
+                            source: "base_count".into(),
+                            blend: 0.4,
+                            transform: SignalTransform::LinearSaturate,
+                            saturation: Some(3.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "fleet_total".into(),
+                            blend: 0.3,
+                            transform: SignalTransform::SqrtSaturate,
+                            saturation: Some(3.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "satellites_active".into(),
+                            blend: 0.3,
+                            transform: SignalTransform::SqrtSaturate,
+                            saturation: Some(3.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                        SignalDef {
+                            source: "extra_bases".into(),
+                            blend: 0.15,
+                            transform: SignalTransform::LinearSaturate,
+                            saturation: Some(3.0),
+                            band_low: None,
+                            band_high: None,
+                            clamp_max: None,
+                        },
+                    ],
                 },
             ],
             thresholds: vec![
@@ -579,6 +890,33 @@ mod tests {
     }
 
     #[test]
+    fn unknown_signal_source_rejected() {
+        let mut config = sample_config();
+        config.dimensions[0].signals[0].source = "nonexistent".into();
+        let err = validate_scoring_config(&config).unwrap_err();
+        assert!(err.contains("unknown source"), "{err}");
+    }
+
+    #[test]
+    fn missing_saturation_rejected() {
+        let mut config = sample_config();
+        // research_progress has linear_saturate signals with saturation
+        config.dimensions[1].signals[1].saturation = None;
+        let err = validate_scoring_config(&config).unwrap_err();
+        assert!(err.contains("saturation"), "{err}");
+    }
+
+    #[test]
+    fn invalid_band_rejected() {
+        let mut config = sample_config();
+        // efficiency has a band signal
+        config.dimensions[4].signals[2].band_low = Some(0.9);
+        config.dimensions[4].signals[2].band_high = Some(0.1); // low > high
+        let err = validate_scoring_config(&config).unwrap_err();
+        assert!(err.contains("band_low < band_high"), "{err}");
+    }
+
+    #[test]
     fn run_score_serde_roundtrip() {
         let score = RunScore {
             dimensions: BTreeMap::from([(
@@ -610,6 +948,9 @@ mod tests {
         assert_eq!(roundtrip.dimensions.len(), 6);
         assert_eq!(roundtrip.thresholds.len(), 5);
         assert_eq!(roundtrip.computation_interval_ticks, 24);
+        // Verify signals survived round-trip
+        assert_eq!(roundtrip.dimensions[1].signals.len(), 3);
+        assert_eq!(roundtrip.dimensions[1].signals[0].source, "tech_fraction");
     }
 
     #[test]
@@ -617,6 +958,102 @@ mod tests {
         let config = ScoringConfig::default();
         assert_eq!(config.computation_interval_ticks, 24);
         assert!((config.scale_factor - 2500.0).abs() < f64::EPSILON);
+    }
+
+    // -- Transform unit tests --
+
+    #[test]
+    fn transform_identity() {
+        let signal = SignalDef {
+            source: String::new(),
+            blend: 1.0,
+            transform: SignalTransform::Identity,
+            saturation: None,
+            band_low: None,
+            band_high: None,
+            clamp_max: None,
+        };
+        assert!((apply_transform(0.75, &signal) - 0.75).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn transform_linear_saturate() {
+        let signal = SignalDef {
+            source: String::new(),
+            blend: 1.0,
+            transform: SignalTransform::LinearSaturate,
+            saturation: Some(100.0),
+            band_low: None,
+            band_high: None,
+            clamp_max: None,
+        };
+        assert!((apply_transform(50.0, &signal) - 0.5).abs() < f64::EPSILON);
+        assert!((apply_transform(200.0, &signal) - 1.0).abs() < f64::EPSILON); // clamped
+    }
+
+    #[test]
+    fn transform_sqrt_saturate() {
+        let signal = SignalDef {
+            source: String::new(),
+            blend: 1.0,
+            transform: SignalTransform::SqrtSaturate,
+            saturation: Some(3.0),
+            band_low: None,
+            band_high: None,
+            clamp_max: None,
+        };
+        // sqrt(4) / 3 = 2/3
+        assert!((apply_transform(4.0, &signal) - 2.0 / 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn transform_inverse() {
+        let signal = SignalDef {
+            source: String::new(),
+            blend: 1.0,
+            transform: SignalTransform::Inverse,
+            saturation: None,
+            band_low: None,
+            band_high: None,
+            clamp_max: None,
+        };
+        assert!((apply_transform(0.2, &signal) - 0.8).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn transform_band() {
+        let signal = SignalDef {
+            source: String::new(),
+            blend: 1.0,
+            transform: SignalTransform::Band,
+            saturation: None,
+            band_low: Some(0.1),
+            band_high: Some(0.95),
+            clamp_max: None,
+        };
+        // In band → 1.0
+        assert!((apply_transform(0.5, &signal) - 1.0).abs() < f64::EPSILON);
+        // Below band → linear
+        assert!((apply_transform(0.05, &signal) - 0.5).abs() < f64::EPSILON);
+        // Above band → linear penalty
+        assert!((apply_transform(0.975, &signal) - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn transform_clamp_saturate() {
+        let signal = SignalDef {
+            source: String::new(),
+            blend: 1.0,
+            transform: SignalTransform::ClampSaturate,
+            saturation: Some(1_000_000_000.0),
+            band_low: None,
+            band_high: None,
+            clamp_max: Some(2.0),
+        };
+        // 1B / 1B = 1.0, clamp(0, 2) / 2 = 0.5
+        assert!((apply_transform(1_000_000_000.0, &signal) - 0.5).abs() < f64::EPSILON);
+        // 3B / 1B = 3.0, clamp(0, 2) / 2 = 1.0
+        assert!((apply_transform(3_000_000_000.0, &signal) - 1.0).abs() < f64::EPSILON);
     }
 
     // -- compute_run_score tests --
@@ -867,8 +1304,6 @@ mod tests {
 
     #[test]
     fn multi_base_improves_expansion_score() {
-        // VIO-603: deploying a second base should produce a visible
-        // expansion score bump via the multi_base_bonus.
         let content = scored_content();
         let metrics = make_metrics(100);
 
@@ -915,9 +1350,6 @@ mod tests {
 
     #[test]
     fn multi_base_bonus_plateaus_at_four_bases() {
-        // VIO-603: the multi_base_bonus must saturate at 4 total bases.
-        // Adding a 5th or 10th base must produce the same expansion
-        // raw_value as 4 bases — no reward for sprawl.
         let content = scored_content();
         let metrics = make_metrics(100);
 
@@ -952,14 +1384,9 @@ mod tests {
 
     #[test]
     fn multi_productive_bases_improve_industrial_score() {
-        // VIO-603: running N productive bases (assembler/processor)
-        // should produce a diversification multiplier on throughput,
-        // rewarding distributed production over concentrating everything
-        // on one base.
         let content = scored_content();
         let metrics = make_metrics(100);
 
-        // Baseline: single station with a processor.
         let mut state_one = crate::test_fixtures::base_state(&content);
         {
             let station = state_one
@@ -974,7 +1401,6 @@ mod tests {
         }
         let score_one = compute_run_score(&metrics, &state_one, &content);
 
-        // Two productive bases.
         let mut state_two = state_one.clone();
         state_two.stations.insert(
             crate::StationId("station_mars_orbit".into()),
@@ -992,9 +1418,6 @@ mod tests {
 
     #[test]
     fn unproductive_second_base_no_industrial_bonus() {
-        // VIO-603: a base with no assembler/processor should NOT
-        // contribute to the industrial diversification multiplier —
-        // only productive bases count.
         let content = scored_content();
         let metrics = make_metrics(100);
 
@@ -1018,13 +1441,9 @@ mod tests {
 
     #[test]
     fn ground_facility_counts_as_productive_base() {
-        // VIO-603: ground facilities with productive modules must count
-        // toward the diversification multiplier so ground-start runs
-        // have access to the same rewards as orbital-start runs.
         let content = scored_content();
         let metrics = make_metrics(100);
 
-        // Baseline: one productive orbital station.
         let mut state_orbital = crate::test_fixtures::base_state(&content);
         {
             let station = state_orbital
@@ -1039,7 +1458,6 @@ mod tests {
         }
         let score_orbital = compute_run_score(&metrics, &state_orbital, &content);
 
-        // Add a productive ground facility.
         let mut state_hybrid = state_orbital.clone();
         let gf_id = crate::GroundFacilityId("gf_earth_kennedy".into());
         state_hybrid.ground_facilities.insert(
@@ -1134,13 +1552,11 @@ mod tests {
         let content = scored_content();
         let state = crate::test_fixtures::base_state(&content);
 
-        // All active — sat_util = 1.0
         let mut metrics_all_active = make_metrics(100);
         metrics_all_active.satellites_active = 4;
         metrics_all_active.satellites_failed = 0;
         let score_healthy = compute_run_score(&metrics_all_active, &state, &content);
 
-        // Half failed — sat_util = 0.5
         let mut metrics_half_failed = make_metrics(100);
         metrics_half_failed.satellites_active = 2;
         metrics_half_failed.satellites_failed = 2;

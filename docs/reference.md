@@ -110,7 +110,7 @@ All in `content/`. Loaded at runtime; never compiled in.
 | `module_defs.json` | Modules include: `module_basic_iron_refinery` (Processor, 60-tick interval, wear_per_run=0.01), `module_maintenance_bay` (Maintenance, 30-tick interval, reduces 0.2 wear, costs 1 RepairKit), `module_basic_assembler` (Assembler, 360-tick interval, wear_per_run=0.008, 200kg Fe → 1 RepairKit, max_stock: repair_kit=50), `module_basic_smelter` (Processor with ThermalDef, thermal recipe requirements), `module_basic_radiator` (Radiator, cooling_capacity_w shared across thermal group) |
 | `component_defs.json` | 1 component: `repair_kit` (50kg, 0.1 m³) |
 | `pricing.json` | Import/export pricing: surcharges per kg, per-item base prices, importable/exportable flags |
-| `scoring.json` | Run scoring config: 6 dimensions (id, name, weight, ceiling), 5 named thresholds (Startup→Space Magnate), computation_interval_ticks (default 24), scale_factor (default 2500). See Scoring section below. |
+| `scoring.json` | Run scoring config: 6 dimensions (id, name, weight, ceiling, signals), 5 named thresholds (Startup→Space Magnate), computation_interval_ticks (default 24), scale_factor (default 2500). Each dimension has config-driven signals with source, blend, transform, and saturation. See Scoring section below. |
 | `milestones.json` | Progression milestones: 8 milestones with conditions, rewards (grants, trade tier, zones), phase advancement. See Milestones section below. |
 | `satellite_defs.json` | 4 satellite types: `sat_survey` (survey, wear_rate 0.00015), `sat_comm_relay` (communication, wear_rate 0.00008), `sat_nav_beacon` (navigation, wear_rate 0.0001), `sat_science_platform` (science_platform, wear_rate 0.00012). Each has `behavior_config` with type-specific params. |
 | `dev_advanced_state.json` | Pre-baked dev state: tick 0, 1 ship, 1 station with refinery module in inventory |
@@ -330,29 +330,31 @@ runs/<name>_<timestamp>/
 **Run scoring** evaluates simulation performance across 6 weighted dimensions, producing a composite score and named threshold.
 
 **Content schema** (`content/scoring.json`):
-- `dimensions[]` — Array of `DimensionDef`: `id` (string), `name` (string), `weight` (f64, all must sum to 1.0), `ceiling` (f64, normalization ceiling)
-- `thresholds[]` — Array of `ThresholdDef`: `name` (string), `min_score` (f64, ascending order)
+- `dimensions[]` — Array of `DimensionDef`: `id`, `name`, `weight` (f64, must sum to 1.0), `ceiling` (f64), `signals[]`
+- `signals[]` — Array of `SignalDef`: `source` (named signal), `blend` (f64), `transform` (enum), `saturation` (f64, optional), `band_low`/`band_high` (f64, optional), `clamp_max` (f64, optional)
+- `thresholds[]` — Array of `ThresholdDef`: `name`, `min_score` (f64, ascending order)
 - `computation_interval_ticks` — How often score is recomputed (default: 24)
 - `scale_factor` — Multiplier on weighted sum to produce composite (default: 2500.0)
 
-**Dimensions** (6):
+**Signal transforms:** `identity` (pass-through), `linear_saturate` (`v/sat`), `sqrt_saturate` (`sqrt(v)/sat`), `inverse` (`1-v`), `band` (piecewise optimal in `[low,high]`), `clamp_saturate` (`clamp(v/sat, 0, max)/max`)
 
-| Dimension | Weight | Inputs |
-|---|---|---|
-| Industrial Output | 25% | total_material_kg/tick, assembler active count |
-| Research Progress | 20% | techs_unlocked/total, total_scan_data growth |
-| Economic Health | 20% | balance trend, export_revenue_total growth |
-| Fleet Operations | 15% | fleet utilization, ships constructed |
-| Efficiency | 10% | inverted avg_module_wear, power util, storage util |
-| Expansion | 10% | station count, zone activity, fleet size |
+**Signal sources** (resolved by code, blending is config-driven): `industrial_throughput`, `assembler_active`, `tech_fraction`, `total_raw_data`, `science_satellites`, `balance`, `revenue_rate`, `grant_rate`, `fleet_utilization`, `ships_constructed`, `satellites_active`, `total_launches`, `avg_module_wear`, `power_utilization`, `station_storage_used_pct`, `satellite_utilization`, `base_count`, `fleet_total`, `extra_bases`
+
+**Dimension computation:** `raw = Σ(transform(resolve(source)) × blend)`, `normalized = clamp(raw / ceiling, 0, 1)`, `weighted = normalized × weight × scale_factor`, `composite = Σ(weighted)`
+
+**sim_bench scoring overrides:** `scoring.scale_factor`, `scoring.dimensions.<id>.weight`, `scoring.dimensions.<id>.signals.<source>.blend`, `scoring.dimensions.<id>.signals.<source>.saturation`
 
 **Named thresholds:** Startup (0) → Contractor (200) → Enterprise (500) → Industrial Giant (1000) → Space Magnate (2000+)
 
 **Types** (`sim_core::scoring`):
 - `ScoringConfig` — content-loaded config (dimensions, thresholds, interval, scale_factor)
+- `DimensionDef` — id, name, weight, ceiling, signals
+- `SignalDef` — source, blend, transform, saturation/band_low/band_high/clamp_max
+- `SignalTransform` — Identity, LinearSaturate, SqrtSaturate, Inverse, Band, ClampSaturate
 - `RunScore` — output: per-dimension `BTreeMap<String, DimensionScore>`, composite (f64), threshold (String), tick (u64)
 - `DimensionScore` — per-dimension: id, name, raw_value, normalized [0.0–1.0], weighted contribution
-- `validate_scoring_config()` — validates weights sum, ascending thresholds, positive ceilings
+- `validate_scoring_config()` — validates weights sum, ascending thresholds, positive ceilings, signal sources, transform params
+- `KNOWN_SIGNAL_SOURCES` — const array of recognized signal source names
 
 ## Milestones
 
