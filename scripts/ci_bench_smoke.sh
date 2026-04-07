@@ -91,6 +91,19 @@ fi
 
 python3 "$REPO_ROOT/scripts/validate_ground_smoke.py" "$GROUND_RUN_DIR/batch_summary.json"
 
+# Full progression arc (ground -> Industrial+, 30k ticks, 5 seeds)
+echo "  running progression_full_arc scenario..."
+"$BENCH" run --scenario "$REPO_ROOT/scenarios/progression_full_arc.json" --output-dir "$OUTPUT_DIR"
+
+ARC_RUN_DIR=$(find "$OUTPUT_DIR" -maxdepth 1 -type d -name 'progression_full_arc_*' | sort | tail -1)
+
+if [ -z "$ARC_RUN_DIR" ] || [ ! -f "$ARC_RUN_DIR/batch_summary.json" ]; then
+  echo "ERROR: batch_summary.json not found in $OUTPUT_DIR/progression_full_arc_*/"
+  exit 1
+fi
+
+python3 "$REPO_ROOT/scripts/validate_progression_full_arc.py" "$ARC_RUN_DIR"
+
 # Data gap detection (warning only — does not block CI)
 echo "  running data gap analysis..."
 if python3 -m scripts.analysis.data_gaps "$RUN_DIR" --json "$OUTPUT_DIR/gap_report.json" 2>/dev/null; then

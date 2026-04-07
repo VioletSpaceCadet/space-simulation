@@ -73,6 +73,8 @@ pub struct SummaryMetrics {
     pub satellites_failed: u32,
     pub transfer_volume_kg: f64,
     pub transfer_count: u32,
+    pub milestones_completed: u32,
+    pub game_phase: u32,
 }
 
 impl SummaryMetrics {
@@ -109,6 +111,8 @@ impl SummaryMetrics {
             satellites_failed: snapshot.satellites_failed,
             transfer_volume_kg: f64::from(snapshot.transfer_volume_kg),
             transfer_count: snapshot.transfer_count,
+            milestones_completed: snapshot.milestones_completed,
+            game_phase: snapshot.game_phase,
         }
     }
 }
@@ -238,6 +242,8 @@ mod tests {
             satellites_failed: 0,
             transfer_volume_kg: 0.0,
             transfer_count: 0,
+            milestones_completed: 0,
+            game_phase: 0,
         }
     }
 
