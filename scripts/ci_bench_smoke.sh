@@ -91,7 +91,7 @@ fi
 
 python3 "$REPO_ROOT/scripts/validate_ground_smoke.py" "$GROUND_RUN_DIR/batch_summary.json"
 
-# Full progression arc (ground -> Industrial+, 30k ticks, 5 seeds)
+# Full progression arc (ground -> Orbital, 30k ticks, 5 seeds)
 echo "  running progression_full_arc scenario..."
 "$BENCH" run --scenario "$REPO_ROOT/scenarios/progression_full_arc.json" --output-dir "$OUTPUT_DIR"
 

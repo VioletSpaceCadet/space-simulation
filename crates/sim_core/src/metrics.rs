@@ -1225,6 +1225,8 @@ mod tests {
         assert_eq!(snapshot.overheat_warning_count, 0);
         assert_eq!(snapshot.overheat_critical_count, 0);
         assert!((snapshot.heat_wear_multiplier_avg - 0.0).abs() < f32::EPSILON);
+        assert_eq!(snapshot.milestones_completed, 0);
+        assert_eq!(snapshot.game_phase, 0);
     }
 
     #[test]
