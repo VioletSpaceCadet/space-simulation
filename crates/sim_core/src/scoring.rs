@@ -236,6 +236,12 @@ fn validate_dimension_signals(dim: &DimensionDef) -> Result<(), String> {
                         dim.id, signal.source
                     ));
                 }
+                if high >= 1.0 {
+                    return Err(format!(
+                        "dimension '{}' signal '{}' band requires band_high < 1.0 (got {})",
+                        dim.id, signal.source, high
+                    ));
+                }
             }
             SignalTransform::Identity | SignalTransform::Inverse => {}
         }
@@ -485,10 +491,20 @@ fn apply_transform(raw: f64, signal: &SignalDef) -> f64 {
         SignalTransform::Band => {
             let low = signal.band_low.unwrap_or(0.0);
             let high = signal.band_high.unwrap_or(1.0);
+            let raw = raw.max(0.0); // Guard: signal sources should not be negative
             if raw < low {
-                raw / low
+                if low > 0.0 {
+                    raw / low
+                } else {
+                    1.0
+                }
             } else if raw > high {
-                (1.0 - raw) / (1.0 - high)
+                let range = 1.0 - high;
+                if range > f64::EPSILON {
+                    (1.0 - raw) / range
+                } else {
+                    0.0
+                }
             } else {
                 1.0
             }
