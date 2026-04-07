@@ -142,7 +142,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install "duckdb>=1.0" "pyarrow>=17.0" "ruff>=0.9" "pytest>=8.0" "pytest-cov>=6.0" "mypy>=1.14"
+        run: pip install "duckdb>=1.0" "pyarrow>=17.0" "optuna>=4.0" "ruff>=0.9" "pytest>=8.0" "pytest-cov>=6.0" "mypy>=1.14"
 
       - name: Format check
         run: ruff format --check scripts/analysis/
