@@ -2462,12 +2462,14 @@ mod tests {
                     name: "A".into(),
                     weight: 0.6,
                     ceiling: 1.0,
+                    signals: vec![],
                 },
                 sim_core::DimensionDef {
                     id: "b".into(),
                     name: "B".into(),
                     weight: 0.6, // sums to 1.2
                     ceiling: 1.0,
+                    signals: vec![],
                 },
             ],
             thresholds: vec![sim_core::ThresholdDef {
