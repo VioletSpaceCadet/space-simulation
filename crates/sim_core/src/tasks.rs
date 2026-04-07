@@ -1121,14 +1121,20 @@ pub(crate) fn resolve_refuels(
     }
 }
 
-/// Get total LH2 (kg) in a station's inventory.
-fn station_lh2_kg(state: &GameState, station_id: &StationId) -> f32 {
+/// Get total propellant (kg) in a station's inventory.
+fn station_propellant_kg(
+    state: &GameState,
+    station_id: &StationId,
+    propellant_element: &str,
+) -> f32 {
     state.stations.get(station_id).map_or(0.0, |s| {
         s.core
             .inventory
             .iter()
             .filter_map(|item| match item {
-                InventoryItem::Material { element, kg, .. } if element == "LH2" => Some(*kg),
+                InventoryItem::Material { element, kg, .. } if element == propellant_element => {
+                    Some(*kg)
+                }
                 _ => None,
             })
             .sum()
@@ -1145,7 +1151,8 @@ fn resolve_station_refuels(
 ) {
     let current_tick = state.meta.tick;
     let rate = content.constants.refuel_kg_per_tick;
-    let available_lh2 = station_lh2_kg(state, station_id);
+    let propellant = &content.autopilot.propellant_element;
+    let available_propellant = station_propellant_kg(state, station_id, propellant);
 
     // Each ship requests min(rate, remaining_need)
     let requests: Vec<(ShipId, f32)> = ship_ids
@@ -1171,12 +1178,12 @@ fn resolve_station_refuels(
         return;
     }
 
-    if available_lh2 <= content.constants.min_meaningful_kg {
+    if available_propellant <= content.constants.min_meaningful_kg {
         abort_all(state, events, current_tick, station_id, ship_ids);
         return;
     }
 
-    // Pro-rata allocation and LH2 transfer
+    // Pro-rata allocation and propellant transfer
     let total_consumed = allocate_and_transfer(
         state,
         events,
@@ -1184,12 +1191,12 @@ fn resolve_station_refuels(
         station_id,
         &requests,
         total_requested,
-        available_lh2,
+        available_propellant,
     );
 
-    // Deduct LH2 from station inventory
+    // Deduct propellant from station inventory
     if total_consumed > 0.0 {
-        deduct_station_lh2(state, content, station_id, total_consumed);
+        deduct_station_propellant(state, content, station_id, total_consumed);
     }
 }
 
@@ -1289,12 +1296,13 @@ fn allocate_and_transfer(
     total_consumed
 }
 
-fn deduct_station_lh2(
+fn deduct_station_propellant(
     state: &mut GameState,
     content: &GameContent,
     station_id: &StationId,
     amount: f32,
 ) {
+    let propellant = content.autopilot.propellant_element.clone();
     if let Some(station) = state.stations.get_mut(station_id) {
         let mut remaining = amount;
         for item in &mut station.core.inventory {
@@ -1302,7 +1310,7 @@ fn deduct_station_lh2(
                 break;
             }
             if let InventoryItem::Material { element, kg, .. } = item {
-                if element == "LH2" {
+                if *element == propellant {
                     let deduct = remaining.min(*kg);
                     *kg -= deduct;
                     remaining -= deduct;
