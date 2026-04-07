@@ -86,6 +86,10 @@ export interface RunJournal {
   strategy_notes: string[];
   /** Categorization tags (e.g. "ore-supply", "fleet-sizing"). */
   tags: string[];
+  /** VIO-612: Game phase during observation (e.g. "Startup", "Industrial"). */
+  game_phase?: string;
+  /** VIO-612: Strategy mode during observation (e.g. "Balanced", "Expand"). */
+  strategy_mode?: string;
 
   // --- ML metadata (optional, for training pipeline) ---
 

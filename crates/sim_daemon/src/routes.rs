@@ -212,6 +212,7 @@ async fn advisor_digest_handler(
         &sim.timings_history,
         &sim.content.constants,
         &sim.score_history,
+        Some(&sim.game_state),
     )
     .unwrap();
     drop(sim);

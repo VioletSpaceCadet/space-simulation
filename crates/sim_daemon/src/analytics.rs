@@ -21,6 +21,18 @@ pub struct AdvisorDigest {
     pub score: Option<RunScore>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score_trend: Option<TrendDirection>,
+    /// VIO-612: Strategy context for the advisor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<StrategyContext>,
+}
+
+/// VIO-612: Current strategy mode, game phase, and priority weights.
+#[derive(Debug, Clone, Serialize)]
+pub struct StrategyContext {
+    pub mode: String,
+    pub phase: String,
+    pub fleet_size_target: u32,
+    pub priorities: std::collections::BTreeMap<String, f32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -263,6 +275,7 @@ pub fn compute_digest(
     timings: &VecDeque<sim_core::TickTimings>,
     constants: &sim_core::Constants,
     score_history: &VecDeque<RunScore>,
+    state: Option<&sim_core::GameState>,
 ) -> Option<AdvisorDigest> {
     let latest = history.back()?;
 
@@ -279,6 +292,27 @@ pub fn compute_digest(
         (None, None)
     };
 
+    let strategy = state.map(|s| {
+        let priorities = s.strategy_config.priorities;
+        StrategyContext {
+            mode: format!("{:?}", s.strategy_config.mode),
+            phase: format!("{:?}", s.progression.phase),
+            fleet_size_target: s.strategy_config.fleet_size_target,
+            priorities: [
+                ("mining".to_string(), priorities.mining),
+                ("survey".to_string(), priorities.survey),
+                ("deep_scan".to_string(), priorities.deep_scan),
+                ("research".to_string(), priorities.research),
+                ("maintenance".to_string(), priorities.maintenance),
+                ("export".to_string(), priorities.export),
+                ("propellant".to_string(), priorities.propellant),
+                ("fleet_expansion".to_string(), priorities.fleet_expansion),
+            ]
+            .into_iter()
+            .collect(),
+        }
+    });
+
     Some(AdvisorDigest {
         tick: latest.tick,
         snapshot: latest.clone(),
@@ -289,6 +323,7 @@ pub fn compute_digest(
         perf,
         score,
         score_trend,
+        strategy,
     })
 }
 
@@ -407,7 +442,8 @@ mod tests {
             vec![],
             &VecDeque::new(),
             &test_constants(),
-            &VecDeque::new()
+            &VecDeque::new(),
+            None,
         )
         .is_none());
     }
@@ -423,6 +459,7 @@ mod tests {
             &VecDeque::new(),
             &test_constants(),
             &VecDeque::new(),
+            None,
         )
         .unwrap();
         for trend in &digest.trends {
@@ -740,6 +777,7 @@ mod tests {
             &VecDeque::new(),
             &test_constants(),
             &score_history,
+            None,
         )
         .unwrap();
         assert!(digest.score.is_some());
@@ -758,6 +796,7 @@ mod tests {
             &VecDeque::new(),
             &test_constants(),
             &VecDeque::new(),
+            None,
         )
         .unwrap();
         assert!(digest.score.is_none());
