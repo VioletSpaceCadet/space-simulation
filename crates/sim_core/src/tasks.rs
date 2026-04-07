@@ -1253,14 +1253,14 @@ fn allocate_and_transfer(
     station_id: &StationId,
     requests: &[(ShipId, f32)],
     total_requested: f32,
-    available_lh2: f32,
+    available_propellant: f32,
 ) -> f32 {
     let mut total_consumed = 0.0_f32;
     for (ship_id, requested) in requests {
-        let allocated = if total_requested <= available_lh2 {
+        let allocated = if total_requested <= available_propellant {
             *requested
         } else {
-            requested / total_requested * available_lh2
+            requested / total_requested * available_propellant
         };
         if allocated <= 0.0 {
             continue;
@@ -1302,7 +1302,7 @@ fn deduct_station_propellant(
     station_id: &StationId,
     amount: f32,
 ) {
-    let propellant = content.autopilot.propellant_element.clone();
+    let propellant = &content.autopilot.propellant_element;
     if let Some(station) = state.stations.get_mut(station_id) {
         let mut remaining = amount;
         for item in &mut station.core.inventory {
@@ -1310,7 +1310,7 @@ fn deduct_station_propellant(
                 break;
             }
             if let InventoryItem::Material { element, kg, .. } = item {
-                if *element == propellant {
+                if element == propellant {
                     let deduct = remaining.min(*kg);
                     *kg -= deduct;
                     remaining -= deduct;
