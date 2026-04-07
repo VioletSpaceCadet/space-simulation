@@ -1,0 +1,26 @@
+{
+  "name": "strategy_optimized",
+  "ticks": 50000,
+  "metrics_every": 5000,
+  "seeds": { "range": [1, 10] },
+  "overrides": {
+    "strategy.priorities.mining": 0.740,
+    "strategy.priorities.survey": 0.667,
+    "strategy.priorities.deep_scan": 0.518,
+    "strategy.priorities.research": 0.450,
+    "strategy.priorities.maintenance": 0.904,
+    "strategy.priorities.export": 0.789,
+    "strategy.priorities.propellant": 0.941,
+    "strategy.priorities.fleet_expansion": 0.146,
+    "strategy.fleet_size_target": 5,
+    "strategy.volatile_threshold_kg": 1850.91,
+    "strategy.lh2_threshold_kg": 19973.90,
+    "strategy.lh2_abundant_multiplier": 3.202,
+    "strategy.refinery_threshold_kg": 4398.96,
+    "strategy.slag_jettison_pct": 0.629,
+    "strategy.export_batch_size_kg": 1082.94,
+    "strategy.export_min_revenue": 3451.47,
+    "strategy.budget_cap_fraction": 0.050,
+    "strategy.refuel_threshold_pct": 0.679
+  }
+}

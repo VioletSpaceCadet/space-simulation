@@ -1,0 +1,6 @@
+{
+  "name": "strategy_default",
+  "ticks": 50000,
+  "metrics_every": 5000,
+  "seeds": { "range": [1, 10] }
+}
