@@ -39,6 +39,7 @@ except ImportError:
 # Parameter space definition
 # ---------------------------------------------------------------------------
 
+
 def suggest_strategy_params(trial: Any) -> dict[str, Any]:
     """Define the StrategyConfig parameter space for optuna.
 
@@ -48,64 +49,28 @@ def suggest_strategy_params(trial: Any) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
     # Priority weights [0.0, 1.0]
-    params["strategy.priorities.mining"] = trial.suggest_float(
-        "priorities.mining", 0.1, 1.0
-    )
-    params["strategy.priorities.survey"] = trial.suggest_float(
-        "priorities.survey", 0.1, 1.0
-    )
-    params["strategy.priorities.deep_scan"] = trial.suggest_float(
-        "priorities.deep_scan", 0.0, 0.8
-    )
-    params["strategy.priorities.research"] = trial.suggest_float(
-        "priorities.research", 0.1, 1.0
-    )
-    params["strategy.priorities.maintenance"] = trial.suggest_float(
-        "priorities.maintenance", 0.3, 1.0
-    )
-    params["strategy.priorities.export"] = trial.suggest_float(
-        "priorities.export", 0.1, 1.0
-    )
-    params["strategy.priorities.propellant"] = trial.suggest_float(
-        "priorities.propellant", 0.3, 1.0
-    )
-    params["strategy.priorities.fleet_expansion"] = trial.suggest_float(
-        "priorities.fleet_expansion", 0.1, 1.0
-    )
+    params["strategy.priorities.mining"] = trial.suggest_float("priorities.mining", 0.1, 1.0)
+    params["strategy.priorities.survey"] = trial.suggest_float("priorities.survey", 0.1, 1.0)
+    params["strategy.priorities.deep_scan"] = trial.suggest_float("priorities.deep_scan", 0.0, 0.8)
+    params["strategy.priorities.research"] = trial.suggest_float("priorities.research", 0.1, 1.0)
+    params["strategy.priorities.maintenance"] = trial.suggest_float("priorities.maintenance", 0.3, 1.0)
+    params["strategy.priorities.export"] = trial.suggest_float("priorities.export", 0.1, 1.0)
+    params["strategy.priorities.propellant"] = trial.suggest_float("priorities.propellant", 0.3, 1.0)
+    params["strategy.priorities.fleet_expansion"] = trial.suggest_float("priorities.fleet_expansion", 0.1, 1.0)
 
     # Fleet size target
-    params["strategy.fleet_size_target"] = trial.suggest_int(
-        "fleet_size_target", 1, 8
-    )
+    params["strategy.fleet_size_target"] = trial.suggest_int("fleet_size_target", 1, 8)
 
     # Operational thresholds
-    params["strategy.volatile_threshold_kg"] = trial.suggest_float(
-        "volatile_threshold_kg", 100.0, 2000.0
-    )
-    params["strategy.lh2_threshold_kg"] = trial.suggest_float(
-        "lh2_threshold_kg", 1000.0, 20000.0
-    )
-    params["strategy.lh2_abundant_multiplier"] = trial.suggest_float(
-        "lh2_abundant_multiplier", 1.5, 5.0
-    )
-    params["strategy.refinery_threshold_kg"] = trial.suggest_float(
-        "refinery_threshold_kg", 500.0, 5000.0
-    )
-    params["strategy.slag_jettison_pct"] = trial.suggest_float(
-        "slag_jettison_pct", 0.5, 0.95
-    )
-    params["strategy.export_batch_size_kg"] = trial.suggest_float(
-        "export_batch_size_kg", 100.0, 2000.0
-    )
-    params["strategy.export_min_revenue"] = trial.suggest_float(
-        "export_min_revenue", 100.0, 5000.0
-    )
-    params["strategy.budget_cap_fraction"] = trial.suggest_float(
-        "budget_cap_fraction", 0.01, 0.15
-    )
-    params["strategy.refuel_threshold_pct"] = trial.suggest_float(
-        "refuel_threshold_pct", 0.5, 0.95
-    )
+    params["strategy.volatile_threshold_kg"] = trial.suggest_float("volatile_threshold_kg", 100.0, 2000.0)
+    params["strategy.lh2_threshold_kg"] = trial.suggest_float("lh2_threshold_kg", 1000.0, 20000.0)
+    params["strategy.lh2_abundant_multiplier"] = trial.suggest_float("lh2_abundant_multiplier", 1.5, 5.0)
+    params["strategy.refinery_threshold_kg"] = trial.suggest_float("refinery_threshold_kg", 500.0, 5000.0)
+    params["strategy.slag_jettison_pct"] = trial.suggest_float("slag_jettison_pct", 0.5, 0.95)
+    params["strategy.export_batch_size_kg"] = trial.suggest_float("export_batch_size_kg", 100.0, 2000.0)
+    params["strategy.export_min_revenue"] = trial.suggest_float("export_min_revenue", 100.0, 5000.0)
+    params["strategy.budget_cap_fraction"] = trial.suggest_float("budget_cap_fraction", 0.01, 0.15)
+    params["strategy.refuel_threshold_pct"] = trial.suggest_float("refuel_threshold_pct", 0.5, 0.95)
 
     return params
 
@@ -113,6 +78,7 @@ def suggest_strategy_params(trial: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Objective function
 # ---------------------------------------------------------------------------
+
 
 def run_trial(
     sim_bench_path: str,
@@ -211,6 +177,7 @@ def create_objective(
 # Results export
 # ---------------------------------------------------------------------------
 
+
 def export_best_config(study: Any, export_path: str) -> None:
     """Export the best trial's parameters as a strategy config JSON."""
     best = study.best_trial
@@ -223,13 +190,25 @@ def export_best_config(study: Any, export_path: str) -> None:
     }
 
     priority_keys = [
-        "mining", "survey", "deep_scan", "research",
-        "maintenance", "export", "propellant", "fleet_expansion",
+        "mining",
+        "survey",
+        "deep_scan",
+        "research",
+        "maintenance",
+        "export",
+        "propellant",
+        "fleet_expansion",
     ]
     threshold_keys = [
-        "fleet_size_target", "volatile_threshold_kg", "lh2_threshold_kg",
-        "lh2_abundant_multiplier", "refinery_threshold_kg", "slag_jettison_pct",
-        "export_batch_size_kg", "export_min_revenue", "budget_cap_fraction",
+        "fleet_size_target",
+        "volatile_threshold_kg",
+        "lh2_threshold_kg",
+        "lh2_abundant_multiplier",
+        "refinery_threshold_kg",
+        "slag_jettison_pct",
+        "export_batch_size_kg",
+        "export_min_revenue",
+        "budget_cap_fraction",
         "refuel_threshold_pct",
     ]
 
@@ -260,11 +239,13 @@ def save_history(study: Any, output_dir: str) -> None:
     for trial in study.trials:
         if trial.state.name != "COMPLETE":
             continue
-        history.append({
-            "trial": trial.number,
-            "score": trial.value,
-            "params": trial.params,
-        })
+        history.append(
+            {
+                "trial": trial.number,
+                "score": trial.value,
+                "params": trial.params,
+            }
+        )
 
     history.sort(key=lambda t: t["score"] or 0, reverse=True)
 
@@ -288,6 +269,7 @@ def save_history(study: Any, output_dir: str) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     """CLI entry point."""
     import argparse
@@ -299,12 +281,8 @@ def main() -> None:
         )
         sys.exit(1)
 
-    parser = argparse.ArgumentParser(
-        description="Bayesian optimization over StrategyConfig parameters"
-    )
-    parser.add_argument(
-        "--scenario", required=True, help="Base sim_bench scenario JSON"
-    )
+    parser = argparse.ArgumentParser(description="Bayesian optimization over StrategyConfig parameters")
+    parser.add_argument("--scenario", required=True, help="Base sim_bench scenario JSON")
     parser.add_argument(
         "--sim-bench",
         default="target/release/sim_bench",
@@ -315,9 +293,7 @@ def main() -> None:
         default="runs/bayesian_opt",
         help="Output directory for trials",
     )
-    parser.add_argument(
-        "--trials", type=int, default=50, help="Number of optimization trials"
-    )
+    parser.add_argument("--trials", type=int, default=50, help="Number of optimization trials")
     parser.add_argument(
         "--export",
         help="Export best config to this path (e.g., content/strategy_optimized.json)",
@@ -333,9 +309,7 @@ def main() -> None:
         sampler=optuna.samplers.TPESampler(seed=42),
     )
 
-    objective = create_objective(
-        args.sim_bench, args.scenario, args.output_dir
-    )
+    objective = create_objective(args.sim_bench, args.scenario, args.output_dir)
 
     print(f"Starting Bayesian optimization: {args.trials} trials")
     print(f"  Scenario: {args.scenario}")
