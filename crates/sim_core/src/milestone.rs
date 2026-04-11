@@ -338,6 +338,25 @@ mod tests {
     use crate::test_fixtures::{base_content, base_state};
     use crate::{GamePhase, MilestoneReward, TradeTier};
 
+    /// Drift guard: every counter listed in `KNOWN_COUNTERS` must actually
+    /// resolve via `resolve_counter`. If a new counter match arm is added
+    /// but not registered here, this test fails. If a counter is listed but
+    /// removed from resolve_counter, content validation would reject legal
+    /// uses — this catches that.
+    #[test]
+    fn known_counters_all_resolve() {
+        let content = base_content();
+        let state = base_state(&content);
+        for counter in KNOWN_COUNTERS {
+            assert!(
+                resolve_counter(&state, &content, counter).is_some(),
+                "KNOWN_COUNTERS entry '{counter}' does not resolve — \
+                 missing match arm in resolve_counter/resolve_satellite_counter/\
+                 resolve_launch_counter/resolve_station_structure_counter",
+            );
+        }
+    }
+
     fn test_milestone(id: &str, conditions: Vec<MilestoneCondition>) -> MilestoneDef {
         MilestoneDef {
             id: id.to_string(),
