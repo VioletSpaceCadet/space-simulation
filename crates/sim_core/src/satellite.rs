@@ -36,13 +36,14 @@ pub fn zone_comm_tier(zone_id: &str, state: &GameState, content: &GameContent) -
     }
 
     // Count active comm satellites in this zone.
+    let comm_type = &content.autopilot.comm_satellite_type;
     let comm_count = state
         .satellites
         .values()
         .filter(|sat| {
             sat.enabled
                 && sat.wear < 1.0
-                && sat.satellite_type == "communication"
+                && sat.satellite_type == *comm_type
                 && sat.position.parent_body.0 == zone_id
         })
         .count();
@@ -61,13 +62,14 @@ pub fn zone_comm_tier(zone_id: &str, state: &GameState, content: &GameContent) -
 /// Formula: `1.0 - (transit_reduction_pct/100) * sqrt(count)` clamped to `[0.5, 1.0]`.
 /// `transit_reduction_pct` is read from nav satellite content config (default 15).
 pub fn zone_nav_bonus(zone_id: &str, state: &GameState, content: &GameContent) -> f64 {
+    let nav_type = &content.autopilot.nav_satellite_type;
     let nav_sats: Vec<&crate::SatelliteState> = state
         .satellites
         .values()
         .filter(|sat| {
             sat.enabled
                 && sat.wear < 1.0
-                && sat.satellite_type == "navigation"
+                && sat.satellite_type == *nav_type
                 && sat.position.parent_body.0 == zone_id
         })
         .collect();

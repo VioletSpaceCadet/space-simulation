@@ -118,6 +118,7 @@ impl Default for ScoringConfig {
 }
 
 /// All recognized signal source names. Used for content validation.
+/// Dynamic prefixes (`satellites_of_type:`) are handled separately.
 pub const KNOWN_SIGNAL_SOURCES: &[&str] = &[
     "assembler_active",
     "avg_module_wear",
@@ -132,13 +133,15 @@ pub const KNOWN_SIGNAL_SOURCES: &[&str] = &[
     "revenue_rate",
     "satellites_active",
     "satellite_utilization",
-    "science_satellites",
     "ships_constructed",
     "station_storage_used_pct",
     "tech_fraction",
     "total_launches",
     "total_raw_data",
 ];
+
+/// Prefixes that accept arbitrary suffixes as signal sources.
+const KNOWN_SIGNAL_PREFIXES: &[&str] = &["satellites_of_type:"];
 
 /// Validate a scoring config. Returns an error message if invalid.
 pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
@@ -209,7 +212,11 @@ fn validate_dimension_signals(dim: &DimensionDef) -> Result<(), String> {
                 dim.id, signal.source, signal.blend
             ));
         }
-        if !KNOWN_SIGNAL_SOURCES.contains(&signal.source.as_str()) {
+        let is_known = KNOWN_SIGNAL_SOURCES.contains(&signal.source.as_str())
+            || KNOWN_SIGNAL_PREFIXES
+                .iter()
+                .any(|prefix| signal.source.starts_with(prefix));
+        if !is_known {
             return Err(format!(
                 "dimension '{}' signal '{}' has unknown source",
                 dim.id, signal.source
@@ -376,12 +383,6 @@ fn resolve_signal_source(
             data_values.sort_by(f64::total_cmp);
             data_values.iter().sum()
         }
-        "science_satellites" => state
-            .satellites
-            .values()
-            .filter(|s| s.enabled && s.satellite_type == "science_platform")
-            .count() as f64,
-
         // -- Economic --
         "balance" => state.balance,
         "revenue_rate" => metrics.export_revenue_total / tick,
@@ -446,6 +447,16 @@ fn resolve_signal_source(
         "extra_bases" => {
             let base_count = (state.stations.len() + state.ground_facilities.len()) as f64;
             (base_count - 1.0).clamp(0.0, 3.0)
+        }
+
+        // -- Dynamic satellite type filter --
+        _ if source.starts_with("satellites_of_type:") => {
+            let sat_type = &source["satellites_of_type:".len()..];
+            state
+                .satellites
+                .values()
+                .filter(|s| s.enabled && s.satellite_type == sat_type)
+                .count() as f64
         }
 
         _ => 0.0,
@@ -628,7 +639,7 @@ mod tests {
                             clamp_max: None,
                         },
                         SignalDef {
-                            source: "science_satellites".into(),
+                            source: "satellites_of_type:science_platform".into(),
                             blend: 0.15,
                             transform: SignalTransform::LinearSaturate,
                             saturation: Some(3.0),

@@ -47,8 +47,15 @@ pub fn validate_content(content: &GameContent) {
     validate_hull_defs(content);
     validate_autopilot(content, &element_ids);
     validate_crew_roles(content);
+    let satellite_types: HashSet<&str> = content
+        .satellite_defs
+        .values()
+        .map(|s| s.satellite_type.as_str())
+        .collect();
+    validate_satellite_type_refs(content, &satellite_types);
     validate_scoring(content);
     validate_milestones(&content.milestones);
+    validate_milestone_satellite_refs(&content.milestones, &satellite_types);
 }
 
 fn validate_constants(content: &GameContent) {
@@ -664,6 +671,64 @@ fn load_fitting_templates(
 }
 
 /// Validate milestone definitions: unique IDs, valid chained references.
+/// Validate that satellite type strings referenced by autopilot config and
+/// scoring signals exist in `satellite_defs`. This catches typos and content
+/// drift at load time rather than silently returning zero counts.
+fn validate_satellite_type_refs(content: &sim_core::GameContent, satellite_types: &HashSet<&str>) {
+    // Only validate if there are satellite defs at all (test fixtures may be empty).
+    if satellite_types.is_empty() {
+        return;
+    }
+    // autopilot.comm_satellite_type
+    let comm = content.autopilot.comm_satellite_type.as_str();
+    assert!(
+        satellite_types.contains(comm),
+        "autopilot.comm_satellite_type '{comm}' not found in satellite_defs"
+    );
+    // autopilot.nav_satellite_type
+    let nav = content.autopilot.nav_satellite_type.as_str();
+    assert!(
+        satellite_types.contains(nav),
+        "autopilot.nav_satellite_type '{nav}' not found in satellite_defs"
+    );
+    // scoring signal sources with satellites_of_type: prefix
+    for dim in &content.scoring.dimensions {
+        for signal in &dim.signals {
+            if let Some(sat_type) = signal.source.strip_prefix("satellites_of_type:") {
+                assert!(
+                    satellite_types.contains(sat_type),
+                    "scoring dimension '{}' signal '{}' references unknown satellite type '{sat_type}'",
+                    dim.id, signal.source
+                );
+            }
+        }
+    }
+}
+
+/// Validate that satellite type references in milestone counters exist in
+/// `satellite_defs`.
+fn validate_milestone_satellite_refs(
+    milestones: &[sim_core::MilestoneDef],
+    satellite_types: &HashSet<&str>,
+) {
+    if satellite_types.is_empty() {
+        return;
+    }
+    for m in milestones {
+        for cond in &m.conditions {
+            if let sim_core::MilestoneCondition::CounterAbove { counter, .. } = cond {
+                if let Some(sat_type) = counter.strip_prefix("satellites_of_type:") {
+                    assert!(
+                        satellite_types.contains(sat_type),
+                        "milestone '{}' counter '{counter}' references unknown satellite type '{sat_type}'",
+                        m.id
+                    );
+                }
+            }
+        }
+    }
+}
+
 fn validate_milestones(milestones: &[sim_core::MilestoneDef]) {
     let mut seen_ids = std::collections::HashSet::new();
     for m in milestones {
