@@ -117,6 +117,12 @@ pub(crate) fn tick_satellites(
         };
         let wear_rate = def.wear_rate;
 
+        // NOTE: satellite tick-behavior dispatch still hardcodes "survey" and
+        // "science_platform" here. These encode *engine mechanics* (which
+        // satellite types have active tick behavior), not a tuning knob, so
+        // they stay in code. Adding a new tickable satellite type currently
+        // requires a code change. A proper fix would add a content-driven
+        // `behavior_kind` field on SatelliteDef — tracked for a future ticket.
         match satellite_type.as_str() {
             "survey" => tick_survey_satellite(state, content, rng, events, &def_id),
             "science_platform" => tick_science_satellite(state, content, events, &def_id),

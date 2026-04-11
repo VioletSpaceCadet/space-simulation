@@ -20,8 +20,8 @@ fn resolve_satellite_counter(state: &GameState, counter: &str) -> Option<f64> {
         "satellites_deployed" => {
             Some(state.satellites.values().filter(|s| s.enabled).count() as f64)
         }
-        _ if counter.starts_with("satellites_of_type:") => {
-            let sat_type = &counter["satellites_of_type:".len()..];
+        _ if counter.starts_with(crate::SATELLITES_OF_TYPE_PREFIX) => {
+            let sat_type = &counter[crate::SATELLITES_OF_TYPE_PREFIX.len()..];
             Some(
                 state
                     .satellites

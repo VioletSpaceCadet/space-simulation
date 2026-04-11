@@ -140,8 +140,10 @@ pub const KNOWN_SIGNAL_SOURCES: &[&str] = &[
     "total_raw_data",
 ];
 
-/// Prefixes that accept arbitrary suffixes as signal sources.
-const KNOWN_SIGNAL_PREFIXES: &[&str] = &["satellites_of_type:"];
+/// Prefix for dynamic satellite-type signal sources and milestone counters.
+/// A source like `"satellites_of_type:science_platform"` matches satellites
+/// of that content-defined type.
+pub const SATELLITES_OF_TYPE_PREFIX: &str = "satellites_of_type:";
 
 /// Validate a scoring config. Returns an error message if invalid.
 pub fn validate_scoring_config(config: &ScoringConfig) -> Result<(), String> {
@@ -213,9 +215,7 @@ fn validate_dimension_signals(dim: &DimensionDef) -> Result<(), String> {
             ));
         }
         let is_known = KNOWN_SIGNAL_SOURCES.contains(&signal.source.as_str())
-            || KNOWN_SIGNAL_PREFIXES
-                .iter()
-                .any(|prefix| signal.source.starts_with(prefix));
+            || signal.source.starts_with(SATELLITES_OF_TYPE_PREFIX);
         if !is_known {
             return Err(format!(
                 "dimension '{}' signal '{}' has unknown source",
@@ -450,8 +450,8 @@ fn resolve_signal_source(
         }
 
         // -- Dynamic satellite type filter --
-        _ if source.starts_with("satellites_of_type:") => {
-            let sat_type = &source["satellites_of_type:".len()..];
+        _ if source.starts_with(SATELLITES_OF_TYPE_PREFIX) => {
+            let sat_type = &source[SATELLITES_OF_TYPE_PREFIX.len()..];
             state
                 .satellites
                 .values()

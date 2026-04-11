@@ -103,6 +103,7 @@ pub use types::{InventoryItem, PricingEntry, PricingTable, TradeItemSpec};
 pub use scoring::{
     compute_run_score, validate_scoring_config, DimensionDef, DimensionScore, RunScore,
     ScoringConfig, SignalDef, SignalTransform, ThresholdDef, KNOWN_SIGNAL_SOURCES,
+    SATELLITES_OF_TYPE_PREFIX,
 };
 pub use types::{boiloff_rate_per_tick, derive_module_tick_values, Constants};
 // -- types: strategy --
