@@ -8,6 +8,27 @@ use crate::{
     GameContent, GameState, GrantRecord, MetricsSnapshot, MilestoneCondition, MilestoneDef,
 };
 
+/// All known static counter names resolved by `resolve_counter`. Dynamic
+/// counters (e.g. `satellites_of_type:<type>`) are validated separately via
+/// `SATELLITES_OF_TYPE_PREFIX`. Keep this list in sync with the match arms in
+/// `resolve_counter`, `resolve_satellite_counter`, `resolve_launch_counter`,
+/// and `resolve_station_structure_counter`.
+pub const KNOWN_COUNTERS: &[&str] = &[
+    "asteroids_classified",
+    "asteroids_discovered",
+    "assembler_runs",
+    "max_labs_on_any_station",
+    "reusable_landings",
+    "rockets_in_inventory",
+    "satellites_deployed",
+    "ships_built",
+    "stations_deployed",
+    "techs_unlocked",
+    "total_launches",
+    "total_raw_data",
+    "total_stations",
+];
+
 /// Resolve a counter name to a value derived from game state.
 ///
 /// Counter names map to computed properties that aren't in `MetricsSnapshot`
@@ -316,6 +337,25 @@ mod tests {
     use super::*;
     use crate::test_fixtures::{base_content, base_state};
     use crate::{GamePhase, MilestoneReward, TradeTier};
+
+    /// Drift guard: every counter listed in `KNOWN_COUNTERS` must actually
+    /// resolve via `resolve_counter`. If a new counter match arm is added
+    /// but not registered here, this test fails. If a counter is listed but
+    /// removed from resolve_counter, content validation would reject legal
+    /// uses — this catches that.
+    #[test]
+    fn known_counters_all_resolve() {
+        let content = base_content();
+        let state = base_state(&content);
+        for counter in KNOWN_COUNTERS {
+            assert!(
+                resolve_counter(&state, &content, counter).is_some(),
+                "KNOWN_COUNTERS entry '{counter}' does not resolve — \
+                 missing match arm in resolve_counter/resolve_satellite_counter/\
+                 resolve_launch_counter/resolve_station_structure_counter",
+            );
+        }
+    }
 
     fn test_milestone(id: &str, conditions: Vec<MilestoneCondition>) -> MilestoneDef {
         MilestoneDef {

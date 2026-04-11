@@ -54,7 +54,12 @@ pub fn validate_content(content: &GameContent) {
         .collect();
     validate_satellite_type_refs(content, &satellite_types);
     validate_scoring(content);
-    validate_milestones(&content.milestones);
+    let module_behavior_types: HashSet<&'static str> = content
+        .module_defs
+        .values()
+        .map(|m| m.behavior.type_name())
+        .collect();
+    validate_milestones(&content.milestones, &module_behavior_types);
     validate_milestone_satellite_refs(&content.milestones, &satellite_types);
 }
 
@@ -731,8 +736,17 @@ fn validate_milestone_satellite_refs(
     }
 }
 
-/// Validate milestone definitions: unique IDs, valid chained references.
-fn validate_milestones(milestones: &[sim_core::MilestoneDef]) {
+/// Validate milestone definitions: unique IDs, valid chained references,
+/// known counter names, and known metric field names. Typos in content must
+/// panic at load time rather than silently preventing milestones from firing.
+///
+/// `module_behavior_types` is the set of module behavior type names present
+/// in `content.module_defs` (e.g. `"processor"`, `"assembler"`) — used to
+/// validate per-module metric field prefixes like `"processor_starved"`.
+fn validate_milestones(
+    milestones: &[sim_core::MilestoneDef],
+    module_behavior_types: &HashSet<&'static str>,
+) {
     let mut seen_ids = std::collections::HashSet::new();
     for m in milestones {
         assert!(
@@ -741,18 +755,74 @@ fn validate_milestones(milestones: &[sim_core::MilestoneDef]) {
             m.id
         );
     }
-    // Validate chained milestone references point to existing IDs.
+    // Build the set of known metric field names from MetricsSnapshot's descriptors.
+    let metric_fields: HashSet<&'static str> = sim_core::MetricsSnapshot::fixed_field_descriptors()
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    let known_counters: HashSet<&'static str> = sim_core::KNOWN_COUNTERS.iter().copied().collect();
+
     for m in milestones {
         for cond in &m.conditions {
-            if let sim_core::MilestoneCondition::MilestoneCompleted { milestone_id } = cond {
-                assert!(
-                    seen_ids.contains(milestone_id.as_str()),
-                    "milestone '{}' references unknown prerequisite milestone '{milestone_id}'",
-                    m.id
-                );
+            match cond {
+                sim_core::MilestoneCondition::MilestoneCompleted { milestone_id } => {
+                    assert!(
+                        seen_ids.contains(milestone_id.as_str()),
+                        "milestone '{}' references unknown prerequisite milestone '{milestone_id}'",
+                        m.id
+                    );
+                }
+                sim_core::MilestoneCondition::CounterAbove { counter, .. } => {
+                    // Dynamic satellites_of_type:<type> counters are validated by
+                    // validate_milestone_satellite_refs; skip them here.
+                    if counter.starts_with(sim_core::SATELLITES_OF_TYPE_PREFIX) {
+                        continue;
+                    }
+                    assert!(
+                        known_counters.contains(counter.as_str()),
+                        "milestone '{}' references unknown counter '{counter}' \
+                         (check spelling or add to KNOWN_COUNTERS in milestone.rs)",
+                        m.id
+                    );
+                }
+                sim_core::MilestoneCondition::MetricAbove { field, .. } => {
+                    // Check fixed fields FIRST to mirror runtime resolution order
+                    // (get_field_f64 looks up fixed fields before falling through
+                    // to per_module_metrics). Otherwise a typo like
+                    // "sateelites_active" would be silently accepted by the
+                    // per-module pattern check.
+                    if metric_fields.contains(field.as_str()) {
+                        continue;
+                    }
+                    // Per-module metric fields use a dynamic <module_type>_<metric>
+                    // pattern (e.g. "processor_starved"). The <module_type> prefix
+                    // must be a real behavior type from content.module_defs,
+                    // otherwise typos slip through.
+                    if is_per_module_metric_field(field, module_behavior_types) {
+                        continue;
+                    }
+                    panic!(
+                        "milestone '{}' references unknown metric field '{field}' \
+                         (check spelling against MetricsSnapshot::fixed_field_descriptors)",
+                        m.id
+                    );
+                }
             }
         }
     }
+}
+
+/// Per-module metric fields are dynamic: `<module_type>_<metric>` where
+/// `<metric>` is one of `active`, `stalled`, `starved` and `<module_type>`
+/// is a real behavior type from `content.module_defs`.
+fn is_per_module_metric_field(field: &str, module_behavior_types: &HashSet<&'static str>) -> bool {
+    let Some(suffix_start) = field.rfind('_') else {
+        return false;
+    };
+    let type_name = &field[..suffix_start];
+    let metric_name = &field[suffix_start + 1..];
+    matches!(metric_name, "active" | "stalled" | "starved")
+        && module_behavior_types.contains(type_name)
 }
 
 /// Load an optional JSON file, returning `T::default()` if the file is missing.
@@ -2743,7 +2813,7 @@ mod tests {
                 phase_advance: None,
             },
         ];
-        validate_milestones(&milestones); // should not panic
+        validate_milestones(&milestones, &test_behavior_types()); // should not panic
     }
 
     #[test]
@@ -2779,7 +2849,7 @@ mod tests {
                 phase_advance: None,
             },
         ];
-        validate_milestones(&milestones);
+        validate_milestones(&milestones, &test_behavior_types());
     }
 
     #[test]
@@ -2801,7 +2871,122 @@ mod tests {
             },
             phase_advance: None,
         }];
-        validate_milestones(&milestones);
+        validate_milestones(&milestones, &test_behavior_types());
+    }
+
+    /// Test helper: set of module behavior type names that exercise the
+    /// per-module metric field validation path.
+    fn test_behavior_types() -> HashSet<&'static str> {
+        [
+            "processor",
+            "assembler",
+            "lab",
+            "sensor_array",
+            "maintenance",
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    fn milestone_with_condition(
+        id: &str,
+        cond: sim_core::MilestoneCondition,
+    ) -> sim_core::MilestoneDef {
+        sim_core::MilestoneDef {
+            id: id.to_string(),
+            name: id.to_string(),
+            description: String::new(),
+            conditions: vec![cond],
+            rewards: sim_core::MilestoneReward {
+                grant_amount: 0.0,
+                reputation: 0.0,
+                unlock_trade_tier: None,
+                unlock_zone_ids: vec![],
+                unlock_module_ids: vec![],
+            },
+            phase_advance: None,
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown counter 'satelites_deployed'")]
+    fn validate_milestones_rejects_counter_typo() {
+        // Intentional typo: "satelites" with one L
+        let milestones = vec![milestone_with_condition(
+            "typo_milestone",
+            sim_core::MilestoneCondition::CounterAbove {
+                counter: "satelites_deployed".to_string(),
+                threshold: 1.0,
+            },
+        )];
+        validate_milestones(&milestones, &test_behavior_types());
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown metric field 'total_or_kg'")]
+    fn validate_milestones_rejects_metric_field_typo() {
+        let milestones = vec![milestone_with_condition(
+            "typo_milestone",
+            sim_core::MilestoneCondition::MetricAbove {
+                field: "total_or_kg".to_string(), // typo: should be "total_ore_kg"
+                threshold: 100.0,
+            },
+        )];
+        validate_milestones(&milestones, &test_behavior_types());
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown metric field 'sateelites_active'")]
+    fn validate_milestones_rejects_metric_field_typo_ending_in_active() {
+        // Regression guard: typos ending in _active/_stalled/_starved must
+        // NOT be silently accepted as per-module metric fields. The real
+        // "satellites_active" (one L) is a fixed field; "sateelites_active"
+        // (double E) is neither a fixed field nor a legitimate module type.
+        let milestones = vec![milestone_with_condition(
+            "typo_milestone",
+            sim_core::MilestoneCondition::MetricAbove {
+                field: "sateelites_active".to_string(),
+                threshold: 1.0,
+            },
+        )];
+        validate_milestones(&milestones, &test_behavior_types());
+    }
+
+    #[test]
+    fn validate_milestones_accepts_known_counter_and_metric() {
+        let milestones = vec![
+            milestone_with_condition(
+                "m1",
+                sim_core::MilestoneCondition::CounterAbove {
+                    counter: "asteroids_discovered".to_string(),
+                    threshold: 1.0,
+                },
+            ),
+            milestone_with_condition(
+                "m2",
+                sim_core::MilestoneCondition::MetricAbove {
+                    field: "total_ore_kg".to_string(),
+                    threshold: 100.0,
+                },
+            ),
+            // Dynamic satellites_of_type counter is allowed (validated elsewhere)
+            milestone_with_condition(
+                "m3",
+                sim_core::MilestoneCondition::CounterAbove {
+                    counter: "satellites_of_type:custom_type".to_string(),
+                    threshold: 1.0,
+                },
+            ),
+            // Dynamic per-module metric field is allowed
+            milestone_with_condition(
+                "m4",
+                sim_core::MilestoneCondition::MetricAbove {
+                    field: "processor_active".to_string(),
+                    threshold: 1.0,
+                },
+            ),
+        ];
+        validate_milestones(&milestones, &test_behavior_types()); // should not panic
     }
 
     #[test]
