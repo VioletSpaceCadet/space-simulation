@@ -62,17 +62,16 @@ fn execute(
         return super::RunOutcome::Skipped { reset_timer: true };
     };
 
-    // Phase 2: tech gates (recipe-required tech + ship-construction tech).
+    // Phase 2: recipe-required tech gate.
     if let Some(outcome) = check_recipe_tech_gate(ctx, assembler_def, recipe, state, events) {
-        return outcome;
-    }
-    if let Some(outcome) =
-        check_ship_construction_gate(ctx, assembler_def, recipe, state, content, events)
-    {
         return outcome;
     }
 
     // Phase 3: inventory pre-checks (inputs available, stock not capped).
+    // Checked BEFORE ship-construction gate to preserve the original order
+    // from main — insufficient inputs return Skipped{reset_timer=true} and
+    // stock-capped returns Stalled(StockCap), rather than being pre-empted
+    // by the ship-construction ModuleAwaitingTech event emission.
     if !inputs_available(ctx, recipe, state) {
         return super::RunOutcome::Skipped { reset_timer: true };
     }
@@ -80,7 +79,16 @@ fn execute(
         return super::RunOutcome::Stalled(super::StallReason::StockCap);
     }
 
-    // Phase 4: volume pre-check.
+    // Phase 4: ship-construction tech gate (runs after inventory checks so
+    // insufficient inputs / stock caps take precedence, matching original
+    // execution order).
+    if let Some(outcome) =
+        check_ship_construction_gate(ctx, assembler_def, recipe, state, content, events)
+    {
+        return outcome;
+    }
+
+    // Phase 5: volume pre-check.
     let output_volume = estimate_output_volume(recipe, content);
     let shortfall = {
         let Some(station) = state.stations.get_mut(&ctx.station_id) else {
@@ -96,7 +104,7 @@ fn execute(
         });
     }
 
-    // Phase 5: all checks passed — execute the assembler run.
+    // Phase 6: all checks passed — execute the assembler run.
     resolve_assembler_run(ctx, state, recipe, content, rng, events);
     super::RunOutcome::Completed
 }
@@ -402,7 +410,9 @@ fn consume_recipe_inputs(
     recipe: &RecipeDef,
     content: &GameContent,
 ) -> Option<(ConsumedMaterial, bool)> {
-    state.stations.get(&ctx.station_id)?;
+    if !state.stations.contains_key(&ctx.station_id) {
+        return None;
+    }
     let min_kg = content.constants.min_meaningful_kg;
     let mut consumed = ConsumedMaterial::default();
     let mut any = false;
