@@ -10,6 +10,10 @@ no-default-features = false
 ignore = [
     # paste is archived but stable/no security issue; used transitively by arrow
     "RUSTSEC-2024-0436",
+    # rand 0.8.5 unsound with custom logger accessing rand::rng() — we use
+    # ChaCha8Rng explicitly for determinism, not thread_rng, and have no
+    # custom logger. The unsoundness conditions don't apply to this codebase.
+    "RUSTSEC-2026-0097",
 ]
 
 # -- Licenses --
