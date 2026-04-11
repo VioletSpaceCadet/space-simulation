@@ -100,6 +100,7 @@ pub use types::{Command, CommandEnvelope, Event, EventEnvelope};
 // -- types: inventory & trade --
 pub use types::{InventoryItem, PricingEntry, PricingTable, TradeItemSpec};
 // -- types: constants & functions --
+pub use milestone::KNOWN_COUNTERS;
 pub use scoring::{
     compute_run_score, validate_scoring_config, DimensionDef, DimensionScore, RunScore,
     ScoringConfig, SignalDef, SignalTransform, ThresholdDef, KNOWN_SIGNAL_SOURCES,

@@ -8,6 +8,27 @@ use crate::{
     GameContent, GameState, GrantRecord, MetricsSnapshot, MilestoneCondition, MilestoneDef,
 };
 
+/// All known static counter names resolved by `resolve_counter`. Dynamic
+/// counters (e.g. `satellites_of_type:<type>`) are validated separately via
+/// `SATELLITES_OF_TYPE_PREFIX`. Keep this list in sync with the match arms in
+/// `resolve_counter`, `resolve_satellite_counter`, `resolve_launch_counter`,
+/// and `resolve_station_structure_counter`.
+pub const KNOWN_COUNTERS: &[&str] = &[
+    "asteroids_classified",
+    "asteroids_discovered",
+    "assembler_runs",
+    "max_labs_on_any_station",
+    "reusable_landings",
+    "rockets_in_inventory",
+    "satellites_deployed",
+    "ships_built",
+    "stations_deployed",
+    "techs_unlocked",
+    "total_launches",
+    "total_raw_data",
+    "total_stations",
+];
+
 /// Resolve a counter name to a value derived from game state.
 ///
 /// Counter names map to computed properties that aren't in `MetricsSnapshot`
