@@ -47,8 +47,8 @@ pub(super) fn tick_assembler_modules(
     }
 }
 
-/// Assembler-specific logic. Returns a `RunOutcome` for the framework to apply.
-#[allow(clippy::too_many_lines)]
+/// Assembler-specific logic. Orchestrates recipe resolution, pre-checks, and
+/// the actual assembler run. Returns a `RunOutcome` for the framework to apply.
 fn execute(
     ctx: &super::ModuleTickContext,
     assembler_def: &crate::AssemblerDef,
@@ -57,17 +57,69 @@ fn execute(
     rng: &mut impl rand::Rng,
     events: &mut Vec<EventEnvelope>,
 ) -> super::RunOutcome {
-    let selected = {
-        let Some(station) = state.stations.get(&ctx.station_id) else {
+    // Phase 1: resolve which recipe to run.
+    let Some(recipe) = resolve_recipe(ctx, assembler_def, state, content, events) else {
+        return super::RunOutcome::Skipped { reset_timer: true };
+    };
+
+    // Phase 2: tech gates (recipe-required tech + ship-construction tech).
+    if let Some(outcome) = check_recipe_tech_gate(ctx, assembler_def, recipe, state, events) {
+        return outcome;
+    }
+    if let Some(outcome) =
+        check_ship_construction_gate(ctx, assembler_def, recipe, state, content, events)
+    {
+        return outcome;
+    }
+
+    // Phase 3: inventory pre-checks (inputs available, stock not capped).
+    if !inputs_available(ctx, recipe, state) {
+        return super::RunOutcome::Skipped { reset_timer: true };
+    }
+    if is_stock_capped(ctx, assembler_def, recipe, state) {
+        return super::RunOutcome::Stalled(super::StallReason::StockCap);
+    }
+
+    // Phase 4: volume pre-check.
+    let output_volume = estimate_output_volume(recipe, content);
+    let shortfall = {
+        let Some(station) = state.stations.get_mut(&ctx.station_id) else {
             return super::RunOutcome::Skipped { reset_timer: true };
         };
+        let current_used = station.used_volume_m3(content);
+        let capacity = station.core.cargo_capacity_m3;
+        (current_used + output_volume) - capacity
+    };
+    if shortfall > 0.0 {
+        return super::RunOutcome::Stalled(super::StallReason::VolumeCap {
+            shortfall_m3: shortfall,
+        });
+    }
+
+    // Phase 5: all checks passed — execute the assembler run.
+    resolve_assembler_run(ctx, state, recipe, content, rng, events);
+    super::RunOutcome::Completed
+}
+
+/// Resolve which recipe the assembler should run. Handles the fallback when
+/// the currently-selected recipe is no longer in the assembler's recipe list
+/// (e.g., after a content update). Returns `None` if no valid recipe exists.
+fn resolve_recipe<'c>(
+    ctx: &super::ModuleTickContext,
+    assembler_def: &crate::AssemblerDef,
+    state: &mut GameState,
+    content: &'c GameContent,
+    events: &mut Vec<EventEnvelope>,
+) -> Option<&'c RecipeDef> {
+    let selected = {
+        let station = state.stations.get(&ctx.station_id)?;
         match &station.core.modules[ctx.module_idx].kind_state {
             crate::ModuleKindState::Assembler(asmb) => asmb.selected_recipe.clone(),
-            _ => return super::RunOutcome::Skipped { reset_timer: true },
+            _ => return None,
         }
     };
 
-    // Recipe fallback: if selected recipe is not in assembler's recipe list, reset it
+    // Recipe fallback: if selected recipe is not in assembler's recipe list, reset it.
     let recipe_id = if let Some(ref sel_id) = selected {
         if assembler_def.recipes.contains(sel_id) {
             selected
@@ -100,234 +152,228 @@ fn execute(
     };
 
     let recipe_id = recipe_id.as_ref().or_else(|| assembler_def.recipes.first());
-    let Some(recipe) = recipe_id.and_then(|id| content.recipes.get(id)) else {
-        return super::RunOutcome::Skipped { reset_timer: true };
-    };
+    recipe_id.and_then(|id| content.recipes.get(id))
+}
 
-    // Tech gate: if recipe requires a tech that isn't unlocked, skip
-    if let Some(ref required_tech) = recipe.required_tech {
-        if !state.research.unlocked.iter().any(|t| t == required_tech) {
-            let first_trigger = {
-                let Some(station) = state.stations.get(&ctx.station_id) else {
-                    return super::RunOutcome::Skipped { reset_timer: false };
-                };
-                match &station.core.modules[ctx.module_idx].kind_state {
-                    crate::ModuleKindState::Assembler(asmb) => {
-                        asmb.ticks_since_last_run == assembler_def.assembly_interval_ticks
-                    }
-                    _ => false,
-                }
-            };
-            if first_trigger {
-                let current_tick = state.meta.tick;
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    Event::ModuleAwaitingTech {
-                        station_id: ctx.station_id.clone(),
-                        module_id: ctx.module_id.clone(),
-                        tech_id: required_tech.clone(),
-                    },
-                ));
-            }
-            return super::RunOutcome::Skipped { reset_timer: false };
-        }
+/// Check the recipe's `required_tech` gate. Returns `Some(outcome)` if the
+/// gate blocks execution (emitting `ModuleAwaitingTech` at the first trigger),
+/// or `None` if the gate is passed.
+fn check_recipe_tech_gate(
+    ctx: &super::ModuleTickContext,
+    assembler_def: &crate::AssemblerDef,
+    recipe: &RecipeDef,
+    state: &mut GameState,
+    events: &mut Vec<EventEnvelope>,
+) -> Option<super::RunOutcome> {
+    let required_tech = recipe.required_tech.as_ref()?;
+    if state.research.unlocked.iter().any(|t| t == required_tech) {
+        return None;
     }
-
-    // Check input availability
-    let input_available = {
-        let Some(station) = state.stations.get(&ctx.station_id) else {
-            return super::RunOutcome::Skipped { reset_timer: true };
-        };
-        recipe
-            .inputs
-            .iter()
-            .all(|input| match (&input.filter, &input.amount) {
-                (InputFilter::Element(el), InputAmount::Kg(required_kg)) => {
-                    let available_kg: f32 = station
-                        .core.inventory
-                        .iter()
-                        .filter_map(|item| match item {
-                            InventoryItem::Material { element, kg, .. } if element == el => {
-                                Some(*kg)
-                            }
-                            _ => None,
-                        })
-                        .sum();
-                    available_kg >= *required_kg
-                }
-                (InputFilter::Component(cid), InputAmount::Count(required)) => {
-                    let available: u32 = station
-                        .core.inventory
-                        .iter()
-                        .filter_map(|item| match item {
-                            InventoryItem::Component {
-                                component_id,
-                                count,
-                                ..
-                            } if component_id.0 == cid.0 => Some(*count),
-                            _ => None,
-                        })
-                        .sum();
-                    available >= *required
-                }
-                #[allow(clippy::cast_possible_truncation)]
-                (InputFilter::Module(def_id), InputAmount::Count(required)) => {
-                    let available = station
-                        .core.inventory
-                        .iter()
-                        .filter(|item| {
-                            matches!(item, InventoryItem::Module { module_def_id, .. } if *module_def_id == *def_id)
-                        })
-                        .count() as u32;
-                    available >= *required
-                }
-                _ => false,
-            })
-    };
-
-    if !input_available {
-        return super::RunOutcome::Skipped { reset_timer: true };
+    if is_first_interval_trigger(ctx, assembler_def, state) {
+        let current_tick = state.meta.tick;
+        events.push(crate::emit(
+            &mut state.counters,
+            current_tick,
+            Event::ModuleAwaitingTech {
+                station_id: ctx.station_id.clone(),
+                module_id: ctx.module_id.clone(),
+                tech_id: required_tech.clone(),
+            },
+        ));
     }
+    Some(super::RunOutcome::Skipped { reset_timer: false })
+}
 
-    // Stock cap check
-    let is_capped = {
-        let Some(station) = state.stations.get(&ctx.station_id) else {
-            return super::RunOutcome::Skipped { reset_timer: true };
-        };
-
-        let cap_override = match &station.core.modules[ctx.module_idx].kind_state {
-            crate::ModuleKindState::Assembler(asmb) => asmb.cap_override.clone(),
-            _ => std::collections::HashMap::new(),
-        };
-
-        recipe.outputs.iter().any(|output| {
-            if let OutputSpec::Component { component_id, .. } = output {
-                let effective_cap = cap_override
-                    .get(component_id)
-                    .copied()
-                    .or_else(|| assembler_def.max_stock.get(component_id).copied());
-
-                if let Some(cap) = effective_cap {
-                    let current_count: u32 = station
-                        .core
-                        .inventory
-                        .iter()
-                        .filter_map(|item| match item {
-                            InventoryItem::Component {
-                                component_id: cid,
-                                count,
-                                ..
-                            } if cid == component_id => Some(*count),
-                            _ => None,
-                        })
-                        .sum();
-                    current_count >= cap
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        })
-    };
-
-    if is_capped {
-        return super::RunOutcome::Stalled(super::StallReason::StockCap);
-    }
-
-    // Tech gate: if recipe has ship output, require EnableShipConstruction effect
+/// Check the ship-construction tech gate if the recipe has a ship output.
+fn check_ship_construction_gate(
+    ctx: &super::ModuleTickContext,
+    assembler_def: &crate::AssemblerDef,
+    recipe: &RecipeDef,
+    state: &mut GameState,
+    content: &GameContent,
+    events: &mut Vec<EventEnvelope>,
+) -> Option<super::RunOutcome> {
     let has_ship_output = recipe
         .outputs
         .iter()
         .any(|o| matches!(o, OutputSpec::Ship { .. }));
-    if has_ship_output && !ship_construction_enabled(&state.research, content) {
-        // Only emit ModuleAwaitingTech once — when timer first reaches the interval.
-        // should_run() incremented the timer; if it equals exactly the interval,
-        // this is the first time we've reached it.
-        let first_trigger = {
-            let Some(station) = state.stations.get(&ctx.station_id) else {
-                return super::RunOutcome::Skipped { reset_timer: false };
-            };
-            match &station.core.modules[ctx.module_idx].kind_state {
-                crate::ModuleKindState::Assembler(asmb) => {
-                    asmb.ticks_since_last_run == assembler_def.assembly_interval_ticks
-                }
-                _ => false,
-            }
-        };
-        if first_trigger {
-            if let Some(tech_id) = ship_construction_tech_id(content) {
-                let current_tick = state.meta.tick;
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    Event::ModuleAwaitingTech {
-                        station_id: ctx.station_id.clone(),
-                        module_id: ctx.module_id.clone(),
-                        tech_id: tech_id.clone(),
-                    },
-                ));
-            }
-        }
-        // Don't reset timer — let it stay above interval so we only emit once
-        return super::RunOutcome::Skipped { reset_timer: false };
+    if !has_ship_output || ship_construction_enabled(&state.research, content) {
+        return None;
     }
+    // Only emit ModuleAwaitingTech once — when timer first reaches the interval.
+    if is_first_interval_trigger(ctx, assembler_def, state) {
+        if let Some(tech_id) = ship_construction_tech_id(content) {
+            let current_tick = state.meta.tick;
+            events.push(crate::emit(
+                &mut state.counters,
+                current_tick,
+                Event::ModuleAwaitingTech {
+                    station_id: ctx.station_id.clone(),
+                    module_id: ctx.module_id.clone(),
+                    tech_id: tech_id.clone(),
+                },
+            ));
+        }
+    }
+    // Don't reset timer — let it stay above interval so we only emit once.
+    Some(super::RunOutcome::Skipped { reset_timer: false })
+}
 
-    // Capacity pre-check: estimate net volume change
-    let output_volume = {
-        let mut produced_volume = 0.0_f32;
-        for output in &recipe.outputs {
-            if let OutputSpec::Component { component_id, .. } = output {
+/// True iff this is the first tick the timer reached the assembly interval.
+/// `should_run()` incremented the timer; if it equals exactly the interval,
+/// this is the first trigger.
+fn is_first_interval_trigger(
+    ctx: &super::ModuleTickContext,
+    assembler_def: &crate::AssemblerDef,
+    state: &GameState,
+) -> bool {
+    let Some(station) = state.stations.get(&ctx.station_id) else {
+        return false;
+    };
+    match &station.core.modules[ctx.module_idx].kind_state {
+        crate::ModuleKindState::Assembler(asmb) => {
+            asmb.ticks_since_last_run == assembler_def.assembly_interval_ticks
+        }
+        _ => false,
+    }
+}
+
+/// Check that all of the recipe's inputs are available in the station inventory.
+fn inputs_available(ctx: &super::ModuleTickContext, recipe: &RecipeDef, state: &GameState) -> bool {
+    let Some(station) = state.stations.get(&ctx.station_id) else {
+        return false;
+    };
+    recipe.inputs.iter().all(|input| match (&input.filter, &input.amount) {
+        (InputFilter::Element(el), InputAmount::Kg(required_kg)) => {
+            let available_kg: f32 = station
+                .core
+                .inventory
+                .iter()
+                .filter_map(|item| match item {
+                    InventoryItem::Material { element, kg, .. } if element == el => Some(*kg),
+                    _ => None,
+                })
+                .sum();
+            available_kg >= *required_kg
+        }
+        (InputFilter::Component(cid), InputAmount::Count(required)) => {
+            let available: u32 = station
+                .core
+                .inventory
+                .iter()
+                .filter_map(|item| match item {
+                    InventoryItem::Component {
+                        component_id,
+                        count,
+                        ..
+                    } if component_id.0 == cid.0 => Some(*count),
+                    _ => None,
+                })
+                .sum();
+            available >= *required
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        (InputFilter::Module(def_id), InputAmount::Count(required)) => {
+            let available = station
+                .core
+                .inventory
+                .iter()
+                .filter(|item| {
+                    matches!(item, InventoryItem::Module { module_def_id, .. } if *module_def_id == *def_id)
+                })
+                .count() as u32;
+            available >= *required
+        }
+        _ => false,
+    })
+}
+
+/// True iff any of the recipe's component outputs are stock-capped (current
+/// inventory count >= effective cap).
+fn is_stock_capped(
+    ctx: &super::ModuleTickContext,
+    assembler_def: &crate::AssemblerDef,
+    recipe: &RecipeDef,
+    state: &GameState,
+) -> bool {
+    let Some(station) = state.stations.get(&ctx.station_id) else {
+        return false;
+    };
+    let cap_override = match &station.core.modules[ctx.module_idx].kind_state {
+        crate::ModuleKindState::Assembler(asmb) => asmb.cap_override.clone(),
+        _ => std::collections::HashMap::new(),
+    };
+    recipe.outputs.iter().any(|output| {
+        let OutputSpec::Component { component_id, .. } = output else {
+            return false;
+        };
+        let effective_cap = cap_override
+            .get(component_id)
+            .copied()
+            .or_else(|| assembler_def.max_stock.get(component_id).copied());
+        let Some(cap) = effective_cap else {
+            return false;
+        };
+        let current_count: u32 = station
+            .core
+            .inventory
+            .iter()
+            .filter_map(|item| match item {
+                InventoryItem::Component {
+                    component_id: cid,
+                    count,
+                    ..
+                } if cid == component_id => Some(*count),
+                _ => None,
+            })
+            .sum();
+        current_count >= cap
+    })
+}
+
+/// Estimate the net volume change from running the recipe (produced - consumed,
+/// clamped to non-negative). Used for the capacity pre-check.
+fn estimate_output_volume(recipe: &RecipeDef, content: &GameContent) -> f32 {
+    let mut produced_volume = 0.0_f32;
+    for output in &recipe.outputs {
+        if let OutputSpec::Component { component_id, .. } = output {
+            let comp_volume = content
+                .component_defs
+                .iter()
+                .find(|c| c.id == component_id.0)
+                .map_or(0.0, |c| c.volume_m3);
+            produced_volume += comp_volume;
+        }
+    }
+    let mut consumed_volume = 0.0_f32;
+    for input in &recipe.inputs {
+        match (&input.filter, &input.amount) {
+            (InputFilter::Component(cid), InputAmount::Count(count)) => {
                 let comp_volume = content
                     .component_defs
                     .iter()
-                    .find(|c| c.id == component_id.0)
+                    .find(|c| c.id == cid.0)
                     .map_or(0.0, |c| c.volume_m3);
-                produced_volume += comp_volume;
+                consumed_volume += comp_volume * *count as f32;
             }
-        }
-        let mut consumed_volume = 0.0_f32;
-        for input in &recipe.inputs {
-            match (&input.filter, &input.amount) {
-                (InputFilter::Component(cid), InputAmount::Count(count)) => {
-                    let comp_volume = content
-                        .component_defs
-                        .iter()
-                        .find(|c| c.id == cid.0)
-                        .map_or(0.0, |c| c.volume_m3);
-                    consumed_volume += comp_volume * *count as f32;
-                }
-                (InputFilter::Module(def_id), InputAmount::Count(count)) => {
-                    let mod_volume = content.module_defs.get(def_id).map_or(0.0, |d| d.volume_m3);
-                    consumed_volume += mod_volume * *count as f32;
-                }
-                _ => {}
+            (InputFilter::Module(def_id), InputAmount::Count(count)) => {
+                let mod_volume = content.module_defs.get(def_id).map_or(0.0, |d| d.volume_m3);
+                consumed_volume += mod_volume * *count as f32;
             }
+            _ => {}
         }
-        (produced_volume - consumed_volume).max(0.0)
-    };
-
-    let Some(station) = state.stations.get_mut(&ctx.station_id) else {
-        return super::RunOutcome::Skipped { reset_timer: true };
-    };
-    let current_used = station.used_volume_m3(content);
-    let capacity = station.core.cargo_capacity_m3;
-    let shortfall = (current_used + output_volume) - capacity;
-
-    if shortfall > 0.0 {
-        return super::RunOutcome::Stalled(super::StallReason::VolumeCap {
-            shortfall_m3: shortfall,
-        });
     }
-
-    // All checks passed — execute the assembler run
-    resolve_assembler_run(ctx, state, recipe, content, rng, events);
-
-    super::RunOutcome::Completed
+    (produced_volume - consumed_volume).max(0.0)
 }
 
-#[allow(clippy::too_many_lines)]
+/// Tracks material consumed during the recipe's input phase, so the produced
+/// `AssemblerRan` event can report what was consumed.
+#[derive(Default)]
+struct ConsumedMaterial {
+    element: String,
+    kg: f32,
+}
+
 fn resolve_assembler_run(
     ctx: &super::ModuleTickContext,
     state: &mut GameState,
@@ -336,210 +382,321 @@ fn resolve_assembler_run(
     rng: &mut impl rand::Rng,
     events: &mut Vec<EventEnvelope>,
 ) {
-    let current_tick = state.meta.tick;
-    let min_kg = content.constants.min_meaningful_kg;
+    let Some((consumed, any)) = consume_recipe_inputs(ctx, state, recipe, content) else {
+        return;
+    };
+    if !any {
+        return;
+    }
+    produce_recipe_outputs(ctx, state, recipe, content, rng, events, &consumed);
+    generate_assembly_research_data(state, recipe, content);
+}
 
-    // Consume inputs
-    let mut consumed_element = String::new();
-    let mut consumed_kg = 0.0_f32;
-    let mut consumed_any = false;
+/// Consume the recipe's inputs from the station inventory. Returns
+/// `(consumed_material, any_consumed)`: the first tracks the most-recent
+/// element consumed (for event reporting), the second is `true` if at least
+/// one input was fully consumed. Returns `None` if the station is missing.
+fn consume_recipe_inputs(
+    ctx: &super::ModuleTickContext,
+    state: &mut GameState,
+    recipe: &RecipeDef,
+    content: &GameContent,
+) -> Option<(ConsumedMaterial, bool)> {
+    state.stations.get(&ctx.station_id)?;
+    let min_kg = content.constants.min_meaningful_kg;
+    let mut consumed = ConsumedMaterial::default();
+    let mut any = false;
 
     for input in &recipe.inputs {
         match (&input.filter, &input.amount) {
             (InputFilter::Element(el), InputAmount::Kg(required_kg)) => {
-                let element_id = el.clone();
-                consumed_element.clone_from(&element_id);
-                let mut remaining = *required_kg;
-
-                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                    for item in &mut station.core.inventory {
-                        if remaining <= 0.0 {
-                            break;
-                        }
-                        if let InventoryItem::Material { element, kg, .. } = item {
-                            if *element == element_id {
-                                let take = kg.min(remaining);
-                                *kg -= take;
-                                remaining -= take;
-                                consumed_kg += take;
-                            }
-                        }
-                    }
-                    // Remove empty material lots
-                    station.core.inventory.retain(
-                        |i| !matches!(i, InventoryItem::Material { kg, .. } if *kg < min_kg),
-                    );
-                }
-                if consumed_kg >= min_kg {
-                    consumed_any = true;
+                let taken = take_material(ctx, state, el, *required_kg, min_kg);
+                consumed.element.clone_from(el);
+                consumed.kg += taken;
+                if consumed.kg >= min_kg {
+                    any = true;
                 }
             }
             (InputFilter::Component(cid), InputAmount::Count(required)) => {
-                let mut remaining = *required;
-                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                    for item in &mut station.core.inventory {
-                        if remaining == 0 {
-                            break;
-                        }
-                        if let InventoryItem::Component {
-                            component_id,
-                            count,
-                            ..
-                        } = item
-                        {
-                            if component_id.0 == cid.0 {
-                                let take = (*count).min(remaining);
-                                *count -= take;
-                                remaining -= take;
-                            }
-                        }
-                    }
-                    // Remove empty component stacks
-                    station.core.inventory.retain(
-                        |i| !matches!(i, InventoryItem::Component { count, .. } if *count == 0),
-                    );
-                }
-                if remaining == 0 {
-                    consumed_any = true;
+                if take_components(ctx, state, &cid.0, *required) {
+                    any = true;
                 }
             }
             (InputFilter::Module(def_id), InputAmount::Count(required)) => {
-                let mut remaining = *required;
-                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                    let mut indices_to_remove = Vec::new();
-                    for (index, item) in station.core.inventory.iter().enumerate() {
-                        if remaining == 0 {
-                            break;
-                        }
-                        if matches!(item, InventoryItem::Module { module_def_id, .. } if *module_def_id == *def_id)
-                        {
-                            indices_to_remove.push(index);
-                            remaining -= 1;
-                        }
-                    }
-                    for index in indices_to_remove.into_iter().rev() {
-                        station.core.inventory.remove(index);
-                    }
-                }
-                if remaining == 0 {
-                    consumed_any = true;
+                if take_modules(ctx, state, def_id.as_str(), *required) {
+                    any = true;
                 }
             }
             _ => {}
         }
     }
+    Some((consumed, any))
+}
 
-    if !consumed_any {
-        return;
+/// Remove up to `required_kg` of the given element from the station inventory.
+/// Returns the actual amount taken. Empty material lots are pruned.
+fn take_material(
+    ctx: &super::ModuleTickContext,
+    state: &mut GameState,
+    element_id: &str,
+    required_kg: f32,
+    min_kg: f32,
+) -> f32 {
+    let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+        return 0.0;
+    };
+    let mut remaining = required_kg;
+    let mut taken_total = 0.0_f32;
+    for item in &mut station.core.inventory {
+        if remaining <= 0.0 {
+            break;
+        }
+        if let InventoryItem::Material { element, kg, .. } = item {
+            if *element == element_id {
+                let take = kg.min(remaining);
+                *kg -= take;
+                remaining -= take;
+                taken_total += take;
+            }
+        }
     }
+    station
+        .core
+        .inventory
+        .retain(|i| !matches!(i, InventoryItem::Material { kg, .. } if *kg < min_kg));
+    taken_total
+}
 
-    // Produce outputs
+/// Remove up to `required` components matching `cid` from the station inventory.
+/// Returns `true` iff the full requested count was consumed. Empty component
+/// stacks are pruned.
+fn take_components(
+    ctx: &super::ModuleTickContext,
+    state: &mut GameState,
+    cid: &str,
+    required: u32,
+) -> bool {
+    let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+        return false;
+    };
+    let mut remaining = required;
+    for item in &mut station.core.inventory {
+        if remaining == 0 {
+            break;
+        }
+        if let InventoryItem::Component {
+            component_id,
+            count,
+            ..
+        } = item
+        {
+            if component_id.0 == cid {
+                let take = (*count).min(remaining);
+                *count -= take;
+                remaining -= take;
+            }
+        }
+    }
+    station
+        .core
+        .inventory
+        .retain(|i| !matches!(i, InventoryItem::Component { count, .. } if *count == 0));
+    remaining == 0
+}
+
+/// Remove up to `required` modules matching `def_id` from the station
+/// inventory. Returns `true` iff the full count was consumed.
+fn take_modules(
+    ctx: &super::ModuleTickContext,
+    state: &mut GameState,
+    def_id: &str,
+    required: u32,
+) -> bool {
+    let Some(station) = state.stations.get_mut(&ctx.station_id) else {
+        return false;
+    };
+    let mut remaining = required;
+    let mut indices_to_remove = Vec::new();
+    for (index, item) in station.core.inventory.iter().enumerate() {
+        if remaining == 0 {
+            break;
+        }
+        if matches!(item, InventoryItem::Module { module_def_id, .. } if module_def_id == def_id) {
+            indices_to_remove.push(index);
+            remaining -= 1;
+        }
+    }
+    for index in indices_to_remove.into_iter().rev() {
+        station.core.inventory.remove(index);
+    }
+    remaining == 0
+}
+
+/// Produce the recipe's outputs: components land in station inventory,
+/// ships are constructed at the station's position.
+fn produce_recipe_outputs(
+    ctx: &super::ModuleTickContext,
+    state: &mut GameState,
+    recipe: &RecipeDef,
+    content: &GameContent,
+    rng: &mut impl rand::Rng,
+    events: &mut Vec<EventEnvelope>,
+    consumed: &ConsumedMaterial,
+) {
     for output in &recipe.outputs {
         match output {
             OutputSpec::Component {
                 component_id,
                 quality_formula,
             } => {
-                let quality = match quality_formula {
-                    QualityFormula::Fixed(q) => *q,
-                    QualityFormula::ElementFractionTimesMultiplier { .. } => 1.0,
-                };
-
-                // Use round() so assemblers degrade gracefully: efficiency >= 0.5
-                // still produces 1 item (VIO-460). floor() caused a cliff at < 1.0.
-                #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-                let produced_count = (1.0_f32 * ctx.efficiency).round() as u32;
-                if produced_count == 0 {
-                    continue;
-                }
-
-                if let Some(station) = state.stations.get_mut(&ctx.station_id) {
-                    let existing = station.core.inventory.iter_mut().find(|i| {
-                        matches!(i, InventoryItem::Component { component_id: cid, quality: q, .. }
-                            if cid.0 == component_id.0 && (*q - quality).abs() < 1e-3)
-                    });
-                    if let Some(InventoryItem::Component { count, .. }) = existing {
-                        *count += produced_count;
-                    } else {
-                        station.core.inventory.push(InventoryItem::Component {
-                            component_id: component_id.clone(),
-                            count: produced_count,
-                            quality,
-                        });
-                    }
-                }
-
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    Event::AssemblerRan {
-                        station_id: ctx.station_id.clone(),
-                        module_id: ctx.module_id.clone(),
-                        recipe_id: recipe.id.clone(),
-                        material_consumed_kg: consumed_kg,
-                        material_element: consumed_element.clone(),
-                        component_produced_id: component_id.clone(),
-                        component_produced_count: produced_count,
-                        component_quality: quality,
-                    },
-                ));
+                produce_component_output(
+                    ctx,
+                    state,
+                    recipe,
+                    component_id,
+                    quality_formula,
+                    events,
+                    consumed,
+                );
             }
             OutputSpec::Ship { hull_id } => {
-                let Some(hull) = content.hulls.get(hull_id) else {
-                    return; // hull_id not found in content
-                };
-                let uuid = crate::generate_uuid(rng);
-                let ship_id = ShipId(format!("ship_{uuid}"));
-                let Some(station) = state.stations.get(&ctx.station_id) else {
-                    return;
-                };
-                let ship_position = station.position.clone();
-                let mut ship = ShipState {
-                    id: ship_id.clone(),
-                    position: ship_position.clone(),
-                    owner: PrincipalId("principal_autopilot".to_string()),
-                    inventory: vec![],
-                    cargo_capacity_m3: hull.cargo_capacity_m3,
-                    task: None,
-                    speed_ticks_per_au: Some(hull.base_speed_ticks_per_au),
-                    modifiers: crate::modifiers::ModifierSet::default(),
-                    hull_id: hull_id.clone(),
-                    fitted_modules: content
-                        .fitting_templates
-                        .get(hull_id)
-                        .cloned()
-                        .unwrap_or_default(),
-                    propellant_kg: hull.base_propellant_capacity_kg,
-                    propellant_capacity_kg: hull.base_propellant_capacity_kg,
-                    crew: std::collections::BTreeMap::new(),
-                    leaders: Vec::new(),
-                    // VIO-486: ships built by a shipyard belong to the
-                    // station that built them.
-                    home_station: Some(ctx.station_id.clone()),
-                };
-                crate::commands::recompute_ship_stats(&mut ship, content);
-                ship.propellant_kg = ship.propellant_capacity_kg;
-                let actual_cargo = ship.cargo_capacity_m3;
-                let event_fitted = ship.fitted_modules.clone();
-                state.ships.insert(ship_id.clone(), ship);
-                events.push(crate::emit(
-                    &mut state.counters,
-                    current_tick,
-                    Event::ShipConstructed {
-                        station_id: ctx.station_id.clone(),
-                        ship_id,
-                        position: ship_position,
-                        cargo_capacity_m3: f64::from(actual_cargo),
-                        hull_id: hull_id.clone(),
-                        fitted_modules: event_fitted,
-                    },
-                ));
+                if !produce_ship_output(ctx, state, content, rng, events, hull_id) {
+                    return; // unknown hull_id or missing station
+                }
             }
             _ => {} // Material, Slag handled by processor
         }
     }
+}
 
-    // Generate manufacturing and engineering data from assembly
+/// Add produced components to station inventory (merging with an existing
+/// stack of matching quality) and emit an `AssemblerRan` event.
+fn produce_component_output(
+    ctx: &super::ModuleTickContext,
+    state: &mut GameState,
+    recipe: &RecipeDef,
+    component_id: &crate::ComponentId,
+    quality_formula: &QualityFormula,
+    events: &mut Vec<EventEnvelope>,
+    consumed: &ConsumedMaterial,
+) {
+    let quality = match quality_formula {
+        QualityFormula::Fixed(q) => *q,
+        QualityFormula::ElementFractionTimesMultiplier { .. } => 1.0,
+    };
+
+    // Use round() so assemblers degrade gracefully: efficiency >= 0.5 still
+    // produces 1 item (VIO-460). floor() caused a cliff at < 1.0.
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    let produced_count = (1.0_f32 * ctx.efficiency).round() as u32;
+    if produced_count == 0 {
+        return;
+    }
+
+    if let Some(station) = state.stations.get_mut(&ctx.station_id) {
+        let existing = station.core.inventory.iter_mut().find(|i| {
+            matches!(i, InventoryItem::Component { component_id: cid, quality: q, .. }
+                if cid.0 == component_id.0 && (*q - quality).abs() < 1e-3)
+        });
+        if let Some(InventoryItem::Component { count, .. }) = existing {
+            *count += produced_count;
+        } else {
+            station.core.inventory.push(InventoryItem::Component {
+                component_id: component_id.clone(),
+                count: produced_count,
+                quality,
+            });
+        }
+    }
+
+    let current_tick = state.meta.tick;
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::AssemblerRan {
+            station_id: ctx.station_id.clone(),
+            module_id: ctx.module_id.clone(),
+            recipe_id: recipe.id.clone(),
+            material_consumed_kg: consumed.kg,
+            material_element: consumed.element.clone(),
+            component_produced_id: component_id.clone(),
+            component_produced_count: produced_count,
+            component_quality: quality,
+        },
+    ));
+}
+
+/// Construct a new ship at the station and emit a `ShipConstructed` event.
+/// Returns `false` if the hull is missing from content or the station has
+/// disappeared (caller should abort the rest of the output loop).
+fn produce_ship_output(
+    ctx: &super::ModuleTickContext,
+    state: &mut GameState,
+    content: &GameContent,
+    rng: &mut impl rand::Rng,
+    events: &mut Vec<EventEnvelope>,
+    hull_id: &crate::HullId,
+) -> bool {
+    let Some(hull) = content.hulls.get(hull_id) else {
+        return false;
+    };
+    let uuid = crate::generate_uuid(rng);
+    let ship_id = ShipId(format!("ship_{uuid}"));
+    let Some(station) = state.stations.get(&ctx.station_id) else {
+        return false;
+    };
+    let ship_position = station.position.clone();
+    let mut ship = ShipState {
+        id: ship_id.clone(),
+        position: ship_position.clone(),
+        owner: PrincipalId("principal_autopilot".to_string()),
+        inventory: vec![],
+        cargo_capacity_m3: hull.cargo_capacity_m3,
+        task: None,
+        speed_ticks_per_au: Some(hull.base_speed_ticks_per_au),
+        modifiers: crate::modifiers::ModifierSet::default(),
+        hull_id: hull_id.clone(),
+        fitted_modules: content
+            .fitting_templates
+            .get(hull_id)
+            .cloned()
+            .unwrap_or_default(),
+        propellant_kg: hull.base_propellant_capacity_kg,
+        propellant_capacity_kg: hull.base_propellant_capacity_kg,
+        crew: std::collections::BTreeMap::new(),
+        leaders: Vec::new(),
+        // VIO-486: ships built by a shipyard belong to the
+        // station that built them.
+        home_station: Some(ctx.station_id.clone()),
+    };
+    crate::commands::recompute_ship_stats(&mut ship, content);
+    ship.propellant_kg = ship.propellant_capacity_kg;
+    let actual_cargo = ship.cargo_capacity_m3;
+    let event_fitted = ship.fitted_modules.clone();
+    state.ships.insert(ship_id.clone(), ship);
+    let current_tick = state.meta.tick;
+    events.push(crate::emit(
+        &mut state.counters,
+        current_tick,
+        Event::ShipConstructed {
+            station_id: ctx.station_id.clone(),
+            ship_id,
+            position: ship_position,
+            cargo_capacity_m3: f64::from(actual_cargo),
+            hull_id: hull_id.clone(),
+            fitted_modules: event_fitted,
+        },
+    ));
+    true
+}
+
+/// Generate manufacturing and engineering research data from a completed
+/// assembly run. These feed the research pipeline.
+fn generate_assembly_research_data(
+    state: &mut GameState,
+    recipe: &RecipeDef,
+    content: &GameContent,
+) {
     let action_key = format!("assemble_{}", recipe.id);
     crate::research::generate_data(
         &mut state.research,
