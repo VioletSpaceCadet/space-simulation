@@ -47,8 +47,15 @@ pub fn validate_content(content: &GameContent) {
     validate_hull_defs(content);
     validate_autopilot(content, &element_ids);
     validate_crew_roles(content);
+    let satellite_types: HashSet<&str> = content
+        .satellite_defs
+        .values()
+        .map(|s| s.satellite_type.as_str())
+        .collect();
+    validate_satellite_type_refs(content, &satellite_types);
     validate_scoring(content);
     validate_milestones(&content.milestones);
+    validate_milestone_satellite_refs(&content.milestones, &satellite_types);
 }
 
 fn validate_constants(content: &GameContent) {
@@ -660,6 +667,67 @@ fn load_fitting_templates(
                 .collect())
         }
         Err(_) => Ok(std::collections::BTreeMap::new()),
+    }
+}
+
+/// Validate that satellite type strings referenced by autopilot config and
+/// scoring signals exist in `satellite_defs`. This catches typos and content
+/// drift at load time rather than silently returning zero counts.
+fn validate_satellite_type_refs(content: &sim_core::GameContent, satellite_types: &HashSet<&str>) {
+    // Only validate if there are satellite defs at all (test fixtures may be empty).
+    if satellite_types.is_empty() {
+        return;
+    }
+    // autopilot.comm_satellite_type
+    let comm = content.autopilot.comm_satellite_type.as_str();
+    assert!(
+        satellite_types.contains(comm),
+        "autopilot.comm_satellite_type '{comm}' not found in satellite_defs"
+    );
+    // autopilot.nav_satellite_type
+    let nav = content.autopilot.nav_satellite_type.as_str();
+    assert!(
+        satellite_types.contains(nav),
+        "autopilot.nav_satellite_type '{nav}' not found in satellite_defs"
+    );
+    // scoring signal sources with satellites_of_type: prefix
+    for dim in &content.scoring.dimensions {
+        for signal in &dim.signals {
+            if let Some(sat_type) = signal
+                .source
+                .strip_prefix(sim_core::SATELLITES_OF_TYPE_PREFIX)
+            {
+                assert!(
+                    satellite_types.contains(sat_type),
+                    "scoring dimension '{}' signal '{}' references unknown satellite type '{sat_type}'",
+                    dim.id, signal.source
+                );
+            }
+        }
+    }
+}
+
+/// Validate that satellite type references in milestone counters exist in
+/// `satellite_defs`.
+fn validate_milestone_satellite_refs(
+    milestones: &[sim_core::MilestoneDef],
+    satellite_types: &HashSet<&str>,
+) {
+    if satellite_types.is_empty() {
+        return;
+    }
+    for m in milestones {
+        for cond in &m.conditions {
+            if let sim_core::MilestoneCondition::CounterAbove { counter, .. } = cond {
+                if let Some(sat_type) = counter.strip_prefix(sim_core::SATELLITES_OF_TYPE_PREFIX) {
+                    assert!(
+                        satellite_types.contains(sat_type),
+                        "milestone '{}' counter '{counter}' references unknown satellite type '{sat_type}'",
+                        m.id
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -2479,6 +2547,114 @@ mod tests {
             computation_interval_ticks: 24,
             scale_factor: 2500.0,
         };
+        validate_content(&content);
+    }
+
+    /// Helper: build minimal content with one satellite def of the given type.
+    fn minimal_content_with_satellite(sat_type: &str) -> sim_core::GameContent {
+        let mut content = minimal_content();
+        content.satellite_defs.insert(
+            "sat_test".to_string(),
+            sim_core::SatelliteDef {
+                id: "sat_test".to_string(),
+                name: format!("Test {sat_type}"),
+                satellite_type: sat_type.to_string(),
+                mass_kg: 500.0,
+                wear_rate: 0.001,
+                required_tech: None,
+                behavior_config: serde_json::json!({}),
+            },
+        );
+        content
+    }
+
+    #[test]
+    #[should_panic(expected = "autopilot.comm_satellite_type 'communication' not found")]
+    fn validate_satellite_refs_missing_comm_type_panics() {
+        // Only a "survey" satellite def exists, but autopilot defaults to
+        // comm_satellite_type = "communication" → should panic.
+        let content = minimal_content_with_satellite("survey");
+        validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "references unknown satellite type 'bogus'")]
+    fn validate_scoring_signal_unknown_satellite_type_panics() {
+        let mut content = minimal_content_with_satellite("communication");
+        // Add a nav satellite so comm/nav validation passes.
+        content.satellite_defs.insert(
+            "sat_nav_test".to_string(),
+            sim_core::SatelliteDef {
+                id: "sat_nav_test".to_string(),
+                name: "Test nav".into(),
+                satellite_type: "navigation".into(),
+                mass_kg: 500.0,
+                wear_rate: 0.001,
+                required_tech: None,
+                behavior_config: serde_json::json!({}),
+            },
+        );
+        // Scoring signal references a non-existent satellite type.
+        content.scoring = sim_core::ScoringConfig {
+            dimensions: vec![sim_core::DimensionDef {
+                id: "d".into(),
+                name: "D".into(),
+                weight: 1.0,
+                ceiling: 1.0,
+                signals: vec![sim_core::SignalDef {
+                    source: "satellites_of_type:bogus".into(),
+                    blend: 1.0,
+                    transform: sim_core::SignalTransform::Identity,
+                    saturation: None,
+                    band_low: None,
+                    band_high: None,
+                    clamp_max: None,
+                }],
+            }],
+            thresholds: vec![sim_core::ThresholdDef {
+                name: "Start".into(),
+                min_score: 0.0,
+            }],
+            computation_interval_ticks: 24,
+            scale_factor: 2500.0,
+        };
+        validate_content(&content);
+    }
+
+    #[test]
+    #[should_panic(expected = "references unknown satellite type 'bogus'")]
+    fn validate_milestone_counter_unknown_satellite_type_panics() {
+        let mut content = minimal_content_with_satellite("communication");
+        content.satellite_defs.insert(
+            "sat_nav_test".to_string(),
+            sim_core::SatelliteDef {
+                id: "sat_nav_test".to_string(),
+                name: "Test nav".into(),
+                satellite_type: "navigation".into(),
+                mass_kg: 500.0,
+                wear_rate: 0.001,
+                required_tech: None,
+                behavior_config: serde_json::json!({}),
+            },
+        );
+        // Milestone counter references a non-existent satellite type.
+        content.milestones = vec![sim_core::MilestoneDef {
+            id: "m1".into(),
+            name: "M1".into(),
+            description: String::new(),
+            conditions: vec![sim_core::MilestoneCondition::CounterAbove {
+                counter: "satellites_of_type:bogus".into(),
+                threshold: 1.0,
+            }],
+            rewards: sim_core::MilestoneReward {
+                grant_amount: 0.0,
+                reputation: 0.0,
+                unlock_trade_tier: None,
+                unlock_zone_ids: vec![],
+                unlock_module_ids: vec![],
+            },
+            phase_advance: None,
+        }];
         validate_content(&content);
     }
 

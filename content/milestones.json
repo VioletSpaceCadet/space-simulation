@@ -121,7 +121,7 @@
     "name": "First Communication Relay",
     "description": "Deploy a communication satellite, enabling remote zone operations.",
     "conditions": [
-      { "type": "counter_above", "counter": "comm_satellites", "threshold": 1 }
+      { "type": "counter_above", "counter": "satellites_of_type:communication", "threshold": 1 }
     ],
     "rewards": {
       "grant_amount": 10000000,
@@ -133,7 +133,7 @@
     "name": "Orbital Survey Network",
     "description": "Establish a network of 3 or more survey satellites for comprehensive asteroid discovery.",
     "conditions": [
-      { "type": "counter_above", "counter": "survey_satellites", "threshold": 3 }
+      { "type": "counter_above", "counter": "satellites_of_type:survey", "threshold": 3 }
     ],
     "rewards": {
       "grant_amount": 25000000,
@@ -146,7 +146,7 @@
     "description": "Deploy communication relays enabling operations in the asteroid belt.",
     "conditions": [
       { "type": "milestone_completed", "milestone_id": "first_comm_relay" },
-      { "type": "counter_above", "counter": "comm_satellites", "threshold": 2 }
+      { "type": "counter_above", "counter": "satellites_of_type:communication", "threshold": 2 }
     ],
     "rewards": {
       "grant_amount": 30000000,
@@ -158,7 +158,7 @@
     "name": "Science Constellation",
     "description": "Operate 2 or more science platforms for enhanced data collection.",
     "conditions": [
-      { "type": "counter_above", "counter": "science_satellites", "threshold": 2 }
+      { "type": "counter_above", "counter": "satellites_of_type:science_platform", "threshold": 2 }
     ],
     "rewards": {
       "grant_amount": 20000000,

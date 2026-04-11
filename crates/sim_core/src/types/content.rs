@@ -150,6 +150,12 @@ pub struct AutopilotConfig {
     /// Tech required before the autopilot attempts satellite operations.
     #[serde(default)]
     pub satellite_tech: String,
+    /// Satellite type string for communication satellites (zone comm tier).
+    #[serde(default = "default_comm_satellite_type")]
+    pub comm_satellite_type: String,
+    /// Satellite type string for navigation satellites (zone nav bonus).
+    #[serde(default = "default_nav_satellite_type")]
+    pub nav_satellite_type: String,
 }
 
 impl Default for AutopilotConfig {
@@ -223,6 +229,8 @@ impl Default for AutopilotConfig {
             satellite_launch_rocket: "rocket_light".to_string(),
             satellite_replacement_wear: default_satellite_replacement_wear(),
             satellite_tech: "tech_satellite_basics".to_string(),
+            comm_satellite_type: default_comm_satellite_type(),
+            nav_satellite_type: default_nav_satellite_type(),
         }
     }
 }
@@ -443,6 +451,14 @@ fn default_ground_opex_max_fraction() -> f64 {
 
 fn default_satellite_replacement_wear() -> f64 {
     0.7
+}
+
+fn default_comm_satellite_type() -> String {
+    "communication".to_string()
+}
+
+fn default_nav_satellite_type() -> String {
+    "navigation".to_string()
 }
 
 fn default_quality() -> f32 {

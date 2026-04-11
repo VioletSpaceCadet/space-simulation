@@ -36,13 +36,14 @@ pub fn zone_comm_tier(zone_id: &str, state: &GameState, content: &GameContent) -
     }
 
     // Count active comm satellites in this zone.
+    let comm_type = &content.autopilot.comm_satellite_type;
     let comm_count = state
         .satellites
         .values()
         .filter(|sat| {
             sat.enabled
                 && sat.wear < 1.0
-                && sat.satellite_type == "communication"
+                && sat.satellite_type == *comm_type
                 && sat.position.parent_body.0 == zone_id
         })
         .count();
@@ -61,13 +62,14 @@ pub fn zone_comm_tier(zone_id: &str, state: &GameState, content: &GameContent) -
 /// Formula: `1.0 - (transit_reduction_pct/100) * sqrt(count)` clamped to `[0.5, 1.0]`.
 /// `transit_reduction_pct` is read from nav satellite content config (default 15).
 pub fn zone_nav_bonus(zone_id: &str, state: &GameState, content: &GameContent) -> f64 {
+    let nav_type = &content.autopilot.nav_satellite_type;
     let nav_sats: Vec<&crate::SatelliteState> = state
         .satellites
         .values()
         .filter(|sat| {
             sat.enabled
                 && sat.wear < 1.0
-                && sat.satellite_type == "navigation"
+                && sat.satellite_type == *nav_type
                 && sat.position.parent_body.0 == zone_id
         })
         .collect();
@@ -115,6 +117,12 @@ pub(crate) fn tick_satellites(
         };
         let wear_rate = def.wear_rate;
 
+        // NOTE: satellite tick-behavior dispatch still hardcodes "survey" and
+        // "science_platform" here. These encode *engine mechanics* (which
+        // satellite types have active tick behavior), not a tuning knob, so
+        // they stay in code. Adding a new tickable satellite type currently
+        // requires a code change. A proper fix would add a content-driven
+        // `behavior_kind` field on SatelliteDef — tracked for a future ticket.
         match satellite_type.as_str() {
             "survey" => tick_survey_satellite(state, content, rng, events, &def_id),
             "science_platform" => tick_science_satellite(state, content, events, &def_id),

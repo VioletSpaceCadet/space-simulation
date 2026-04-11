@@ -18,7 +18,7 @@
       "signals": [
         { "source": "tech_fraction", "blend": 0.6, "transform": "identity" },
         { "source": "total_raw_data", "blend": 0.25, "saturation": 1000.0, "transform": "linear_saturate" },
-        { "source": "science_satellites", "blend": 0.15, "saturation": 3.0, "transform": "linear_saturate" }
+        { "source": "satellites_of_type:science_platform", "blend": 0.15, "saturation": 3.0, "transform": "linear_saturate" }
       ]
     },
     {

@@ -16,21 +16,20 @@ use crate::{
 /// Returns `None` for non-satellite counter names so the outer
 /// `resolve_counter` can fall through to other handlers.
 fn resolve_satellite_counter(state: &GameState, counter: &str) -> Option<f64> {
-    let filter = |kind: &str| {
-        state
-            .satellites
-            .values()
-            .filter(|s| s.enabled && s.satellite_type == kind)
-            .count() as f64
-    };
     match counter {
         "satellites_deployed" => {
             Some(state.satellites.values().filter(|s| s.enabled).count() as f64)
         }
-        "comm_satellites" => Some(filter("communication")),
-        "survey_satellites" => Some(filter("survey")),
-        "science_satellites" => Some(filter("science_platform")),
-        "nav_satellites" => Some(filter("navigation")),
+        _ if counter.starts_with(crate::SATELLITES_OF_TYPE_PREFIX) => {
+            let sat_type = &counter[crate::SATELLITES_OF_TYPE_PREFIX.len()..];
+            Some(
+                state
+                    .satellites
+                    .values()
+                    .filter(|s| s.enabled && s.satellite_type == sat_type)
+                    .count() as f64,
+            )
+        }
         _ => None,
     }
 }
@@ -558,15 +557,15 @@ mod tests {
             Some(0.0)
         );
         assert_eq!(
-            resolve_counter(&state, &content, "comm_satellites"),
+            resolve_counter(&state, &content, "satellites_of_type:communication"),
             Some(0.0)
         );
         assert_eq!(
-            resolve_counter(&state, &content, "survey_satellites"),
+            resolve_counter(&state, &content, "satellites_of_type:survey"),
             Some(0.0)
         );
         assert_eq!(
-            resolve_counter(&state, &content, "science_satellites"),
+            resolve_counter(&state, &content, "satellites_of_type:science_platform"),
             Some(0.0)
         );
 
@@ -619,15 +618,15 @@ mod tests {
             Some(2.0)
         );
         assert_eq!(
-            resolve_counter(&state, &content, "comm_satellites"),
+            resolve_counter(&state, &content, "satellites_of_type:communication"),
             Some(1.0)
         );
         assert_eq!(
-            resolve_counter(&state, &content, "survey_satellites"),
+            resolve_counter(&state, &content, "satellites_of_type:survey"),
             Some(1.0)
         );
         assert_eq!(
-            resolve_counter(&state, &content, "science_satellites"),
+            resolve_counter(&state, &content, "satellites_of_type:science_platform"),
             Some(0.0)
         );
     }
