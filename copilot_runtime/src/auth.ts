@@ -12,22 +12,32 @@
  * from silently driving the LLM backend.
  */
 
+import { timingSafeEqual } from "node:crypto";
+
 import type { RequestHandler } from "express";
 
 export const SHARED_SECRET_HEADER = "x-copilot-runtime-secret";
 
 /**
- * Constant-time string comparison to avoid timing oracles leaking the secret.
- * Falls back to a constant-false path when lengths differ, so even early-exit
- * on length comparison doesn't tip off an attacker.
+ * Constant-time string comparison via `node:crypto`. Node's native
+ * `timingSafeEqual` is guaranteed constant-time and cannot be JIT-optimized
+ * into an early-exit loop the way a hand-rolled comparison can. Lengths
+ * must match — we hash-pad both inputs so length-mismatch paths are also
+ * constant-time (otherwise returning `false` on length-diff leaks the
+ * secret length).
  */
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) { return false; }
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return mismatch === 0;
+function safeEqual(provided: string, expected: string): boolean {
+  const providedBuf = Buffer.from(provided, "utf8");
+  const expectedBuf = Buffer.from(expected, "utf8");
+
+  // `timingSafeEqual` throws on length mismatch, so pad the shorter buffer
+  // to the expected length and compare — then compare lengths separately.
+  // The OR at the end keeps the control flow constant-time.
+  const padded = Buffer.alloc(expectedBuf.length);
+  providedBuf.copy(padded);
+  const bytesEqual = timingSafeEqual(padded, expectedBuf);
+  const lengthsEqual = providedBuf.length === expectedBuf.length;
+  return bytesEqual && lengthsEqual;
 }
 
 /**

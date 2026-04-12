@@ -1,9 +1,9 @@
 /**
  * copilot_runtime sidecar entrypoint.
  *
- * Boots an Express server on 127.0.0.1:4000 and exposes CopilotKit's runtime
- * endpoint at `/api/copilotkit`. Ships alongside sim_daemon and ui_web for the
- * local development stack:
+ * Boots an Express server on 127.0.0.1:4000 and exposes CopilotKit's v2
+ * runtime endpoint at `/api/copilotkit`. Ships alongside sim_daemon and
+ * ui_web for the local development stack:
  *
  *   sim_daemon      → :3001   (HTTP + SSE, game loop)
  *   ui_web (vite)   → :5173   (React mission control)
@@ -15,21 +15,36 @@
  * model.
  */
 
+import { pathToFileURL } from "node:url";
 import express from "express";
 import cors from "cors";
-import {
-  copilotRuntimeNodeExpressEndpoint,
-  ExperimentalEmptyAdapter,
-} from "@copilotkit/runtime";
+import { createCopilotExpressHandler } from "@copilotkit/runtime/v2/express";
 import { buildAdapterFromEnv } from "./adapter.js";
 import { getSharedSecret } from "./credentials.js";
 import { buildRuntime } from "./runtime.js";
 import { createSharedSecretMiddleware } from "./auth.js";
 
 const HOST = "127.0.0.1";
-const PORT = Number(process.env.COPILOT_RUNTIME_PORT ?? 4000);
+const DEFAULT_PORT = 4000;
 const COPILOT_ENDPOINT = "/api/copilotkit";
-const UI_ORIGIN = process.env.COPILOT_UI_ORIGIN ?? "http://localhost:5173";
+const DEFAULT_UI_ORIGIN = "http://localhost:5173";
+
+function resolvePort(raw: string | undefined): number {
+  const parsed = Number(raw ?? DEFAULT_PORT);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 65535) {
+    throw new Error(
+      `copilot_runtime: invalid COPILOT_RUNTIME_PORT="${raw}". ` +
+      "Expected an integer in 1..65535.",
+    );
+  }
+  return parsed;
+}
+
+function resolveUiOrigin(raw: string | undefined): string {
+  const candidate = raw?.trim();
+  if (candidate && candidate.length > 0) { return candidate; }
+  return DEFAULT_UI_ORIGIN;
+}
 
 function main(): void {
   // Resolve all secrets + adapters up front. Any failure here should crash the
@@ -37,13 +52,17 @@ function main(): void {
   const adapter = buildAdapterFromEnv();
   const sharedSecret = getSharedSecret();
   const runtime = buildRuntime(adapter);
+  const port = resolvePort(process.env.COPILOT_RUNTIME_PORT);
+  const uiOrigin = resolveUiOrigin(process.env.COPILOT_UI_ORIGIN);
 
-  const copilotHandler = copilotRuntimeNodeExpressEndpoint({
-    endpoint: COPILOT_ENDPOINT,
+  // CopilotKit ships its own cors middleware when configured, but we want a
+  // single known CORS policy mounted in front of everything (including the
+  // health check), so we pass `cors: false` on the CopilotKit side and run
+  // our own `cors()` first.
+  const copilotRouter = createCopilotExpressHandler({
     runtime,
-    // BuiltInAgent handles model invocation; the empty adapter is the
-    // canonical no-op service adapter for the v2 agent path.
-    serviceAdapter: new ExperimentalEmptyAdapter(),
+    basePath: COPILOT_ENDPOINT,
+    cors: false,
   });
 
   const app = express();
@@ -52,7 +71,7 @@ function main(): void {
   // origin. Credentials disabled — the shared-secret header is the gate.
   app.use(
     cors({
-      origin: UI_ORIGIN,
+      origin: uiOrigin,
       methods: ["GET", "POST", "OPTIONS"],
       allowedHeaders: ["Content-Type", "X-Copilot-Runtime-Secret"],
       credentials: false,
@@ -67,30 +86,39 @@ function main(): void {
   });
 
   // Shared-secret gate, then CopilotKit runtime. Order matters — unauthorized
-  // requests must not reach the CopilotKit handler. The handler is wrapped so
-  // its Promise-returning behavior doesn't trip `no-misused-promises`;
-  // CopilotKit writes its own response and handles errors internally, so we
-  // intentionally discard the returned promise.
-  app.use(
-    COPILOT_ENDPOINT,
-    createSharedSecretMiddleware(sharedSecret),
-    (req, res) => {
-      void copilotHandler(req, res);
-    },
-  );
+  // requests must not reach the CopilotKit handler.
+  app.use(COPILOT_ENDPOINT, createSharedSecretMiddleware(sharedSecret));
+  app.use(copilotRouter);
 
-  app.listen(PORT, HOST, () => {
+  const server = app.listen(port, HOST, () => {
     // Startup log is the user's only confirmation that the sidecar is live.
     console.log(
-      `copilot_runtime listening on http://${HOST}:${PORT}${COPILOT_ENDPOINT} ` +
-      `(provider=${adapter.provider}, model=${adapter.model}, origin=${UI_ORIGIN})`,
+      `copilot_runtime listening on http://${HOST}:${port}${COPILOT_ENDPOINT} ` +
+      `(provider=${adapter.provider}, model=${adapter.model}, origin=${uiOrigin})`,
     );
+  });
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `copilot_runtime: port ${port} is already in use. ` +
+        "Stop the other process or set COPILOT_RUNTIME_PORT to a free port.",
+      );
+    } else {
+      console.error("copilot_runtime server error:", err);
+    }
+    process.exit(1);
   });
 }
 
 // Only run when invoked directly. Importing `index.ts` in tests should not
-// start the server.
-const isDirectInvocation = import.meta.url === `file://${process.argv[1]}`;
+// start the server. `pathToFileURL` handles spaces and symlinks correctly on
+// macOS — a raw `file://${argv[1]}` comparison silently breaks on
+// `/private/var` ↔ `/var` and URL-encoded paths.
+const isDirectInvocation =
+  typeof process.argv[1] === "string" &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
 if (isDirectInvocation) {
   try {
     main();

@@ -1,17 +1,20 @@
 /**
- * CopilotRuntime + BuiltInAgent wiring.
+ * CopilotRuntime + BuiltInAgent wiring (v2 API).
  *
- * Separated from index.ts so tests can build a runtime with a stub adapter
- * without standing up the whole Express server.
+ * Everything here uses the `@copilotkit/runtime/v2` entrypoint. The v1
+ * `copilotRuntimeNodeExpressEndpoint` helper ships a GraphQL/SSE surface
+ * that a v2 `<CopilotKit>` frontend does not speak — mixing the two
+ * produces the `Agent default not found` / `POST /api/copilotkit 404`
+ * symptoms we hit on the first smoke test. The v2 `CopilotRuntime` +
+ * `createCopilotExpressHandler` pair serves the canonical v2 wire format
+ * that matches `@copilotkit/react-core/v2`'s expectations.
  *
- * Note on system prompt: Mb1 ships a minimal one ("you are a space sim
- * co-pilot in development — answer briefly from the dummy snapshot"). Mb2
- * replaces this with a fuller prompt that references the real hierarchical
- * readable.
+ * `CopilotRuntime` is the v2 compatibility shim over `CopilotSseRuntime`;
+ * new code could use `CopilotSseRuntime` directly, but the shim gives us a
+ * single, stable public symbol.
  */
 
-import { CopilotRuntime } from "@copilotkit/runtime";
-import { BuiltInAgent } from "@copilotkit/runtime/v2";
+import { CopilotRuntime, BuiltInAgent } from "@copilotkit/runtime/v2";
 import type { AdapterConfig } from "./adapter.js";
 
 const SYSTEM_PROMPT =
