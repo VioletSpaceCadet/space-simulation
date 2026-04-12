@@ -154,6 +154,31 @@ Tests stub `node:child_process` and `createOpenAICompatible` so they never
 touch Keychain, the network, or a real LLM. CI runs these; manual smoke
 testing (step above) covers the parts the unit tests cannot.
 
+## Known workarounds
+
+### AI SDK `txt-0` stream-part ID collision
+
+`@ai-sdk/openai-compatible` hardcodes `id: "txt-0"` on every text stream
+part. CopilotKit's `BuiltInAgent` forwards that ID verbatim as the AG-UI
+messageId, and the client's `deduplicateMessages()` merges all assistant
+turns into a single bubble.
+
+Fix: `src/languageModelMiddleware.ts` wraps the chat model with a Proxy
+that intercepts `doStream()` and rewrites text-part IDs to fresh UUIDs.
+If a future CopilotKit or AI SDK release fixes the upstream issue, delete
+`languageModelMiddleware.ts` and the `wrapChatModelWithUniqueTextIds` call
+in `adapter.ts`.
+
+See `docs/solutions/integration-issues/copilotkit-ai-sdk-stream-id-deduplication.md`
+for the full root-cause analysis.
+
+### CopilotKit v1/v2 import mixing
+
+All server-side CopilotKit imports MUST come from `@copilotkit/runtime/v2`
+(and `/v2/express`). Mixing v1 `CopilotRuntime` with v2 `BuiltInAgent`
+silently serves the wrong wire format, producing `Agent default not found`
+errors on the client.
+
 ## Version pinning
 
 CopilotKit is fast-moving and MCP support is new (shipped January 2026).

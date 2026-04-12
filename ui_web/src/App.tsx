@@ -20,6 +20,7 @@ import { RecipeDagPanel } from './components/RecipeDagPanel';
 import { ResearchPanel } from './components/ResearchPanel';
 import { SolarSystemMapCanvas } from './components/SolarSystemMapCanvas';
 import { SPEED_TPS_VALUES, StatusBar } from './components/StatusBar';
+import { CopilotMissionBridge } from './copilot/CopilotMissionBridge';
 import { useAnimatedTick } from './hooks/useAnimatedTick';
 import { useFloatingWindows } from './hooks/useFloatingWindows';
 import { useLayoutState } from './hooks/useLayoutState';
@@ -264,6 +265,13 @@ export default function App() {
           </FloatingWindow>
         ))}
       </div>
+      <CopilotMissionBridge
+        snapshot={snapshot}
+        activeAlerts={activeAlerts}
+        currentTick={currentTick}
+        paused={paused}
+        connected={connected}
+      />
     </div>
   );
 }
