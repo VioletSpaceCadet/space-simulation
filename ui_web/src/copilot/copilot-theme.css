@@ -136,3 +136,15 @@
 [data-copilotkit] .copilotKitInput input::placeholder {
   color: #b4b8c0;
 }
+
+/* Hide CopilotKit dev console / inspector banner.
+   The inspector is a <CPK-WEB-INSPECTOR> custom element with a Shadow
+   DOM — CSS can't reach inside it, so we hide the host element itself. */
+cpk-web-inspector {
+  display: none !important;
+}
+
+/* Spinner for tool-call loading states in generative UI components */
+@keyframes cpk-spin {
+  to { transform: rotate(360deg); }
+}
