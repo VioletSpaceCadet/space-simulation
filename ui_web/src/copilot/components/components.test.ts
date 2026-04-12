@@ -10,6 +10,7 @@
 import { ToolCallStatus } from '@copilotkit/core';
 import { describe, expect, it } from 'vitest';
 
+import { deriveCardStatus } from '../actions/approval';
 import type { QuerySection } from '../actions/queryHandlers';
 
 // --- FleetTable data shape tests ---
@@ -137,6 +138,38 @@ describe('ToolCallStatus values', () => {
     expect(ToolCallStatus.InProgress).toBe('inProgress');
     expect(ToolCallStatus.Executing).toBe('executing');
     expect(ToolCallStatus.Complete).toBe('complete');
+  });
+});
+
+// --- deriveCardStatus tests ---
+
+describe('deriveCardStatus', () => {
+  it('returns pending for InProgress status', () => {
+    expect(deriveCardStatus(ToolCallStatus.InProgress)).toBe('pending');
+  });
+
+  it('returns pending for Executing status', () => {
+    expect(deriveCardStatus(ToolCallStatus.Executing)).toBe('pending');
+  });
+
+  it('returns approved when result starts with APPROVED', () => {
+    expect(deriveCardStatus(ToolCallStatus.Complete, 'APPROVED: pause')).toBe('approved');
+  });
+
+  it('returns rejected when result starts with REJECTED', () => {
+    expect(deriveCardStatus(ToolCallStatus.Complete, 'REJECTED: player cancelled')).toBe('rejected');
+  });
+
+  it('returns error when result starts with ERROR', () => {
+    expect(deriveCardStatus(ToolCallStatus.Complete, 'ERROR: command failed')).toBe('error');
+  });
+
+  it('returns rejected for unknown result strings', () => {
+    expect(deriveCardStatus(ToolCallStatus.Complete, 'something else')).toBe('rejected');
+  });
+
+  it('returns pending when Complete but result is undefined', () => {
+    expect(deriveCardStatus(ToolCallStatus.Complete, undefined)).toBe('pending');
   });
 });
 

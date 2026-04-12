@@ -6,27 +6,46 @@
  * from CopilotKit's Executing state to send the user's decision back
  * to the LLM.
  *
- * Used by every command-executing copilot action (pause, speed, launch).
+ * Used by every command-executing copilot action (pause, speed, command).
  */
 
+import { useState } from 'react';
+
 import { SEMANTIC_COLORS } from '../../config/theme';
+
+export type ApprovalCardStatus = 'pending' | 'approved' | 'rejected' | 'error';
 
 interface ApprovalCardProps {
   title: string;
   children?: React.ReactNode;
-  onApprove: () => void;
+  onApprove: (() => void) | (() => Promise<void>);
   onReject: () => void;
   approveLabel?: string;
   rejectLabel?: string;
   approveDisabled?: boolean;
-  status: 'pending' | 'approved' | 'rejected';
+  status: ApprovalCardStatus;
 }
 
-const STATUS_STYLES = {
+const STATUS_LABELS: Record<ApprovalCardStatus, string> = {
+  pending: '',
+  approved: 'Approved',
+  rejected: 'Cancelled',
+  error: 'Error',
+};
+
+const STATUS_COLORS: Record<ApprovalCardStatus, string> = {
+  pending: '',
+  approved: SEMANTIC_COLORS.positive,
+  rejected: SEMANTIC_COLORS.negative,
+  error: SEMANTIC_COLORS.negative,
+};
+
+const STATUS_BORDER: Record<ApprovalCardStatus, React.CSSProperties> = {
   pending: {},
   approved: { borderColor: SEMANTIC_COLORS.positive },
   rejected: { borderColor: SEMANTIC_COLORS.negative, opacity: 0.7 },
-} as const;
+  error: { borderColor: SEMANTIC_COLORS.negative },
+};
 
 export function ApprovalCard({
   title,
@@ -39,6 +58,9 @@ export function ApprovalCard({
   status,
 }: ApprovalCardProps) {
   const isDone = status !== 'pending';
+  // Double-click guard: once the player clicks, disable further clicks
+  // during the async gap before CopilotKit transitions to Complete.
+  const [clicked, setClicked] = useState(false);
 
   return (
     <div style={{
@@ -46,7 +68,7 @@ export function ApprovalCard({
       borderRadius: '8px',
       backgroundColor: 'rgba(255,255,255,0.04)',
       border: '1px solid rgba(255,255,255,0.08)',
-      ...STATUS_STYLES[status],
+      ...STATUS_BORDER[status],
     }}>
       <div style={{
         fontSize: '13px',
@@ -69,15 +91,20 @@ export function ApprovalCard({
           fontWeight: 600,
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
-          color: status === 'approved' ? SEMANTIC_COLORS.positive : SEMANTIC_COLORS.negative,
+          color: STATUS_COLORS[status],
         }}>
-          {status === 'approved' ? 'Approved' : 'Cancelled'}
+          {STATUS_LABELS[status]}
         </div>
       ) : (
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             type="button"
-            onClick={onReject}
+            disabled={clicked}
+            onClick={() => {
+              if (clicked) { return; }
+              setClicked(true);
+              onReject();
+            }}
             style={{
               padding: '6px 14px',
               borderRadius: '6px',
@@ -92,8 +119,12 @@ export function ApprovalCard({
           </button>
           <button
             type="button"
-            onClick={onApprove}
-            disabled={approveDisabled}
+            onClick={() => {
+              if (clicked) { return; }
+              setClicked(true);
+              void onApprove();
+            }}
+            disabled={approveDisabled || clicked}
             style={{
               padding: '6px 14px',
               borderRadius: '6px',

@@ -17,6 +17,7 @@ import { useRef, useEffect } from 'react';
 import { z } from 'zod';
 
 import { API_PATHS } from '../../api';
+import { IDLE_COLOR } from '../../config/theme';
 import { ApprovalCard } from '../components/ApprovalCard';
 
 export interface ApprovalActionsState {
@@ -26,20 +27,18 @@ export interface ApprovalActionsState {
 }
 
 /** Derive card visual status from CopilotKit tool lifecycle. */
-function deriveCardStatus(
+export function deriveCardStatus(
   status: ToolCallStatus,
   result?: string,
-): 'pending' | 'approved' | 'rejected' {
-  if (status === ToolCallStatus.Complete) {
-    return typeof result === 'string' && result.startsWith('APPROVED')
-      ? 'approved'
-      : 'rejected';
-  }
-  return 'pending';
+): 'pending' | 'approved' | 'rejected' | 'error' {
+  if (status !== ToolCallStatus.Complete) { return 'pending'; }
+  if (typeof result !== 'string') { return 'pending'; }
+  if (result.startsWith('APPROVED')) { return 'approved'; }
+  if (result.startsWith('ERROR')) { return 'error'; }
+  return 'rejected';
 }
 
 const noop = () => { /* placeholder for non-responding states */ };
-const noopAsync = async () => { /* placeholder */ };
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -82,7 +81,7 @@ export function useApprovalActions(args: ApprovalActionsState): void {
       parameters: pauseSchema,
       render: (props) => {
         if (props.status === ToolCallStatus.InProgress) {
-          return <div style={{ fontSize: '12px', color: '#8a8e98' }}>Preparing...</div>;
+          return <div style={{ fontSize: '12px', color: IDLE_COLOR }}>Preparing...</div>;
         }
 
         const action = props.args.action;
@@ -95,7 +94,12 @@ export function useApprovalActions(args: ApprovalActionsState): void {
             status={cardStatus}
             approveLabel={action === 'pause' ? 'Pause' : 'Resume'}
             onApprove={respond ? () => {
-              stateRef.current.onTogglePause();
+              // Guard: only toggle if state differs from requested action
+              const currentlyPaused = stateRef.current.paused;
+              const wantPause = action === 'pause';
+              if (currentlyPaused !== wantPause) {
+                stateRef.current.onTogglePause();
+              }
               void respond(`APPROVED: ${action}`);
             } : noop}
             onReject={respond
@@ -117,7 +121,7 @@ export function useApprovalActions(args: ApprovalActionsState): void {
       parameters: speedSchema,
       render: (props) => {
         if (props.status === ToolCallStatus.InProgress) {
-          return <div style={{ fontSize: '12px', color: '#8a8e98' }}>Preparing...</div>;
+          return <div style={{ fontSize: '12px', color: IDLE_COLOR }}>Preparing...</div>;
         }
 
         const tps = props.args.ticks_per_sec;
@@ -154,7 +158,7 @@ export function useApprovalActions(args: ApprovalActionsState): void {
       parameters: commandSchema,
       render: (props) => {
         if (props.status === ToolCallStatus.InProgress) {
-          return <div style={{ fontSize: '12px', color: '#8a8e98' }}>Preparing command...</div>;
+          return <div style={{ fontSize: '12px', color: IDLE_COLOR }}>Preparing command...</div>;
         }
 
         const cardStatus = deriveCardStatus(props.status, props.result);
@@ -188,7 +192,7 @@ export function useApprovalActions(args: ApprovalActionsState): void {
               } catch (err) {
                 void respond(`ERROR: ${err instanceof Error ? err.message : 'unknown'}`);
               }
-            } : noopAsync}
+            } : noop}
             onReject={respond
               ? () => { void respond('REJECTED: player cancelled command'); }
               : noop}
