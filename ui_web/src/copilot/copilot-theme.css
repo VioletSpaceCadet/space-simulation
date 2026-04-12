@@ -1,0 +1,138 @@
+/**
+ * Dark-mode theme override for CopilotKit v2 sidebar.
+ *
+ * CopilotKit v2 ships a light-mode default that clashes with the rest of
+ * the mission-control UI (dark blue-gray panels on `--color-surface`).
+ * We override CopilotKit's CSS variables on `[data-copilotkit]` (the
+ * selector the package scopes all of its styles to) so every child
+ * component — sidebar shell, chat bubbles, input, toolbar — picks up
+ * the repo's palette without touching CopilotKit's markup.
+ *
+ * Palette source: `ui_web/src/index.css` `@theme` block.
+ *
+ * The CopilotKit variables we override come from their shadcn-style
+ * token set; see the dumped CSS in
+ * `node_modules/@copilotkit/react-core/dist/v2/index.css` for the full
+ * list (search for `--background`, `--foreground`, etc.).
+ */
+
+[data-copilotkit] {
+  /* Core surfaces */
+  --background: #10131a;        /* --color-surface */
+  --foreground: #f0f2f7;        /* near-white for maximum chat readability */
+  --card: #151921;              /* slightly lifted from surface */
+  --card-foreground: #f0f2f7;
+  --popover: #151921;
+  --popover-foreground: #f0f2f7;
+
+  /* Primary (sidebar accent + buttons) */
+  --primary: #5ca0c8;           /* --color-accent */
+  --primary-foreground: #0b0d14;
+
+  /* Secondary / muted (panel chrome) */
+  --secondary: #1e2228;         /* --color-edge */
+  --secondary-foreground: #f0f2f7;
+  --muted: #1e2228;
+  --muted-foreground: #b4b8c0;  /* brighter than --color-dim for chat legibility */
+
+  /* Accent (hover + highlight) */
+  --accent: #1e2228;
+  --accent-foreground: #ffffff;
+
+  /* Destructive (error bubbles) */
+  --destructive: #c85450;       /* --color-offline */
+  --destructive-foreground: #f0f2f7;
+
+  /* Borders + inputs + focus ring */
+  --border: #1e2228;
+  --input: #10131a;
+  --ring: #5ca0c8;
+
+  /* Text selection highlight for readability over dark */
+  color-scheme: dark;
+}
+
+/*
+ * Force the prose renderer (markdown in assistant bubbles) to use our
+ * bright foreground for the body text AND for headings/strong/em. The
+ * Tailwind Typography plugin defaults pull from `--tw-prose-body` etc.,
+ * which CopilotKit doesn't override for dark mode on the sidebar shell.
+ * We override them here so every chat bubble is high-contrast regardless
+ * of whether the LLM returns plain text or markdown.
+ */
+[data-copilotkit] .cpk\:prose {
+  --tw-prose-body: #f0f2f7;
+  --tw-prose-headings: #ffffff;
+  --tw-prose-lead: #f0f2f7;
+  --tw-prose-links: #5ca0c8;
+  --tw-prose-bold: #ffffff;
+  --tw-prose-counters: #b4b8c0;
+  --tw-prose-bullets: #8a8e98;
+  --tw-prose-hr: #1e2228;
+  --tw-prose-quotes: #f0f2f7;
+  --tw-prose-quote-borders: #1e2228;
+  --tw-prose-captions: #b4b8c0;
+  --tw-prose-code: #c89a4a;
+  --tw-prose-pre-code: #f0f2f7;
+  --tw-prose-pre-bg: #0b0d14;
+  --tw-prose-th-borders: #1e2228;
+  --tw-prose-td-borders: #1e2228;
+  color: #f0f2f7;
+}
+
+/*
+ * Inline code styling. CopilotKit's prose renderer uses the Tailwind
+ * Typography plugin which, by default, renders inline <code> with a
+ * light-gray background and shows the literal backticks around the
+ * content via a generated-content pseudo-element. Both look wrong in
+ * dark mode AND against tech IDs like `tech_advanced_refining` that the
+ * LLM likes to wrap in backticks. Suppress the generated quotes and
+ * match the repo's code accent color.
+ */
+[data-copilotkit] .cpk\:prose :where(code):not(:where([class~="not-prose"] *))::before,
+[data-copilotkit] .cpk\:prose :where(code):not(:where([class~="not-prose"] *))::after {
+  content: none;
+}
+
+[data-copilotkit] .cpk\:prose :where(code):not(:where([class~="not-prose"] *)) {
+  background-color: #1e2228;    /* --color-edge */
+  color: #c89a4a;               /* --color-cargo — gold accent for IDs */
+  padding: 0.1em 0.35em;
+  border-radius: 0.25rem;
+  font-weight: 500;
+}
+
+/* Code blocks (triple-backtick) use the same edge background. */
+[data-copilotkit] .cpk\:prose :where(pre):not(:where([class~="not-prose"] *)) {
+  background-color: #0b0d14;    /* --color-void */
+  color: #c8ccd4;               /* --color-fg */
+  border: 1px solid #1e2228;
+}
+
+/*
+ * Chat input pill. CopilotKit renders a white (`cpk:bg-white`) or
+ * hardcoded `#303030` (dark mode) pill for the message input area.
+ * Neither matches the rest of the mission-control UI. Override with a
+ * muted purple so the input is visually distinct from the surrounding
+ * dark panels without being glaring.
+ *
+ * `.copilotKitInput` is the class CopilotKit adds to the input pill
+ * wrapper; we bump specificity via `[data-copilotkit]` so the override
+ * wins over the `!important`-free base styles.
+ */
+[data-copilotkit] .copilotKitInput {
+  background-color: #3d3156 !important;  /* muted dark purple */
+  border: 1px solid #4d3f6e;
+}
+
+[data-copilotkit] .copilotKitInput textarea,
+[data-copilotkit] .copilotKitInput input,
+[data-copilotkit] .copilotKitInput [contenteditable="true"] {
+  color: #f0f2f7;
+  caret-color: #f0f2f7;
+}
+
+[data-copilotkit] .copilotKitInput textarea::placeholder,
+[data-copilotkit] .copilotKitInput input::placeholder {
+  color: #b4b8c0;
+}

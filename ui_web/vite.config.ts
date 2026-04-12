@@ -55,6 +55,16 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test-setup.ts',
+    // CopilotKit's v2 ESM builds import CSS as a side-effect from inside
+    // node_modules. Vitest's default node loader does not know how to
+    // parse `.css` files; forcing these packages through Vite's transform
+    // pipeline via `server.deps.inline` lets the CSS plugin handle them
+    // the same way the dev bundler does.
+    server: {
+      deps: {
+        inline: [/@copilotkit/],
+      },
+    },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

@@ -20,6 +20,7 @@ import {
   type OpenAICompatibleProvider,
 } from "@ai-sdk/openai-compatible";
 import { getOpenRouterKey } from "./credentials.js";
+import { wrapChatModelWithUniqueTextIds } from "./languageModelMiddleware.js";
 
 /**
  * `ChatModel` is inferred from the provider return type so we don't need a
@@ -101,9 +102,17 @@ export function buildAdapterFromEnv(
         apiKey: "ollama",
       });
 
+  // Wrap the raw chat model so every `doStream()` invocation allocates a
+  // fresh UUID for text stream parts. Without this, CopilotKit's
+  // `BuiltInAgent` forwards the openai-compatible provider's hardcoded
+  // `"txt-0"` id as the AG-UI messageId, and the client merges all
+  // assistant turns into a single bubble via deduplicateMessages. See
+  // languageModelMiddleware.ts for the full diagnosis.
+  const chatModel = wrapChatModelWithUniqueTextIds(openaiCompatible.chatModel(model));
+
   return {
     provider,
     model,
-    chatModel: openaiCompatible.chatModel(model),
+    chatModel,
   };
 }
