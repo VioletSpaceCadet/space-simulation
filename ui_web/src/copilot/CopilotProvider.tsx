@@ -60,7 +60,7 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
   // if that fails the chat will surface a clear network error instead
   // of silently degrading.
   return (
-    <CopilotKit runtimeUrl={RUNTIME_URL} headers={headers} useSingleEndpoint={false}>
+    <CopilotKit runtimeUrl={RUNTIME_URL} headers={headers} useSingleEndpoint={false} showDevConsole={false}>
       {children}
     </CopilotKit>
   );

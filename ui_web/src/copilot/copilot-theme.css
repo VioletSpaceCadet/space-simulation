@@ -137,6 +137,12 @@
   color: #b4b8c0;
 }
 
+/* Hide CopilotKit dev console / inspector banner */
+[data-copilotkit-inspector],
+.copilotKitDevConsole {
+  display: none !important;
+}
+
 /* Spinner for tool-call loading states in generative UI components */
 @keyframes cpk-spin {
   to { transform: rotate(360deg); }
