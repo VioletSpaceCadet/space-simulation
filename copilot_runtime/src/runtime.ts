@@ -14,7 +14,11 @@
  * single, stable public symbol.
  */
 
-import { CopilotRuntime, BuiltInAgent } from "@copilotkit/runtime/v2";
+import {
+  CopilotRuntime,
+  BuiltInAgent,
+  type MCPClientProvider,
+} from "@copilotkit/runtime/v2";
 import type { AdapterConfig } from "./adapter.js";
 
 const SYSTEM_PROMPT = [
@@ -60,14 +64,30 @@ const SYSTEM_PROMPT = [
   "  Do not volunteer follow-up tool calls unless the user asked or the",
   "  answer is obviously incomplete without them.",
   "",
+  "Analytics tools (MCP):",
+  "- get_metrics_digest: fetch the latest analytics digest from the",
+  "  daemon — includes trends, production rates, bottleneck analysis,",
+  "  and performance stats. Call this when the player asks about trends,",
+  "  efficiency, bottlenecks, or overall sim health.",
+  "- get_game_parameters: read game content files (constants, module_defs,",
+  "  techs, pricing, solar_system). Use when the player asks about game",
+  "  rules, costs, tech requirements, or module specs.",
+  "- get_active_alerts: fetch the current alert list from the daemon.",
+  "  Use alongside diagnose_alert for deeper investigation.",
+  "- query_knowledge: search past run journals and the strategy playbook",
+  "  for advice. Use when the player asks for strategic recommendations",
+  "  or how to handle a known bottleneck.",
+  "- get_strategy_config: fetch the current autopilot strategy settings.",
+  "  Use when the player asks about current priorities or fleet targets.",
+  "",
   "Approval actions:",
   "- When the player asks you to DO something (pause, change speed,",
   "  enable a module, import materials), use an approval tool:",
-  "  `propose_pause`, `propose_set_speed`, or `propose_command`.",
+  "  propose_pause, propose_set_speed, or propose_command.",
   "- These render an approval card. The player clicks Approve or Cancel.",
   "- Never execute side effects without an approval card. Always propose",
   "  first, let the player confirm.",
-  "- For `propose_command`, provide the full Command JSON that the daemon",
+  "- For propose_command, provide the full Command JSON that the daemon",
   "  expects. The command_json must be valid sim_core::Command JSON.",
   "",
   "Do not invent game state. If the summary does not have the detail the",
@@ -78,11 +98,17 @@ const SYSTEM_PROMPT = [
 // to be as close to deterministic as sampling allows.
 const LLM_TEMPERATURE = 0.2;
 
-export function buildRuntime(adapter: AdapterConfig): CopilotRuntime {
+export interface RuntimeOptions {
+  adapter: AdapterConfig;
+  mcpClients?: MCPClientProvider[];
+}
+
+export function buildRuntime({ adapter, mcpClients }: RuntimeOptions): CopilotRuntime {
   const agent = new BuiltInAgent({
     model: adapter.chatModel,
     prompt: SYSTEM_PROMPT,
     temperature: LLM_TEMPERATURE,
+    ...(mcpClients && mcpClients.length > 0 ? { mcpClients } : {}),
   });
 
   return new CopilotRuntime({

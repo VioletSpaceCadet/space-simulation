@@ -31,9 +31,11 @@ const stubChatModel = {
 describe("buildRuntime", () => {
   it("constructs a v2 CopilotRuntime with a `default` agent registered", async () => {
     const runtime = buildRuntime({
-      provider: "openrouter",
-      model: "qwen/qwen-2.5-72b-instruct",
-      chatModel: stubChatModel,
+      adapter: {
+        provider: "openrouter",
+        model: "qwen/qwen-2.5-72b-instruct",
+        chatModel: stubChatModel,
+      },
     });
 
     expect(runtime).toBeInstanceOf(CopilotRuntime);
@@ -47,17 +49,53 @@ describe("buildRuntime", () => {
 
   it("constructs successfully regardless of the provider variant", () => {
     const openrouter = buildRuntime({
-      provider: "openrouter",
-      model: "qwen/qwen-2.5-72b-instruct",
-      chatModel: stubChatModel,
+      adapter: {
+        provider: "openrouter",
+        model: "qwen/qwen-2.5-72b-instruct",
+        chatModel: stubChatModel,
+      },
     });
     const ollama = buildRuntime({
-      provider: "ollama",
-      model: "qwen2.5:14b-instruct",
-      chatModel: stubChatModel,
+      adapter: {
+        provider: "ollama",
+        model: "qwen2.5:14b-instruct",
+        chatModel: stubChatModel,
+      },
     });
 
     expect(openrouter).toBeInstanceOf(CopilotRuntime);
     expect(ollama).toBeInstanceOf(CopilotRuntime);
+  });
+
+  it("accepts MCP clients when provided", async () => {
+    const stubProvider = {
+      tools: async () => ({}),
+    };
+
+    const runtime = buildRuntime({
+      adapter: {
+        provider: "openrouter",
+        model: "qwen/qwen-2.5-72b-instruct",
+        chatModel: stubChatModel,
+      },
+      mcpClients: [stubProvider],
+    });
+
+    expect(runtime).toBeInstanceOf(CopilotRuntime);
+
+    const agents = await Promise.resolve(runtime.agents);
+    expect(Object.keys(agents as Record<string, unknown>)).toContain("default");
+  });
+
+  it("works without MCP clients", () => {
+    const runtime = buildRuntime({
+      adapter: {
+        provider: "openrouter",
+        model: "qwen/qwen-2.5-72b-instruct",
+        chatModel: stubChatModel,
+      },
+    });
+
+    expect(runtime).toBeInstanceOf(CopilotRuntime);
   });
 });

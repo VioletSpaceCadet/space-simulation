@@ -107,16 +107,49 @@ Defaults per provider:
 | `openrouter` | `qwen/qwen-2.5-72b-instruct`   | `https://openrouter.ai/api/v1`  |
 | `ollama`     | `qwen2.5:14b-instruct`         | `http://localhost:11434/v1`     |
 
+## MCP integration (balance-advisor)
+
+At startup, `copilot_runtime` spawns `mcp_advisor` as a stdio child process
+and connects via `@ai-sdk/mcp`. The LLM gains access to 5 read-only
+analytics tools:
+
+| Tool | What it provides |
+|------|-----------------|
+| `get_metrics_digest` | Trends, production rates, bottleneck analysis |
+| `get_active_alerts` | Current alert list from the daemon |
+| `get_game_parameters` | Game content files (constants, techs, pricing) |
+| `query_knowledge` | Past run journals and strategy playbook |
+| `get_strategy_config` | Current autopilot strategy settings |
+
+Write tools (sim lifecycle, parameter proposals, knowledge mutations) are
+filtered out — sim control is covered by the approval-card actions, and
+admin tools aren't player-facing.
+
+If `mcp_advisor` isn't built (`npm run build` in `mcp_advisor/`), the
+sidecar starts without analytics tools and logs a warning. Build with:
+
+```bash
+cd ../mcp_advisor && npm run build
+```
+
+The MCP adapter (`src/mcp.ts`) is the single file that touches the MCP
+client API. If CopilotKit or `@ai-sdk/mcp` change upstream, breakage is
+contained here.
+
 ## Smoke test
 
-1. Start `sim_daemon` (`cargo run -p sim_daemon -- run --seed 42`).
-2. Start `copilot_runtime` (`npm run dev` from this directory).
-3. Start `ui_web` (`cd ../ui_web && npm run dev`).
-4. Open `http://localhost:5173`. The CopilotKit sidebar shows
+1. Build `mcp_advisor` (`cd ../mcp_advisor && npm run build`).
+2. Start `sim_daemon` (`cargo run -p sim_daemon -- run --seed 42`).
+3. Start `copilot_runtime` (`npm run dev` from this directory).
+   Console should show: `MCP advisor connected (5 read-only tools)`.
+4. Start `ui_web` (`cd ../ui_web && npm run dev`).
+5. Open `http://localhost:5173`. The CopilotKit sidebar shows
    "Mission Co-pilot · running ⟳".
-5. Ask "how many ships do I have?" — should show a FleetTable card.
-6. Ask "pause the sim" — should show an approval card with Pause button.
-7. Click Pause — sim should pause, card shows "APPROVED".
+6. Ask "how many ships do I have?" — should show a FleetTable card.
+7. Ask "pause the sim" — should show an approval card with Pause button.
+8. Click Pause — sim should pause, card shows "APPROVED".
+9. Ask "what are the current bottlenecks?" — should invoke
+   `get_metrics_digest` and summarize the analytics.
 
 You can also hit the health endpoint directly:
 
@@ -129,13 +162,14 @@ curl http://127.0.0.1:4000/healthz
 
 ```
 copilot_runtime/
-├── package.json         # pinned @copilotkit/*, express, ai-sdk
+├── package.json         # pinned @copilotkit/*, express, ai-sdk, @modelcontextprotocol/sdk
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── src/
 │   ├── index.ts         # Express boot, 127.0.0.1:4000
 │   ├── runtime.ts       # CopilotRuntime + BuiltInAgent wiring
 │   ├── adapter.ts       # env-driven OpenRouter | Ollama factory
+│   ├── mcp.ts           # MCP client adapter for balance-advisor (decision 4)
 │   ├── credentials.ts   # macOS Keychain retrieval (decision 13)
 │   ├── auth.ts          # shared-secret middleware
 │   └── *.test.ts        # vitest unit tests
