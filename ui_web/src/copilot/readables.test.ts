@@ -234,6 +234,43 @@ describe('buildSnapshotReadable', () => {
     expect(readable.fleet.in_transit).toBe(1);
     expect(readable.fleet.mining).toBe(1);
     expect(readable.fleet.idle).toBe(2);
+    expect(readable.fleet.other).toBe(0);
+  });
+
+  it('counts Deposit, Survey, and DeepScan tasks in the other bucket', () => {
+    const ships: Record<string, ShipState> = {
+      s1: makeShip({
+        kind: { Deposit: { station: 'station_1' } },
+        started_tick: 0,
+        eta_tick: 10,
+      }),
+      s2: makeShip({
+        kind: { Survey: { site_id: 'site_1', duration_ticks: 20 } },
+        started_tick: 0,
+        eta_tick: 20,
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- intentional runtime-shape test
+      s3: makeShip({ kind: 'DeepScan' as any, started_tick: 0, eta_tick: 30 }),
+      s4: makeShip({
+        kind: { Idle: {} },
+        started_tick: 0,
+        eta_tick: 0,
+      }),
+    };
+
+    const readable = buildSnapshotReadable({
+      snapshot: makeSnapshot({ ships }),
+      activeAlerts: new Map(),
+      currentTick: 100,
+      paused: true,
+      connected: true,
+    });
+
+    expect(readable.fleet.total).toBe(4);
+    expect(readable.fleet.idle).toBe(1);
+    expect(readable.fleet.other).toBe(3);
+    expect(readable.fleet.in_transit).toBe(0);
+    expect(readable.fleet.mining).toBe(0);
   });
 
   it('treats the bare string "Idle" variant as idle (serde unit-variant wire format)', () => {
@@ -264,6 +301,7 @@ describe('buildSnapshotReadable', () => {
     expect(readable.fleet.total).toBe(2);
     expect(readable.fleet.idle).toBe(1);
     expect(readable.fleet.mining).toBe(1);
+    expect(readable.fleet.other).toBe(0);
   });
 
   it('summarizes research with unlocked count, recent unlocks, and active domains', () => {

@@ -63,6 +63,7 @@ export interface SnapshotReadable {
     in_transit: number;
     mining: number;
     idle: number;
+    other: number;
   };
   asteroids: {
     discovered: number;
@@ -137,17 +138,20 @@ function countShipsByTask(ships: Record<string, ShipState>): {
   in_transit: number;
   mining: number;
   idle: number;
+  other: number;
 } {
   let in_transit = 0;
   let mining = 0;
   let idle = 0;
+  let other = 0;
   const shipList = Object.values(ships);
   for (const ship of shipList) {
     if (!ship.task || isShipTask(ship, 'Idle')) { idle++; }
     else if (isShipTask(ship, 'Transit')) { in_transit++; }
     else if (isShipTask(ship, 'Mine')) { mining++; }
+    else { other++; }
   }
-  return { total: shipList.length, in_transit, mining, idle };
+  return { total: shipList.length, in_transit, mining, idle, other };
 }
 
 function summarizeStations(stations: Record<string, StationState>): SnapshotReadable['stations'] {
@@ -213,7 +217,7 @@ export function buildSnapshotReadable(args: SnapshotReadableInput): SnapshotRead
       active_alerts: { total: 0, warnings: 0, critical: 0, recent_critical: [] },
       research: { unlocked_count: 0, recent_unlocks: [], data_pool_kinds: 0, active_domains: 0 },
       stations: { total: 0, summary: [] },
-      fleet: { total: 0, in_transit: 0, mining: 0, idle: 0 },
+      fleet: { total: 0, in_transit: 0, mining: 0, idle: 0, other: 0 },
       asteroids: { discovered: 0, tagged: 0 },
     };
   }

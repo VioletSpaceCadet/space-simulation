@@ -12,7 +12,6 @@
  */
 
 import { CopilotSidebar } from '@copilotkit/react-core/v2';
-import { memo } from 'react';
 
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import type { ActiveAlert, SimSnapshot } from '../types';
@@ -74,9 +73,6 @@ function MissionBridgeInner(props: CopilotMissionBridgeProps) {
  * mismatch after an upstream upgrade) only takes down the sidebar. The
  * App's panels keep rendering unaffected.
  *
- * `React.memo` keeps the bridge from re-rendering on every parent tick
- * animation frame — only when the props it actually reads change.
- *
  * The outer `<div className="dark">` is load-bearing: CopilotKit's v2
  * CSS uses `:is(.dark *)` selectors to swap light-mode defaults (white
  * input box, white gradient "feather" above the input) for dark-mode
@@ -85,9 +81,7 @@ function MissionBridgeInner(props: CopilotMissionBridgeProps) {
  * of the mission control UI. We scope the class to this subtree so the
  * rest of the app is unaffected.
  */
-export const CopilotMissionBridge = memo(function CopilotMissionBridge(
-  props: CopilotMissionBridgeProps,
-) {
+export function CopilotMissionBridge(props: CopilotMissionBridgeProps) {
   return (
     <div className="dark">
       <ErrorBoundary panelName="Mission Co-pilot">
@@ -95,4 +89,4 @@ export const CopilotMissionBridge = memo(function CopilotMissionBridge(
       </ErrorBoundary>
     </div>
   );
-});
+}
