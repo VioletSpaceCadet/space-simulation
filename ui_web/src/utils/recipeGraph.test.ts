@@ -40,6 +40,11 @@ describe('parseRecipeInputItem', () => {
     const input: RecipeInput = { filter: { Component: 'fe_plate' }, amount: { Count: 3 } };
     expect(parseRecipeInputItem(input)).toEqual({ itemId: 'fe_plate', type: 'component' });
   });
+
+  it('parses Module filter', () => {
+    const input: RecipeInput = { filter: { Module: 'module_cargo_expander' }, amount: { Count: 1 } };
+    expect(parseRecipeInputItem(input)).toEqual({ itemId: 'module_cargo_expander', type: 'component' });
+  });
 });
 
 describe('parseRecipeInputAmount', () => {

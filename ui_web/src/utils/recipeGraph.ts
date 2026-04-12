@@ -56,6 +56,9 @@ export function parseRecipeInputItem(input: RecipeInput): ParsedItem {
   if ('Component' in filter) {
     return { itemId: filter.Component as string, type: 'component' };
   }
+  if ('Module' in filter) {
+    return { itemId: filter.Module as string, type: 'component' };
+  }
   return { itemId: 'unknown', type: 'raw' };
 }
 
