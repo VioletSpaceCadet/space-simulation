@@ -106,6 +106,39 @@ jobs:
           path: ui_web/coverage/
           retention-days: 30
 
+  copilot-runtime:
+    name: copilot_runtime (lint + typecheck + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: copilot_runtime
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: copilot_runtime/package-lock.json
+
+      - name: Install
+        run: npm ci --ignore-scripts
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
   bench-smoke:
     name: Bench smoke
     runs-on: ubuntu-latest

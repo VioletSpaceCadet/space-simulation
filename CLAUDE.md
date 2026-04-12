@@ -26,6 +26,9 @@ cargo run -p sim_bench -- run --scenario scenarios/baseline.json
 cd mcp_advisor && npm run build                           # Build MCP advisor
 cd mcp_advisor && npm start                               # Run MCP advisor (stdio transport)
 
+cd copilot_runtime && npm run dev                         # CopilotKit sidecar (:4000)
+cd copilot_runtime && npm test                            # vitest unit tests
+
 cd e2e && npx playwright test                             # E2E tests
 cd e2e && npx playwright test --headed                    # E2E tests (visible browser)
 
@@ -44,6 +47,7 @@ pytest scripts/analysis/tests/                            # Python tests
 ./scripts/ci_bench_smoke.sh                               # Release build + ci_smoke scenario
 ./scripts/ci_e2e.sh                                       # E2E Playwright tests
 ./scripts/ci_event_sync.sh                                # Event exhaustiveness check
+./scripts/ci_copilot_runtime.sh                           # copilot_runtime lint + tsc + vitest + build
 
 CARGO_PROFILE_RELEASE_DEBUG=true cargo build --release -p sim_cli  # Build with debug symbols
 samply record target/release/sim_cli run --ticks 10000 --seed 42   # CPU profile (opens browser)
@@ -61,8 +65,9 @@ Cargo workspace: `sim_core` ← `sim_control` ← `sim_cli` / `sim_daemon`. Plus
 - **sim_cli** — CLI tick loop with autopilot. `--state`, `--metrics-every`, `--no-metrics` flags.
 - **sim_daemon** — axum 0.7, SSE, AlertEngine, pause/resume, command queue. See `docs/reference.md` for endpoints. Includes `analytics` module (trend/rate/bottleneck analysis) and `GET /api/v1/advisor/digest` endpoint.
 - **mcp_advisor** — MCP server (TypeScript, stdio transport) for balance analysis and knowledge capture. Tools: metrics digest, alerts, game parameters, parameter proposals, sim lifecycle, `save_run_journal`, `query_knowledge`, `update_playbook`. Auto-discovered via `.mcp.json`. Requires running `sim_daemon` for sim tools; knowledge tools work standalone.
+- **copilot_runtime** — CopilotKit runtime sidecar (TypeScript, Express, `127.0.0.1:4000`) for the in-game LLM co-pilot. Routes chat requests from `ui_web` to an OpenAI-compatible LLM provider (OpenRouter in Phase A, Ollama in Phase B) via `BuiltInAgent` + `@ai-sdk/openai-compatible`. OpenRouter key lives in macOS Keychain (decision 13 in the CopilotKit Foundation plan). Shared-secret header check defends against other local processes. See `copilot_runtime/README.md` for setup.
 - **e2e** — Playwright E2E smoke tests. Global setup spawns daemon (port 3002) + Vite (port 5174). Kept minimal for CI stability; use Chrome browser tools for ad-hoc UI testing.
-- **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts.
+- **ui_web** — Vite 7 + React 19 + TS 5 + Tailwind v4. Draggable panels, SSE streaming, keyboard shortcuts. Wraps its root with `<CopilotKit>` (v2 API from `@copilotkit/react-core/v2`); all CopilotKit glue lives in `ui_web/src/copilot/`.
 
 **Tick order:** 1. Apply commands → 2. Resolve ship tasks → 3. Tick station modules (processors, assemblers, sensors, labs, maintenance, 3.6 thermal, 3.7 boiloff) → 3.5 Tick ground facility modules (same pipeline via proxy-station) → 4. Advance research → 4.5 Evaluate milestones → 4.6 Evaluate sim events → 5. Replenish scan sites → 6. Increment tick.
 

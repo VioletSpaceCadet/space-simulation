@@ -1,0 +1,40 @@
+{
+  "name": "copilot_runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CopilotKit runtime sidecar for the space simulation LLM co-pilot. Localhost-only Express server that routes requests from ui_web to an LLM provider (OpenRouter in Phase A, Ollama in Phase B).",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "2.0.41",
+    "@copilotkit/runtime": "1.55.3",
+    "@langchain/core": "1.1.39",
+    "cors": "2.8.6",
+    "express": "4.22.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@types/cors": "2.8.19",
+    "@types/express": "4.17.25",
+    "@types/node": "25.6.0",
+    "@types/supertest": "7.2.0",
+    "eslint": "9.39.1",
+    "supertest": "7.2.2",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.48.0",
+    "vitest": "4.1.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
