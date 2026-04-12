@@ -107,16 +107,16 @@ Defaults per provider:
 | `openrouter` | `qwen/qwen-2.5-72b-instruct`   | `https://openrouter.ai/api/v1`  |
 | `ollama`     | `qwen2.5:14b-instruct`         | `http://localhost:11434/v1`     |
 
-## Smoke test (Mb1 acceptance)
+## Smoke test
 
 1. Start `sim_daemon` (`cargo run -p sim_daemon -- run --seed 42`).
 2. Start `copilot_runtime` (`npm run dev` from this directory).
-3. Start `ui_web` (`cd ../ui_web && npm run dev`) in a shell that has
-   `VITE_COPILOT_RUNTIME_SECRET` exported.
-4. Open `http://localhost:5173`, click the CopilotKit sidebar, and ask
-   something like "what tick are we on?". The LLM should respond via the
-   runtime. The Mb1 stub readable returns a fake tick — Mb2 wires the real
-   hierarchical snapshot.
+3. Start `ui_web` (`cd ../ui_web && npm run dev`).
+4. Open `http://localhost:5173`. The CopilotKit sidebar shows
+   "Mission Co-pilot · running ⟳".
+5. Ask "how many ships do I have?" — should show a FleetTable card.
+6. Ask "pause the sim" — should show an approval card with Pause button.
+7. Click Pause — sim should pause, card shows "APPROVED".
 
 You can also hit the health endpoint directly:
 
@@ -178,6 +178,64 @@ All server-side CopilotKit imports MUST come from `@copilotkit/runtime/v2`
 (and `/v2/express`). Mixing v1 `CopilotRuntime` with v2 `BuiltInAgent`
 silently serves the wrong wire format, producing `Agent default not found`
 errors on the client.
+
+## Switching to Ollama (Phase A → Phase B)
+
+When the Mac Mini M4 Pro arrives (or any machine with enough VRAM for
+local inference), switch from OpenRouter to Ollama in two steps:
+
+### 1. Install and pull a model
+
+```bash
+# Install Ollama (macOS)
+brew install ollama
+
+# Pull the default model (8.4 GB, Q4_K_M quantization)
+ollama pull qwen2.5:14b-instruct
+
+# Optional: larger model for better tool calling
+ollama pull qwen3:30b-a3b
+
+# Keep models warm to avoid cold-start latency
+export OLLAMA_KEEP_ALIVE=30m
+```
+
+### 2. Start copilot_runtime with Ollama
+
+```bash
+# Start Ollama (if not already running as a service)
+ollama serve
+
+# Start copilot_runtime pointed at Ollama
+LLM_PROVIDER=ollama npm run dev
+```
+
+That's it. The adapter factory in `adapter.ts` handles everything:
+- Skips the macOS Keychain call (Ollama ignores API keys)
+- Points at `http://localhost:11434/v1` (Ollama's OpenAI-compatible endpoint)
+- Uses `qwen2.5:14b-instruct` by default (override with `LLM_MODEL=...`)
+- The `txt-0` stream-ID middleware wraps Ollama the same way it wraps OpenRouter
+
+To switch back: unset `LLM_PROVIDER` (or set it to `openrouter`) and restart.
+
+### Model selection guidance
+
+| Model | VRAM | Speed | Tool calling | Notes |
+|-------|------|-------|-------------|-------|
+| `qwen2.5:14b-instruct` | ~10 GB | Fast | Good | Default, recommended for most use |
+| `qwen3:30b-a3b` | ~18 GB | Moderate | Better | MoE, stronger reasoning |
+| `qwen2.5:72b-instruct` | ~48 GB | Slow | Best | Only if you have the VRAM |
+
+### Localhost hardening
+
+Ollama binds to `127.0.0.1:11434` by default. Verify with:
+
+```bash
+lsof -i :11434 -Pn
+# Should show ollama on 127.0.0.1, not *
+```
+
+If Ollama is exposed on `0.0.0.0`, set `OLLAMA_HOST=127.0.0.1` before starting.
 
 ## Version pinning
 
