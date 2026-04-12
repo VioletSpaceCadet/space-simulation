@@ -143,6 +143,7 @@ export const MAP_COLORS = {
 // --- Semantic colors (positive/negative indicators) ---
 export const SEMANTIC_COLORS = {
   positive: '#4caf7d',
+  warning: '#d4a44c',
   negative: '#e05252',
 } as const;
 

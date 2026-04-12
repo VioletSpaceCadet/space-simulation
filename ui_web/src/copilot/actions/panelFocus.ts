@@ -13,21 +13,11 @@ import { useFrontendTool } from '@copilotkit/react-core/v2';
 import { useRef, useEffect } from 'react';
 import { z } from 'zod';
 
+import { ALL_PANELS } from '../../layout';
 import type { PanelId } from '../../layout';
 
-/** Panel IDs exposed to the LLM. Matches PanelId type in layout.ts. */
-const PANEL_IDS = [
-  'map',
-  'events',
-  'asteroids',
-  'fleet',
-  'research',
-  'economy',
-  'manufacturing',
-] as const;
-
 const panelFocusSchema = z.object({
-  panel: z.enum(PANEL_IDS).describe(
+  panel: z.enum(ALL_PANELS).describe(
     'Which panel to open and highlight in the mission control UI.',
   ),
 });

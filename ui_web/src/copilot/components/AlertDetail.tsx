@@ -41,7 +41,7 @@ type DiagnoseResult = DiagnoseOkResult | DiagnoseNotFoundResult;
 
 const SEVERITY_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   Critical: { bg: `${SEMANTIC_COLORS.negative}18`, text: SEMANTIC_COLORS.negative, label: 'CRITICAL' },
-  Warning: { bg: '#d4a44c18', text: '#d4a44c', label: 'WARNING' },
+  Warning: { bg: `${SEMANTIC_COLORS.warning}18`, text: SEMANTIC_COLORS.warning, label: 'WARNING' },
 };
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -133,7 +133,7 @@ export function AlertsSummaryCard({ data }: { data: AlertsSummaryData }) {
         <span style={{ color: SEMANTIC_COLORS.negative }}>
           {String(data.critical)} critical
         </span>
-        <span style={{ color: '#d4a44c' }}>
+        <span style={{ color: SEMANTIC_COLORS.warning }}>
           {String(data.warnings)} warnings
         </span>
       </div>

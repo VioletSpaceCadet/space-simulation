@@ -22,7 +22,7 @@ interface StationsData {
 /** Wear-band thresholds matching sim_core's 3-band system. */
 function wearColor(wear: number): string {
   if (wear < 0.5) { return SEMANTIC_COLORS.positive; }
-  if (wear < 0.8) { return '#d4a44c'; }
+  if (wear < 0.8) { return SEMANTIC_COLORS.warning; }
   return SEMANTIC_COLORS.negative;
 }
 

@@ -17,6 +17,7 @@ import { useFrontendTool } from '@copilotkit/react-core/v2';
 import { useRef, useEffect } from 'react';
 import { z } from 'zod';
 
+import { IDLE_COLOR, SEMANTIC_COLORS } from '../../config/theme';
 import { AlertDetailCard, AlertsSummaryCard } from '../components/AlertDetail';
 import { FleetTable } from '../components/FleetTable';
 import { StationSummary } from '../components/StationSummary';
@@ -40,7 +41,7 @@ function LoadingIndicator({ label }: { label: string }) {
     <div style={{
       padding: '8px',
       fontSize: '12px',
-      color: '#8a8e98',
+      color: IDLE_COLOR,
       display: 'flex',
       alignItems: 'center',
       gap: '6px',
@@ -49,7 +50,7 @@ function LoadingIndicator({ label }: { label: string }) {
         display: 'inline-block',
         width: '12px',
         height: '12px',
-        border: '2px solid #8a8e9840',
+        border: '2px solid ${IDLE_COLOR}40',
         borderTopColor: '#8a8e98',
         borderRadius: '50%',
         animation: 'cpk-spin 0.8s linear infinite',
@@ -126,7 +127,7 @@ export function useQueryActions(args: QueryActionsState): void {
 
     const section = props.args.section;
     if (!section) {
-      return <div style={{ fontSize: '12px', color: '#e05252' }}>Missing section.</div>;
+      return <div style={{ fontSize: '12px', color: SEMANTIC_COLORS.negative }}>Missing section.</div>;
     }
 
     const data = extractSection(section, stateRef.current);
@@ -167,7 +168,7 @@ export function useQueryActions(args: QueryActionsState): void {
 
     const alertId = props.args.alert_id;
     if (!alertId) {
-      return <div style={{ fontSize: '12px', color: '#e05252' }}>Missing alert ID.</div>;
+      return <div style={{ fontSize: '12px', color: SEMANTIC_COLORS.negative }}>Missing alert ID.</div>;
     }
 
     const data = diagnoseAlertById(alertId, stateRef.current.activeAlerts);
