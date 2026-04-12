@@ -282,6 +282,8 @@ export default function App() {
         paused={paused}
         connected={connected}
         onFocusPanel={handleFocusPanel}
+        onTogglePause={handleTogglePause}
+        onSetSpeed={handleSetSpeed}
       />
     </div>
   );
