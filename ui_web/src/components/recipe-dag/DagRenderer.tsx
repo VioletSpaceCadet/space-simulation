@@ -242,7 +242,7 @@ export function DagRenderer({
           </marker>
         </defs>
         <g transform={`translate(${padding}, ${padding})`}>
-          {layout.edges.map((edge) => {
+          {layout.edges.map((edge, edgeIndex) => {
             const fromLayout = layout.nodes.get(edge.from);
             const toLayout = layout.nodes.get(edge.to);
             if (!fromLayout || !toLayout) { return null; }
@@ -264,7 +264,7 @@ export function DagRenderer({
 
             return (
               <line
-                key={`${edge.from}-${edge.to}`}
+                key={`${edge.from}-${edge.to}-${edgeIndex}`}
                 x1={x1}
                 y1={y1}
                 x2={x2}
