@@ -11,6 +11,7 @@ interface Props {
   isDragging: boolean
   activeDragId: PanelId | null
   onPopOut?: (panelId: PanelId) => void
+  highlightPanel?: PanelId | null
 }
 
 type SharedDragProps = {
@@ -18,6 +19,7 @@ type SharedDragProps = {
   activeDragId: PanelId | null
   rootLayout: GroupNode
   onPopOut?: (panelId: PanelId) => void
+  highlightPanel?: PanelId | null
 }
 
 function RenderNode({
@@ -29,8 +31,14 @@ function RenderNode({
   renderPanel: Props['renderPanel']
 } & SharedDragProps) {
   if (node.type === 'leaf') {
+    const isHighlighted = drag.highlightPanel === node.panelId;
     return (
-      <section className="relative flex flex-col h-full overflow-hidden bg-void p-3">
+      <section
+        className="relative flex flex-col h-full overflow-hidden bg-void p-3"
+        style={isHighlighted ? {
+          animation: 'cpk-panel-highlight 1.5s ease-out forwards',
+        } : undefined}
+      >
         <DraggableTab panelId={node.panelId} isDragging={drag.activeDragId === node.panelId} onPopOut={drag.onPopOut} />
         <div className="flex-1 min-h-0 overflow-y-auto mt-2">{renderPanel(node.panelId)}</div>
         <DropZoneOverlay
@@ -88,7 +96,7 @@ function RenderGroup({
   );
 }
 
-export function LayoutRenderer({ layout, renderPanel, isDragging, activeDragId, onPopOut }: Props) {
+export function LayoutRenderer({ layout, renderPanel, isDragging, activeDragId, onPopOut, highlightPanel }: Props) {
   return (
     <RenderGroup
       group={layout}
@@ -97,6 +105,7 @@ export function LayoutRenderer({ layout, renderPanel, isDragging, activeDragId, 
       activeDragId={activeDragId}
       rootLayout={layout}
       onPopOut={onPopOut}
+      highlightPanel={highlightPanel}
     />
   );
 }

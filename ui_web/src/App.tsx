@@ -6,7 +6,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fetchMeta, pauseGame, resumeGame, setSpeed } from './api';
 import { AsteroidTable } from './components/AsteroidTable';
@@ -45,6 +45,8 @@ export default function App() {
   const { displayTick, measuredTickRate } = useAnimatedTick(currentTick, ticksPerSec, paused);
 
   const [activeDragId, setActiveDragId] = useState<PanelId | null>(null);
+  const [highlightPanel, setHighlightPanel] = useState<PanelId | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -83,6 +85,13 @@ export default function App() {
     if (PANEL_ID_SET.has(panelId)) {
       ensurePanelVisible(panelId as PanelId);
     }
+  }, [ensurePanelVisible]);
+
+  const handleFocusPanel = useCallback((panelId: PanelId) => {
+    ensurePanelVisible(panelId);
+    if (highlightTimerRef.current) { clearTimeout(highlightTimerRef.current); }
+    setHighlightPanel(panelId);
+    highlightTimerRef.current = setTimeout(() => setHighlightPanel(null), 1500);
   }, [ensurePanelVisible]);
 
   const handlePopOut = useCallback((panelId: PanelId) => {
@@ -233,6 +242,7 @@ export default function App() {
               isDragging={activeDragId !== null}
               activeDragId={activeDragId}
               onPopOut={handlePopOut}
+              highlightPanel={highlightPanel}
             />
             <DragOverlay>
               {activeDragId ? (
@@ -271,6 +281,7 @@ export default function App() {
         currentTick={currentTick}
         paused={paused}
         connected={connected}
+        onFocusPanel={handleFocusPanel}
       />
     </div>
   );

@@ -14,8 +14,10 @@
 import { CopilotSidebar } from '@copilotkit/react-core/v2';
 
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import type { PanelId } from '../layout';
 import type { ActiveAlert, SimSnapshot } from '../types';
 
+import { usePanelFocus } from './actions/panelFocus';
 import { useQueryActions } from './actions/query';
 import { useSnapshotReadable } from './readables';
 
@@ -25,6 +27,7 @@ interface CopilotMissionBridgeProps {
   currentTick: number;
   paused: boolean;
   connected: boolean;
+  onFocusPanel: (panelId: PanelId) => void;
 }
 
 function buildSidebarTitle(paused: boolean, connected: boolean): string {
@@ -51,6 +54,7 @@ const NoDisclaimer = () => null;
 function MissionBridgeInner(props: CopilotMissionBridgeProps) {
   useSnapshotReadable(props);
   useQueryActions(props);
+  usePanelFocus({ onFocusPanel: props.onFocusPanel });
 
   const sidebarTitle = buildSidebarTitle(props.paused, props.connected);
   const welcomeMessage = buildWelcomeMessage(props.paused);

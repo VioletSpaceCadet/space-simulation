@@ -22,6 +22,9 @@ import { useFrontendTool } from '@copilotkit/react-core/v2';
 import { useRef, useEffect } from 'react';
 import { z } from 'zod';
 
+import { DiagnoseAlertRenderer } from '../components/DiagnoseAlertRenderer';
+import { QueryResultRenderer } from '../components/QueryResultRenderer';
+
 import { diagnoseAlertById, extractSection, QUERY_SECTIONS } from './queryHandlers';
 import type { QueryActionsState } from './queryHandlers';
 
@@ -71,6 +74,7 @@ export function useQueryActions(args: QueryActionsState): void {
         'Returns JSON that matches the shape in the top-level readable.',
       parameters: querySchema,
       handler: async ({ section }) => extractSection(section, stateRef.current),
+      render: QueryResultRenderer,
     },
     [],
   );
@@ -83,6 +87,7 @@ export function useQueryActions(args: QueryActionsState): void {
         'Use when the player asks about a warning or critical notice by ID.',
       parameters: diagnoseSchema,
       handler: async ({ alert_id }) => diagnoseAlertById(alert_id, stateRef.current.activeAlerts),
+      render: DiagnoseAlertRenderer,
     },
     [],
   );

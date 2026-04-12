@@ -136,3 +136,8 @@
 [data-copilotkit] .copilotKitInput input::placeholder {
   color: #b4b8c0;
 }
+
+/* Spinner for tool-call loading states in generative UI components */
+@keyframes cpk-spin {
+  to { transform: rotate(360deg); }
+}
