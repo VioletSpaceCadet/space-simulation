@@ -17,6 +17,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import type { PanelId } from '../layout';
 import type { ActiveAlert, SimSnapshot } from '../types';
 
+import { useApprovalActions } from './actions/approval';
 import { usePanelFocus } from './actions/panelFocus';
 import { useQueryActions } from './actions/query';
 import { useSnapshotReadable } from './readables';
@@ -28,6 +29,8 @@ interface CopilotMissionBridgeProps {
   paused: boolean;
   connected: boolean;
   onFocusPanel: (panelId: PanelId) => void;
+  onTogglePause: () => void;
+  onSetSpeed: (tps: number) => void;
 }
 
 function buildSidebarTitle(paused: boolean, connected: boolean): string {
@@ -55,6 +58,11 @@ function MissionBridgeInner(props: CopilotMissionBridgeProps) {
   useSnapshotReadable(props);
   useQueryActions(props);
   usePanelFocus({ onFocusPanel: props.onFocusPanel });
+  useApprovalActions({
+    paused: props.paused,
+    onTogglePause: props.onTogglePause,
+    onSetSpeed: props.onSetSpeed,
+  });
 
   const sidebarTitle = buildSidebarTitle(props.paused, props.connected);
   const welcomeMessage = buildWelcomeMessage(props.paused);
