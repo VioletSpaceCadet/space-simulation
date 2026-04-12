@@ -59,9 +59,21 @@ function main(): void {
   // single known CORS policy mounted in front of everything (including the
   // health check), so we pass `cors: false` on the CopilotKit side and run
   // our own `cors()` first.
+  //
+  // `mode: "single-route"` is load-bearing: the v2 `@copilotkit/react-core/v2`
+  // client's transport auto-detect probe to `GET basePath/info` fails
+  // through the browser's CORS handshake on macOS Chrome (even though
+  // direct curl to `/info` returns 200). When auto-detect fails it falls
+  // back to `POST basePath` with a `{method, ...}` JSON envelope, which
+  // only exists in single-route mode. Multi-route mode 404s the bare POST
+  // and the chat never connects — symptom is the `agent_connect_failed`
+  // error with `{"error":"Not found"}` in the CopilotKit sidebar. Verified
+  // empirically: the same frontend round-trips successfully against a
+  // single-route backend and 404s against a multi-route backend.
   const copilotRouter = createCopilotExpressHandler({
     runtime,
     basePath: COPILOT_ENDPOINT,
+    mode: "single-route",
     cors: false,
   });
 

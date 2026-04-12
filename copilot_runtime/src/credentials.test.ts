@@ -94,6 +94,20 @@ describe("credentials", () => {
 
       expect(() => getOpenRouterKey()).toThrowError(/missing Keychain entry/);
     });
+
+    it("refuses to cache an empty Keychain value", () => {
+      mockedExecFileSync.mockReturnValueOnce("   \n");
+
+      // Empty entry must throw with install instructions instead of caching
+      // an empty string that silently causes 401s on every subsequent call.
+      expect(() => getOpenRouterKey()).toThrowError(
+        /Keychain entry.*is empty.*security add-generic-password/s,
+      );
+
+      // Calling again re-attempts the Keychain read; nothing is cached.
+      mockedExecFileSync.mockReturnValueOnce("sk-or-fresh\n");
+      expect(getOpenRouterKey()).toBe("sk-or-fresh");
+    });
   });
 
   describe("getSharedSecret", () => {
@@ -131,6 +145,14 @@ describe("credentials", () => {
       getSharedSecret();
 
       expect(mockedExecFileSync).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses to cache an empty Keychain value", () => {
+      mockedExecFileSync.mockReturnValueOnce("\n");
+
+      expect(() => getSharedSecret()).toThrowError(
+        /Keychain entry.*is empty.*openssl rand/s,
+      );
     });
   });
 });

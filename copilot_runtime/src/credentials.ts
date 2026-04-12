@@ -51,10 +51,22 @@ let cachedSharedSecret: string | null = null;
 
 /**
  * Returns the OpenRouter API key. Reads from Keychain on first call; cached
- * thereafter. Throws with install instructions if missing.
+ * thereafter. Throws with install instructions if missing or empty.
+ *
+ * Explicit length check on the retrieved value so an empty Keychain entry
+ * does not cache as a valid secret and silently cause 401s forever.
  */
 export function getOpenRouterKey(): string {
-  cachedOpenRouterKey ??= readKeychainSecret(DEFAULT_ACCOUNT, OPENROUTER_SERVICE);
+  if (cachedOpenRouterKey !== null) { return cachedOpenRouterKey; }
+  const raw = readKeychainSecret(DEFAULT_ACCOUNT, OPENROUTER_SERVICE);
+  if (raw.length === 0) {
+    throw new Error(
+      `copilot_runtime: Keychain entry for service="${OPENROUTER_SERVICE}" ` +
+      "is empty. Replace it with: " +
+      `security add-generic-password -a "${DEFAULT_ACCOUNT}" -s "${OPENROUTER_SERVICE}" -U -w "sk-or-..."`,
+    );
+  }
+  cachedOpenRouterKey = raw;
   return cachedOpenRouterKey;
 }
 
@@ -76,7 +88,15 @@ export function getSharedSecret(): string {
     return cachedSharedSecret;
   }
 
-  cachedSharedSecret = readKeychainSecret(DEFAULT_ACCOUNT, SHARED_SECRET_SERVICE);
+  const raw = readKeychainSecret(DEFAULT_ACCOUNT, SHARED_SECRET_SERVICE);
+  if (raw.length === 0) {
+    throw new Error(
+      `copilot_runtime: Keychain entry for service="${SHARED_SECRET_SERVICE}" ` +
+      "is empty. Replace it with: " +
+      `security add-generic-password -a "${DEFAULT_ACCOUNT}" -s "${SHARED_SECRET_SERVICE}" -U -w "$(openssl rand -hex 32)"`,
+    );
+  }
+  cachedSharedSecret = raw;
   return cachedSharedSecret;
 }
 
