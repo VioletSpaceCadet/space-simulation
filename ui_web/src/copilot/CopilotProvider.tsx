@@ -13,6 +13,7 @@
 
 import { CopilotKit, CopilotSidebar, useAgentContext } from '@copilotkit/react-core/v2';
 import '@copilotkit/react-ui/v2/styles.css';
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -20,12 +21,24 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 const DEFAULT_RUNTIME_URL = 'http://localhost:4000/api/copilotkit';
 const RUNTIME_URL = import.meta.env.VITE_COPILOT_RUNTIME_URL ?? DEFAULT_RUNTIME_URL;
 const SHARED_SECRET = import.meta.env.VITE_COPILOT_RUNTIME_SECRET;
+const HAS_SHARED_SECRET = typeof SHARED_SECRET === 'string' && SHARED_SECRET.length > 0;
 
-function buildHeaders(): Record<string, string> | undefined {
-  if (typeof SHARED_SECRET === 'string' && SHARED_SECRET.length > 0) {
-    return { 'X-Copilot-Runtime-Secret': SHARED_SECRET };
-  }
-  return undefined;
+// Warn loudly at module load when the shared secret is missing. The Vite
+// config already tries to hydrate it from Keychain at dev-server startup;
+// this is the browser-side safety net when that path fails (e.g. Linux
+// dev machine, missing Keychain entry, someone running a production build
+// locally without the env var wired up). The sidebar will 401 on every
+// request until the secret is supplied, and the console.warn makes the
+// failure mode obvious instead of silent.
+if (!HAS_SHARED_SECRET) {
+  // Diagnostic for a setup failure the user can only debug from the
+  // browser console. `console.warn` is allowlisted by the repo eslint
+  // config, so no disable directive needed.
+  console.warn(
+    '[CopilotProvider] VITE_COPILOT_RUNTIME_SECRET is not set. ' +
+    'The chat sidebar will 401 on every request until you populate the ' +
+    'macOS Keychain entry (see copilot_runtime/README.md).',
+  );
 }
 
 /**
@@ -57,12 +70,25 @@ function StubbedSidebar() {
 }
 
 export function CopilotProvider({ children }: { children: ReactNode }) {
-  const headers = buildHeaders();
+  // Memoize the headers so `<CopilotKit>` does not see a new object on
+  // every parent re-render — avoids triggering CopilotKit's fetch/context
+  // equality checks unnecessarily. Recomputed only when the module-level
+  // constants change (never, in practice, for a given dev session).
+  const headers = useMemo<Record<string, string> | undefined>(() => {
+    if (typeof SHARED_SECRET === 'string' && SHARED_SECRET.length > 0) {
+      return { 'X-Copilot-Runtime-Secret': SHARED_SECRET };
+    }
+    return undefined;
+  }, []);
 
-  // `children` renders OUTSIDE the ErrorBoundary so a crash in the co-pilot
-  // layer (CopilotKit internals, useAgentContext, sidebar chrome) cannot
-  // take down the rest of the app. This satisfies the repo's checklist item
-  // #15: new top-level components must be wrapped in an ErrorBoundary.
+  // `children` renders OUTSIDE the inner ErrorBoundary so a crash in the
+  // sidebar (useAgentContext, CopilotKit network failure, sidebar chrome)
+  // cannot take down the rest of the app. An OUTER boundary in main.tsx
+  // is still required to catch failures in the `<CopilotKit>` provider
+  // itself, because this inner boundary lives inside that provider's
+  // context and cannot see its own parent throwing. This layered approach
+  // satisfies the repo's PR checklist item #15 without the choice of
+  // "sidebar crash kills the app" vs "CopilotKit crash shows a blank page".
   return (
     <CopilotKit runtimeUrl={RUNTIME_URL} headers={headers}>
       {children}

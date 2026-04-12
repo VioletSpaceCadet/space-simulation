@@ -19,20 +19,27 @@ import type { RequestHandler } from "express";
 export const SHARED_SECRET_HEADER = "x-copilot-runtime-secret";
 
 /**
- * Constant-time string comparison via `node:crypto`. Node's native
- * `timingSafeEqual` is guaranteed constant-time and cannot be JIT-optimized
- * into an early-exit loop the way a hand-rolled comparison can. Lengths
- * must match — we hash-pad both inputs so length-mismatch paths are also
- * constant-time (otherwise returning `false` on length-diff leaks the
- * secret length).
+ * Near-constant-time string comparison via `node:crypto`. Node's native
+ * `timingSafeEqual` is guaranteed constant-time over equal-length buffers
+ * and cannot be JIT-optimized into an early-exit loop the way a hand-rolled
+ * comparison can.
+ *
+ * Caveat: `Buffer.copy` is O(min(provided, expected)), so a provided value
+ * far shorter than the expected secret runs slightly faster than one that
+ * matches the expected length. This leaks the secret's length order of
+ * magnitude to a local attacker who can measure thousands of responses.
+ * That's acceptable for the threat model (localhost hardening against
+ * other processes on the same machine) — a network-facing auth layer
+ * would need a different primitive.
  */
 function safeEqual(provided: string, expected: string): boolean {
   const providedBuf = Buffer.from(provided, "utf8");
   const expectedBuf = Buffer.from(expected, "utf8");
 
-  // `timingSafeEqual` throws on length mismatch, so pad the shorter buffer
-  // to the expected length and compare — then compare lengths separately.
-  // The OR at the end keeps the control flow constant-time.
+  // `timingSafeEqual` throws on length mismatch, so pad the provided buffer
+  // to the expected length and compare bytes, then AND with a separate
+  // length equality check. Both branches run unconditionally so the
+  // control flow does not short-circuit on length mismatch.
   const padded = Buffer.alloc(expectedBuf.length);
   providedBuf.copy(padded);
   const bytesEqual = timingSafeEqual(padded, expectedBuf);
