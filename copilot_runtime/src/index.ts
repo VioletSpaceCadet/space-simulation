@@ -23,6 +23,7 @@ import { buildAdapterFromEnv } from "./adapter.js";
 import { getSharedSecret } from "./credentials.js";
 import { buildRuntime } from "./runtime.js";
 import { createSharedSecretMiddleware } from "./auth.js";
+import { createAdvisorMCPProvider, type AdvisorMCPProvider } from "./mcp.js";
 
 const HOST = "127.0.0.1";
 const DEFAULT_PORT = 4000;
@@ -46,14 +47,32 @@ function resolveUiOrigin(raw: string | undefined): string {
   return DEFAULT_UI_ORIGIN;
 }
 
-function main(): void {
+async function main(): Promise<void> {
   // Resolve all secrets + adapters up front. Any failure here should crash the
   // process with a clear message before we accept any requests.
   const adapter = buildAdapterFromEnv();
   const sharedSecret = getSharedSecret();
-  const runtime = buildRuntime(adapter);
   const port = resolvePort(process.env.COPILOT_RUNTIME_PORT);
   const uiOrigin = resolveUiOrigin(process.env.COPILOT_UI_ORIGIN);
+
+  // Connect to the balance-advisor MCP server. If mcp_advisor isn't built
+  // or the handshake fails, the copilot still works — just without the
+  // analytics tools.
+  let mcpProvider: AdvisorMCPProvider | null = null;
+  try {
+    mcpProvider = await createAdvisorMCPProvider();
+    console.log("copilot_runtime: MCP advisor connected (5 read-only tools)");
+  } catch (err) {
+    console.warn(
+      "copilot_runtime: MCP advisor unavailable, continuing without analytics tools.",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  const runtime = buildRuntime({
+    adapter,
+    mcpClients: mcpProvider ? [mcpProvider] : undefined,
+  });
 
   // CopilotKit ships its own cors middleware when configured, but we want a
   // single known CORS policy mounted in front of everything (including the
@@ -117,6 +136,15 @@ function main(): void {
     }
     process.exit(1);
   });
+
+  // Graceful shutdown: close the MCP child process when the server stops.
+  const shutdown = () => {
+    if (mcpProvider) {
+      mcpProvider.close().catch(() => { /* best-effort */ });
+    }
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
 
 // Only run when invoked directly. Importing `index.ts` in tests should not
@@ -128,11 +156,9 @@ const isDirectInvocation =
   import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isDirectInvocation) {
-  try {
-    main();
-  } catch (err) {
+  main().catch((err: unknown) => {
     // Fatal startup error must print the install instruction for the user.
     console.error("copilot_runtime failed to start:", err instanceof Error ? err.message : err);
     process.exit(1);
-  }
+  });
 }
